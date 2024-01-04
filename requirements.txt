@@ -1,0 +1,15 @@
+folium
+jupyterlab
+matplotlib
+scikit-spatial
+ipympl
+black
+flake8
+mypy
+pep8-naming
+setuptools
+numpy
+scipy
+protobuf
+geojson
+pymap3d
