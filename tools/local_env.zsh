@@ -12,7 +12,7 @@ env_down() {
     deactivate
 }
 env_up() {
-    pyhton -m venv $ENV_HOME/$ENV_DIR
+    python3.10 -m venv $ENV_HOME/$ENV_DIR
     source $ENV_HOME/$ENV_DIR/bin/activate
     pip install -r $ENV_HOME/requirements.txt
 }

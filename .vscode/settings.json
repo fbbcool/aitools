@@ -1,0 +1,28 @@
+{
+    "pyhton.envFile": "${workspaceFolder}/.vscode/.env",
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "python.analysis.extraPaths": [
+        "src/imgset",
+    ],
+    "black-formatter.args": [
+        "--line-length=100",
+    ],
+    "flake8.args": [
+        "--max-line-length=100",
+    ],
+    "isort.args": [
+        "--profile",
+        "black"
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true,
+        },
+    },
+    "editor.formatOnSave": true,
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+    },
+}
