@@ -14,3 +14,4 @@ protobuf
 geojson
 pymap3d
 pandas
+pillow

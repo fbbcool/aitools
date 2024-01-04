@@ -11,7 +11,7 @@ env_down() {
     unset PYTHONPATH_OLD
     deactivate
 }
-env_up() {
+env_inst() {
     python3.10 -m venv $ENV_HOME/$ENV_DIR
     source $ENV_HOME/$ENV_DIR/bin/activate
     pip install -r $ENV_HOME/requirements.txt
