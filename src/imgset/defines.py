@@ -1,5 +1,28 @@
 from typing import Final
 
+class Defines():
+    DF_FILE_IMG : Final = "file_img"
+    DF_FILE_CRAWL : Final = "file_crawl"
+    DF_POOL : Final = "pool"
+    DF_POOL_ID : Final = "pool_id"
+    DF_CAP : Final = "cap"
+    DF_CAP_NEG : Final = "cap_neg"
+    DF_TAG_BLIP : Final = "tag_blip"
+    DF_TAG_WD14 : Final = "tag_wd14"
+    DF_COLUMNS : Final = [
+        DF_POOL,
+        DF_POOL_ID,
+        DF_CAP,
+        DF_CAP_NEG,
+        DF_TAG_WD14,
+        DF_TAG_BLIP,
+        DF_FILE_CRAWL,
+        DF_FILE_IMG,
+    ]
+    DIR_BUILD : Final = "build"
+    DIR_TAGS : Final = "tags"
+
+
 class Defaults():
     NAME = "lara"
     CELEB : Final = "rakhee thakar"
@@ -87,25 +110,3 @@ class Defaults():
         "lace",
         "grey",
     ]
-
-class Defines():
-    DF_FILE_IMG : Final = "file_img"
-    DF_FILE_CRAWL : Final = "file_crawl"
-    DF_POOL : Final = "pool"
-    DF_POOL_ID : Final = "pool_id"
-    DF_CAP : Final = "cap"
-    DF_CAP_NEG : Final = "cap_neg"
-    DF_TAG_BLIP : Final = "tag_blip"
-    DF_TAG_WD14 : Final = "tag_wd14"
-    DF_COLUMNS : Final = [
-        DF_POOL,
-        DF_POOL_ID,
-        DF_CAP,
-        DF_CAP_NEG,
-        DF_TAG_WD14,
-        DF_TAG_BLIP,
-        DF_FILE_CRAWL,
-        DF_FILE_IMG,
-    ]
-    DIR_BUILD : Final = "build"
-    DIR_TAGS : Final = "tags"
