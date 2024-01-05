@@ -53,14 +53,18 @@ class ImgSet:
             pool = Path(img).parts[-2]
             pool_id = Path(img).stem
             df_data.append({
-                Defines.DF_FILE_CRAWL: "",
                 Defines.DF_POOL: pool,
                 Defines.DF_POOL_ID: pool_id,
-                Defines.DF_FILE_IMG: self._get_img_file(pool, pool_id),
-                Defines.DF_TAG_BLIP: [],
+                Defines.DF_CAP: [],
+                Defines.DF_CAP_NEG: [],
                 Defines.DF_TAG_WD14: [],
+                Defines.DF_TAG_BLIP: [],
+                Defines.DF_FILE_IMG: self._get_img_file(pool, pool_id),
+                Defines.DF_FILE_CRAWL: "",
             })
+
         self.df = pd.DataFrame(df_data, columns=Defines.DF_COLUMNS)
+        self.reload_tags()
 
     def _initialize_new(self):
         paths = []
@@ -72,12 +76,14 @@ class ImgSet:
         df_data = []
         for file_crawl in paths:
             df_data.append({
-                Defines.DF_FILE_CRAWL: file_crawl,
                 Defines.DF_POOL: "",
                 Defines.DF_POOL_ID: "",
-                Defines.DF_FILE_IMG: "",
-                Defines.DF_TAG_BLIP: [],
+                Defines.DF_CAP: [],
+                Defines.DF_CAP_NEG: [],
                 Defines.DF_TAG_WD14: [],
+                Defines.DF_TAG_BLIP: [],
+                Defines.DF_FILE_IMG: "",
+                Defines.DF_FILE_CRAWL: file_crawl,
             })
         self.df = pd.DataFrame(df_data, columns=Defines.DF_COLUMNS)
 
@@ -117,11 +123,14 @@ class ImgSet:
     def _get_pool_dir(self, pool: str) -> str:
         return f"{pool}"
     
-    def _get_pool_id_file(self, pool_id: str) -> str:
+    def _get_pool_id_img_file(self, pool_id: str) -> str:
         return f"{pool_id}.png"
     
+    def _get_pool_id_tag_file(self, pool_id: str) -> str:
+        return f"{pool_id}.txt"
+    
     def _get_img_file(self, pool: str, pool_id: str) -> str:
-        return f"{self._get_build_path}/{self._get_pool_dir(pool)}/{self._get_pool_id_file(pool_id)}"
+        return f"{self._get_build_path}/{self._get_pool_dir(pool)}/{self._get_pool_id_img_file(pool_id)}"
     
     @property
     def _get_descr(self) -> str:
@@ -139,3 +148,58 @@ class ImgSet:
     @property
     def pools(self):
         return self.df[Defines.DF_POOL].unique()
+    
+    def _get_tags(self, row) -> list[str]:
+        pool = row[Defines.DF_POOL]
+        pool_id = row[Defines.DF_POOL_ID]
+        tags_file = self._get_tag_file(pool, pool_id)
+        try:
+            with open(tags_file) as f:
+                tags = f.readline()
+        except FileNotFoundError:
+            print(f"no tags file for {pool}/{pool_id}: {tags_file}")
+            return []
+        return tags.split(", ") 
+    
+    def _get_tag_file(self, pool: str, pool_id: str):
+        return f"{self._get_build_path}/{Defines.DIR_TAGS}/{self._get_pool_dir(pool)}/{self._get_pool_id_tag_file(pool_id)}"
+    
+
+    def _get_caps(self, row) -> list[str]:
+        caps = []
+        tags = row[Defines.DF_TAG_WD14]
+        for tag in tags:
+            cap = self._tag2cap(tag)
+            if cap:
+                caps.append(cap)
+        return caps
+
+    def _tag2cap(self, tag : str) -> str:
+        cap = ""
+        
+        if tag in Defaults.CAP_NEG:
+            return cap
+        if tag in Defines.DF_CAP_NEG:
+            return cap
+        
+        for key in Defaults.CAP_NEG_KEY:
+            if key in tag:
+                return cap
+        
+        cap = tag
+
+        return cap
+
+    """
+    API
+    """
+    def reload_tags(self) -> None:
+        for idx, row in self.rows:
+            tags = self._get_tags(row)
+            self.df.at[idx, Defines.DF_TAG_WD14] = tags
+    
+    def create_captions(self) -> None:
+        for idx, row in self.rows:
+            caps = self._get_caps(row)
+            self.df.at[idx, Defines.DF_CAP] = caps
+        
