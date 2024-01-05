@@ -176,6 +176,12 @@ class ImgSet:
 
     def _tag2cap(self, tag : str) -> str:
         cap = ""
+        tag_split = tag.split(" ")
+        
+        # remove color prefix
+        if len(tag_split) > 1:
+            if tag_split[0] in Defaults.CAP_NEG_COLOR:
+                tag = tag_split[1]
         
         if tag in Defaults.CAP_NEG:
             return cap
