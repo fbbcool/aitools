@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Final
+import numpy as np
 import pandas as pd
 from PIL import Image
 
@@ -129,6 +130,9 @@ class ImgSet:
     def _get_pool_id_tag_file(self, pool_id: str) -> str:
         return f"{pool_id}.txt"
     
+    def _get_pool_id_cap_file(self, pool_id: str) -> str:
+        return f"{pool_id}.caption"
+    
     def _get_img_file(self, pool: str, pool_id: str) -> str:
         return f"{self._get_build_path}/{self._get_pool_dir(pool)}/{self._get_pool_id_img_file(pool_id)}"
     
@@ -166,7 +170,7 @@ class ImgSet:
     
 
     def _get_caps(self, row) -> list[str]:
-        caps = []
+        caps = [Defaults.TRIGGER, Defaults.CLASS, Defaults.CELEB, Defaults.CROPPED]
         tags = row[Defines.DF_TAG_WD14]
         for tag in tags:
             cap = self._tag2cap(tag)
@@ -174,7 +178,12 @@ class ImgSet:
                 caps.append(cap)
         return caps
 
+    def _get_cap_file(self, pool: str, pool_id: str):
+        return f"{self._get_build_path}/{self._get_pool_dir(pool)}/{self._get_pool_id_cap_file(pool_id)}"
+    
     def _tag2cap(self, tag : str) -> str:
+        tag = tag.strip()
+
         cap = ""
         tag_split = tag.split(" ")
         
@@ -183,10 +192,11 @@ class ImgSet:
             if tag_split[0] in Defaults.CAP_NEG_COLOR:
                 tag = tag_split[1]
         
-        if tag in Defaults.CAP_NEG:
-            return cap
-        if tag in Defines.DF_CAP_NEG:
-            return cap
+        for subtag in tag_split:
+            if subtag in Defaults.CAP_NEG:
+                return cap
+            if subtag in Defines.DF_CAP_NEG:
+                return cap
         
         for key in Defaults.CAP_NEG_KEY:
             if key in tag:
@@ -208,4 +218,31 @@ class ImgSet:
         for idx, row in self.rows:
             caps = self._get_caps(row)
             self.df.at[idx, Defines.DF_CAP] = caps
+    
+    def save_captions(self) -> None:
+        for idx, row in self.rows:
+            pool = row[Defines.DF_POOL]
+            pool_id = row[Defines.DF_POOL_ID]
+            caps = row[Defines.DF_CAP]
+            caps_file = self._get_cap_file(pool, pool_id)
+            caps_str = f"{caps[0]}"
+            for cap in caps[1:]:
+                caps_str += f", {cap}"
+            with open(caps_file, "w") as text_file:
+                text_file.write(caps_str)
+
+    @property
+    def caps_all(self):
+        caps = []
+        for idx, row in self.rows:
+            caps += row[Defines.DF_CAP]
+        return caps
+    
+    @property
+    def caps_hist(self) -> pd.DataFrame:
+        caps_all = self.caps_all
+        caps_unique = np.unique(caps_all)
+        caps_ser = pd.Series(np.array(caps_all))
+        return caps_ser.value_counts(ascending=True)
+        
         
