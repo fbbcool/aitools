@@ -40,6 +40,7 @@ class Defaults():
         "smile",
         "ass",
         "anus",
+        "penis",
         "armpits",
         "navel",
         "cleavage",
