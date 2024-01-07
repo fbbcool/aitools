@@ -15,3 +15,4 @@ geojson
 pymap3d
 pandas
 pillow
+huggingface_hub

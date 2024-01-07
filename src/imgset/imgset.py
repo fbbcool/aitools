@@ -4,6 +4,7 @@ from typing import Final
 import numpy as np
 import pandas as pd
 from PIL import Image
+import tarfile
 
 
 from .defines import Defaults, Defines
@@ -230,6 +231,24 @@ class ImgSet:
                 caps_str += f", {cap}"
             with open(caps_file, "w") as text_file:
                 text_file.write(caps_str)
+    
+    def create_dataset(self, pools=[]) -> None:
+        _pools = []
+        for pool in self.pools:
+            if not pools:
+                _pools.append(pool)
+            elif pool in pools:
+                _pools.append(pool)
+        tar_file = f"{self._get_build_path}/loraset.tar"
+        try:
+            os.remove(tar_file)
+        except OSError:
+            pass
+
+        with tarfile.open(tar_file, "a") as tf:
+            for pool in pools:
+                pool_dir = self._get_pool_dir(pool)
+                tf.add(pool_dir)
 
     @property
     def caps_all(self):
