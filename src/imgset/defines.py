@@ -25,13 +25,26 @@ class Defines():
         DF_CAP,
     ]
     DIR_BUILD : Final = "build"
-    DIR_TAGS : Final = "tags"
+    DIR_POOLS : Final = f"{DIR_BUILD}/pools"
+    DIR_TAGS : Final = "_tags"
+    TYPE_TAGS : Final = "caption"
+    TYPE_TAGS_WD14 = f"{TYPE_TAGS}_wd14"
+    TYPE_TAGS_BLIP = f"{TYPE_TAGS}_blip"
+    TYPE_TAGS_CROPPED = f"{TYPE_TAGS}_cropped"
+    TYPE_TAGS_PROCINFO = f"{TYPE_TAGS}_procinfo"
+    IMG_TARGET_FORMAT : Final = "png"
+    IMG_SOURCE_FORMAT : Final = "jpg"
+    SCRIPT_TAGS : Final = "src/script/cap.sh"
+    MAX_POOLS : Final = 20
+    MAX_POOL_IDS : Final = 2000
 
 
 class Defaults():
-    NAME = "lara"
-    TRIGGER = f"x{NAME}"
+    NAME : Final = "lara"
+    POOL_NAME : Final = NAME
+    TRIGGER : Final = f"x{NAME}"
     CELEB : Final = "rakhee thakar"
+    CELEB2 : Final = "tifa_lockhart"
     CLASS : Final = "woman"
     CROPPED : Final = "cropped"
     V_MINOR : Final = 1

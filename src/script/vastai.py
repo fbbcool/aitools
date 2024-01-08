@@ -9,7 +9,7 @@ controlnet_models = [
     "control_seg-fp16.safetensors",
     "control_normal-fp16.safetensors",
     "control_mlsd-fp16.safetensors",
-    "control_heg-fp16.safetensors",
+    "control_hed-fp16.safetensors",
 ]
 controlnet_inst_dir = "/workspace/storage/stable_diffusion/models/controlnet"
 
@@ -17,3 +17,9 @@ for model in controlnet_models:
     hf = hf_hub_download(repo_id=controlnet_model_id, filename=model)
     shutil.copy2(hf, controlnet_inst_dir)
 
+
+from civitai import models
+model = models.get_model(modelId=15003) # cyberrealistic
+#modelVersion = models.get_by_modelVersion(modelVersionId=128713)
+#model.name                # DreamShaper
+#modelVersion.name  
