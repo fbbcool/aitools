@@ -5,11 +5,12 @@ env_inst() {
 env_pool_inst() {
     if [ "$#" -eq 0 ]; then
     echo "using local pool tar"
+    tar xf $ENV_TMP_POOL_TAR -C $ENV_POOLS
     else
     echo "downloading gdrive pool tar"
-    gdown --fuzzy $1 -O $ENV_POOLS_TAR
+    gdown --fuzzy $1 -O $ENV_TMP_POOL_TAR
     fi
-    tar xf $ENV_POOLS_TAR -C $ENV_POOLS
+    tar xf $ENV_TMP_POOL_TAR -C $ENV_POOLS
 }
 env_cap() {
     accelerate launch\
@@ -83,7 +84,7 @@ export ENV_POOLS=$ENV_HOME/pools
 export ENV_TRAINS=$ENV_HOME/trains
 export ENV_MODELS=$ENV_HOME/models
 export ENV_TMP=$ENV_HOME/tmp
-export ENV_POOLS_TAR=$ENV_TMP/pools.tar
+export ENV_TMP_POOL_TAR=$ENV_TMP/pool.tar
 export ENV_DIR_KOHYA=/kohya_ss
 
 mkdir -p $ENV_POOLS
