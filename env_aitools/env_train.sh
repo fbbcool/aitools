@@ -20,7 +20,7 @@ env_cap() {
         --model="SmilingWolf/wd-v1-4-convnextv2-tagger-v2"\
         --max_data_loader_n_workers="2" --recursive --debug\
         --remove_underscore\
-        --frequency_tags "/root/train/build/pools"
+        --frequency_tags $ENV_POOLS
 }
 env_help_train() {
     echo '#env_train pool trigger profile sd_version model epochs version'
