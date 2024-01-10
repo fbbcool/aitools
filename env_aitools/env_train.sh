@@ -1,15 +1,15 @@
 env_inst() {
     pip install -r $ENV_HOME/requirements.txt
-    env_pools_inst https://drive.google.com/file/d/1wdS5ULSgHV6KaaH9y6vHZY_-O6m5AXpB/view?usp=sharing
+    env_pool_inst https://drive.google.com/file/d/1wdS5ULSgHV6KaaH9y6vHZY_-O6m5AXpB/view?usp=sharing
 }
-env_pools_inst() {
+env_pool_inst() {
     if [ "$#" -eq 0 ]; then
-    echo "using local pools tar"
+    echo "using local pool tar"
     else
-    echo "downloading gdrive pools tar"
+    echo "downloading gdrive pool tar"
     gdown --fuzzy $1 -O $ENV_POOLS_TAR
     fi
-    tar xf $ENV_POOLS_TAR -C $ENV_HOME
+    tar xf $ENV_POOLS_TAR -C $ENV_POOLS
 }
 env_cap() {
     accelerate launch\
