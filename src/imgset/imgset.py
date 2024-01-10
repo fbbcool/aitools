@@ -7,10 +7,11 @@ from PIL import Image
 import tarfile
 import shutil
 import subprocess
+import random
 
 
 from .defines import Defaults, Defines
-from .tags import Tags
+from ..tags import Tags
 
 class ImgSet:
     def __init__(self,
@@ -34,7 +35,7 @@ class ImgSet:
                 url_pool_tags = self._url_pool_tags(pool)
                 Path(url_pool_tags).mkdir(parents=True, exist_ok=True)
                 print(f"moving tags to {url_pool_tags}:")
-                for _, url in self._url_pool_id_list(pool, use_type=Defines.TYPE_TAGS_WD14):
+                for _, url in self._url_pool_id_list(pool, use_type=Defines.EXT_WD14):
                     shutil.move(url, url_pool_tags)
     
     @classmethod
@@ -88,7 +89,7 @@ class ImgSet:
     def _url_pool_tags(self, pool: int) -> str:
         return f"{self._url_pools}/{Defines.DIR_TAGS}/{pool:02d}"
     
-    def _url_pool_id_tags(self, pool: int, pool_id: int, use_type: str = Defines.TYPE_TAGS) -> str:
+    def _url_pool_id_tags(self, pool: int, pool_id: int, use_type: str = Defines.EXT) -> str:
         return f"{self._url_pool_tags(pool)}/{pool_id:04d}.{use_type}"
     
     def _url_exit(self, url: str) -> bool:
@@ -126,7 +127,7 @@ class ImgSet:
     tags
     """
     def tags_init(self, init_list: list[str], type_tags: str):
-        if Defines.TYPE_TAGS not in type_tags:
+        if Defines.EXT not in type_tags:
             print(f"Warning: no tags initialized because of unvalid tags extension given: {type_tags}!")
             return
         if not init_list:
@@ -141,10 +142,10 @@ class ImgSet:
                     text_file.write(tags_str)
 
     def tags_copy(self, from_type: str, to_type: str):
-        if Defines.TYPE_TAGS not in from_type:
+        if Defines.EXT not in from_type:
             print(f"Warning: no tags copied because of unvalid tags extension given: {from_type}!")
             return
-        if Defines.TYPE_TAGS not in to_type:
+        if Defines.EXT not in to_type:
             print(f"Warning: no tags copied because of unvalid tags extension given: {to_type}!")
             return
         for pool, _ in self._url_pool_list:
@@ -152,7 +153,7 @@ class ImgSet:
                 shutil.copy(url_pool_id_tags, self._url_change_type(url_pool_id_tags, to_type))
     
     def tags_remove(self, type_tags: str):
-        if Defines.TYPE_TAGS not in type_tags:
+        if Defines.EXT not in type_tags:
             print(f"Warning: no tags removed because of unvalid tags extension given: {type_tags}!")
             return
         for pool, _ in self._url_pool_list:
@@ -161,7 +162,7 @@ class ImgSet:
     
 
     def tags_link(self, type_tags: str):
-        if Defines.TYPE_TAGS not in type_tags:
+        if Defines.EXT not in type_tags:
             print(f"Warning: no tags linked because of unvalid tags extension given: {type_tags}!")
             return
         for pool, url_pool in self._url_pool_list:
@@ -170,7 +171,7 @@ class ImgSet:
 
 
     def tags_link_save(self, type_tags: str):
-        if Defines.TYPE_TAGS not in type_tags:
+        if Defines.EXT not in type_tags:
             print(f"Warning: no tags linked because of unvalid tags extension given: {type_tags}!")
             return
         for pool, _ in self._url_pool_list:
@@ -180,7 +181,7 @@ class ImgSet:
 
 
     def tags_unlink(self, type_tags: str):
-        if Defines.TYPE_TAGS not in type_tags:
+        if Defines.EXT not in type_tags:
             print(f"Warning: no tags unlinked because of unvalid tags extension given: {type_tags}!")
             return
         
@@ -194,7 +195,7 @@ class ImgSet:
     """
     caps
     """
-    def _tags_to_caps(self, pool: int, pool_id: int, use_type: str = Defines.TYPE_TAGS) -> list[str]:
+    def _tags_to_caps(self, pool: int, pool_id: int, use_type: str = Defines.EXT) -> list[str]:
         url = self._url_pool_id_tags(pool, pool_id, use_type = use_type)
         try:
             with open(url) as f:
@@ -204,7 +205,7 @@ class ImgSet:
             return []
         return caps.split(",") 
 
-    def _caps_to_tags(self, _list: list[str], pool: int, pool_id: int, use_type: str = Defines.TYPE_TAGS) -> None:
+    def _caps_to_tags(self, _list: list[str], pool: int, pool_id: int, use_type: str = Defines.EXT) -> None:
         tags_str = []
         for tag in _list:
             tags_str += f",{tag}"
@@ -247,7 +248,7 @@ class ImgSet:
     """
     API
     """
-    def build(self, use_pools : list[int], use_type : str, num_steps) -> None:
+    def build(self, use_pools : list[int], use_type : str, num_steps : int, perc : float = 1.0) -> None:
         if os.path.isdir(Defines.DIR_TMP):
             yes = input(f"Really want to delete {Defines.DIR_TMP} [y/n]? ")
             if yes not in ["y"]:
@@ -257,6 +258,8 @@ class ImgSet:
         Path(dir_root).mkdir(parents=True, exist_ok=True)
 
         # build output pool structure
+        img_count = 0
+        sum_count = 0
         for pool, _ in self._url_pool_list:
             select_pool = False
             if not use_pools: # empty list selects all pools
@@ -270,23 +273,31 @@ class ImgSet:
                 Path(pool_dir).mkdir(parents=True, exist_ok=True)
                 # copy all images and write tags from pool
                 for pool_id, url_pool_id in self._url_pool_id_list(pool):
+                    sum_count += 1
                     # process procinfo
-                    procinfo = self._tags_to_caps(pool, pool_id, use_type=Defines.TYPE_TAGS_PROCINFO)
+                    procinfo = self._tags_to_caps(pool, pool_id, use_type=Defines.EXT_PROCINFO)
                     if Tags.SKIP in procinfo:
-                        print(f"Info: skipping pool_id {self.pool_name}/{pool:02d}/{pool_id:04d}")
+                        #print(f"Info: skipping due to procinfo {self.pool_name}/{pool:02d}/{pool_id:04d}")
                         continue
+                    # chance to skip
+                    rand = random.random()
+                    if perc < rand:
+                        #print(f"Info: skipping due to random({rand} > {perc}) {self.pool_name}/{pool:02d}/{pool_id:04d}")
+                        continue
+
+                    img_count += 1
                     # copy img
                     shutil.copy(url_pool_id, pool_dir)
                     # write tags
-                    caps_cropped = self._tags_to_caps(pool, pool_id, use_type=Defines.TYPE_TAGS_CROPPED)
+                    caps_cropped = self._tags_to_caps(pool, pool_id, use_type=Defines.EXT_CROPPED)
                     caps = self._tags_to_caps(pool, pool_id, use_type)
                     caps = self._caps_clean(caps)
-                    caps = Tags.HEADER + caps_cropped + caps
+                    caps = Tags.HEADER + caps_cropped + caps + Tags.FOOTER
                     tags_str = ""
                     for cap in caps:
                         tags_str += f",{cap}"
                     tags_str = tags_str[1:]
-                    tags_file = f"{pool_dir}/{pool_id:04d}.{Defines.TYPE_TAGS}"
+                    tags_file = f"{pool_dir}/{pool_id:04d}.{Defines.EXT}"
                     try:
                         with open(tags_file,'w') as f:
                                 f.write(tags_str)
@@ -294,7 +305,8 @@ class ImgSet:
                         print(f"Warning: write tags {tags_file} failed.")
 
         # tar output pool structure
-        tar_file = f"{Defines.DIR_TMP}/{self.pool_name}_imgset.tar"
+        print(f"Info: build done with {img_count}/{sum_count} imgs ({img_count / sum_count * 100.0}%)")
+        tar_file = f"{Defines.DIR_TMP}/{self.pool_name}_imgset_{int(perc*100.0):03d}_{num_steps:02d}.tar"
         with tarfile.open(tar_file, "a") as tf:
             tf.add(dir_root)
 

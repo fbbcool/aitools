@@ -1,6 +1,12 @@
 from typing import Final
 
-class Tags():
+class Tags:
+    EXT : Final = "caption"
+    EXT_WD14 : Final = f"{EXT}_wd14"
+    EXT_BLIP : Final = f"{EXT}_blip"
+    EXT_CROPPED : Final = f"{EXT}_cropped"
+    EXT_PROCINFO : Final = f"{EXT}_procinfo"
+
     CELEB : Final = "rakhee thakar"
     CELEB2 : Final = "tifa_lockhart"
     CLASS : Final = "woman"
@@ -8,6 +14,7 @@ class Tags():
     SKIP : Final = "skipit"
     PROCINFO = [SKIP,]
     HEADER : Final = [CELEB2, CLASS,]
+    FOOTER : Final = ["watermark", "indoors"]
     DEL : Final = [
         "1girl",
         "2girls",
@@ -148,3 +155,5 @@ class Tags():
         "short",
         "tied",
     ]
+    def __init__(self) -> None:
+        pass
