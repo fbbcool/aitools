@@ -5,6 +5,6 @@ export ENV_HOME=$ENV_PWD/aitools
 install_train() {
     rm -rf $ENV_HOME
     git clone $ENV_REPOS $ENV_HOME
-    source $ENV_HOME/env/env_train.sh
+    source $ENV_HOME/env_aitools/env_train.sh
     env_inst
 }

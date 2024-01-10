@@ -9,7 +9,7 @@ env_pools_inst() {
     echo "downloading gdrive pools tar"
     gdown --fuzzy $1 -O $ENV_POOLS_TAR
     fi
-    tar xf $ENV_POOLS_TAR -C $ENV_POOLS
+    tar xf $ENV_POOLS_TAR -C $ENV_HOME
 }
 env_cap() {
     accelerate launch\
