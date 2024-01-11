@@ -1,6 +1,6 @@
 env_inst() {
     pip install -r $ENV_HOME/requirements.txt
-    env_pool_inst https://drive.google.com/file/d/1wdS5ULSgHV6KaaH9y6vHZY_-O6m5AXpB/view?usp=sharing
+    #env_pool_inst https://drive.google.com/file/d/1wdS5ULSgHV6KaaH9y6vHZY_-O6m5AXpB/view?usp=sharing
 }
 env_pool_inst() {
     if [ "$#" -eq 0 ]; then
@@ -24,18 +24,19 @@ env_cap() {
         --frequency_tags $ENV_POOLS
 }
 env_help_train() {
-    echo '#env_train pool trigger profile sd_version model epochs version'
+    echo '#env_train pool folder trigger profile sd_version model epochs version'
 }
 env_train() {
     pool=$1
-    trigger=$2
-    profile=$3
-    sd_version=$4
-    model=$5
-    epochs=$6
-    version=$7
+    folder=$2
+    trigger=$3
+    profile=$4
+    sd_version=$5
+    model=$6
+    epochs=$7
+    version=$8
     url_model=$ENV_MODELS/$model
-    train_dir=$ENV_TRAINS/$pool
+    train_dir=$ENV_TRAINS/$folder/$pool
     
     accelerate launch\
         --num_cpu_threads_per_process=2\
@@ -78,6 +79,10 @@ env_train() {
         --sample_sampler=euler_a\
         --sample_prompts="$train_dir/sample/prompt.txt"\
         --sample_every_n_epochs="1"
+}
+
+env_model_cyberrealistc() {
+
 }
 
 export ENV_POOLS=$ENV_HOME/pools

@@ -5,8 +5,8 @@ class Defines():
     DIR_TMP : Final = f"{DIR_BUILD}/tmp"
     DIR_POOLS : Final = f"{DIR_BUILD}/pools"
     DIR_TRAINS : Final = f"{DIR_BUILD}/trains"
-    DIR_POOL_TAGS : Final = "tags"
-    DIR_POOL_ORIG : Final = "orig"
+    DIR_POOL_ORIGS : Final = "origs"
+    DIR_POOL_TAGS : Final = DIR_POOL_ORIGS
     DIR_POOL_FACES : Final = "faces"
     
     TYPE_IMG_TARGET : Final = "png"

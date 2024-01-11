@@ -29,8 +29,8 @@ for model in controlnet_models_xl:
     shutil.copy2(hf, controlnet_inst_dir)
 
 
-from civitai import models
-model = models.get_model(modelId=15003) # cyberrealistic
+#from civitai import models
+#model = models.get_model(modelId=15003) # cyberrealistic
 #modelVersion = models.get_by_modelVersion(modelVersionId=128713)
 #model.name                # DreamShaper
 #modelVersion.name  
