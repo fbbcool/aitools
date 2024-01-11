@@ -164,4 +164,6 @@ img_sets/
 img_imports/
 testset/
 build/
+external/
 .DS_Store
+.DS_Store/
