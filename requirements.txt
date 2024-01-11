@@ -19,5 +19,5 @@ huggingface_hub
 civitai
 gdown
 tqdm
-face_recognition
-imageio
+#face_recognition
+#imageio
