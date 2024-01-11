@@ -77,7 +77,7 @@ env_train() {
         --bucket_no_upscale\
         --noise_offset=0.0\
         --sample_sampler=euler_a\
-        --sample_prompts="$train_dir/sample/prompt.txt"\
+        --sample_prompts="$/root/aitools/prompts/prompt.txt"\
         --sample_every_n_epochs="1"
 }
 
