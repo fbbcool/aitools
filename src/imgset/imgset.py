@@ -7,7 +7,7 @@ import pandas as pd
 import shutil
 import random
 from PIL import Image
-import face_recognition
+#import face_recognition
 import imageio as iio
 
 from .defines import Defines
