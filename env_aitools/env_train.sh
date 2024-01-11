@@ -8,7 +8,7 @@ env_pool_inst() {
     tar xf $ENV_TMP_POOL_TAR -C $ENV_POOLS
     else
     echo "downloading gdrive pool tar"
-    gdown --fuzzy $1 -O $ENV_TMP_POOL_TAR
+    gdown --fuzzy $1
     fi
     tar xf $ENV_TMP_POOL_TAR -C $ENV_POOLS
 }
