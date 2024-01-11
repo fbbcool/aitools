@@ -8,7 +8,7 @@ env_pool_inst() {
     tar xf $ENV_TMP_POOL_TAR -C $ENV_POOLS
     else
     echo "downloading gdrive pool tar"
-    gdown --fuzzy $1
+    gdown --fuzzy $1 -O $ENV_TMP_POOL_TAR
     fi
     tar xf $ENV_TMP_POOL_TAR -C $ENV_POOLS
 }
@@ -79,10 +79,6 @@ env_train() {
         --sample_sampler=euler_a\
         --sample_prompts="$/root/aitools/prompts/prompt.txt"\
         --sample_every_n_epochs="1"
-}
-
-env_model_cyberrealistc() {
-
 }
 
 export ENV_POOLS=$ENV_HOME/pools
