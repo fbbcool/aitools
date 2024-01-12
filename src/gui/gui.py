@@ -1,7 +1,7 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 
-from ..imgset import ImgSet
+from ..imgset import ImgPool
 
 def gui(pool_name: str, count: int):
     root = tk.Tk()
