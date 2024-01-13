@@ -13,7 +13,7 @@ import imageio as iio
 from img_select import ImgSelector, ImgSelectorCategory, ImgSelectorMode
 
 from .defines import Defines
-from ..tags import Tags, build_caps, TagsProfile
+from ..tags import Tags, write_caps, TagsProfile
 
 class ImgPool:
     def __init__(self,
@@ -85,7 +85,7 @@ class ImgPool:
             shutil.rmtree(self.url_pool, ignore_errors=False)
         Path(self.url_pool).mkdir(parents=True, exist_ok=True)
 
-        for id, url_src in enumerate(ImgSelector(url_crawl, ImgSelectorCategory.Body, self.num_img, self.mode).result):
+        for id, url_src in enumerate(ImgSelector(url_crawl, ImgSelectorCategory.Orig, self.num_img, self.mode).result):
             url_orig = self.url_orig_id(id)
             self._proc_img(url_src, url_orig)
         for id, url_src in enumerate(ImgSelector(url_crawl, ImgSelectorCategory.Face, self.num_img, self.mode).result):
@@ -98,34 +98,27 @@ class ImgPool:
     """
     @property
     def url_pool(self) -> str:
-        return f"{Defines.DIR_POOLS}/{self.pool_name}"
+        return f"{Defines.DirPools}/{self.pool_name}"
     @property
     def url_origs(self) -> str:
-        return self._url_category(ImgSelectorCategory.Body)
+        return self._url_category(ImgSelectorCategory.Orig)
     @property
     def url_faces(self) -> str:
         return self._url_category(ImgSelectorCategory.Face)
     
     def url_orig_id(self, id: int) -> str:
-        return self._url_id(id, ImgSelectorCategory.Body, Defines.TYPE_IMG_TARGET)
+        return self._url_id(id, ImgSelectorCategory.Orig, Defines.TYPE_IMG_TARGET)
     def url_face_id(self, id: int) -> str:
         return self._url_id(id, ImgSelectorCategory.Face, Defines.TYPE_IMG_TARGET)
     
     def url_orig_id_tag(self, id: int, use_type: str) -> str:
-        return self._url_id_tag(id, ImgSelectorCategory.Body, use_type)
+        return self._url_id_tag(id, ImgSelectorCategory.Orig, use_type)
     def url_face_id_tag(self, id: int, use_type: str) -> str:
         return self._url_id_tag(id, ImgSelectorCategory.Face, use_type)
     
     #  url helpers
     def _url_category(self, category: ImgSelectorCategory) -> str:
-        dir_category = ""
-        if ImgSelectorCategory.Body == category:
-            dir_category = Defines.DIR_ORIGS
-        if ImgSelectorCategory.Face == category:
-            dir_category = Defines.DIR_FACES
-        if not dir_category:
-            raise ValueError(f"Unknown category {category}")
-        return f"{self.url_pool}/{dir_category}"
+        return f"{self.url_pool}/{category}"
     def _url_id(self, id: int, category: ImgSelectorCategory, use_type: str):
         return f"{self._url_category(category)}/{id:04d}.{use_type}"
     def _url_id_tag(self, id: int, category: ImgSelectorCategory, use_type: str) -> str:
@@ -140,7 +133,7 @@ class ImgPool:
         return f"{os.path.splitext(url)[0]}.{to_type}"
     @classmethod
     def _caption_check_type(cls, use_type: str) -> None:    
-        if Defines.TYPE_CAP != use_type.split("_")[0]:
+        if Defines.TypeCap != use_type.split("_")[0]:
             raise ValueError(f"Unknown caption {use_type}.")
 
     """
@@ -148,14 +141,14 @@ class ImgPool:
     """
     @property
     def url_orig_ids(self) -> Generator:
-        for id in range(Defines.MAX_IDS):
+        for id in range(Defines.MaxIds):
             url = self.url_orig_id(id)
             if not ImgPool._url_exit(url):
                 continue
             yield url
     @property
     def url_face_ids(self) -> Generator:
-        for id in range(Defines.MAX_IDS):
+        for id in range(Defines.MaxIds):
             url = self.url_face_id(id)
             if not ImgPool._url_exit(url):
                 continue
@@ -205,18 +198,39 @@ class ImgPool:
     """
     API
     """
-    def build(self, categories: list[ImgSelectorCategory], profile: TagsProfile, num_steps : int, perc : float = 1.1) -> None:
+    def make_train(self, categories: list[ImgSelectorCategory], profile: TagsProfile, num_steps : int, perc : float = 1.1) -> None:
 
-        for category in categories:
-            
-
-        dir_train_pools = f"{Defines.DIR_TRAINS}/{self.pool_name}"
-        if os.path.isdir(dir_train_pools):
-            yes = input(f"Really want to delete {dir_train_pools} [y/n]? ")
+        url_train = f"{Defines.DirTrains}/{self.pool_name}"
+        if os.path.isdir(url_train):
+            yes = input(f"Really want to delete {url_train} [y/n]? ")
             if yes not in ["y"]:
                 return
-            shutil.rmtree(dir_train_pools, ignore_errors=False)
-        Path(dir_train_pools).mkdir(parents=True, exist_ok=True)
+            shutil.rmtree(url_train, ignore_errors=False)
+        Path(url_train).mkdir(parents=True, exist_ok=True)
+
+        for category in categories:
+            url_category = self._url_category(category)
+            url_train_category = f"{url_train}/{num_steps}_{category}"
+            Path(url_train_category).mkdir(parents=False, exist_ok=False)
+            # TODO
+            url_imgs = ImgSelector(
+                url_category,
+                ImgSelectorCategory.NONE,
+                perc * len(url_category),
+                ImgSelectorMode.IngoreTags,
+                ).result
+            for url_img in url_imgs:
+                filename_img, _ = os.path.split(url_img)
+                url_img_train = f"{url_train_category}/{filename_img}"
+                # only symlink imgages
+                os.symlink(os.path.abspath(url_img), os.path.abspath(url_img_train))
+                # TODO
+                write_caps(url_img, profile)
+
+
+
+            #
+
 
         # build output pool structure
         selected_abs = 0
@@ -232,7 +246,7 @@ class ImgPool:
                 # build pool
                 for folder in folders:
                     src_dir = f"{self.url_pool(pool)}/{folder}"
-                    dst_dir = f"{dir_train_pools}/{folder}/{num_steps:02d}_{pool:02d}"
+                    dst_dir = f"{url_train}/{folder}/{num_steps:02d}_{pool:02d}"
                     (selected, count) = self._build_train_pool(src_dir, dst_dir, use_type, profile,perc)
                     selected_abs += selected
                     count_abs += count
@@ -271,7 +285,7 @@ class ImgPool:
             for cap in caps:
                 tags_str += f",{cap}"
             tags_str = tags_str[1:]
-            tags_file = f"{dst_dir}/{ImgPool._url_change_type(filename, Defines.TYPE_CAP)}"
+            tags_file = f"{dst_dir}/{ImgPool._url_change_type(filename, Defines.TypeCap)}"
             try:
                 with open(tags_file,'w') as f:
                         f.write(tags_str)

@@ -1,25 +1,18 @@
 from typing import Final
 
 class Defines():
-    DIR_BUILD : Final = "build"
-    DIR_TMP : Final = f"{DIR_BUILD}/tmp"
-    DIR_POOLS : Final = f"{DIR_BUILD}/pools"
-    DIR_TRAINS : Final = f"{DIR_BUILD}/trains"
-    DIR_ORIGS : Final = "origs"
-    DIR_POOL_TAGS : Final = DIR_ORIGS
-    DIR_FACES : Final = "faces"
+    DirBuild : Final = "build"
+    DirTmp : Final = f"{DirBuild}/tmp"
+    DirPools : Final = f"{DirBuild}/pools"
+    DirTrains : Final = f"{DirBuild}/trains"
     
-    TYPE_IMG_TARGET : Final = "png"
-    TYPE_IMG_SOURCE : Final = "jpg"
-    TYPE_CAP : Final = "caption"
-    TYPE_CAP_WD14 : Final = f"{TYPE_CAP}_wd14"
-    TYPE_CAP_BLIP : Final = f"{TYPE_CAP}_blip"
-    TYPE_CAP_CROPPED : Final = f"{TYPE_CAP}_cropped"
-    TYPE_CAP_PROCINFO : Final = f"{TYPE_CAP}_procinfo"
+    TypeImgTarget : Final = "png"
+    TypeImgSource : Final = "jpg"
+    TypeCap : Final = "caption"
+    TypeCapWd14 : Final = f"{TypeCap}_wd14"
+    TypeCapBlip : Final = f"{TypeCap}_blip"
+    TypeCapCropped : Final = f"{TypeCap}_cropped"
     
-    CROPPED : Final = "cropped"
-    SKIP : Final = "skip it"
-    PROCINFO = [SKIP,]
+    CapCropped : Final = "cropped"
 
-    MAX_POOLS : Final = 20
-    MAX_IDS : Final = 2000
+    MaxIds : Final = 2000

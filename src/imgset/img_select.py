@@ -13,16 +13,17 @@ class ImgSelectorMode(Enum):
     UseTags = auto()
     IngoreTags = auto()
 
-class ImgSelectorCategory(Enum):
-    Body = auto()
-    Face = auto()
+class ImgSelectorCategory():
+    NONE: Final = ""
+    Orig: Final = "origs"
+    Face: Final = "faces"
 
 class ImgSelector:
-    TAG_PREFIX : Final = "ai_"
-    TAG_OK : Final = f"{TAG_PREFIX}ok"
-    TAG_NOK : Final = f"{TAG_PREFIX}not"
-    TAG_BODY : Final = f"{TAG_PREFIX}body"
-    TAG_FACE : Final = f"{TAG_PREFIX}face"
+    TagPrefix : Final = "ai_"
+    TagOk : Final = f"{TagPrefix}ok"
+    TagNok : Final = f"{TagPrefix}not"
+    TagBody : Final = f"{TagPrefix}body"
+    TagFace : Final = f"{TagPrefix}face"
 
     def __init__(self, url_crawl: str, category: ImgSelectorCategory, num_img: int, mode: ImgSelectorMode) -> None:
         self.url_crawl = url_crawl
@@ -60,9 +61,9 @@ class ImgSelector:
         if ImgSelectorMode.UseTags == self.mode:
             for dir in ret:
                 tags = macos_tags.get_all(dir)
-                b = ImgSelector.TAG_NOK in tags
+                b = ImgSelector.TagNok in tags
             ret = [dir for dir in ret
-                if ImgSelector.TAG_NOK not in ImgSelector._tags_url(dir)]
+                if ImgSelector.TagNok not in ImgSelector._tags_url(dir)]
 
         return [self.url_crawl] + ret # also use imgs which are not in s subfolder
     
@@ -77,11 +78,11 @@ class ImgSelector:
     def _url_img_select_by_tag(self, url: str):
         if ImgSelectorMode.IngoreTags == self.mode:
             return False
-        if ImgSelectorCategory.Body == self.category:
-            if ImgSelector.TAG_BODY in self._tags_url(url):
+        if ImgSelectorCategory.Orig == self.category:
+            if ImgSelector.TagBody in self._tags_url(url):
                 return True
         if ImgSelectorCategory.Face == self.category:
-            if ImgSelector.TAG_FACE in self._tags_url(url):
+            if ImgSelector.TagFace in self._tags_url(url):
                 return True
         return False
         
