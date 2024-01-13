@@ -1,1 +1,1 @@
-from .tags import Tags, TagsProfile, build_caps
+from .tags import Tags, TagsProfile, build_tags, build_caps

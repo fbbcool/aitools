@@ -7,13 +7,11 @@ import pandas as pd
 import shutil
 import random
 from PIL import Image
-import face_recognition
 import imageio as iio
 
-from img_select import ImgSelector, ImgSelectorCategory, ImgSelectorMode
-
-from .defines import Defines
-from ..tags import Tags, write_caps, TagsProfile
+from .img_select import ImgSelector, ImgSelectorCategory, ImgSelectorMode
+from ..defines import Defines, Helpers
+from ..tags import Tags, write_tags, TagsProfile
 
 class ImgPool:
     def __init__(self,
@@ -33,6 +31,7 @@ class ImgPool:
     
     @classmethod
     def _facecrop(cls, _from, width, height, ratio=1.0):
+        import face_recognition
         image = face_recognition.load_image_file(_from)
         face_locations = face_recognition.face_locations(
             image
@@ -107,9 +106,9 @@ class ImgPool:
         return self._url_category(ImgSelectorCategory.Face)
     
     def url_orig_id(self, id: int) -> str:
-        return self._url_id(id, ImgSelectorCategory.Orig, Defines.TYPE_IMG_TARGET)
+        return self._url_id(id, ImgSelectorCategory.Orig, Defines.TypeImgTarget)
     def url_face_id(self, id: int) -> str:
-        return self._url_id(id, ImgSelectorCategory.Face, Defines.TYPE_IMG_TARGET)
+        return self._url_id(id, ImgSelectorCategory.Face, Defines.TypeImgTarget)
     
     def url_orig_id_tag(self, id: int, use_type: str) -> str:
         return self._url_id_tag(id, ImgSelectorCategory.Orig, use_type)
@@ -122,20 +121,9 @@ class ImgPool:
     def _url_id(self, id: int, category: ImgSelectorCategory, use_type: str):
         return f"{self._url_category(category)}/{id:04d}.{use_type}"
     def _url_id_tag(self, id: int, category: ImgSelectorCategory, use_type: str) -> str:
-        ImgPool._caption_check_type(use_type)
+        Helpers.caption_check_type(use_type)
         return self._url_id(id, category, use_type)
     
-    @classmethod
-    def _url_exit(cls, url: str) -> bool:
-        return os.path.isfile(url) or os.path.isdir(url)
-    @classmethod
-    def _url_change_type(cls, url: str, to_type: str) -> str:
-        return f"{os.path.splitext(url)[0]}.{to_type}"
-    @classmethod
-    def _caption_check_type(cls, use_type: str) -> None:    
-        if Defines.TypeCap != use_type.split("_")[0]:
-            raise ValueError(f"Unknown caption {use_type}.")
-
     """
     LISTS
     """
@@ -143,58 +131,26 @@ class ImgPool:
     def url_orig_ids(self) -> Generator:
         for id in range(Defines.MaxIds):
             url = self.url_orig_id(id)
-            if not ImgPool._url_exit(url):
+            if not Helpers.url_exit(url):
                 continue
             yield url
     @property
     def url_face_ids(self) -> Generator:
         for id in range(Defines.MaxIds):
             url = self.url_face_id(id)
-            if not ImgPool._url_exit(url):
+            if not Helpers.url_exit(url):
                 continue
             yield url
     
     def url_orig_ids_tag(self, use_type: str) -> Generator:
-        ImgPool._caption_check_type(use_type)
+        Helpers.caption_check_type(use_type)
         for url_orig_id in self.url_orig_ids:
-            yield self._url_change_type(url_orig_id, use_type)
+            yield Helpers.url_change_type(url_orig_id, use_type)
     def url_face_ids_tag(self, use_type: str) -> Generator:
-        ImgPool._caption_check_type(use_type)
+        Helpers.caption_check_type(use_type)
         for url_orig_id in self.url_face_ids:
-            yield self._url_change_type(url_orig_id, use_type)
+            yield Helpers.url_change_type(url_orig_id, use_type)
 
-    """
-    caps
-    """
-    @classmethod
-    def _tags_to_caps(cls, url) -> list[str]:
-        try:
-            with open(url) as f:
-                tags = f.readline()
-        except FileNotFoundError:
-            print(f"Warning: no tags file {url} found.")
-            return []
-        
-        caps = []
-        caps_raw = tags.split(",")
-        for cap in caps_raw:
-            caps.append(cap.replace("_", " "))
-        return caps
-
-    @classmethod
-    def _caps_to_tags(cls, caps: list[str], url: str) -> None:
-        tags = ""
-        for cap in caps:
-            cap = cap.replace("_", " ")
-            tags += f",{cap}"
-        tags = tags[1:]
-        
-        try:
-            with open(url,'w') as f:
-                    f.write(tags)
-        except:
-            print(f"Warning: write tags {url} failed.")
-    
     """
     API
     """
@@ -212,7 +168,6 @@ class ImgPool:
             url_category = self._url_category(category)
             url_train_category = f"{url_train}/{num_steps}_{category}"
             Path(url_train_category).mkdir(parents=False, exist_ok=False)
-            # TODO
             url_imgs = ImgSelector(
                 url_category,
                 ImgSelectorCategory.NONE,
@@ -225,7 +180,7 @@ class ImgPool:
                 # only symlink imgages
                 os.symlink(os.path.abspath(url_img), os.path.abspath(url_img_train))
                 # TODO
-                write_caps(url_img, profile)
+                write_tags(url_img, profile)
 
 
 
@@ -261,7 +216,7 @@ class ImgPool:
         # copy all images and write tags from pool
         for url_img in url_img_list:
             # process procinfo
-            procinfo = self._tags_to_caps(ImgPool._url_change_type(url_img, Defines.TYPE_CAP_PROCINFO))
+            procinfo = self._tags_to_caps(ImgPool.url_change_type(url_img, Defines.TYPE_CAP_PROCINFO))
             if Defines.SKIP in procinfo:
                 #print(f"Info: skipping due to procinfo {self.pool_name}/{pool:02d}/{pool_id:04d}")
                 continue
@@ -277,15 +232,15 @@ class ImgPool:
             img_link = f"{dst_dir}/{filename}"
             os.symlink(os.path.abspath(url_img), os.path.abspath(img_link))
             # write tags
-            caps_cropped = self._tags_to_caps(ImgPool._url_change_type(url_img, Defines.TYPE_CAP_CROPPED))
-            caps = self._tags_to_caps(ImgPool._url_change_type(url_img, use_type))
+            caps_cropped = self._tags_to_caps(ImgPool.url_change_type(url_img, Defines.TYPE_CAP_CROPPED))
+            caps = self._tags_to_caps(ImgPool.url_change_type(url_img, use_type))
             caps = caps_cropped + caps
             caps = build_caps(caps, profile)
             tags_str = ""
             for cap in caps:
                 tags_str += f",{cap}"
             tags_str = tags_str[1:]
-            tags_file = f"{dst_dir}/{ImgPool._url_change_type(filename, Defines.TypeCap)}"
+            tags_file = f"{dst_dir}/{ImgPool.url_change_type(filename, Defines.TypeCap)}"
             try:
                 with open(tags_file,'w') as f:
                         f.write(tags_str)

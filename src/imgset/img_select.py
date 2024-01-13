@@ -7,7 +7,7 @@ from typing import Final
 
 import macos_tags
 
-from .defines import Defines
+from ..defines import Defines
 
 class ImgSelectorMode(Enum):
     UseTags = auto()
@@ -36,7 +36,7 @@ class ImgSelector:
     
     @property
     def result(self) -> list[str]:
-        all = [glob(f"{dir}/*.{Defines.TYPE_IMG_SOURCE}") for dir in self._url_src_folders]
+        all = [glob(f"{dir}/*.{Defines.TypeImgSource}") for dir in self._url_src_folders]
         url_img_pooled = [x for xs in all for x in xs] # flattened list
         url_img_selected = []
         #split pool by tags
@@ -77,7 +77,9 @@ class ImgSelector:
     
     def _url_img_select_by_tag(self, url: str):
         if ImgSelectorMode.IngoreTags == self.mode:
-            return False
+            return True
+        if ImgSelectorCategory.NONE == self.category:
+                return True
         if ImgSelectorCategory.Orig == self.category:
             if ImgSelector.TagBody in self._tags_url(url):
                 return True

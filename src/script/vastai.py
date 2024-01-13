@@ -5,18 +5,18 @@ controlnet_model_id = "webui/ControlNet-modules-safetensors"
 controlnet_models = [
     "control_depth-fp16.safetensors",
     "control_openpose-fp16.safetensors",
-    "control_scribble-fp16.safetensors",
-    "control_seg-fp16.safetensors",
-    "control_normal-fp16.safetensors",
-    "control_mlsd-fp16.safetensors",
-    "control_hed-fp16.safetensors",
+    #"control_scribble-fp16.safetensors",
+    #"control_seg-fp16.safetensors",
+    #"control_normal-fp16.safetensors",
+    #"control_mlsd-fp16.safetensors",
+    #"control_hed-fp16.safetensors",
 ]
 controlnet_model_id_xl="lllyasviel/sd_control_collection"
 controlnet_models_xl = [
-    "diffusers_xl_depth_mid.safetensors",
-    "thibaud_xl_openpose_256lora.safetensors",
-    "t2i-adapter_diffusers_xl_openpose.safetensors",
-    "thibaud_xl_openpose.safetensors",
+    #"diffusers_xl_depth_mid.safetensors",
+    #"thibaud_xl_openpose_256lora.safetensors",
+    #"t2i-adapter_diffusers_xl_openpose.safetensors",
+    #"thibaud_xl_openpose.safetensors",
 ]
 controlnet_inst_dir = "/workspace/storage/stable_diffusion/models/controlnet"
 

@@ -19,6 +19,3 @@ huggingface_hub
 civitai
 gdown
 tqdm
-face_recognition
-macos-tags
-#imageio

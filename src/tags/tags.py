@@ -1,10 +1,12 @@
+import os
 from typing import Final
-from copy import deepcopy
+
+from ..defines import Defines, Helpers
 
 class Tags:
-    HEADER : Final = []
-    FOOTER : Final = []
-    NEG_COMMON : Final = [
+    Header : Final = []
+    Footer : Final = []
+    NegCommon : Final = [
         "1girl",
         "2girls",
         "multiple girls",
@@ -27,7 +29,7 @@ class Tags:
     ]
 
 class TagsProfile(dict):
-    KNOWN_TYPES = [
+    KnownTypes = [
         "busty",
         "leggy",
         "fbb",
@@ -36,12 +38,12 @@ class TagsProfile(dict):
     def __init__(self, _type: str, trigger: str = ""):
         super().__init__({
             "header": [trigger],
-            "negative": Tags.NEG_COMMON.copy(),
+            "negative": Tags.NegCommon.copy(),
             "replace": {},
             "footer": [],
         })
         
-        if _type not in self.KNOWN_TYPES:
+        if _type not in self.KnownTypes:
             print(f"Warning: unknown profile type ({_type}), empty profile created.")
             self.type = "empty"
             return
@@ -106,10 +108,22 @@ class TagsProfile(dict):
     def append_replace(self, dict_replace) -> None:
         self["replace"] = self["replace"] | dict_replace
     
-def build_caps(caps_input: list[str], profile: TagsProfile) -> list[str]:
+def build_tags(url_img: str, profile: TagsProfile, use_type=Defines.TypeCapWd14) -> None:
+    Helpers.caps_to_tags(use_type)
+    url_from_tags = Helpers.url_change_type(url_img, use_type)
+    from_caps = []
+    if not Helpers.url_exit(url_from_tags):
+        print(f"Warning: not tags file found: {url_from_tags}.")
+    elif True:
+        from_caps = Helpers.tags_to_caps(url_from_tags)
+    url_to_tags = f"{os.path.splitext(url_img)[0]}.{Defines.TypeCap}"
+    to_caps = build_caps(from_caps, profile)
+    Helpers.caps_to_tags(to_caps, url_to_tags)
+
+def build_caps(from_caps: list[str], profile: TagsProfile) -> list[str]:
     # clean
     caps_clean = []
-    for cap in caps_input:
+    for cap in from_caps:
         cap = cap.replace("_", " ")
         clean = True
         if cap in profile["negative"]:

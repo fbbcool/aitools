@@ -15,6 +15,7 @@ env_inst() {
     python3.10 -m venv $ENV_HOME/$ENV_DIR
     source $ENV_HOME/$ENV_DIR/bin/activate
     pip install -r $ENV_HOME/requirements.txt
+    pip install -r $ENV_HOME/requirements_local.txt
 }
 
 export ENV_HOME=`pwd`
