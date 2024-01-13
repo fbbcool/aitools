@@ -38,34 +38,46 @@ class ImgSelector:
     def result(self) -> list[str]:
         all = [glob(f"{dir}/*.{Defines.TypeImgSource}") for dir in self._url_src_folders]
         url_img_pooled = [x for xs in all for x in xs] # flattened list
+        if not url_img_pooled:
+            return []
+
         url_img_selected = []
+        url_img_later_use = []
         #split pool by tags
         for url_img in url_img_pooled:
-            if self._url_img_select_by_tag(url_img):
+            (selected, later_use) = self._url_img_select_by_tag(url_img)
+            if selected:
                 url_img_selected.append(url_img)
+            if later_use:
+                url_img_later_use.append(url_img)
         
         # select from pooled with remaining propability
-        prob = (self.num_img - len(url_img_selected)) / len(url_img_pooled)
-        return url_img_selected + [url_img for url_img in url_img_pooled
+        if not url_img_later_use:
+            return url_img_selected
+        prob = (self.num_img - len(url_img_selected)) / len(url_img_later_use)
+        print(prob)
+        return url_img_selected + [url_img for url_img in url_img_later_use
             if prob > random()]
         
     @property
     def _url_src_folders(self) -> list[str]:
-        ret = os.listdir(self.url_crawl)
+        url_srcs = os.listdir(self.url_crawl)
         # filter dot folders
-        ret = [dir for dir in ret
+        url_srcs = [dir for dir in url_srcs
                if dir[0] != '.']
         # make paths absolute
-        ret = [os.path.join(self.url_crawl, dir) for dir in ret]
+        url_srcs = [os.path.join(self.url_crawl, dir) for dir in url_srcs]
+        url_srcs =[self.url_crawl] + url_srcs # also use imgs which are not in a subfolder
         # filter by tags
         if ImgSelectorMode.UseTags == self.mode:
-            for dir in ret:
-                tags = macos_tags.get_all(dir)
-                b = ImgSelector.TagNok in tags
-            ret = [dir for dir in ret
-                if ImgSelector.TagNok not in ImgSelector._tags_url(dir)]
-
-        return [self.url_crawl] + ret # also use imgs which are not in s subfolder
+            ret = [url for url in url_srcs
+                if self._url_select_by_tag(url)
+                if ImgSelector.TagNok not in ImgSelector._tags_url(url)]
+        elif ImgSelectorMode.IngoreTags == self.mode:
+            ret = url_srcs
+        elif True:
+            ret = []
+        return ret
     
     """
     HELPERS
@@ -75,16 +87,36 @@ class ImgSelector:
         tags = macos_tags.get_all(url)
         return [tag.name for tag in tags]
     
-    def _url_img_select_by_tag(self, url: str):
+    def _url_select_by_tag(self, url: str) -> bool:
+        tags_os = self._tags_url(url)
+        if ImgSelector.TagNok in tags_os:
+            return False
+        if ImgSelectorMode.UseTags == self.mode:
+            if ImgSelector.TagOk not in tags_os:
+                return False
+        return True
+        
+    def _url_img_select_by_tag(self, url: str) -> tuple[bool, bool]:
+        """
+        return (selected, later_use)
+        """
+        tags_os = self._tags_url(url)
+        if ImgSelector.TagNok in tags_os:
+            return (False, False)
+        
         if ImgSelectorMode.IngoreTags == self.mode:
-            return True
-        if ImgSelectorCategory.NONE == self.category:
-                return True
-        if ImgSelectorCategory.Orig == self.category:
-            if ImgSelector.TagBody in self._tags_url(url):
-                return True
-        if ImgSelectorCategory.Face == self.category:
-            if ImgSelector.TagFace in self._tags_url(url):
-                return True
-        return False
+            return (False, True)
+        if ImgSelectorMode.UseTags == self.mode:
+            if ImgSelectorCategory.Orig == self.category:
+                if ImgSelector.TagBody in tags_os:
+                    return (True, False)
+                elif True: # save for later use
+                    return(False, True)
+            if ImgSelectorCategory.Face == self.category:
+                if ImgSelector.TagFace in tags_os:
+                    return (True, False)
+                elif True: # save for later use
+                    return(False, True)
+        
+        return (False, True)
         

@@ -20,12 +20,16 @@ class Defines():
 
     Epochs : Final = 10
     TrainSteps : Final = 20
-    PicsNum : Final = 100
+    PicsNum : Final = 10
 
 class Helpers():
     @classmethod
     def url_exit(cls, url: str) -> bool:
         return os.path.isfile(url) or os.path.isdir(url)
+    @classmethod
+    def url_exit_exception(cls, url: str) -> None:
+        if cls.url_exit(url):
+            raise FileExistsError(f"{url} exists!")
     @classmethod
     def url_change_type(cls, url: str, to_type: str) -> str:
         return f"{os.path.splitext(url)[0]}.{to_type}"
@@ -56,6 +60,7 @@ class Helpers():
             tags += f",{cap}"
         tags = tags[1:]
         
+        cls.url_exit_exception(url)
         try:
             with open(url,'w') as f:
                     f.write(tags)
