@@ -73,8 +73,12 @@ class ImgPool:
         bbox = cls._facecrop(_from, width, height, 1.3)
         if not bbox:
             return
-        im_face = im.crop(bbox)
-        Helpers.url_exit_exception(_to)
+        try:
+            im_face = im.crop(bbox)
+            Helpers.url_exit_exception(_to)
+        except:
+            return
+
         im_face.save(_to)
 
     def _create_pool(self, url_crawl: str) -> None:

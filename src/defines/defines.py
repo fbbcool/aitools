@@ -20,7 +20,7 @@ class Defines():
 
     Epochs : Final = 10
     TrainSteps : Final = 20
-    PicsNum : Final = 10
+    PicsNum : Final = 150
 
 class Helpers():
     @classmethod

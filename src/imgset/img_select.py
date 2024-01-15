@@ -37,6 +37,7 @@ class ImgSelector:
     @property
     def result(self) -> list[str]:
         all = [glob(f"{dir}/*.{Defines.TypeImgSource}") for dir in self._url_src_folders]
+        all += [glob(f"{dir}/*.{Defines.TypeImgTarget}") for dir in self._url_src_folders]
         url_img_pooled = [x for xs in all for x in xs] # flattened list
         if not url_img_pooled:
             return []

@@ -1,4 +1,5 @@
-from .imgpool import ImgPool, ImgSelectorMode
+from .imgpool import ImgPool, ImgSelectorMode, ImgSelectorCategory
+from ..tags import TagsProfile
 from ..defines import Defines
 
 class ImgPools():
@@ -22,3 +23,7 @@ class ImgPools():
             pool = ImgPool(pool_name, self.num_pics, mode, crawl_dir)
             dict_rows.append((pool_name, pool))
         self.pools = dict(dict_rows)
+    
+    def make_train_pool(self, pool_name: str, categories: list[ImgSelectorCategory], profile: TagsProfile) -> None:
+        pool: ImgPool = self.pools[pool_name]
+        pool.make_train(categories, profile, self.train_steps)
