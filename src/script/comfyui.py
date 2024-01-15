@@ -47,21 +47,18 @@ class ModelInst:
         if self.method == DownloadMethod.Hugging:
             url_split = self.url.split("/")
             filename = hf_hub_download(repo_id = f"{url_split[0]}/{url_split[1]}", filename = url_split[2])
+            print(f"installing from hugging: {self.url} -> {url_model}")
             shutil.move(filename, url_model)
             
         if self.method == DownloadMethod.Wget:
             filename = wget.download(self.url)
+            print(f"installing by wget: {self.url} -> {url_model}")
             shutil.move(filename, url_model)
 
         if self.method == DownloadMethod.GDrive:
+            print(f"installing from gdrive: {self.url} -> {url_model}")
             gdown.download(id = self.url, output = url_model)
 
-    @property
-    def url_models(self) -> str:
-        if self.target == TargetType.Comfy:
-            return "/opt/ComfyUi/models/"
-        raise ValueError("Url Models unknown!")
-    
     @property
     def url_models(self) -> str:
         if self.target == TargetType.Comfy:
