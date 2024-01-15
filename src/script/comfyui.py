@@ -63,7 +63,7 @@ class ModelInst:
     def url_models(self) -> str:
         if self.target == TargetType.Comfy:
             if self.model == ModelType.Checkpoint:
-                return "/opt/ComfyUI/models/ckpt"
+                return "/opt/ComfyUI/models/checkpoints"
             if self.model == ModelType.Controlnet:
                 return "/opt/ComfyUI/models/controllnet"
             if self.model == ModelType.Lora:
