@@ -3,6 +3,7 @@ import os
 import shutil
 from typing import Final
 from huggingface_hub import hf_hub_download
+import requests
 import wget
 import gdown
 
@@ -32,6 +33,15 @@ class ModelInst:
         self.ext = "safetensors"
         self.name = name
     
+
+    def url_download(self, url: str) -> str:
+        local_filename = url.split('/')[-1]
+        with requests.get(url, stream=True) as r:
+            with open(local_filename, 'wb') as f:
+                shutil.copyfileobj(r.raw, f)
+
+        return local_filename
+    
     @classmethod
     def url_exit(cls, url: str) -> bool:
         return os.path.isfile(url) or os.path.isdir(url)
@@ -52,7 +62,8 @@ class ModelInst:
             
         if self.method == DownloadMethod.Wget:
             print(f"installing by wget: {self.url} -> {url_model}")
-            filename = wget.download(self.url)
+            #filename = wget.download(self.url)
+            filename = self.url_download(self.url)
             shutil.move(filename, url_model)
 
         if self.method == DownloadMethod.GDrive:
