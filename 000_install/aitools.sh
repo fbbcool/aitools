@@ -14,4 +14,10 @@ ___gen () {
     source $ENV_HOME/env_aitools/env_gen.sh
     env_inst
 }
+___comfy () {
+    rm -rf $ENV_HOME
+    git clone $ENV_REPOS $ENV_HOME
+    source $ENV_HOME/env_aitools/env_comfy.sh
+    env_inst
+}
 
