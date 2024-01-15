@@ -84,7 +84,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Checkpoint, DownloadMethod.Wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
             ModelInst(t, ModelType.Checkpoint, DownloadMethod.Wget, "https://civitai.com/api/download/models/128713?type=Model&format=SafeTensor&size=pruned&fp=fp16", "dreamshaper"),
             ModelInst(t, ModelType.Lora, DownloadMethod.GDrive, "1WOAizZJY4g4qO8nGWOW2UuMLvbI3bWsM", "lara"),
-            ModelInst(t, ModelType.Lora, DownloadMethod.GDrive, "https://civitai.com/api/download/models/260383?type=Model&format=SafeTensor", "Muscle_bimbo"),
+            ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://civitai.com/api/download/models/260383?type=Model&format=SafeTensor", "Muscle_bimbo"),
             ModelInst(t, ModelType.ClipVision, DownloadMethod.Hugging, "InvokeAI/ip_adapter_sd_image_encoder/model.safetensors", "ip_adapter_sd_image_encoder"),
             ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15.safetensors", "ip-adapter_sd15"),
             ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_light.safetensors", "ip-adapter_sd15_light"),
