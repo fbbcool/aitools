@@ -23,7 +23,7 @@ class ModelType(Enum):
 
 
 class ModelInst:
-    UrlModels: Final = "/workspace/storage/stable_diffusion/models"
+    UrlStorageModels: Final = "/workspace/storage/stable_diffusion/models"
     def __init__(self, target: TargetType, model: ModelType, method: DownloadMethod, url: str, name: str) -> None:
         self.target = target
         self.model = model
@@ -38,16 +38,11 @@ class ModelInst:
     
     @property
     def install(self, force: bool = False) -> None:
-        url_inst = f"{ModelInst.UrlModels}/{self.dir_models}"
-        url_model = f"{url_inst}/{self.name}.{self.ext}"
+        url_model = f"{self.url_models}/{self.name}.{self.ext}"
         
         if not force:
             if ModelInst.url_exit(url_model):
                 return
-            
-        if not ModelInst.url_exit(url_inst):
-            # make symlink to target modeldir
-            os.symlink(f"{self.url_models}/{self.dir_models}", url_inst)
         
         if self.method == DownloadMethod.Hugging:
             url_split = self.url.split("/")
@@ -64,20 +59,22 @@ class ModelInst:
     @property
     def url_models(self) -> str:
         if self.target == TargetType.Comfy:
-            return "/opt/ComfyUi/models"
+            return "/opt/ComfyUi/models/"
         raise ValueError("Url Models unknown!")
     
     @property
-    def dir_models(self) -> str:
+    def url_models(self) -> str:
         if self.target == TargetType.Comfy:
             if self.model == ModelType.Checkpoint:
-                return "ckpt"
+                return "/opt/ComfyUi/models/ckpt"
             if self.model == ModelType.Controlnet:
-                return "controllnet"
+                return "/opt/ComfyUi/models/controllnet"
             if self.model == ModelType.Lora:
-                return "Loras"
+                return "/opt/ComfyUi/models/loras"
             if self.model == ModelType.ClipVision:
-                return "clip_vision"
+                return "/opt/ComfyUi/models/clip_vision"
+            if self.model == ModelType.IPAdapter:
+                return "/opt/ComfyUI/custom_nodes/ComfyUI_IPAdapter_plus/models"
         raise ValueError("Dir Models unknown!")
     
 class ModelInstComfyUi:
