@@ -63,13 +63,13 @@ class ModelInst:
     def url_models(self) -> str:
         if self.target == TargetType.Comfy:
             if self.model == ModelType.Checkpoint:
-                return "/opt/ComfyUi/models/ckpt"
+                return "/opt/ComfyUI/models/ckpt"
             if self.model == ModelType.Controlnet:
-                return "/opt/ComfyUi/models/controllnet"
+                return "/opt/ComfyUI/models/controllnet"
             if self.model == ModelType.Lora:
-                return "/opt/ComfyUi/models/loras"
+                return "/opt/ComfyUI/models/loras"
             if self.model == ModelType.ClipVision:
-                return "/opt/ComfyUi/models/clip_vision"
+                return "/opt/ComfyUI/models/clip_vision"
             if self.model == ModelType.IPAdapter:
                 return "/opt/ComfyUI/custom_nodes/ComfyUI_IPAdapter_plus/models"
         raise ValueError("Dir Models unknown!")
