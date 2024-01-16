@@ -76,7 +76,7 @@ class ModelInst:
             if self.model == ModelType.Checkpoint:
                 return "/opt/ComfyUI/models/checkpoints"
             if self.model == ModelType.Controlnet:
-                return "/opt/ComfyUI/models/controllnet"
+                return "/opt/ComfyUI/models/controlnet"
             if self.model == ModelType.Lora:
                 return "/opt/ComfyUI/models/loras"
             if self.model == ModelType.ClipVision:
@@ -101,8 +101,11 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus-face_sd15.safetensors", "ip-adapter-plus-face_sd15.safetensors"),
             ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-full-face_sd15.safetensors", "ip-adapter-full-face_sd15"),
             ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_vit-G.safetensors", "ip-adapter_sd15_vit-G"),
+            ModelInst(t, ModelType.Controlnet, DownloadMethod.Wget, "https://huggingface.co/webui/ControlNet-modules-safetensors/resolve/main/control_depth-fp16.safetensors?download=true", "control_depth-fp16.safetensors"),
         ]
         for model in models:
             model.install
 
 ModelInstComfyUi()
+
+# https://huggingface.co/lllyasviel/ControlNet-v1-1/tree/main #ctrlnet models
