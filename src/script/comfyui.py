@@ -4,7 +4,7 @@ import shutil
 from typing import Final
 #from huggingface_hub import hf_hub_download
 import requests
-import tqdm
+from tqdm import tqdm
 #import gdown
 
 class DownloadMethod(Enum):
