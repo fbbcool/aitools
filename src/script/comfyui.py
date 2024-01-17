@@ -33,7 +33,7 @@ class ModelInst:
         self.ext = "safetensors"
         self.name = name
     
-    def url_download(url: str, fname: str):
+    def url_download(self, url: str, fname: str):
         resp = requests.get(url, stream=True)
         total = int(resp.headers.get('content-length', 0))
         # Can also replace 'file' with a io.BytesIO object
