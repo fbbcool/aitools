@@ -25,12 +25,12 @@ class ModelType(Enum):
 
 class ModelInst:
     UrlStorageModels: Final = "/workspace/storage/stable_diffusion/models"
-    def __init__(self, target: TargetType, model: ModelType, method: DownloadMethod, url: str, name: str) -> None:
+    def __init__(self, target: TargetType, model: ModelType, method: DownloadMethod, url: str, name: str, ext:str ="safetensors") -> None:
         self.target = target
         self.model = model
         self.method = method
         self.url = url
-        self.ext = "safetensors"
+        self.ext = ext
         self.name = name
     
     def url_download(self, url: str, fname: str):
@@ -116,7 +116,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-full-face_sd15.safetensors", "ip-adapter-full-face_sd15"),
             ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_vit-G.safetensors", "ip-adapter_sd15_vit-G"),
             ModelInst(t, ModelType.Controlnet, DownloadMethod.Wget, "https://huggingface.co/webui/ControlNet-modules-safetensors/resolve/main/control_depth-fp16.safetensors?download=true", "control_depth-fp16"),
-            ModelInst(t, ModelType.Controlnet, DownloadMethod.Wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16"),
+            ModelInst(t, ModelType.Controlnet, DownloadMethod.Wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16", ext="pth"),
         ]
         for model in models:
             model.install
