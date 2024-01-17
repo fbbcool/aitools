@@ -2,10 +2,10 @@ from enum import Enum, auto
 import os
 import shutil
 from typing import Final
-from huggingface_hub import hf_hub_download
+#from huggingface_hub import hf_hub_download
 import requests
 import tqdm
-import gdown
+#import gdown
 
 class DownloadMethod(Enum):
     Hugging = auto()
@@ -69,10 +69,10 @@ class ModelInst:
                 return
         
         if self.method == DownloadMethod.Hugging:
-            print(f"installing from hugging: {self.url} -> {url_model}")
+            print(f"(NO)installing from hugging: {self.url} -> {url_model}")
             url_split = self.url.split("/")
-            filename = hf_hub_download(repo_id = f"{url_split[0]}/{url_split[1]}", filename = url_split[2])
-            shutil.move(filename, url_model)
+            #filename = hf_hub_download(repo_id = f"{url_split[0]}/{url_split[1]}", filename = url_split[2])
+            #shutil.move(filename, url_model)
             
         if self.method == DownloadMethod.Wget:
             print(f"installing by wget: {self.url} -> {url_model}")
@@ -81,8 +81,8 @@ class ModelInst:
             self.url_download(self.url, url_model)
 
         if self.method == DownloadMethod.GDrive:
-            print(f"installing from gdrive: {self.url} -> {url_model}")
-            gdown.download(id = self.url, output = url_model)
+            print(f"(NO)installing from gdrive: {self.url} -> {url_model}")
+            #gdown.download(id = self.url, output = url_model)
 
     @property
     def url_models(self) -> str:
