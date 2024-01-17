@@ -1,6 +1,6 @@
-folium
-jupyterlab
-matplotlib
+#folium
+#jupyterlab
+#matplotlib
 scikit-spatial
 ipympl
 black
@@ -15,8 +15,5 @@ geojson
 pymap3d
 pandas
 pillow
-huggingface_hub
-civitai
-gdown
+#huggingface_hub
 tqdm
-wget

@@ -4,7 +4,7 @@ import shutil
 from typing import Final
 from huggingface_hub import hf_hub_download
 import requests
-import wget
+import tqdm
 import gdown
 
 class DownloadMethod(Enum):
@@ -33,8 +33,22 @@ class ModelInst:
         self.ext = "safetensors"
         self.name = name
     
+    def url_download(url: str, fname: str):
+        resp = requests.get(url, stream=True)
+        total = int(resp.headers.get('content-length', 0))
+        # Can also replace 'file' with a io.BytesIO object
+        with open(fname, 'wb') as file, tqdm(
+            desc=fname,
+            total=total,
+            unit='iB',
+            unit_scale=True,
+            unit_divisor=1024,
+        ) as bar:
+            for data in resp.iter_content(chunk_size=1024):
+                size = file.write(data)
+                bar.update(size)
 
-    def url_download(self, url: str) -> str:
+    def url_download_old(self, url: str) -> str:
         local_filename = url.split('/')[-1]
         with requests.get(url, stream=True) as r:
             with open(local_filename, 'wb') as f:
@@ -62,9 +76,9 @@ class ModelInst:
             
         if self.method == DownloadMethod.Wget:
             print(f"installing by wget: {self.url} -> {url_model}")
-            #filename = wget.download(self.url)
-            filename = self.url_download(self.url)
-            shutil.move(filename, url_model)
+            #filename = self.url_download_old(self.url)
+            #shutil.move(filename, url_model)
+            self.url_download(self.url, url_model)
 
         if self.method == DownloadMethod.GDrive:
             print(f"installing from gdrive: {self.url} -> {url_model}")
