@@ -138,6 +138,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://civitai.com/api/download/models/260383?type=Model&format=SafeTensor", "Muscle_bimbo"),
             ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://civitai.com/api/download/models/281780?type=Model&format=SafeTensor", "Muscle_mgm"),
             ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://civitai.com/api/download/models/87153?type=Model&format=SafeTensor", "Adetailer"),
+            ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://civitai.com/api/download/models/295786", "MuscleGirlsXL"),
             ModelInst(t, ModelType.Embedding, DownloadMethod.Wget, "https://civitai.com/api/download/models/77169?type=Model&format=PickleTensor", "BadDream", ext="pt"),
             ModelInst(t, ModelType.Embedding, DownloadMethod.Wget, "https://civitai.com/api/download/models/77173?type=Model&format=PickleTensor", "UnrealisticDream", ext="pt"),
             ModelInst(t, ModelType.ClipVision, DownloadMethod.Wget, "https://huggingface.co/InvokeAI/ip_adapter_sd_image_encoder/resolve/main/model.safetensors?download=true", "ip_adapter_sd_image_encoder"),
