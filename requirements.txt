@@ -11,6 +11,7 @@ setuptools
 numpy
 scipy
 protobuf
+gitpython
 geojson
 pymap3d
 pandas
