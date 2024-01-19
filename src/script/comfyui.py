@@ -102,7 +102,7 @@ class ModelInst:
             #gdown.download(id = self.url, output = url_model)
 
         if self.method == DownloadMethod.Git:
-            print(f"git clone: {self.url} -> {url_model}")
+            print(f"git clone: {self.url} -> {url_folder}")
             self.git_clone(self.url, url_folder)
             #gdown.download(id = self.url, output = url_model)
 
@@ -118,7 +118,7 @@ class ModelInst:
             if self.model == ModelType.Lora:
                 return "/opt/ComfyUI/models/loras"
             if self.model == ModelType.Embedding:
-                return "/opt/ComfyUI/models/embedding"
+                return "/opt/ComfyUI/models/embeddings"
             if self.model == ModelType.ClipVision:
                 return "/opt/ComfyUI/models/clip_vision"
             if self.model == ModelType.IPAdapter:
@@ -159,6 +159,9 @@ ModelInstComfyUi()
 #https://huggingface.co/h94/IP-Adapter-FaceID/tree/main
 # custom nodes
 # - ComfyUI-Impact-Pack
+# - controlnet
 # - Essentials
-# - ipadapter
+# - Efficiency nodes 2.0+
+# - Nimbus pack
+# - ipadapter plus
 # - reactor
