@@ -172,3 +172,4 @@ ModelInstComfyUi()
 # - reactor
 # - sdultimtaeupscale
 # - clipseg
+# - mask bounding box
