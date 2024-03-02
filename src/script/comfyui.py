@@ -163,13 +163,15 @@ ModelInstComfyUi()
 # https://huggingface.co/lllyasviel/ControlNet-v1-1/tree/main #ctrlnet models
 #https://huggingface.co/h94/IP-Adapter-FaceID/tree/main
 # custom nodes
-# - ComfyUI-Impact-Pack
-# - controlnet
-# - Essentials
-# - Efficiency nodes 2.0+
-# - Nimbus pack
-# - ipadapter plus
-# - reactor
-# - sdultimtaeupscale
-# - clipseg
-# - mask bounding box
+# 002 - ComfyUI-Impact-Pack
+# 003 - ComfyUI-Inspire-Pack
+# 006 - controlnet
+# 011 - clipseg
+# 017 - Efficiency nodes 2.0+
+# 065 - ultimateSDupscale
+# 090 - ipadapter plus
+# 127 - reactor
+# 157 - rgthree 
+# 215 - Essentials
+# 273 - mask bounding box
+# 311 - Nimbus pack
