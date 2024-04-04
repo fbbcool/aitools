@@ -122,7 +122,7 @@ class ModelInst:
             if self.model == ModelType.ClipVision:
                 return "/opt/ComfyUI/models/clip_vision"
             if self.model == ModelType.IPAdapter:
-                return "/opt/ComfyUI/custom_nodes/ComfyUI_IPAdapter_plus/models"
+                return "/opt/ComfyUI/models/ipadapter"
         raise ValueError("Dir Models unknown!")
     
 class ModelInstComfyUi:
