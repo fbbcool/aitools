@@ -136,20 +136,33 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Checkpoint, DownloadMethod.Wget, "https://civitai.com/api/download/models/251662", "dreamshaper_xl"),
             #ModelInst(t, ModelType.Checkpoint, DownloadMethod.Wget, "https://civitai.com/api/download/models/288982?type=Model&format=SafeTensor&size=full&fp=fp16", "juggernaut_xl"),
             #ModelInst(t, ModelType.Checkpoint, DownloadMethod.Wget, "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0_0.9vae.safetensors?download=true", "sdxl_refiner"),
+
             ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://drive.usercontent.google.com/download?id=1WOAizZJY4g4qO8nGWOW2UuMLvbI3bWsM&export=download&authuser=0&confirm=t&uuid=2754e049-8f00-4b61-af55-974da0d86cf4&at=APZUnTVuxLuA5FGY9HgGSYyqScEe%3A1705351998875", "lara"),
             ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://civitai.com/api/download/models/260383?type=Model&format=SafeTensor", "Muscle_bimbo"),
             #ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://civitai.com/api/download/models/281780?type=Model&format=SafeTensor", "Muscle_mgm"),
             ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://civitai.com/api/download/models/87153?type=Model&format=SafeTensor", "Adetailer"),
             #ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://civitai.com/api/download/models/295786", "MuscleGirlsXL"),
+            ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sd15_lora.safetensors", "ip-adapter-faceid_sd15_lora"),
+            ModelInst(t, ModelType.Lora, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sd15_lora.safetensors", "ip-adapter-faceid-plusv2_sd15_lora"),
+            
             ModelInst(t, ModelType.Embedding, DownloadMethod.Wget, "https://civitai.com/api/download/models/77169?type=Model&format=PickleTensor", "BadDream", ext="pt"),
             ModelInst(t, ModelType.Embedding, DownloadMethod.Wget, "https://civitai.com/api/download/models/77173?type=Model&format=PickleTensor", "UnrealisticDream", ext="pt"),
+
             #ModelInst(t, ModelType.ClipVision, DownloadMethod.Wget, "https://huggingface.co/InvokeAI/ip_adapter_sd_image_encoder/resolve/main/model.safetensors?download=true", "ip_adapter_sd_image_encoder"),
-            #ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15.safetensors", "ip-adapter_sd15"),
-            #ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_light.safetensors", "ip-adapter_sd15_light"),
-            #ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus_sd15.safetensors", "ip-adapter-plus_sd15"),
-            #ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus-face_sd15.safetensors", "ip-adapter-plus-face_sd15"),
-            #ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-full-face_sd15.safetensors", "ip-adapter-full-face_sd15"),
-            #ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_vit-G.safetensors", "ip-adapter_sd15_vit-G"),
+            ModelInst(t, ModelType.ClipVision, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/image_encoder/model.safetensors", "CLIP-ViT-H-14-laion2B-s32B-b79K"),
+            ModelInst(t, ModelType.ClipVision, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/image_encoder/model.safetensors", "CLIP-ViT-bigG-14-laion2B-39B-b160k"),
+
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15.safetensors", "ip-adapter_sd15"),
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_light_v11.safetensors", "ip-adapter_sd15_light_v11"),
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus_sd15.safetensors", "ip-adapter-plus_sd15"),
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus-face_sd15.safetensors", "ip-adapter-plus-face_sd15"),
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-full-face_sd15.safetensors", "ip-adapter-full-face_sd15"),
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_vit-G.safetensors", "ip-adapter_sd15_vit-G"),
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sd15.bin", "ip-adapter-faceid_sd15", ext="bin"),
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sd15.bin", "ip-adapter-faceid-plusv2_sd15", ext="bin"),
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-portrait-v11_sd15.bin", "ip-adapter-faceid-portrait-v11_sd5", ext="bin"),
+            ModelInst(t, ModelType.IPAdapter, DownloadMethod.Wget, "https://huggingface.co/ostris/ip-composition-adapter/resolve/main/ip_plus_composition_sd15.safetensors", "ip_plus_composition_sd15"),
+
             ModelInst(t, ModelType.Controlnet, DownloadMethod.Wget, "https://huggingface.co/webui/ControlNet-modules-safetensors/resolve/main/control_depth-fp16.safetensors?download=true", "control_depth-fp16"),
             ModelInst(t, ModelType.Controlnet, DownloadMethod.Wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16", ext="pth"),
             ModelInst(t, ModelType.Controlnet, DownloadMethod.Wget, "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_softedge.pth?download=true", "control_softedge-fp16", ext="pth"),
@@ -167,6 +180,7 @@ ModelInstComfyUi()
 # 003 - ComfyUI-Inspire-Pack
 # 006 - controlnet
 # 011 - clipseg
+# 014 - ComFyUI Noise
 # 017 - Efficiency nodes 2.0+
 # 062 - ImagePreprocessing
 # 065 - ultimateSDupscale
