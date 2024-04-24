@@ -136,7 +136,7 @@ class ModelInstComfyUi:
     def __init__(self) -> None:
         t = TargetType.Comfy
         wget = DownloadMethod.Wget
-        models_default: list[ModelInst] = [
+        models_sd15: list[ModelInst] = [
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/245598?type=Model&format=SafeTensor&size=pruned&fp=fp16", "realisticvision"),
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/128713?type=Model&format=SafeTensor&size=pruned&fp=fp16", "dreamshaper"),
@@ -211,7 +211,8 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16", ext="pth"),
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_softedge.pth?download=true", "control_softedge-fp16", ext="pth"),
         ]
-        for model in models_default:
+        #for model in models_sd15:
+        for model in models_sdxl:
             model.install
 
 ModelInstComfyUi()
