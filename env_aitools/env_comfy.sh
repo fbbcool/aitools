@@ -3,7 +3,22 @@ env_inst() {
     #pip install -r $ENV_HOME/requirements_traingen.txt
     #pip install -r $ENV_HOME/requirements_gen.txt
     #env_pool_inst https://drive.google.com/file/d/1wdS5ULSgHV6KaaH9y6vHZY_-O6m5AXpB/view?usp=sharing
+}
+
+comfyui_default() {
     python3 $ENV_HOME/src/script/comfyui.py
+}
+
+comfyui_sd15() {
+    python3 $ENV_HOME/src/script/comfyui.py "sd15"
+}
+
+comfyui_sdxl() {
+    python3 $ENV_HOME/src/script/comfyui.py "sdxl"
+}
+
+comfyui_sdall() {
+    python3 $ENV_HOME/src/script/comfyui.py "sdall"
 }
 
 #export ENV_POOLS=$ENV_HOME/pools

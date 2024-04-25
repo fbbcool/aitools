@@ -21,3 +21,15 @@ ___comfy () {
     env_inst
 }
 
+___sd15 () {
+    comfyui_sd15
+}
+
+___sdxl () {
+    comfyui_sdxl
+}
+
+___sdall () {
+    comfyui_sdall
+}
+

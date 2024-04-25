@@ -1,5 +1,6 @@
 from enum import Enum, auto
 import os
+import sys
 import shutil
 from typing import Final
 #from huggingface_hub import hf_hub_download
@@ -13,6 +14,10 @@ class DownloadMethod(Enum):
     Wget = auto()
     GDrive = auto()
     Git = auto()
+class DownloadGroup(Enum):
+    SD15 = auto()
+    SDXL = auto()
+    SDALL = auto()
 class TargetType(Enum):
     Comfy = auto()
     SD = auto()
@@ -38,6 +43,7 @@ class ModelInst:
         self.name = name
         if not name:
             self.name = os.path.basename(self.url)
+            self.ext = ""
     
     def url_download(self, url: str, fname: str):
         resp = requests.get(url, stream=True)
@@ -85,7 +91,9 @@ class ModelInst:
     def install(self, force: bool = False) -> None:
         url_folder = self.url_models
         url_repos = f"{url_folder}/{self.name}"
-        url_model = f"{url_folder}/{self.name}.{self.ext}"
+        url_model = url_repos
+        if not self.ext:
+            url_model = f"{url_model}.{self.ext}"
         
         if not force:
             if ModelInst.url_exit(url_model):
@@ -133,8 +141,10 @@ class ModelInst:
         raise ValueError("Dir Models unknown!")
     
 class ModelInstComfyUi:
-    def __init__(self) -> None:
+    def __init__(self, group = DownloadGroup.SD15) -> None:
         t = TargetType.Comfy
+        xl = DownloadGroup.SDALL
+        sd = DownloadGroup.SD15
         wget = DownloadMethod.Wget
         models_sd15: list[ModelInst] = [
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
@@ -150,8 +160,8 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/281780?type=Model&format=SafeTensor", "Muscle_mgm"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/87153?type=Model&format=SafeTensor", "Adetailer"),
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/295786", "MuscleGirlsXL"),
-            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sd15_lora.safetensors", "ip-adapter-faceid_sd15_lora"),
-            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sd15_lora.safetensors", "ip-adapter-faceid-plusv2_sd15_lora"),
+            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sd15_lora.safetensors"),
+            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sd15_lora.safetensors"),
             
             ModelInst(t, ModelType.Embedding, wget, "https://civitai.com/api/download/models/77169?type=Model&format=PickleTensor", "BadDream", ext="pt"),
             ModelInst(t, ModelType.Embedding, wget, "https://civitai.com/api/download/models/77173?type=Model&format=PickleTensor", "UnrealisticDream", ext="pt"),
@@ -160,16 +170,16 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.ClipVision, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/image_encoder/model.safetensors", "CLIP-ViT-H-14-laion2B-s32B-b79K"),
             ModelInst(t, ModelType.ClipVision, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/image_encoder/model.safetensors", "CLIP-ViT-bigG-14-laion2B-39B-b160k"),
 
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15.safetensors", "ip-adapter_sd15"),
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_light_v11.safetensors", "ip-adapter_sd15_light_v11", ext="bin"),
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus_sd15.safetensors", "ip-adapter-plus_sd15"),
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus-face_sd15.safetensors", "ip-adapter-plus-face_sd15"),
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-full-face_sd15.safetensors", "ip-adapter-full-face_sd15"),
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_vit-G.safetensors", "ip-adapter_sd15_vit-G"),
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sd15.bin", "ip-adapter-faceid_sd15", ext="bin"),
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sd15.bin", "ip-adapter-faceid-plusv2_sd15", ext="bin"),
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-portrait-v11_sd15.bin", "ip-adapter-faceid-portrait-v11_sd5", ext="bin"),
-            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/ostris/ip-composition-adapter/resolve/main/ip_plus_composition_sd15.safetensors", "ip_plus_composition_sd15"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15.safetensors"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_light_v11.safetensors"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus_sd15.safetensors"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus-face_sd15.safetensors"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-full-face_sd15.safetensors"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_vit-G.safetensors"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sd15.bin"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sd15.bin"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-portrait-v11_sd15.bin"),
+            ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/ostris/ip-composition-adapter/resolve/main/ip_plus_composition_sd15.safetensors"),
 
             ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/webui/ControlNet-modules-safetensors/resolve/main/control_depth-fp16.safetensors?download=true", "control_depth-fp16"),
             ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16", ext="pth"),
@@ -211,11 +221,29 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16", ext="pth"),
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_softedge.pth?download=true", "control_softedge-fp16", ext="pth"),
         ]
-        #for model in models_sd15:
-        for model in models_sdxl:
+        model_db = {
+            DownloadGroup.SD15: models_sd15,
+            DownloadGroup.SDXL: models_sdxl,
+            DownloadGroup.SDALL: models_sd15 + models_sdxl,
+        }
+        for model in model_db[group]:
             model.install
 
-ModelInstComfyUi()
+if __name__ == "__main__":
+    str_group = int(sys.argv[1])
+    if str_group == "sd15":
+        group = DownloadGroup.SD15
+    elif str_group == "sdxl":
+        group = DownloadGroup.SDXL
+    elif str_group == "sdall":
+        group = DownloadGroup.SDALL
+    else:
+        str_group = "sd15"
+        group = DownloadGroup.SD15
+    
+
+    print(f"using download group {str_group}.")
+    ModelInstComfyUi(group=group)
 
 # https://huggingface.co/lllyasviel/ControlNet-v1-1/tree/main #ctrlnet models
 #https://huggingface.co/h94/IP-Adapter-FaceID/tree/main
