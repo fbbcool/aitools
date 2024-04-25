@@ -92,7 +92,7 @@ class ModelInst:
         url_folder = self.url_models
         url_repos = f"{url_folder}/{self.name}"
         url_model = url_repos
-        if not self.ext:
+        if self.ext:
             url_model = f"{url_model}.{self.ext}"
         
         if not force:
