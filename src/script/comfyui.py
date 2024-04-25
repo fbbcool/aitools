@@ -34,7 +34,7 @@ class ModelType(Enum):
 
 class ModelInst:
     UrlStorageModels: Final = "/workspace/storage/stable_diffusion/models"
-    def __init__(self, target: TargetType, model: ModelType, method: DownloadMethod, url: str, name: str, ext:str ="safetensors") -> None:
+    def __init__(self, target: TargetType, model: ModelType, method: DownloadMethod, url: str, name: str="", ext:str ="safetensors") -> None:
         self.target = target
         self.model = model
         self.method = method
