@@ -200,6 +200,9 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, wget, "https://drive.usercontent.google.com/download?id=12hW1O5jk06wwjbaalNDAOiq6GtAEb56C&export=download&authuser=0&confirm=t&uuid=6f0b3a21-37aa-487d-bd6e-6ad48c7ab68b&at=APZUnTWUTuTLbnTZjWSiW2DcBkMH%3A1713994594036", "LaraXL"),
             ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sdxl_lora.safetensors", ""),
             ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl_lora.safetensors", ""),
+            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_2step_lora.safetensors", ""),
+            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_4step_lora.safetensors", ""),
+            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_8step_lora.safetensors", ""),
             
             ModelInst(t, ModelType.Embedding, wget, "https://civitai.com/api/download/models/77169?type=Model&format=PickleTensor", "BadDream", ext="pt"),
             ModelInst(t, ModelType.Embedding, wget, "https://civitai.com/api/download/models/77173?type=Model&format=PickleTensor", "UnrealisticDream", ext="pt"),
