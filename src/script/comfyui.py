@@ -230,7 +230,7 @@ class ModelInstComfyUi:
             model.install
 
 if __name__ == "__main__":
-    str_group = int(sys.argv[1])
+    str_group = sys.argv[1]
     if str_group == "sd15":
         group = DownloadGroup.SD15
     elif str_group == "sdxl":
