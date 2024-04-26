@@ -226,11 +226,11 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/webui/ControlNet-modules-safetensors/resolve/main/control_depth-fp16.safetensors?download=true", "control_depth-fp16"),
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16", ext="pth"),
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_softedge.pth?download=true", "control_softedge-fp16", ext="pth"),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/blob/main/t2i-adapter_diffusers_xl_canny.safetensors", ""),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/blob/main/t2i-adapter_diffusers_xl_depth_midas.safetensors", ""),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/blob/main/t2i-adapter_diffusers_xl_openpose.safetensors", ""),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/blob/main/t2i-adapter_diffusers_xl_sketch.safetensors", ""),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/blob/main/t2i-adapter_xl_openpose.safetensors", ""),
+            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_canny.safetensors", ""),
+            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_depth_midas.safetensors", ""),
+            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_openpose.safetensors", ""),
+            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_sketch.safetensors", ""),
+            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_xl_openpose.safetensors", ""),
         ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
