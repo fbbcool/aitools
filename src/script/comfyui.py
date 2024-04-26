@@ -200,6 +200,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/295786", "MuscleGirlsXL"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/152734", "Uberfit"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/166271", "MinigiantessXL"),
+            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/440189", "Minigiantess World XL"),
             ModelInst(t, ModelType.Lora, wget, "https://drive.usercontent.google.com/download?id=12hW1O5jk06wwjbaalNDAOiq6GtAEb56C&export=download&authuser=0&confirm=t&uuid=6f0b3a21-37aa-487d-bd6e-6ad48c7ab68b&at=APZUnTWUTuTLbnTZjWSiW2DcBkMH%3A1713994594036", "LaraXL"),
             ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sdxl_lora.safetensors", ""),
             ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl_lora.safetensors", ""),
