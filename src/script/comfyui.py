@@ -188,7 +188,7 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.CustomNode, wget "https://github.com/ssitu/ComfyUI_UltimateSDUpscale", "ComfyUI_UltimateSDUpscale"),
         ]
         models_sdxl: list[ModelInst] = [
-            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/149868", "BBBvolup"),
+            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/149868", "BBBvolup"),
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/461409", "EpicRealismXL_v6"),
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/401841", "EpicRealismXL_Lightning_Zeus"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/251662", "dreamshaper_xl"),
