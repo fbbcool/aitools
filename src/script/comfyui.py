@@ -230,6 +230,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/blob/main/t2i-adapter_diffusers_xl_depth_midas.safetensors", ""),
             ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/blob/main/t2i-adapter_diffusers_xl_openpose.safetensors", ""),
             ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/blob/main/t2i-adapter_diffusers_xl_sketch.safetensors", ""),
+            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/blob/main/t2i-adapter_xl_openpose.safetensors", ""),
         ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
