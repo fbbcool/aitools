@@ -22,14 +22,17 @@ ___comfy () {
 }
 
 ___sd15 () {
+    git -C $ENV_HOME pull
     comfyui_sd15
 }
 
 ___sdxl () {
+    git -C $ENV_HOME pull
     comfyui_sdxl
 }
 
 ___sdall () {
+    git -C $ENV_HOME pull
     comfyui_sdall
 }
 
