@@ -188,7 +188,7 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.CustomNode, wget "https://github.com/ssitu/ComfyUI_UltimateSDUpscale", "ComfyUI_UltimateSDUpscale"),
         ]
         models_sdxl: list[ModelInst] = [
-            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/149868", "BBBvolup"),
+            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/149868", "BBBvolup"),
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/461409", "EpicRealismXL_v6"),
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/401841", "EpicRealismXL_Lightning_Zeus"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/251662", "dreamshaper_xl"),
@@ -200,7 +200,6 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/295786", "MuscleGirlsXL"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/152734", "Uberfit"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/166271", "MinigiantessXL"),
-            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/440189", "MinigiantessWorldXL"),
             ModelInst(t, ModelType.Lora, wget, "https://drive.usercontent.google.com/download?id=12hW1O5jk06wwjbaalNDAOiq6GtAEb56C&export=download&authuser=0&confirm=t&uuid=6f0b3a21-37aa-487d-bd6e-6ad48c7ab68b&at=APZUnTWUTuTLbnTZjWSiW2DcBkMH%3A1713994594036", "LaraXL"),
             ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sdxl_lora.safetensors", ""),
             ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl_lora.safetensors", ""),
@@ -263,15 +262,19 @@ if __name__ == "__main__":
 # 002 - ComfyUI-Impact-Pack
 # 003 - ComfyUI-Inspire-Pack
 # 006 - controlnet
-# 011 - clipseg
-# 014 - ComFyUI Noise
+# 013 - clipseg
+# 014 - ComFyUI Cutoff
+# 016 - ComFyUI Noise
 # 017 - Efficiency nodes 2.0+
-# 062 - ImagePreprocessing
+# 061 - ComfyUI WD 1.4 Tagger
 # 065 - ultimateSDupscale
 # 090 - ipadapter plus
 # 127 - reactor
 # 157 - rgthree 
-# 202 - comfy_pop
+# 202 - comfy_PoP
 # 215 - Essentials
+# 227 - CFG Scale Fix
+# 231 - Use Everywher
+# 258 - segment anything
 # 273 - mask bounding box
-# 311 - Nimbus pack
+# 382 - Comfyui Easy USe
