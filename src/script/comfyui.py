@@ -148,6 +148,7 @@ class ModelInstComfyUi:
         wget = DownloadMethod.Wget
         models_sd15: list[ModelInst] = [
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
+            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/143906", "EpicRealism"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/245598?type=Model&format=SafeTensor&size=pruned&fp=fp16", "realisticvision"),
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/128713?type=Model&format=SafeTensor&size=pruned&fp=fp16", "dreamshaper"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/143906?type=Model&format=SafeTensor&size=pruned&fp=fp16", "epic_realism_vae"),
