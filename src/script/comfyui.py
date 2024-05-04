@@ -271,11 +271,11 @@ if __name__ == "__main__":
 # 065 - ultimateSDupscale *
 # 090 - ipadapter plus *
 # 127 - ReActor Node for ComfyUI
-# 157 - rgthree *
+# 163 - rgthree *
 # 202 - comfy_PoP
-# 215 - Essentials *
+# 224 - Essentials *
 # 227 - CFG Scale Fix
 # 231 - Use Everywher
-# 258 - segment anything
+# 258 - segment anything *
 # 273 - mask bounding box
 # 382 - Comfyui Easy Use *
