@@ -163,6 +163,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/96699", "Minigiantess"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/154604", "ChloeVevrier"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/310719", "ExtremeHairy_v2"),
+            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/137206", "Unshaven"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/229047", "Insertion"),
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/295786", "MuscleGirlsXL"),
             ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sd15_lora.safetensors"),
@@ -265,20 +266,20 @@ if __name__ == "__main__":
 # custom nodes
 # 002 - ComfyUI-Impact-Pack *
 # 003 - ComfyUI-Inspire-Pack *
-# 006 - controlnet *
+# 008 - controlnet *
 # 013 - clipseg
 # 014 - ComFyUI Cutoff
 # 016 - ComFyUI Noise
-# 017 - Efficiency nodes 2.0+ *
-# 061 - ComfyUI WD 1.4 Tagger *
-# 065 - ultimateSDupscale *
-# 090 - ipadapter plus *
+# 020 - Efficiency nodes 2.0+ *
+# 064 - ComfyUI WD 1.4 Tagger *
+# 073 - ultimateSDupscale *
+# 098 - ipadapter plus *
 # 127 - ReActor Node for ComfyUI
-# 163 - rgthree *
+# 169 - rgthree *
 # 202 - comfy_PoP
-# 224 - Essentials *
+# 232 - Essentials *
 # 227 - CFG Scale Fix
 # 231 - Use Everywher
-# 258 - segment anything *
+# 267 - segment anything *
 # 273 - mask bounding box
-# 382 - Comfyui Easy Use *
+# 396 - Comfyui Easy Use *
