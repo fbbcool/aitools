@@ -162,6 +162,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/87153?type=Model&format=SafeTensor", "Adetailer"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/96699", "Minigiantess"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/154604", "ChloeVevrier"),
+            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/123205", "Giantess"),
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/310719", "ExtremeHairy_v2"),
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/137206", "Unshaven"),
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/229047", "Insertion"),
