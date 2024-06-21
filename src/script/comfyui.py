@@ -147,10 +147,12 @@ class ModelInstComfyUi:
         sd = DownloadGroup.SD15
         wget = DownloadMethod.Wget
         models_sd15: list[ModelInst] = [
-            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
-            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/143906", "EpicRealism"),
+            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
+            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/143906", "EpicRealism"),
+            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/573082", "GODDESSofRealism"),
+            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/283712", "MFCGDollMix"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/245598?type=Model&format=SafeTensor&size=pruned&fp=fp16", "realisticvision"),
-            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/128713?type=Model&format=SafeTensor&size=pruned&fp=fp16", "dreamshaper"),
+            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/128713?type=Model&format=SafeTensor&size=pruned&fp=fp16", "dreamshaper"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/143906?type=Model&format=SafeTensor&size=pruned&fp=fp16", "epic_realism_vae"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/251662", "dreamshaper_xl"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/288982?type=Model&format=SafeTensor&size=full&fp=fp16", "juggernaut_xl"),
@@ -161,6 +163,7 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/281780?type=Model&format=SafeTensor", "Muscle_mgm"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/87153?type=Model&format=SafeTensor", "Adetailer"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/96699", "Minigiantess"),
+            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/315369", "GiantessWithTiny"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/154604", "ChloeVevrier"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/123205", "Giantess"),
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/310719", "ExtremeHairy_v2"),
