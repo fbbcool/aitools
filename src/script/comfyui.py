@@ -149,7 +149,7 @@ class ModelInstComfyUi:
         models_sd15: list[ModelInst] = [
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/143906", "EpicRealism"),
-            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/573082", "GODDESSofRealism"),
+            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/573082", "GODDESSofRealism"),
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/283712", "MFCGDollMix"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/245598?type=Model&format=SafeTensor&size=pruned&fp=fp16", "realisticvision"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/128713?type=Model&format=SafeTensor&size=pruned&fp=fp16", "dreamshaper"),
@@ -268,22 +268,22 @@ if __name__ == "__main__":
 # https://huggingface.co/lllyasviel/ControlNet-v1-1/tree/main #ctrlnet models
 #https://huggingface.co/h94/IP-Adapter-FaceID/tree/main
 # custom nodes
-# 002 - ComfyUI-Impact-Pack *
-# 003 - ComfyUI-Inspire-Pack *
-# 008 - controlnet *
+# 002 * ComfyUI-Impact-Pack *
+# 003 * ComfyUI-Inspire-Pack *
+# 008 * controlnet *
 # 013 - clipseg
 # 014 - ComFyUI Cutoff
 # 016 - ComFyUI Noise
-# 020 - Efficiency nodes 2.0+ *
-# 064 - ComfyUI WD 1.4 Tagger *
-# 073 - ultimateSDupscale *
-# 098 - ipadapter plus *
+# 020 * Efficiency nodes 2.0+ *
+# 064 * ComfyUI WD 1.4 Tagger *
+# 073 * ultimateSDupscale *
+# 098 * ipadapter plus *
 # 127 - ReActor Node for ComfyUI
-# 169 - rgthree *
+# 171 * rgthree *
 # 202 - comfy_PoP
-# 232 - Essentials *
+# 236 * Essentials *
 # 227 - CFG Scale Fix
 # 231 - Use Everywher
-# 267 - segment anything *
+# 275 * segment anything *
 # 273 - mask bounding box
-# 396 - Comfyui Easy Use *
+# 408 * Comfyui Easy Use *
