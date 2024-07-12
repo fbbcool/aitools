@@ -128,7 +128,7 @@ class ModelInst:
             if self.model == ModelType.Checkpoint:
                 return "/opt/ComfyUI/models/checkpoints"
             if self.model == ModelType.VAE:
-                return "/opt/ComfyUI/models/VAE"
+                return "/opt/ComfyUI/models/vae"
             if self.model == ModelType.Controlnet:
                 return "/opt/ComfyUI/models/controlnet"
             if self.model == ModelType.CustomNode:
