@@ -30,6 +30,7 @@ class ModelType(Enum):
     ClipVision = auto()
     IPAdapter = auto()
     CustomNode = auto()
+    VAE = auto()
 
 
 class ModelInst:
@@ -126,6 +127,8 @@ class ModelInst:
         if self.target == TargetType.Comfy:
             if self.model == ModelType.Checkpoint:
                 return "/opt/ComfyUI/models/checkpoints"
+            if self.model == ModelType.VAE:
+                return "/opt/ComfyUI/models/VAE"
             if self.model == ModelType.Controlnet:
                 return "/opt/ComfyUI/models/controlnet"
             if self.model == ModelType.CustomNode:
@@ -147,10 +150,10 @@ class ModelInstComfyUi:
         sd = DownloadGroup.SD15
         wget = DownloadMethod.Wget
         models_sd15: list[ModelInst] = [
-            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
+            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/143906", "EpicRealism"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/573082", "GODDESSofRealism"),
-            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/283712", "MFCGDollMix"),
+            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/283712", "MFCGDollMix"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/245598?type=Model&format=SafeTensor&size=pruned&fp=fp16", "realisticvision"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/128713?type=Model&format=SafeTensor&size=pruned&fp=fp16", "dreamshaper"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/143906?type=Model&format=SafeTensor&size=pruned&fp=fp16", "epic_realism_vae"),
@@ -158,10 +161,10 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/288982?type=Model&format=SafeTensor&size=full&fp=fp16", "juggernaut_xl"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0_0.9vae.safetensors?download=true", "sdxl_refiner"),
 
-            ModelInst(t, ModelType.Lora, wget, "https://drive.usercontent.google.com/download?id=1WOAizZJY4g4qO8nGWOW2UuMLvbI3bWsM&export=download&authuser=0&confirm=t&uuid=2754e049-8f00-4b61-af55-974da0d86cf4&at=APZUnTVuxLuA5FGY9HgGSYyqScEe%3A1705351998875", "lara"),
+            #ModelInst(t, ModelType.Lora, wget, "https://drive.usercontent.google.com/download?id=1WOAizZJY4g4qO8nGWOW2UuMLvbI3bWsM&export=download&authuser=0&confirm=t&uuid=2754e049-8f00-4b61-af55-974da0d86cf4&at=APZUnTVuxLuA5FGY9HgGSYyqScEe%3A1705351998875", "lara"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/260383?type=Model&format=SafeTensor", "Muscle_bimbo"),
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/281780?type=Model&format=SafeTensor", "Muscle_mgm"),
-            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/87153?type=Model&format=SafeTensor", "Adetailer"),
+            #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/87153?type=Model&format=SafeTensor", "Adetailer"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/96699", "Minigiantess"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/315369", "GiantessWithTiny"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/154604", "ChloeVevrier"),
@@ -198,23 +201,31 @@ class ModelInstComfyUi:
         ]
         models_sdxl: list[ModelInst] = [
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/149868", "BBBvolup"),
-            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/461409", "EpicRealismXL_v6"),
-            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/401841", "EpicRealismXL_Lightning_Zeus"),
+            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/461409", "EpicRealismXL_v6"),
+            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/401841", "EpicRealismXL_Lightning_Zeus"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/251662", "dreamshaper_xl"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/288982?type=Model&format=SafeTensor&size=full&fp=fp16", "juggernaut_xl"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0_0.9vae.safetensors?download=true", "sdxl_refiner"),
+            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/461409", "Pony_Realism_XL"),
+            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/290640?type=Model&format=SafeTensor&size=pruned&fp=fp16", "PonyDiff_v6_XL"),
+            
+            ModelInst(t, ModelType.VAE, wget, "https://civitai.com/api/download/models/290640?type=VAE&format=SafeTensor", "PonyDiff_VAE_XL"),
 
             #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/281780?type=Model&format=SafeTensor", "Muscle_mgm"),
             ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/87153?type=Model&format=SafeTensor", "Adetailer"),
-            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/295786", "MuscleGirlsXL"),
-            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/152734", "Uberfit"),
-            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/166271", "MinigiantessXL"),
-            ModelInst(t, ModelType.Lora, wget, "https://drive.usercontent.google.com/download?id=12hW1O5jk06wwjbaalNDAOiq6GtAEb56C&export=download&authuser=0&confirm=t&uuid=6f0b3a21-37aa-487d-bd6e-6ad48c7ab68b&at=APZUnTWUTuTLbnTZjWSiW2DcBkMH%3A1713994594036", "LaraXL"),
+            #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/295786", "MuscleGirlsXL"),
+            #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/152734", "Uberfit"),
+            #ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/166271", "MinigiantessXL"),
+            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/577428", "MinigiantessPDXL"),
+            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/422872", "AnalVorePDXL"),
+            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/443306", "UnbirthPDXL"),
+            ModelInst(t, ModelType.Lora, wget, "https://civitai.com/api/download/models/564673", "ShrunkPDXL"),
+            #ModelInst(t, ModelType.Lora, wget, "https://drive.usercontent.google.com/download?id=12hW1O5jk06wwjbaalNDAOiq6GtAEb56C&export=download&authuser=0&confirm=t&uuid=6f0b3a21-37aa-487d-bd6e-6ad48c7ab68b&at=APZUnTWUTuTLbnTZjWSiW2DcBkMH%3A1713994594036", "LaraXL"),
             ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sdxl_lora.safetensors", ""),
             ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl_lora.safetensors", ""),
-            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_2step_lora.safetensors", ""),
-            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_4step_lora.safetensors", ""),
-            ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_8step_lora.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_2step_lora.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_4step_lora.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, wget, "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_8step_lora.safetensors", ""),
             
             ModelInst(t, ModelType.Embedding, wget, "https://civitai.com/api/download/models/77169?type=Model&format=PickleTensor", "BadDream", ext="pt"),
             ModelInst(t, ModelType.Embedding, wget, "https://civitai.com/api/download/models/77173?type=Model&format=PickleTensor", "UnrealisticDream", ext="pt"),
