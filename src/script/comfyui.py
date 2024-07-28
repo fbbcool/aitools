@@ -194,14 +194,14 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-portrait-v11_sd15.bin"),
             ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/ostris/ip-composition-adapter/resolve/main/ip_plus_composition_sd15.safetensors"),
 
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/webui/ControlNet-modules-safetensors/resolve/main/control_depth-fp16.safetensors?download=true", "control_depth-fp16"),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16", ext="pth"),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_softedge.pth?download=true", "control_softedge-fp16", ext="pth"),
+            #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/webui/ControlNet-modules-safetensors/resolve/main/control_depth-fp16.safetensors?download=true", "control_depth-fp16"),
+            #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16", ext="pth"),
+            #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_softedge.pth?download=true", "control_softedge-fp16", ext="pth"),
             #ModelInst(t, ModelType.CustomNode, wget "https://github.com/ssitu/ComfyUI_UltimateSDUpscale", "ComfyUI_UltimateSDUpscale"),
         ]
         models_sdxl: list[ModelInst] = [
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/149868", "BBBvolup"),
-            ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/344487", "RealVisXL V4.0"),
+            #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/344487", "RealVisXL V4.0"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/461409", "EpicRealismXL_v6"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/401841", "EpicRealismXL_Lightning_Zeus"),
             #ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/251662", "dreamshaper_xl"),
@@ -247,14 +247,15 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-portrait_sdxl_unnorm.bin", ""),
             ModelInst(t, ModelType.IPAdapter, wget, "https://huggingface.co/ostris/ip-composition-adapter/resolve/main/ip_plus_composition_sdxl.safetensors", ""),
 
+            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/resolve/main/diffusion_pytorch_model_promax.safetensors", ""),
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/webui/ControlNet-modules-safetensors/resolve/main/control_depth-fp16.safetensors?download=true", "control_depth-fp16"),
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin?download=true", "control_tile-fp16", ext="pth"),
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_softedge.pth?download=true", "control_softedge-fp16", ext="pth"),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_canny.safetensors", ""),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_depth_midas.safetensors", ""),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_openpose.safetensors", ""),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_sketch.safetensors", ""),
-            ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_xl_openpose.safetensors", ""),
+            #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_canny.safetensors", ""),
+            #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_depth_midas.safetensors", ""),
+            #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_openpose.safetensors", ""),
+            #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_sketch.safetensors", ""),
+            #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_xl_openpose.safetensors", ""),
         ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
