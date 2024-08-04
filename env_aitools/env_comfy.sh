@@ -21,6 +21,10 @@ comfyui_sdall() {
     python3 $ENV_HOME/src/script/comfyui.py "sdall"
 }
 
+comfyui_flux() {
+    python3 $ENV_HOME/src/script/comfyui.py "flux"
+}
+
 #export ENV_POOLS=$ENV_HOME/pools
 #export ENV_TRAINS=$ENV_HOME/trains
 #export ENV_MODELS=$ENV_HOME/models

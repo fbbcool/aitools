@@ -18,6 +18,7 @@ class DownloadGroup(Enum):
     SD15 = auto()
     SDXL = auto()
     SDALL = auto()
+    FLUX = auto()
 class TargetType(Enum):
     Comfy = auto()
     SD = auto()
@@ -28,9 +29,11 @@ class ModelType(Enum):
     Lora = auto()
     Embedding = auto()
     ClipVision = auto()
+    Clip = auto()
     IPAdapter = auto()
     CustomNode = auto()
     VAE = auto()
+    Unet = auto()
 
 
 class ModelInst:
@@ -124,30 +127,39 @@ class ModelInst:
 
     @property
     def url_models(self) -> str:
+        path_models = ""
+        folder_model = ""
         if self.target == TargetType.Comfy:
+            path_models = "/opt/ComfyUI/models"
             if self.model == ModelType.Checkpoint:
-                return "/opt/ComfyUI/models/checkpoints"
-            if self.model == ModelType.VAE:
-                return "/opt/ComfyUI/models/vae"
-            if self.model == ModelType.Controlnet:
-                return "/opt/ComfyUI/models/controlnet"
-            if self.model == ModelType.CustomNode:
-                return "/opt/ComfyUI/custom_nodes"
-            if self.model == ModelType.Lora:
-                return "/opt/ComfyUI/models/loras"
-            if self.model == ModelType.Embedding:
-                return "/opt/ComfyUI/models/embeddings"
-            if self.model == ModelType.ClipVision:
-                return "/opt/ComfyUI/models/clip_vision"
-            if self.model == ModelType.IPAdapter:
-                return "/opt/ComfyUI/models/ipadapter"
-        raise ValueError("Dir Models unknown!")
+                folder_model = "checkpoints"
+            elif self.model == ModelType.VAE:
+                folder_model = "vae"
+            elif self.model == ModelType.Controlnet:
+                folder_model = "controlnet"
+            elif self.model == ModelType.CustomNode:
+                folder_model = "nodes"
+            elif self.model == ModelType.Lora:
+                folder_model = "loras"
+            elif self.model == ModelType.Embedding:
+                folder_model = "embeddings"
+            elif self.model == ModelType.Clip:
+                folder_model = "clip"
+            elif self.model == ModelType.ClipVision:
+                folder_model = "clip_vision"
+            elif self.model == ModelType.IPAdapter:
+                folder_model = "ipadapter"
+            elif self.model == ModelType.Unet:
+                folder_model = "unet"
+        
+        if not folder_model:
+            raise ValueError("Dir Models unknown!")
+        
+        return f"{path_models}/{folder_model}"
     
 class ModelInstComfyUi:
     def __init__(self, group = DownloadGroup.SD15) -> None:
         t = TargetType.Comfy
-        xl = DownloadGroup.SDALL
-        sd = DownloadGroup.SD15
         wget = DownloadMethod.Wget
         models_sd15: list[ModelInst] = [
             ModelInst(t, ModelType.Checkpoint, wget, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
@@ -257,10 +269,20 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_sketch.safetensors", ""),
             #ModelInst(t, ModelType.Controlnet, wget, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_xl_openpose.safetensors", ""),
         ]
+        models_flux: list[ModelInst] = [
+            ModelInst(t, ModelType.Unet, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.sft?download=true", "flux1-schnell"),
+            
+            ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true", "vae_flux1"),
+
+            ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
+            ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
+            ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
+        ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
             DownloadGroup.SDXL: models_sdxl,
             DownloadGroup.SDALL: models_sd15 + models_sdxl,
+            DownloadGroup.FLUX: models_flux
         }
         for model in model_db[group]:
             model.install
@@ -273,6 +295,8 @@ if __name__ == "__main__":
         group = DownloadGroup.SDXL
     elif str_group == "sdall":
         group = DownloadGroup.SDALL
+    elif str_group == "flux":
+        group = DownloadGroup.FLUX
     else:
         str_group = "sd15"
         group = DownloadGroup.SD15

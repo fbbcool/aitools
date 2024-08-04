@@ -36,3 +36,9 @@ ___sdall () {
     comfyui_sdall
 }
 
+
+___flux () {
+    git -C $ENV_HOME pull
+    comfyui_flux
+}
+

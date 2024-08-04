@@ -1,7 +1,7 @@
 #folium
 #jupyterlab
 #matplotlib
-scikit-spatial
+#scikit-spatial
 ipympl
 black
 flake8
@@ -10,10 +10,10 @@ pep8-naming
 setuptools
 numpy
 scipy
-protobuf
-gitpython
-geojson
-pymap3d
+#protobuf
+#gitpython
+#geojson
+#pymap3d
 pandas
 pillow
 #huggingface_hub
