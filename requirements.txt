@@ -16,5 +16,5 @@ scipy
 #pymap3d
 pandas
 pillow
-#huggingface_hub
+huggingface_hub
 tqdm
