@@ -373,13 +373,13 @@ class ModelInstComfyUi:
         ]
         models_flux: list[ModelInst] = [
             ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", "flux1-dev"),
-            #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors?download=true", "flux1-schnell"),
+            #ModelInst(t, ModelType.Unet, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors?download=true", "flux1-schnell"),
             
-            ModelInst(t, ModelType.VAE, hf, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true", "vae_flux1"),
+            ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true", "vae_flux1"),
 
-            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
-            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
-            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
+            ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
+            ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
+            ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
         ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
