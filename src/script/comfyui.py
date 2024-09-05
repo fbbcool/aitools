@@ -97,13 +97,13 @@ class ModelInst:
         hf_hub_download(repo_id = config["repo_id"], filename = config["name"], local_dir=opath)
 
     def download_civitai(self, url: str, fname: str):
+        opath = str(Path(fname).parent)
+        token = self.token_cai
+
         headers = {
             'Authorization': f'Bearer {token}',
             'User-Agent': self.USER_AGENT,
         }
-
-        opath = str(Path(fname).parent)
-        token = self.token_cai
 
         # Disable automatic redirect handling
         class NoRedirection(urllib.request.HTTPErrorProcessor):
