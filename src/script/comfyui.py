@@ -380,6 +380,9 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
             #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
             ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
+            
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756663?type=Model&format=SafeTensor", "F1_GiantwithMiniperson"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/746948?type=Model&format=SafeTensor", "F1_Muscular_woman"),
         ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
