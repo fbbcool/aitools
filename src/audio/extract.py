@@ -2,20 +2,29 @@ import subprocess
 import os
 from pathlib import Path
 
-from src.audio.common import _ofile_attach_metadata
+from src.audio.common import _ofile_attach_metadata, _file_link_metadata, EXT_VIDEOS
 
-def _extract_audio_folder(folder: str, output_ext: str =".mp3"):
-    """Converts video to audio directly using `ffmpeg` command
-    with the help of subprocess module"""
+def _extract_audio_fiorfo(fiorfo: str, output_ext: str =".mp3", force=False):
 
-    ipath = Path(folder)
+    ipath = Path(fiorfo)
 
-    for ifile in ipath.glob("*.mp4"):
-        ofile = ifile.with_suffix(output_ext)
-        ofile = _ofile_attach_metadata(ofile)
-        print(f"{ifile} -> {ofile}")
-        subprocess.call(
-            ["ffmpeg", "-vn", "-y", "-i", str(ifile), str(ofile)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.STDOUT,
-            )
+    for ext_video in EXT_VIDEOS:
+        ifiles = [ipath]
+        if not ipath.is_file():
+            ifiles = ipath.glob(f"*{ext_video}")
+        
+        for ifile in ifiles:
+            _file_link_metadata(ifile)
+            ofile = ifile.with_suffix(output_ext)
+            ofile = _ofile_attach_metadata(ofile)
+
+            if ofile.exists():
+                if not force:
+                    continue
+
+            print(f"{ifile} -> {ofile}")
+            subprocess.call(
+                ["ffmpeg", "-vn", "-y", "-i", str(ifile), str(ofile)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT,
+                )
