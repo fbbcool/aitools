@@ -62,7 +62,7 @@ def _get_model_whisper():
     device = "mps" # if torch.cuda.is_available() else "cpu"
 
     # Load audio file
-    audio_data, sample_rate = sf.read(input_file, always_2d=True)
+    #audio_data, sample_rate = sf.read(input_file, always_2d=True)
 
     #load whisper model
     model_size = "tiny"
@@ -75,8 +75,8 @@ def _get_model_whisper():
     language = "en"
 
     # Transcribe audio
-    with torch.cuda.device(device):
-        result = model.transcribe(audio_data, language=language, fp16=True, word_timestamps=True)
+    #with torch.cuda.device(device):
+    #     result = model.transcribe(audio_data, language=language, fp16=True, word_timestamps=True)
 
 def _transcribe_fiorfo(fiorfo: str, subtitles=True, force=False):
 
