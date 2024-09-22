@@ -373,7 +373,7 @@ class ModelInstComfyUi:
         ]
         models_flux: list[ModelInst] = [
             ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q8_0.gguf", "flux1-dev-q8_gguf"),
-            #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", "flux1-dev"),
+            ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", "flux1-dev"),
             #ModelInst(t, ModelType.Unet, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors?download=true", "flux1-schnell"),
             
             ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true", "vae_flux1"),
