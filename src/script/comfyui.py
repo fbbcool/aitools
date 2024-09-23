@@ -390,6 +390,8 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756663?type=Model&format=SafeTensor", "F1_GiantwithMiniperson"),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/746948?type=Model&format=SafeTensor", "F1_Muscular_woman"),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/720252?type=Model&format=SafeTensor", "F1_Featasic"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/723657?type=Model&format=SafeTensor", "F1_Pony_round breasts"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756686?type=Model&format=SafeTensor", "F1_Pony_nsfw"),
         ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
