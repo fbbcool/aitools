@@ -230,7 +230,7 @@ class ModelInst:
         path_models = ""
         folder_model = ""
         if self.target == TargetType.Comfy:
-            path_models = "/opt/ComfyUI/models"
+            path_models = "/workspace/ComfyUI/models"
             if self.model == ModelType.Checkpoint:
                 folder_model = "checkpoints"
             elif self.model == ModelType.VAE:
