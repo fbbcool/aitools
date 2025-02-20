@@ -373,6 +373,7 @@ class ModelInstComfyUi:
         ]
         models_flux: list[ModelInst] = [
             ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q8_0.gguf", ""),
+            ModelInst(t, ModelType.Unet, cai, "https://civitai.com/api/download/models/1245049?type=Model&format=GGUF&size=full&fp=bf16", ""),
             #ModelInst(t, ModelType.Unet, cai, "https://civitai.com/api/download/models/897489?type=Model&format=SafeTensor&size=full&fp=fp16", ""),
             #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", s"),
             #ModelInst(t, ModelType.Unet, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors?download=true", "flux1-schnell"),
@@ -388,15 +389,15 @@ class ModelInstComfyUi:
             
             ModelInst(t, ModelType.Controlnet, hf, "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro/resolve/main/diffusion_pytorch_model.safetensors?download=true", ""),
             
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756663?type=Model&format=SafeTensor", "F1_GiantwithMiniperson"),
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/746948?type=Model&format=SafeTensor", "F1_Muscular_woman"),
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/720252?type=Model&format=SafeTensor", "F1_Featasic"),
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/723657?type=Model&format=SafeTensor", "F1_Pony_round breasts"),
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756686?type=Model&format=SafeTensor", "F1_Pony_nsfw"),
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/751657?type=Model&format=SafeTensor", "F1_hairy"),
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/827325?type=Model&format=SafeTensor", "F1_skin"),
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1050233?type=Model&format=SafeTensor", "Hairy_girls"),
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/786275?type=Model&format=SafeTensor", ""),
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756663?type=Model&format=SafeTensor", "F1_GiantwithMiniperson"),
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/746948?type=Model&format=SafeTensor", "F1_Muscular_woman"),
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/720252?type=Model&format=SafeTensor", "F1_Featasic"),
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/723657?type=Model&format=SafeTensor", "F1_Pony_round breasts"),
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756686?type=Model&format=SafeTensor", "F1_Pony_nsfw"),
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/751657?type=Model&format=SafeTensor", "F1_hairy"),
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/827325?type=Model&format=SafeTensor", "F1_skin"),
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1050233?type=Model&format=SafeTensor", "Hairy_girls"),
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/786275?type=Model&format=SafeTensor", ""),
         ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
