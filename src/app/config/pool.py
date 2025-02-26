@@ -30,6 +30,7 @@ class Pool:
 
         if not self.root.is_dir():
             print(f"error: no pool found ({str(self.root)})!")
+            self.name = None
             return
         
         self._index(force=force)
@@ -49,6 +50,7 @@ class Pool:
             rows.append(row)
         if not rows:
             print(f"error: no imgs found in pool ({str(self.root)})!")
+            self.name = None
             return
         columns = list(rows[0].keys())
         self.df = pd.DataFrame(rows, columns=columns)
