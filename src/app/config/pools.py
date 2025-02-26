@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from config import config
+from .config import config
 
 class Pools:
     def __init__(self, root: Path):
@@ -9,6 +9,9 @@ class Pools:
     @property
     def labels(self) -> list[str]:
         return [f.name for f in self.root.iterdir() if f.is_dir()]
+    
+    def url_pool(self, pool: str) -> Path:
+        return Path(self.root, pool, "origs")
 
 pools: Pools = Pools(config.path_pools)
     
