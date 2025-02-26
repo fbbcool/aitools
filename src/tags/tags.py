@@ -34,6 +34,8 @@ class TagsProfile(dict):
         "leggy",
         "fbb",
         "slave",
+        "hairy",
+        "gts",
     ]
     def __init__(self, _type: str, trigger: str = ""):
         super().__init__({
@@ -79,8 +81,26 @@ class TagsProfile(dict):
         self["footer"] = [] + self["footer"]
 
     @property
+    def make_hairy(self):
+        self["header"] = ["woman"] + self["header"]
+        self["negative"] = self["negative"] + ["xxx yyy"]
+        self["replace"] = {
+            "aaa": ["bbb", "ccc"],
+        }
+        self["footer"] = [] + self["footer"]
+
+    @property
     def make_slave(self):
         self["header"] = ["man"] + self["header"]
+        self["negative"] = self["negative"] + ["xxx yyy"]
+        self["replace"] = {
+            "aaa": ["bbb", "ccc"],
+        }
+        self["footer"] = [] + self["footer"]
+
+    @property
+    def make_gts(self):
+        self["header"] = ["woman","giantess","size_difference","height_difference","taller_woman"] + self["header"]
         self["negative"] = self["negative"] + ["xxx yyy"]
         self["replace"] = {
             "aaa": ["bbb", "ccc"],
@@ -109,6 +129,8 @@ class TagsProfile(dict):
         self["replace"] = self["replace"] | dict_replace
     
 def build_tags(url_img: str, profile: TagsProfile, use_type=Defines.TypeCapWd14) -> None:
+    """TODO: currently wrongly implemented!"""
+    return
     Helpers.caps_to_tags(use_type)
     url_from_tags = Helpers.url_change_type(url_img, use_type)
     from_caps = []

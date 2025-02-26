@@ -81,23 +81,26 @@ class ImgPool:
 
         im_face.save(_to)
 
-    def _create_pool(self, url_crawl: str) -> None:
+    def _create_pool(self, url_crawl: str, orig: bool =True, face: bool = False) -> None:
         # recreate pools dir
         if os.path.isdir(self.url_pool):
             yes = input(f"Really want to delete {self.url_pool} [y/n]? ")
             if yes not in ["y"]:
                 return
             shutil.rmtree(self.url_pool, ignore_errors=False)
-        Path(self.url_pool).mkdir(parents=True, exist_ok=True)
-        Path(self.url_origs).mkdir(parents=False, exist_ok=False)
-        Path(self.url_faces).mkdir(parents=False, exist_ok=False)
 
-        for id, url_src in enumerate(ImgSelector(url_crawl, ImgSelectorCategory.Orig, self.num_img, self.mode).result):
-            url_orig = self.url_orig_id(id)
-            self._proc_img(url_src, url_orig)
-        for id, url_src in enumerate(ImgSelector(url_crawl, ImgSelectorCategory.Face, self.num_img, self.mode).result):
-            url_face = self.url_face_id(id)
-            self._proc_face(url_src, url_face)
+        print(f"ImgPool: creating directory {self.url_pool}")
+        Path(self.url_pool).mkdir(parents=True, exist_ok=True)
+        if orig:
+            Path(self.url_origs).mkdir(parents=False, exist_ok=False)
+            for id, url_src in enumerate(ImgSelector(url_crawl, ImgSelectorCategory.Orig, self.num_img, self.mode).result):
+                url_orig = self.url_orig_id(id)
+                self._proc_img(url_src, url_orig)
+        if face:
+            Path(self.url_faces).mkdir(parents=False, exist_ok=False)
+            for id, url_src in enumerate(ImgSelector(url_crawl, ImgSelectorCategory.Face, self.num_img, self.mode).result):
+                url_face = self.url_face_id(id)
+                self._proc_face(url_src, url_face)
 
 
     """
@@ -152,12 +155,12 @@ class ImgPool:
     
     def url_orig_ids_tag(self, use_type: str) -> Generator:
         Helpers.caption_check_type(use_type)
-        for url_orig_id in self.url_orig_ids:
-            yield Helpers.url_change_type(url_orig_id, use_type)
+        for url_id in self.url_orig_ids:
+            yield Helpers.url_change_type(url_id, use_type)
     def url_face_ids_tag(self, use_type: str) -> Generator:
         Helpers.caption_check_type(use_type)
-        for url_face_id in self.url_face_ids:
-            yield Helpers.url_change_type(url_orig_id, use_type)
+        for url_id in self.url_face_ids:
+            yield Helpers.url_change_type(url_id, use_type)
 
     """
     API
@@ -180,12 +183,14 @@ class ImgPool:
                 url_category,
                 ImgSelectorCategory.NONE,
                 perc * len(url_category),
-                ImgSelectorMode.IngoreTags,
+                ImgSelectorMode.All,
                 ).result
             for url_img in url_imgs:
-                filename_img, _ = os.path.split(url_img)
+                filename_img = Path(url_img).name
                 url_img_train = f"{url_train_category}/{filename_img}"
                 # only symlink imgages
+                print(f"{os.path.abspath(url_img)}")
+                print(f"->{os.path.abspath(url_img_train)}")
                 os.symlink(os.path.abspath(url_img), os.path.abspath(url_img_train))
                 # TODO
                 build_tags(url_img, profile)

@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 
 # project imgset
+workspace/
 img_sets/
 img_imports/
 testset/

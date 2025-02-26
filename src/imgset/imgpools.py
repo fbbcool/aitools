@@ -9,7 +9,7 @@ class ImgPools():
                  train_steps: int = Defines.TrainSteps,
                  epochs: int = Defines.Epochs,
                  mode: ImgSelectorMode = ImgSelectorMode.UseTags,
-                 crawl = False,
+                 crawl = True,
                  ) -> None:
         self.pools_dict = pools_dict
         self.num_pics = num_pics

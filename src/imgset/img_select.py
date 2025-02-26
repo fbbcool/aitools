@@ -2,6 +2,7 @@
 from enum import Enum, auto
 from glob import glob
 import os
+from pathlib import Path
 from random import random
 from typing import Final
 
@@ -12,6 +13,7 @@ from ..defines import Defines
 class ImgSelectorMode(Enum):
     UseTags = auto()
     IngoreTags = auto()
+    All = auto()
 
 class ImgSelectorCategory():
     NONE: Final = ""
@@ -33,6 +35,9 @@ class ImgSelector:
         
         self.url_src_folders = []
         self.url_img_selected = []
+        
+        if  not Path(self.url_crawl).exists():
+            print(f"warning: crawl dir {self.url_crawl} does not exist!")
     
     @property
     def result(self) -> list[str]:
@@ -40,6 +45,7 @@ class ImgSelector:
         all += [glob(f"{dir}/*.{Defines.TypeImgTarget}") for dir in self._url_src_folders]
         url_img_pooled = [x for xs in all for x in xs] # flattened list
         if not url_img_pooled:
+            print("no files pooled!")
             return []
 
         url_img_selected = []
@@ -56,7 +62,9 @@ class ImgSelector:
         if not url_img_later_use:
             return url_img_selected
         prob = (self.num_img - len(url_img_selected)) / len(url_img_later_use)
-        print(prob)
+        if self.mode == ImgSelectorMode.All:
+            prob = 1.01
+        print(f"p(img_select) = {prob}")
         return url_img_selected + [url_img for url_img in url_img_later_use
             if prob > random()]
         
@@ -75,6 +83,8 @@ class ImgSelector:
                 if self._url_select_by_tag(url)
                 if ImgSelector.TagNok not in ImgSelector._tags_url(url)]
         elif ImgSelectorMode.IngoreTags == self.mode:
+            ret = url_srcs
+        elif ImgSelectorMode.All == self.mode:
             ret = url_srcs
         elif True:
             ret = []
