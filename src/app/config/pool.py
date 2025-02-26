@@ -20,8 +20,11 @@ class PoolItemDict(TypedDict):
     img_caps: Captions | None = None
 
 class Pool:
-    def __init__(self, pool: str, force: bool = False):
-        self.root = pools.url_pool(pool)
+    def __init__(self, poolname: str | None = None, force: bool = False):
+        self.name : str | None = poolname
+        if self.name is None:
+            return
+        self.root = pools.url_pool(self.name)
         self.df: pd.DataFrame
         self.selection: Selection
 
@@ -58,8 +61,10 @@ class Pool:
         pass
 
     def get_image(self, idx: int) -> Image.Image:
-
-        pass
+        if self[idx]["img"] is None:
+            with Image.open(self[idx]["img_url"]) as im:
+                self[idx] |= {"img": im}
+        return self[idx]["img"]
 
     def make_train(self, resize: int | None = None) -> None:
         pass
@@ -78,3 +83,7 @@ class Pool:
         columns = list(item.keys())
         for column in columns:
             self.df.at[index, column] = item[column]
+    def __len__(self):
+        if self.name is None:
+            return 0
+        return len(self.df.index)
