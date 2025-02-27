@@ -22,6 +22,9 @@ class Selection(UserList):
         if isinstance(other, type(self)):
             self.data += other.data
             self.unique
+        elif isinstance(other, int):
+            self.data += [other]
+            self.unique
         else:
             raise TypeError(f"Selection expected, got {type(other).__name__}")
         return self
