@@ -29,13 +29,13 @@ class TagsSummary(TypedDict):
 
 class Pool:
     def __init__(self, poolname: str | None = None, force: bool = False):
+        self.tags: dict = {}
         self.name : str | None = poolname
         if self.name is None:
             return
         self.root = pools.url_pool(self.name)
         self.df: pd.DataFrame
         self.selection: Selection
-        self.tags: dict = {}
 
         if not self.root.is_dir():
             print(f"error: no pool found ({str(self.root)})!")
@@ -53,12 +53,22 @@ class Pool:
         rows:list[PoolItemDict] = []
         for url_img in self._urls_img:
             row = PoolItemDict()
-            url_wd14 = Path(url_img).with_suffix(".caption_wd14")
             caption = Captions()
+            
+            url_tag = Path(url_img).with_suffix(".caption_wd14")
             caption["wd14"] = []
-            if url_wd14.exists():
-                with url_wd14.open() as f:
+            if url_tag.exists():
+                with url_tag.open() as f:
                     caption["wd14"] = [f.read()]
+            
+            url_tag = Path(url_img).with_suffix(".txt")
+            caption["train"] = []
+            if url_tag.exists():
+                with url_tag.open() as f:
+                    caption["train"] = [f.read()]
+            
+            
+            
             row["img"] = None
             row["img_url"] = url_img
             row["img_caps"] = caption
@@ -99,6 +109,7 @@ class Pool:
     @property
     def _build_tags_summary(self) -> None:
         for idx, row in self:
+
             tags = row["img_caps"]["wd14"][0].split(",")
             for tag in tags:
                 if tag in self.tags.keys():
@@ -113,7 +124,7 @@ class Pool:
                     tag_summary["action"]["payload"] = ""
                     self.tags |= {tag: tag_summary}
     @property
-    def reduce_tags_summary(self) -> None:
+    def tags_summary_reduced(self) -> dict:
         tags = {}
         for tag in self.tags.keys():
             tag_summary: TagsSummary = self.tags[tag]
@@ -122,16 +133,19 @@ class Pool:
             if tag_summary["action"]["action"] == "undef":
                 continue
             tags |= {tag: tag_summary}
-        self.tags = tags
+        return tags
 
-    @property
-    def rebuild_tags(self) -> None:
+    def build_tags_train(self, trigger: str) -> None:
+        tags_summary_reduced = self.tags_summary_reduced
         for idx, row in self:
-            new_tags = []
-            tags = row["img_caps"]["wd14"][0].split(",")
+            new_tags = [trigger]
+            wd14 = row["img_caps"]["wd14"]
+            if not wd14:
+                return
+            tags = wd14[0].split(",")
             for tag in tags:
-                if tag in self.tags:
-                    tag_summary: TagsSummary = self.tags[tag]
+                if tag in tags_summary_reduced.keys():
+                    tag_summary: TagsSummary = tags_summary_reduced[tag]
                     action = tag_summary["action"]["action"]
                     payload = tag_summary["action"]["payload"]
                     if action == "deselect":
@@ -143,6 +157,24 @@ class Pool:
                 if tag:
                     new_tags.append(tag)
             self[idx]["img_caps"]["train"] = new_tags
+    
+    @property
+    def safe_tags_train(self) -> None:
+        for idx, row in self:
+            tags = row["img_caps"]["train"]
+            if tags:
+                tags_joined = tags[0]
+            else:
+                return
+            for tag in tags[1:]:
+                tags_joined += f",{tag}"
+
+            url_img = row["img_url"]
+            url_tag = Path(url_img).with_suffix(".txt")
+            with url_tag.open("t+w") as f:
+                f.write(tags_joined)
+                f.close()
+
     @property
     def tags_ordered(self) -> list[str]:
         data = []

@@ -60,7 +60,7 @@ def new_idx_caps(idx: int):
     
     caps = [""]
     if visible:
-        caps = pool[idx]["img_caps"]["wd14"]
+        caps = pool[idx]["img_caps"]["train"]
         if caps:
             caps = caps[0]
         else:
@@ -89,7 +89,7 @@ def render_group(idx: int):
         visible = False
     return gr.update(visible=visible)
 
-def run_captioning(input: Any):
+def run_captioning():
     import subprocess
     url = str(pool.root)
     gr.Info("Captioning ... wait for done info!")
@@ -104,7 +104,7 @@ with gr.Blocks() as interface:
         pools_select = gr.Dropdown(labels, label="Choose Pool", multiselect=False, value=labels[0], interactive=True)
         page_select = gr.Dropdown([1], label= "Page", multiselect=False, value=1,interactive=True)
         btn_do_caption = gr.Button("Captioning")
-        btn_do_caption.click(run_captioning)
+        btn_do_caption.click(run_captioning, None, None)
 
         pools_select.change(flush_pool_idx,pools_select, rows_idx).then(new_pool_idx,pools_select, rows_idx).then(new_pool_page, pools_select, page_select)
         page_select.change(new_page_idx,page_select, rows_idx)

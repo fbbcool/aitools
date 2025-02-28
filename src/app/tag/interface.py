@@ -35,6 +35,11 @@ rows_galleries = [gr.Gallery(
 rows_butt_galleries = [gr.Button(LABEL_BUTT_GALLERY_OFF,value=LABEL_BUTT_GALLERY_OFF, scale=1,visible=True, elem_id=f"but-gallery_{i}") for i in range(TAG_NUM_PER_PAGE)]
 rows_butt_galleries_notags = [gr.Button(LABEL_BUTT_GALLERY_OFF_NOTAGS,value=LABEL_BUTT_GALLERY_OFF_NOTAGS, scale=1,visible=True, elem_id=f"but-gallery_{i}") for i in range(TAG_NUM_PER_PAGE)]
 rows_tag = [gr.Textbox(value="",label="Tag",placeholder="empty", visible=True, elem_id=f"tag_{i}", interactive=False) for i in range(TAG_NUM_PER_PAGE)]
+rows_tag_seq = {rows_tag[0]}
+for tag in rows_tag: rows_tag_seq.add(tag)
+
+rows_action = [gr.Radio(choices=["delete", "replace", "deselect", "deselect_notags", "no_action", "undef"],value="undef",label="Action", visible=True, interactive=True) for i in range(TAG_NUM_PER_PAGE)]
+rows_payload = [gr.Textbox(value="",label="Payload",placeholder="empty", visible=True, interactive=True) for i in range(TAG_NUM_PER_PAGE)]
 
 pool: Pool = Pool()
 
@@ -127,6 +132,34 @@ def update_tags(page: int):
     
     return update
 
+def store_action(tag: str, action: Literal["delete", "replace", "deselect", "deselect_notags", "no_action", "undef"], payload: str):
+    tag_summary: TagsSummary = pool.tags[tag]
+    tag_summary["action"]["action"] = action
+    tag_summary["action"]["payload"] = payload
+    pool.tags[tag] = tag_summary
+
+def restore_actions(tags: dict):
+    update = []
+    for tag in tags.values():
+        tag_summary: TagsSummary = pool.tags[tag]
+        value = tag_summary["action"]["action"]
+        update.append(gr.update(value=value))
+    return update
+
+def restore_payloads(tags: dict):
+    update = []
+    for tag in tags.values():
+        tag_summary: TagsSummary = pool.tags[tag]
+        value = tag_summary["action"]["payload"]
+        update.append(gr.update(value=value))
+    return update
+
+def build_tags(trigger: str):
+    gr.Info("Building tags ...")
+    pool.build_tags_train(trigger)
+    pool.safe_tags_train
+    gr.Info("Building done!")
+
 with gr.Blocks() as interface:
     #gr.Markdown("Template")
     with gr.Row():
@@ -135,20 +168,22 @@ with gr.Blocks() as interface:
         page_select = gr.Dropdown([1], label= "Page", multiselect=False, value=1, scale=2, interactive=True)
         trigger = gr.Textbox(placeholder="Enter trigger tag", label="Trigger Tag", scale=2, interactive=True)
         btn_do_caption = gr.Button("Build Tags", scale=1)
-        #btn_do_caption.click(run_captioning)
 
     rows = []
     for i in range(TAG_NUM_PER_PAGE):
         with gr.Row(visible=False,show_progress=True) as row:
             rows.append(row)
             rows_tag[i].render()
-            with gr.Column(scale=2):
-                gr.TextArea()
             with gr.Column(scale=1):
+                rows_payload[i].render()
+                rows_action[i].render()
+            with gr.Column(scale=2):
                 with gr.Group():
                     rows_butt_galleries[i].render()
                     rows_butt_galleries_notags[i].render()
                     rows_galleries[i].render()
+
+        rows_action[i].change(store_action, [rows_tag[i], rows_action[i], rows_payload[i]], None)     
                 
         rows_butt_galleries[i].click(switch_gallery, [rows_butt_galleries[i] ,rows_tag[i]], [rows_butt_galleries[i], rows_galleries[i]])
         rows_butt_galleries_notags[i].click(switch_gallery_notags, [rows_butt_galleries_notags[i] ,rows_tag[i]], [rows_butt_galleries_notags[i], rows_galleries[i]])
@@ -158,5 +193,11 @@ with gr.Blocks() as interface:
         .then(new_pool,pools_select, None) \
         .then(new_pool_page, pools_select, page_select) \
         .then(update_tags, page_select, rows_tag) \
+        .then(restore_actions, rows_tag_seq, rows_action) \
+        .then(restore_payloads, rows_tag_seq, rows_payload) \
         .then(show_groups,page_select,rows)
-    page_select.change(update_tags,page_select, rows_tag)
+    page_select.change(update_tags,page_select, rows_tag) \
+        .then(restore_actions, rows_tag_seq, rows_action) \
+        .then(restore_payloads, rows_tag_seq, rows_payload)
+    
+    btn_do_caption.click(build_tags, trigger, None)
