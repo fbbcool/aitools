@@ -42,3 +42,8 @@ ___flux () {
     comfyui_flux
 }
 
+___flux_refine () {
+    git -C $ENV_HOME pull
+    comfyui_flux_refine
+}
+

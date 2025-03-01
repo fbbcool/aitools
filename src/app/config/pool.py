@@ -15,7 +15,6 @@ POOL_IDX_SUFFIX: Final = ".index"
 POOL_IMG_SUFFIXES: Final = [".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG", ".webp"]
 
 class PoolItemDict(TypedDict):
-    img: Image.Image | None = None
     img_url: Path | None = None
     img_caps: Captions | None = None
 
@@ -27,9 +26,33 @@ class TagsSummary(TypedDict):
     selection: Selection
     action: TagAction
 
+class TrainItem(TypedDict):
+    idx: int
+    img_url_pool: Path
+    caps: Captions
+
+class TrainTagAction(TypedDict):
+    action: Literal["delete", "deselect","deselect_notags", "replace", "no_action", "undef"]
+    payload: str
+    selection: list[int] # of TrainItem idx, which should correspond to pool selection idxs! Valuable tag score data!
+
+class TrainCfg:
+    poolname: str = "None"
+    id: str = "id_empty"
+    trigger: str = "1trigger"
+    size: int = 150
+    wh: int = 1024
+    poolitem: list[TrainItem]
+    tagaction: dict[str, TrainTagAction] # actions to convert wd14 to train tags
+
+class PoolCfg(TypedDict):
+    tags: dict[str, PoolItemDict]
+    selection: Selection
+    train: TrainCfg
+
 class Pool:
     def __init__(self, poolname: str | None = None, force: bool = False):
-        self.tags: dict = {}
+        self.tags: dict[str, PoolItemDict] = {}
         self.name : str | None = poolname
         if self.name is None:
             return

@@ -25,6 +25,10 @@ comfyui_flux() {
     python3 $ENV_HOME/src/script/comfyui.py "flux"
 }
 
+comfyui_flux_refine() {
+    python3 $ENV_HOME/src/script/comfyui.py "flux_refine"
+}
+
 #export ENV_POOLS=$ENV_HOME/pools
 #export ENV_TRAINS=$ENV_HOME/trains
 #export ENV_MODELS=$ENV_HOME/models
