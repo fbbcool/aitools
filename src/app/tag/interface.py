@@ -163,7 +163,7 @@ def build_tags(trigger: str):
 with gr.Blocks() as interface:
     #gr.Markdown("Template")
     with gr.Row():
-        labels = ["None"] + pools.labels
+        labels = ["None"] + pools.poolnames
         pools_select = gr.Dropdown(labels, label="Choose Pool", multiselect=False, value=labels[0],scale=2, interactive=True)
         page_select = gr.Dropdown([1], label= "Page", multiselect=False, value=1, scale=2, interactive=True)
         trigger = gr.Textbox(placeholder="Enter trigger tag", label="Trigger Tag", scale=2, interactive=True)

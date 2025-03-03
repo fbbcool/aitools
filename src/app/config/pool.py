@@ -1,22 +1,29 @@
 from pathlib import Path
+import shutil
 from typing import Final, Generator, Literal, TypedDict
-
 import pandas as pd
 
-
-from PIL import Image
-
-from .captions import Captions
+from .caption import CaptionItem, Caption
 from .selection import Selection
-from .pools import pools
 
-POOL_IDX_NAME: Final = "pool"
-POOL_IDX_SUFFIX: Final = ".index"
-POOL_IMG_SUFFIXES: Final = [".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG", ".webp"]
+class PoolItem(TypedDict):
+    orig: Path | None
+    cap: CaptionItem | None
+    orig_hd: Path | None
+    cap_hd: CaptionItem | None
+    orig_unref: Path | None
+    cap_unref: CaptionItem | None
 
-class PoolItemDict(TypedDict):
-    img_url: Path | None = None
-    img_caps: Captions | None = None
+    @staticmethod
+    def defaults() -> 'PoolItem':
+        return PoolItem(
+            orig=None,
+            cap=CaptionItem.defaults(),
+            orig_hd=None,
+            cap_hd=CaptionItem.defaults(),
+            orig_unref=None,
+            cap_unref=CaptionItem.defaults(),
+        )
 
 class TagAction(TypedDict):
     action: Literal["delete", "deselect","deselect_notags", "replace", "no_action", "undef"]
@@ -29,7 +36,7 @@ class TagsSummary(TypedDict):
 class TrainItem(TypedDict):
     idx: int
     img_url_pool: Path
-    caps: Captions
+    caps: CaptionItem
 
 class TrainTagAction(TypedDict):
     action: Literal["delete", "deselect","deselect_notags", "replace", "no_action", "undef"]
@@ -46,94 +53,137 @@ class TrainCfg:
     tagaction: dict[str, TrainTagAction] # actions to convert wd14 to train tags
 
 class PoolCfg(TypedDict):
-    tags: dict[str, PoolItemDict]
+    tags: dict[str, PoolItem]
     selection: Selection
     train: TrainCfg
 
 class Pool:
-    def __init__(self, poolname: str | None = None, force: bool = False):
-        self.tags: dict[str, PoolItemDict] = {}
-        self.name : str | None = poolname
-        if self.name is None:
+    FOLDER_ORIGS: Final = "origs"
+    POOL_IDX_NAME: Final = "pool"
+    POOL_IDX_SUFFIX: Final = ".index"
+    POOL_IMG_TARGET_SUFFIX: Final = ".png"
+    POOL_IMG_SUFFIXES: Final = list(set([POOL_IMG_TARGET_SUFFIX, ".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG", ".webp",".tiff",".TIFF"]))
+    POOL_FILES_SKIP: Final = [".DS_Store"]
+    POOL_FOLDER_ORIG: Final = "origs"
+    POOL_SIZE_MAX: Final = 1000
+
+    def __init__(self, root: Path | str, force: bool = False):
+        self.name : str | None = None
+        self.root = Path(root)
+        if not self.root.exists():
             return
-        self.root = pools.url_pool(self.name)
+        if self.root.is_dir():
+            self.name = self.root.stem
+        else:
+            return
+        
+        self.tags: dict[str, PoolItem] = {}
         self.df: pd.DataFrame
         self.selection: Selection
 
-        if not self.root.is_dir():
-            print(f"error: no pool found ({str(self.root)})!")
-            self.name = None
-            return
-        
         self._index(force=force)
-        
-
+    
     def _index(self, force: bool = False) -> None:
         if not force:
             if self.load_index(descr=None):
                 return
 
-        rows:list[PoolItemDict] = []
-        for url_img in self._urls_img:
-            row = PoolItemDict()
-            caption = Captions()
+        # orig files must be sorted first:
+        cands = []
+        for cand in self._origs_by_file:
+            cands.append(str(cand))
+        cands.sort()
+
+        # orig files split into ok/nok
+        rows:list[PoolItem] = []
+        rows_rejected:list[PoolItem] = []
+        for cand in cands:
+            cand = Path(cand)
             
-            url_tag = Path(url_img).with_suffix(".caption_wd14")
-            caption["wd14"] = []
-            if url_tag.exists():
-                with url_tag.open() as f:
-                    caption["wd14"] = [f.read()]
+            row = PoolItem.defaults()
+
+            cap = Caption.dict_from_img(cand)
+            row["orig"] = cand
+            row["cap"] = cap
+
+            url_hd = self.get_hd(cand)
+            if (url_hd):
+                cap_hd = Caption.dict_from_img(url_hd)
+                row["orig_hd"] = url_hd
+                row["cap_hd"] = cap_hd
+
+            url_unref = self.get_unref(cand)
+            if (url_unref):
+                cap_unref = Caption.dict_from_img(url_unref)
+                row["orig_unref"] = url_unref
+                row["cap_unref"] = cap_unref
+
+            if cand.stem == f"{len(rows):04}":
+                rows.append(row)
+            else:
+                rows_rejected.append(row)
             
-            url_tag = Path(url_img).with_suffix(".txt")
-            caption["train"] = []
-            if url_tag.exists():
-                with url_tag.open() as f:
-                    caption["train"] = [f.read()]
+        # now, deal with the noks (w/ captions!)
+        for nok in rows_rejected:
+            idx = len(rows)
+            name_new = f"{idx:04}"
             
-            
-            
-            row["img"] = None
-            row["img_url"] = url_img
-            row["img_caps"] = caption
-            rows.append(row)
+            self.move_poolitem_by_name(nok, name_new)
+
+            rows.append(nok)
+        
+        
+        # put the final data into the dataframe
         if not rows:
             print(f"error: no imgs found in pool ({str(self.root)})!")
             self.name = None
             return
         columns = list(rows[0].keys())
         self.df = pd.DataFrame(rows, columns=columns)
+
         self.selection = Selection(self.df)
         self.selection.all
         self._build_tags_summary
+    
+    def move_poolitem_by_name(self, item: PoolItem, name: str) -> None:
+        """
+        moves all inner url data in the item as well as physically the files.
         
-    def load_index(self, descr: str | None = None) -> bool:
-        return False
-    def save_index(self, descr: str | None = None, overwrite: bool = False) -> None:
-        pass
+        HANDLE WITH CARE!
+        """
+        
+        # cap needs to moved first
+        self._move_poolitem_cap_by_name(item, name)
+        
+        # then origs
+        for types_img in ["orig", "orig_hd", "orig_unref"]:
+            src: Path = item[types_img]
+            if src:
+                target = Path(src.parent, f"{name}").with_suffix(src.suffix)
+                src.rename(target)
+                item[types_img] = target
+    
+    def _move_poolitem_cap_by_name(self, item: PoolItem, name: str) -> None:
+        """
+        moves all inner url data in the item as well as physically the files.
+        
+        HANDLE WITH CARE!
+        """
+        for type_img in ["orig", "orig_hd", "orig_unref"]:
+            url_img = item[type_img]
+            url_caps = Caption.urls_from_img(url_img)
+            for src in url_caps:
+                target = Path(src.parent, f"{name}").with_suffix(src.suffix)
+                src.rename(target)
 
-    def get_image(self, idx: int) -> Image.Image:
-        if self[idx]["img"] is None:
-            with Image.open(self[idx]["img_url"]) as im:
-                self[idx] |= {"img": im}
-        return self[idx]["img"]
-
-    def make_train(self, resize: int | None = None) -> None:
-        pass
-
-    @property
-    def _urls_img(self) -> Generator:
-        for file in self.root.iterdir():
-            if not file.is_file():
-                continue
-            if file.suffix in POOL_IMG_SUFFIXES:
-                yield file
-
-
+    
     @property
     def _build_tags_summary(self) -> None:
         for idx, row in self:
-
-            tags = row["img_caps"]["wd14"][0].split(",")
+            caps = row["cap"]["wd14"]
+            if not caps:
+                continue 
+            tags = Caption.split_data(caps)
             for tag in tags:
                 if tag in self.tags.keys():
                     tag_summary: TagsSummary = self.tags[tag]
@@ -146,6 +196,76 @@ class Pool:
                     tag_summary["action"]["action"] = "undef"
                     tag_summary["action"]["payload"] = ""
                     self.tags |= {tag: tag_summary}
+    
+    @property
+    def url_origs(self) -> Path:
+        url = Path(self.root, Pool.FOLDER_ORIGS)
+        if not url.is_dir():
+            return url.mkdir(parents=True)
+        return url
+    @property
+    def url_origs_hd(self) -> Path:
+        url = Path(self.root, f"{Pool.FOLDER_ORIGS}_hd")
+        if not url.is_dir():
+            return url.mkdir(parents=True)
+        return url
+    @property
+    def url_origs_unref(self) -> Path:
+        url = Path(self.root, f"{Pool.FOLDER_ORIGS}_unref")
+        if not url.is_dir():
+            return url.mkdir(parents=True)
+        return url
+
+    @property
+    def _origs_by_file(self) -> Generator:
+        files = []
+        for file in self.url_origs.iterdir():
+            if not file.is_file():
+                continue
+            if file.suffix in self.POOL_IMG_SUFFIXES:
+                yield file
+    @property
+    def origs(self) -> Generator:
+        for _, orig in self:
+            yield orig["orig"]
+    @property
+    def origs_hd(self) -> Generator:
+        for _, orig in self:
+            yield orig["orig_hd"]
+    @property
+    def origs_unref(self) -> Generator:
+        for _, orig in self:
+            yield orig["orig_unref"]
+
+    def get_hd(self, url_img: Path | str) -> Path | None:
+        path = Path(url_img)
+        if not path.is_file():
+            return
+        target = Path(self.url_origs_hd, path.name)
+        if not target.is_file():
+            return
+        return target
+
+
+    def get_unref(self, url_img: Path | str) -> Path | None:
+        path = Path(url_img)
+        if not path.is_file():
+            return
+        target = Path(self.url_origs_unref, path.name)
+        if not target.is_file():
+            return
+        return target
+
+
+        
+    def load_index(self, descr: str | None = None) -> bool:
+        return False
+    def save_index(self, descr: str | None = None, overwrite: bool = False) -> None:
+        pass
+
+    def make_train(self, resize: int | None = None) -> None:
+        pass
+
     @property
     def tags_summary_reduced(self) -> dict:
         tags = {}
@@ -208,10 +328,62 @@ class Pool:
         return list(reversed(df["tag"].to_list()))
 
 
-    def __getitem__(self, index: int) -> PoolItemDict:
-        ret = self.df.iloc[index].to_dict(into=PoolItemDict)
+    # CLASS HELPERS
+    @classmethod
+    def is_img(cls, url: Path | str) -> bool:
+        p = Path(url)
+
+        if not p.exists():
+            return False
+        if p.is_dir():
+            return False
+        
+        suffix = p.suffix
+        if suffix in cls.POOL_IMG_SUFFIXES:
+            return True
+        
+        return False
+
+    # TOOLS
+
+    
+    @property
+    def _files_categorize(self) -> dict[str, list[Path]]:
+        """
+        categorizes recursivlely all files in a pool and puts them into one of four lists of Paths:
+        
+        {img:[imgs], cap:[caps], dir:[dirs], unk[unknowns]}
+        """
+        ret = {
+            "img": [],
+            "cap": [],
+            "dir": [],
+            "unknown": [],
+            "skip": [],
+        }
+        for url in self.url_origs.rglob("*"):
+            path = Path(url)
+            suffix = path.suffix
+
+
+            if path.name in self.POOL_FILES_SKIP:
+                ret["skip"].append(path)
+            elif path.name.startswith("."):
+                ret["unknown"].append(path)
+            elif path.is_dir():
+                ret["dir"].append(path)
+            elif Caption.is_file(path):
+                ret["cap"].append(path)
+            elif self.is_img(path):
+                ret["img"].append(path)
+            else:
+                ret["unknown"].append(path)
         return ret
-    def __setitem__(self, index, item: PoolItemDict):
+        
+    def __getitem__(self, index: int) -> PoolItem:
+        ret = self.df.iloc[index].to_dict(into=PoolItem)
+        return ret
+    def __setitem__(self, index, item: PoolItem):
         columns = list(item.keys())
         for column in columns:
             self.df.at[index, column] = item[column]
@@ -225,3 +397,4 @@ class Pool:
         while i < n:
             yield i, self[i]
             i+=1
+

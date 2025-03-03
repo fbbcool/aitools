@@ -100,7 +100,7 @@ def run_captioning():
 with gr.Blocks() as interface:
     #gr.Markdown("Template")
     with gr.Row():
-        labels = ["None"] + pools.labels
+        labels = ["None"] + pools.poolnames
         pools_select = gr.Dropdown(labels, label="Choose Pool", multiselect=False, value=labels[0], interactive=True)
         page_select = gr.Dropdown([1], label= "Page", multiselect=False, value=1,interactive=True)
         btn_do_caption = gr.Button("Captioning")
