@@ -131,7 +131,7 @@ def run_captions():
 		img = Image.open(file)
 		cap = stream_chat(img, VLM_PROMPT)
 		file_cap = file.parent / Path(file.stem).with_suffix(".caption_joy")
-		with file_cap.open() as fuck:
+		with file_cap.open(mode="+wt") as fuck:
 			fuck.write(cap)
 		
 		
