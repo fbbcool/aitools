@@ -407,6 +407,7 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Unet, cai, "https://civitai.com/api/download/models/1245049?type=Model&format=GGUF&size=full&fp=bf16", ""),
             #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", s"),
             #ModelInst(t, ModelType.Unet, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors?download=true", "flux1-schnell"),
+            ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/461409", "EpicRealismXL_v6"),
             
             ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true", "vae_flux1"),
 
