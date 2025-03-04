@@ -128,7 +128,16 @@ with gr.Blocks() as demo:
 def run_captions():
 	for file in WORKSPACE.glob("*.png"):
 		print(f"cap ... {str(file)}")
-		img = Image.open(file)
+		try:
+			img = Image.open(file)
+		except Exception:
+			print("\tskipping due to img read error!")
+			continue
+	
+		file_cap = file.parent / Path(file.stem).with_suffix(".caption_joy")
+		if file_cap.exists():
+			continue
+		
 		cap = stream_chat(img, VLM_PROMPT)
 		file_cap = file.parent / Path(file.stem).with_suffix(".caption_joy")
 		with file_cap.open(mode="+wt") as fuck:
