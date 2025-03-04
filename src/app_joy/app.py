@@ -1,6 +1,6 @@
-import spaces
 import gradio as gr
 from huggingface_hub import InferenceClient
+from huggingface_hub import login as hf_login
 from torch import nn
 from transformers import AutoModel, AutoProcessor, AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast, AutoModelForCausalLM
 from pathlib import Path
@@ -17,7 +17,8 @@ CHECKPOINT_PATH = Path("wpkklhc6")
 TITLE = "<h1><center>JoyCaption Pre-Alpha (2024-07-30a)</center></h1>"
 
 HF_TOKEN = os.environ.get("HF_TOKEN", None)
-
+HF_TOKEN = "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"
+hf_login(HF_TOKEN)
 
 class ImageAdapter(nn.Module):
 	def __init__(self, input_features: int, output_features: int):
@@ -61,7 +62,6 @@ image_adapter.eval()
 image_adapter.to("cuda")
 
 
-@spaces.GPU()
 @torch.no_grad()
 def stream_chat(input_image: Image.Image):
 	torch.cuda.empty_cache()
