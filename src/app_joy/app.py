@@ -13,12 +13,10 @@ import os
 CLIP_PATH = "google/siglip-so400m-patch14-384"
 VLM_PROMPT = "A descriptive caption for this image:\n"
 MODEL_PATH = "meta-llama/Meta-Llama-3.1-8B"
-CHECKPOINT_PATH = Path("wpkklhc6")
+CHECKPOINT_PATH = Path("ckpt")
 TITLE = "<h1><center>JoyCaption Pre-Alpha (2024-07-30a)</center></h1>"
 
 HF_TOKEN = os.environ.get("HF_TOKEN", None)
-HF_TOKEN = "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"
-hf_login(HF_TOKEN)
 
 class ImageAdapter(nn.Module):
 	def __init__(self, input_features: int, output_features: int):
