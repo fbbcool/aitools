@@ -126,7 +126,7 @@ with gr.Blocks() as demo:
 	run_button.click(fn=stream_chat, inputs=[input_image,prompt], outputs=[output_caption])
 
 def run_captions():
-	for file in WORKSPACE.glob("0*.*"):
+	for file in WORKSPACE.glob("*.png"):
 		print(f"cap ... {str(file)}")
 		img = Image.open(file)
 		cap = stream_chat(img, VLM_PROMPT)
