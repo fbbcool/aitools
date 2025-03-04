@@ -62,7 +62,7 @@ image_adapter.to("cuda")
 
 
 @torch.no_grad()
-def stream_chat(input_image: Image.Image):
+def stream_chat(input_image: Image.Image, prompt:str):
 	torch.cuda.empty_cache()
 
 	# Preprocess image
@@ -70,7 +70,7 @@ def stream_chat(input_image: Image.Image):
 	image = image.to('cuda')
 
 	# Tokenize the prompt
-	prompt = tokenizer.encode(VLM_PROMPT, return_tensors='pt', padding=False, truncation=False, add_special_tokens=False)
+	prompt = tokenizer.encode(prompt, return_tensors='pt', padding=False, truncation=False, add_special_tokens=False)
 
 	# Embed image
 	with torch.amp.autocast_mode.autocast('cuda', enabled=True):
@@ -119,9 +119,11 @@ with gr.Blocks() as demo:
 			run_button = gr.Button("Caption")
 		
 		with gr.Column():
+			prompt = gr.Textbox(label="Prompt", value=VLM_PROMPT,interactive=True)
+		with gr.Column():
 			output_caption = gr.Textbox(label="Caption")
 	
-	run_button.click(fn=stream_chat, inputs=[input_image], outputs=[output_caption])
+	run_button.click(fn=stream_chat, inputs=[input_image,prompt], outputs=[output_caption])
 
 
 if __name__ == "__main__":
