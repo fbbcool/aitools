@@ -12,8 +12,8 @@ import os
 
 CLIP_PATH = "google/siglip-so400m-patch14-384"
 VLM_PROMPT = "A descriptive caption for this image:\n"
-MODEL_PATH = "meta-llama/Meta-Llama-3.1-8B"
-#MODEL_PATH="FluffyKaeloky/Midnight-Miqu-103B-v1.5"
+#MODEL_PATH = "meta-llama/Meta-Llama-3.1-8B"
+MODEL_PATH="FluffyKaeloky/MistralThinker-v1.1-exl2-6.0bpw"
 CHECKPOINT_PATH = Path("ckpt")
 TITLE = "<h1><center>JoyCaption Pre-Alpha (2024-07-30a)</center></h1>"
 
