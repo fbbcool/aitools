@@ -161,6 +161,7 @@ cython_debug/
 
 # project imgset
 workspace/
+workspace_test/
 img_sets/
 img_imports/
 testset/

@@ -1,6 +1,5 @@
 import gradio as gr
 from huggingface_hub import InferenceClient
-from huggingface_hub import login as hf_login
 from torch import nn
 from transformers import AutoModel, AutoProcessor, AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast, AutoModelForCausalLM
 from pathlib import Path
@@ -14,8 +13,9 @@ CLIP_PATH = "google/siglip-so400m-patch14-384"
 VLM_PROMPT = "is this of giantess and female dominance context?"
 MODEL_PATH = "meta-llama/Meta-Llama-3.1-8B"
 #MODEL_PATH="FluffyKaeloky/MistralThinker-v1.1-exl2-6.0bpw"
-CHECKPOINT_PATH = Path("ckpt")
+CHECKPOINT_PATH = Path("/workspace/___aitools/src/app_joy/ckpt")
 TITLE = "<h1><center>JoyCaption Pre-Alpha (2024-07-30a)</center></h1>"
+WORKSPACE = Path("/workspace/origs")
 
 HF_TOKEN = os.environ.get("HF_TOKEN", None)
 
@@ -125,7 +125,17 @@ with gr.Blocks() as demo:
 	
 	run_button.click(fn=stream_chat, inputs=[input_image,prompt], outputs=[output_caption])
 
+def run_captions():
+	for file in WORKSPACE.glob("0*.*"):
+		print(f"cap ... {str(file)}")
+		img = Image.open(file)
+		cap = stream_chat(img, VLM_PROMPT)
+		file_cap = file.parent / Path(file.stem).with_suffix(".caption_joy")
+		with file_cap.open() as fuck:
+			fuck.write(cap)
+		
+		
 
 if __name__ == "__main__":
-    demo.launch()
+    run_captions()
 
