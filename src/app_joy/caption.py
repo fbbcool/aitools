@@ -137,13 +137,15 @@ def run_captions():
 		file_cap = file.parent / Path(file.stem).with_suffix(".txt")
 		if file_cap.exists():
 			continue
+		cap = ""
 		try:
 			cap = stream_chat(img, VLM_PROMPT)
 		except:
 			pass
 		file_cap = file.parent / Path(file.stem).with_suffix(".txt")
-		with file_cap.open(mode="+wt") as fuck:
-			fuck.write(cap)
+		if cap:
+		    with file_cap.open(mode="+wt") as fuck:
+			    fuck.write(cap)
 		
 		
 
