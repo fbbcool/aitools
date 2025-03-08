@@ -1,0 +1,14 @@
+[general]
+shuffle_caption = false
+caption_extension = '.txt'
+keep_tokens = 1
+
+[[datasets]]
+resolution = 1024
+batch_size = 1
+keep_tokens = 1
+
+  [[datasets.subsets]]
+  image_dir = '/workspace/fluxgym/datasets/1gts-v2'
+  class_tokens = '1gts'
+  num_repeats = 1
