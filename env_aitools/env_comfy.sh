@@ -1,5 +1,5 @@
 env_inst() {
-    pip install -r $ENV_HOME/requirements.txt
+    pip install -r $ENV_HOME/requirements_remote.txt
     #pip install -r $ENV_HOME/requirements_traingen.txt
     #pip install -r $ENV_HOME/requirements_gen.txt
     #env_pool_inst https://drive.google.com/file/d/1wdS5ULSgHV6KaaH9y6vHZY_-O6m5AXpB/view?usp=sharing
@@ -41,4 +41,4 @@ export ENV_DIR_REMOTE_VENV=/ComfyUI
 #mkdir -p $ENV_MODELS
 #mkdir -p $ENV_TMP
 
-source $ENV_DIR_REMOTE_VENV/venv/bin/activate
+#source $ENV_DIR_REMOTE_VENV/venv/bin/activate
