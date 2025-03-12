@@ -455,6 +455,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1252040?type=Model&format=SafeTensor", ""),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1302081?type=Model&format=SafeTensor", ""),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/810590?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/805890?type=Model&format=SafeTensor", "androflux"),
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756663?type=Model&format=SafeTensor", "F1_GiantwithMiniperson"),
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/746948?type=Model&format=SafeTensor", "F1_Muscular_woman"),
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/720252?type=Model&format=SafeTensor", "F1_Featasic"),
