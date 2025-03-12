@@ -418,6 +418,12 @@ class ModelInstComfyUi:
             
             #ModelInst(t, ModelType.Controlnet, hf, "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro/resolve/main/diffusion_pytorch_model.safetensors?download=true", ""),
             
+            ModelInst(t, ModelType.Lora, cai, "", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1206221?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1434864?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/804967?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1084068?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/954444?type=Model&format=SafeTensor", ""),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/780667?type=Model&format=SafeTensor", ""),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/942345?type=Model&format=SafeTensor", ""),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1108920?type=Model&format=SafeTensor", ""),
@@ -447,6 +453,8 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/973465?type=Model&format=SafeTensor", ""),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1252337?type=Model&format=SafeTensor", ""),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1252040?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1302081?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/810590?type=Model&format=SafeTensor", ""),
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756663?type=Model&format=SafeTensor", "F1_GiantwithMiniperson"),
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/746948?type=Model&format=SafeTensor", "F1_Muscular_woman"),
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/720252?type=Model&format=SafeTensor", "F1_Featasic"),
