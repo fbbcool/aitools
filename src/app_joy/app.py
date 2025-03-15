@@ -19,6 +19,9 @@ TITLE = "<h1><center>JoyCaption Pre-Alpha (2024-07-30a)</center></h1>"
 
 HF_TOKEN = os.environ.get("HF_TOKEN", None)
 
+PROMPT_GTS = "do a detailed image description in the context of a scene between a giantess woman and a small man! note that there are only two characters:  a giantess woman and a small man! the second context is female domination!"
+
+
 class ImageAdapter(nn.Module):
 	def __init__(self, input_features: int, output_features: int):
 		super().__init__()
@@ -119,7 +122,7 @@ with gr.Blocks() as demo:
 			run_button = gr.Button("Caption")
 		
 		with gr.Column():
-			prompt = gr.Textbox(label="Prompt", value=VLM_PROMPT,interactive=True)
+			prompt = gr.Textbox(label="Prompt", value=PROMPT_GTS,interactive=True)
 		with gr.Column():
 			output_caption = gr.Textbox(label="Caption")
 	
