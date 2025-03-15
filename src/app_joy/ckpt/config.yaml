@@ -26,7 +26,7 @@ resume: null
 gradient_checkpointing: false
 test_size: 2048
 grad_scaler_init: 65536.0
-max_caption_length: 257
-num_image_tokens: 32
+max_caption_length: 1024
+num_image_tokens: 64
 adapter_type: mlp
 text_model_dtype: float16
