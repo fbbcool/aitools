@@ -463,7 +463,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/751657?type=Model&format=SafeTensor", "F1_hairy"),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/827325?type=Model&format=SafeTensor", "F1_skin"),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1050233?type=Model&format=SafeTensor", "Hairy_girls"),
-            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/786275?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/892207?type=Model&format=SafeTensor", "big cock"),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/817076?type=Model&format=SafeTensor", ""),
 
             
