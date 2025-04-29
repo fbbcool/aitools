@@ -25,6 +25,7 @@ class DownloadGroup(Enum):
     SDALL = auto()
     FLUX = auto()
     FLUX_REFINE = auto()
+    HIDREAM = auto()
 class TargetType(Enum):
     Comfy = auto()
     SD = auto()
@@ -472,12 +473,29 @@ class ModelInstComfyUi:
             # flux fill
             #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/YarvixPA/FLUX.1-Fill-dev-gguf/resolve/main/flux1-fill-dev-Q8_0.gguf", ""),
         ]
+        models_hidream: list[ModelInst] = [
+            ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/HiDream-I1-Dev-gguf/resolve/main/hidream-i1-dev-Q6_K.gguf?download=true", ""),
+            
+            ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true", "vae_flux1"),
+
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/blob/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-TE-only-HF.safetensors", "clip_l_improve"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q8_0.gguf?download=true", "t5_q8_gguf"),
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-f16.gguf?download=true", "t5_gguf"),
+            
+            #ModelInst(t, ModelType.Controlnet, hf, "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro/resolve/main/diffusion_pytorch_model.safetensors?download=true", ""),
+            
+            #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/844798?type=Model&format=SafeTensor", ""),
+        ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
             DownloadGroup.SDXL: models_sdxl,
             DownloadGroup.SDALL: models_sd15 + models_sdxl,
             DownloadGroup.FLUX: models_flux,
             DownloadGroup.FLUX_REFINE: models_flux_refine,
+            DownloadGroup.HIDREAM: models_hidream,
         }
         for model in model_db[group]:
             model.install
@@ -494,6 +512,8 @@ if __name__ == "__main__":
         group = DownloadGroup.FLUX
     elif str_group == "flux_refine":
         group = DownloadGroup.FLUX_REFINE
+    elif str_group == "hidream":
+        group = DownloadGroup.HIDREAM
     else:
         str_group = "sd15"
         group = DownloadGroup.SD15
