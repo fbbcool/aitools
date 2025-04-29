@@ -207,25 +207,28 @@ class ModelInst:
             
         os.makedirs(url_folder, exist_ok=True)
         
-        if self.method == DownloadMethod.Wget:
-            print(f"installing by wget: {self.url} -> {url_model}")
-            self.download_wget(self.url, url_model)
+        try:
+            if self.method == DownloadMethod.Wget:
+                print(f"installing by wget: {self.url} -> {url_model}")
+                self.download_wget(self.url, url_model)
 
-        if self.method == DownloadMethod.Hugging:
-            print(f"installing from hugging: {self.url} -> {url_model}")
-            self.download_hf(self.url, url_model)
-            
-        if self.method == DownloadMethod.Civitai:
-            print(f"installing from hugging: {self.url} -> {url_model}")
-            self.download_civitai(self.url, url_model)
-            
-        if self.method == DownloadMethod.GDrive:
-            print(f"(NO)installing from gdrive: {self.url} -> {url_model}")
-            #gdown.download(id = self.url, output = url_model)
+            if self.method == DownloadMethod.Hugging:
+                print(f"installing from hugging: {self.url} -> {url_model}")
+                self.download_hf(self.url, url_model)
+                
+            if self.method == DownloadMethod.Civitai:
+                print(f"installing from hugging: {self.url} -> {url_model}")
+                self.download_civitai(self.url, url_model)
+                
+            if self.method == DownloadMethod.GDrive:
+                print(f"(NO)installing from gdrive: {self.url} -> {url_model}")
+                #gdown.download(id = self.url, output = url_model)
 
-        if self.method == DownloadMethod.Git:
-            print(f"git clone: {self.url} -> {url_repos}")
-            self.git_clone(self.url, url_folder)
+            if self.method == DownloadMethod.Git:
+                print(f"git clone: {self.url} -> {url_repos}")
+                self.git_clone(self.url, url_folder)
+        except:
+            print(f"sth went wrong!")
 
     @property
     def url_models(self) -> str:
@@ -477,7 +480,6 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/HiDream-I1-Dev-gguf/resolve/main/hidream-i1-dev-Q6_K.gguf?download=true", ""),
             
             ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true", "vae_flux1"),
-
             ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/clip_g_hidream.safetensors?download=true", ""),
 
             #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
