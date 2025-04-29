@@ -479,7 +479,7 @@ class ModelInstComfyUi:
         models_hidream: list[ModelInst] = [
             ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/HiDream-I1-Dev-gguf/resolve/main/hidream-i1-dev-Q6_K.gguf?download=true", ""),
             
-            ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true", "vae_flux1"),
+            ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/vae/ae.safetensors", "vae_hidream"),
             
             ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/clip_g_hidream.safetensors?download=true", "clip_g_hidream"),
             ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/clip_l_hidream.safetensors?download=true", "clip_l_hidream"),
