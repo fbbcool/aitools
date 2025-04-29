@@ -29,6 +29,11 @@ comfyui_flux_refine() {
     python3 $ENV_HOME/src/script/comfyui.py "flux_refine"
 }
 
+comfyui_hidream() {
+    python3 $ENV_HOME/src/script/comfyui.py "hidream"
+}
+
+
 #export ENV_POOLS=$ENV_HOME/pools
 #export ENV_TRAINS=$ENV_HOME/trains
 #export ENV_MODELS=$ENV_HOME/models

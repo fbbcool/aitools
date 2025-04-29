@@ -47,3 +47,8 @@ ___flux_refine () {
     comfyui_flux_refine
 }
 
+___hidream () {
+    git -C $ENV_HOME pull
+    comfyui_hidream
+}
+
