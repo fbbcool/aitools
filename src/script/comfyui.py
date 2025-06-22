@@ -405,9 +405,11 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/786275?type=Model&format=SafeTensor", ""),
         ]
         models_flux_refine: list[ModelInst] = [
+            ModelInst(t, ModelType.Unet, hf, "https://civitai.com/api/download/models/1755367?type=Model&format=SafeTensor&size=pruned&fp=fp8", ""),
+            #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/1795909?type=Model&format=SafeTensor&size=full&fp=fp16", ""),
+
             #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q8_0.gguf", ""),
             #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/979329?type=Model&format=SafeTensor&size=full&fp=fp16", ""),
-            ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/1795909?type=Model&format=SafeTensor&size=full&fp=fp16", ""),
 
             #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q4_0.gguf", ""),
             #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", s"),
