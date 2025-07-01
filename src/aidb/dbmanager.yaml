@@ -1,0 +1,17 @@
+# Configuration for DBManager settings
+
+# MongoDB connection settings
+mongodb_settings:
+  host: "mongodb://mongo:mongo@n100"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
+  port: 27017        # Or your MongoDB port
+  db_name: "prod_ai" # Or your database name, e.g., "prod_ai"
+
+# Thumbnail generation settings
+thumbnail_settings:
+  # Default directory to save generated thumbnails
+  # This path is relative to where the application is run.
+  default_thumbnail_dir: "/Volumes/data/pool/___thumbnails" 
+  
+  # Default size [width, height] for generated thumbnails
+  # The aspect ratio of the original image will be preserved.
+  default_thumbnail_size: [256, 256]

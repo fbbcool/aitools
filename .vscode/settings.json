@@ -1,6 +1,6 @@
 {
     "pyhton.envFile": "${workspaceFolder}/.vscode/.env",
-    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "jupyter.notebookFileRoot": "${workspaceFolder}/src",
     "python.analysis.extraPaths": [
         "src/imgset",
     ],
@@ -22,7 +22,7 @@
         },
     },
     "editor.formatOnSave": true,
-    "terminal.integrated.env.linux": {
+    "terminal.integrated.env.osx": {
         "PYTHONPATH": "${workspaceFolder}/src"
     },
 }
