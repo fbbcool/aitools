@@ -712,7 +712,7 @@ class AIDBGradioApp:
         if ret and ret > 0:
             gr.Info(f"Rating for image {image_id} updated to {new_rating}.")
         else:
-            gr.Info(f"Failed to update rating for image {image_id}.")
+            gr.Warning(f"Failed to update rating for image {image_id}.")
             
         return None 
 
