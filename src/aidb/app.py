@@ -3,113 +3,14 @@ from aidb.dbmanager import DBManager
 from aidb.query import Query
 from aidb.statistics import Statistics
 from aidb.image import Image
+from aidb.app.cell_image import AppImageCell
 from typing import Optional, List, Dict, Any, Tuple
 import pathlib
-import base64
-from io import BytesIO
-from PIL import Image as PILImage
 import html
 import json # Import json for robust string escaping
 
 # Define images per page constant
 IMAGES_PER_PAGE = 250
-
-class AppImageCell:
-    """
-    A helper class to encapsulate the HTML generation logic for a single image cell
-    in the Gradio grid display.
-    """
-
-    @staticmethod
-    def make(
-        image_obj: Image,
-        score: float, # Expected to be float
-        contributing_tags: List[Tuple[str, float]],
-        get_full_image_data_trigger_id: str,
-        rating_update_trigger_id: str
-    ) -> str:
-        """
-        Generates the HTML string for a single image cell.
-
-        Args:
-            image_obj (Image): The Image object for which to generate the cell.
-            score (float): The numerical score for the image.
-            contributing_tags (List[Tuple[str, float]]): List of tags and their probabilities that contributed to the score.
-            get_full_image_data_trigger_id (str): The HTML ID of the hidden button to trigger modal data fetch.
-            rating_update_trigger_id (str): The HTML ID of the hidden button to trigger rating update.
-
-        Returns:
-            str: The HTML string for the image cell.
-        """
-        grid_thumb_pil = image_obj.thumbnail 
-        
-        if grid_thumb_pil:
-            grid_img_base64 = AppImageCell._pil_to_base64(grid_thumb_pil)
-        else:
-            grid_img_base64 = "" # Or a base64 encoded placeholder image
-            print(f"Warning: No thumbnail available for image ID: {image_obj.image_id}. Displaying empty image.")
-
-        current_rating = image_obj.data.get("rating", -1) # Get current rating, default -1
-
-        rating_options_html = ""
-        for r in range(-2, 6): # Ratings from -2 to 5
-            checked = "checked" if current_rating == r else ""
-            # if clicked it should immediatly highlight
-            # The onclick event now uses a more robust pattern:
-            # 1. Find the hidden 'data bus' textbox.
-            # 2. Set its value to the 'image_id,rating' string.
-            # 3. Dispatch an 'input' event so Gradio recognizes the change.
-            # 4. Programmatically click the hidden trigger button.
-            onclick_js = f"""
-            event.stopPropagation();
-            const bus = document.querySelector('#rating_data_bus_elem textarea');
-            bus.value = '{image_obj.image_id},{r}';
-            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            document.getElementById('{rating_update_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
-            rating_options_html += f"""
-                <input type="radio" id="rating-{image_obj.image_id}-{r}" name="rating-{image_obj.image_id}" value="{r}" {checked}
-                       onclick="{onclick_js}">
-                <label for="rating-{image_obj.image_id}-{r}" class="rating-label-btn">{r}</label>
-                """
-                
-        # Format contributing tags for display
-        contributing_tags_html = ""
-        if contributing_tags:
-            contributing_tags_html = "<div class='tag-contribution'><strong>Tags:</strong><br>"
-            for tag, prob in sorted(contributing_tags, key=lambda x: x[1], reverse=True): # Sort contributing tags by probability
-                contributing_tags_html += f"{tag}: {prob:.2f}<br>"
-            contributing_tags_html += "</div>"
-        
-        caption = f"Score: {score:.2f} (ID: {image_obj.image_id})"
-
-        # The onclick for the image now also uses the data bus pattern.
-        img_onclick_js = f"""
-        const bus = document.querySelector('#image_id_bus_elem textarea');
-        bus.value = '{image_obj.image_id}';
-        bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        document.getElementById('{get_full_image_data_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
-
-        return f"""
-        <div class="image-item" id="image-{image_obj.image_id}">
-            <img src="data:image/png;base64,{grid_img_base64}" alt="Image Preview" onclick="{img_onclick_js}">
-            <div class="image-caption">{caption}</div>
-            <div class="image-controls">
-                <div class="rating-label">Rating:</div>
-                <div class="rating-radio-group">
-                    {rating_options_html}
-                </div>
-            </div>
-            {contributing_tags_html}
-        </div>
-        """
-
-    @staticmethod
-    def _pil_to_base64(pil_image: PILImage.Image) -> str:
-        """Converts a PIL Image to a base64 encoded string."""
-        buffered = BytesIO()
-        pil_image.save(buffered, format="PNG")
-        return base64.b64encode(buffered.getvalue()).decode()
-
 
 class AIDBGradioApp:
     """
@@ -174,76 +75,7 @@ class AIDBGradioApp:
             modal_details_data_bus = gr.Textbox(visible=False, elem_id="modal_details_data_bus_elem")
             # --- End Hidden Components ---
 
-
-            # Pure HTML for the full-page image overlay (modal)
-            gr.HTML("""
-            <style>
-                #fullPageImageOverlay {
-                    display: none; /* Hidden by default */
-                    position: fixed; /* Stay in place */
-                    z-index: 1000; /* Sit on top */
-                    left: 0;
-                    top: 0;
-                    width: 100%; /* Full width */
-                    height: 100%; /* Full height */
-                    overflow: auto; /* Enable scroll if needed */
-                    background-color: rgba(0,0,0,0.9); /* Black w/ opacity */
-                    /* Removed display: flex; from here. It will be set by JS when shown. */
-                    justify-content: center;
-                    align-items: center;
-                    flex-direction: column; /* To stack image and details */
-                }
-                #fullPageImageOverlay img {
-                    max-width: 90%;
-                    max-height: 80%;
-                    object-fit: contain;
-                    margin-bottom: 20px;
-                }
-                #fullPageImageDetails {
-                    background-color: #333333; /* Dark grey background for details */
-                    padding: 20px;
-                    border-radius: 8px;
-                    max-width: 80%;
-                    overflow-y: auto; /* Allow scrolling for long details */
-                    max-height: 15%; /* Limit height to prevent overflow */
-                    color: #ffffff; /* White text for details */
-                }
-                #fullPageImageDetails h4 {
-                    color: #ffffff; /* White heading */
-                }
-                #fullPageImageDetails p {
-                    color: #cccccc; /* Light grey text for paragraphs */
-                }
-                #fullPageImageDetails strong {
-                    color: #ffffff; /* White for strong tags */
-                }
-                #fullPageImageDetails pre {
-                    background-color: #555555; /* Slightly lighter grey for preformatted text */
-                    color: #ffffff; /* White text for preformatted text */
-                }
-                #fullPageCloseButton {
-                    position: absolute;
-                    top: 15px;
-                    right: 35px;
-                    color: #f1f1f1;
-                    font-size: 40px;
-                    font-weight: bold;
-                    transition: 0.3s;
-                    cursor: pointer;
-                }
-                #fullPageCloseButton:hover,
-                #fullPageCloseButton:focus {
-                    color: #bbb;
-                    text-decoration: none;
-                    cursor: pointer;
-                }
-            </style>
-            <div id="fullPageImageOverlay" onclick="this.style.display='none';">
-                <span id="fullPageCloseButton" onclick="event.stopPropagation(); document.getElementById('fullPageImageOverlay').style.display='none';">&times;</span>
-                <img id="fullPageImage" src="" alt="Full Size Image">
-                <div id="fullPageImageDetails"></div>
-            </div>
-            """)
+            AppImageCell.html_image_modal()
 
             with gr.Tab("Database Status"):
                 status_output = gr.Textbox(label="MongoDB Connection Status", interactive=False)
@@ -264,6 +96,10 @@ class AIDBGradioApp:
                     optional_tag_2 = gr.Dropdown(label="Optional Tag 2", choices=dropdown_choices, value="", allow_custom_value=False, interactive=True)
                     optional_tag_3 = gr.Dropdown(label="Optional Tag 3", choices=dropdown_choices, value="", allow_custom_value=False, interactive=True)
                 
+                with gr.Row():
+                    rating_min = gr.Dropdown(label="Rating Min", choices=[str(x) for x in list(range(-2, 6))], value="3", allow_custom_value=False, interactive=True)
+                    rating_max = gr.Dropdown(label="Rating Max", choices=[str(x) for x in list(range(-2, 6))], value="5", allow_custom_value=False, interactive=True)
+
                 search_button = gr.Button("Search Images")
                 
                 with gr.Column(visible=True) as advanced_search_list_view:
@@ -280,7 +116,7 @@ class AIDBGradioApp:
                     self._get_images_by_advanced_tags_initial,
                     inputs=[
                         mandatory_tag_1, mandatory_tag_2, mandatory_tag_3,
-                        optional_tag_1, optional_tag_2, optional_tag_3
+                        optional_tag_1, optional_tag_2, optional_tag_3, rating_min, rating_max
                     ],
                     outputs=[advanced_search_html_display, advanced_search_image_cache, advanced_search_current_page, advanced_search_page_info]
                 )
@@ -550,61 +386,52 @@ class AIDBGradioApp:
 
     def _get_images_by_advanced_tags_initial(self, 
                                      mand_tag1: Optional[str], mand_tag2: Optional[str], mand_tag3: Optional[str],
-                                     opt_tag1: Optional[str], opt_tag2: Optional[str], opt_tag3: Optional[str]
+                                     opt_tag1: Optional[str], opt_tag2: Optional[str], opt_tag3: Optional[str],
+                                     rating_min: Optional[str], rating_max: List[str]  # Add ratings filter
                                      ) -> Tuple[str, List[Tuple[Image, float, List[Tuple[str, float]]]], int, str]:
         """
         Performs an advanced search and initializes pagination.
         Returns (html_content, image_cache, current_page, page_info_text).
         """
-        print(f"DEBUG: _get_images_by_advanced_tags_initial called with mandatory: {mand_tag1, mand_tag2, mand_tag3}, optional: {opt_tag1, opt_tag2, opt_tag3}")
+        print(f"DEBUG: _get_images_by_advanced_tags_initial called with mandatory: {mand_tag1, mand_tag2, mand_tag3}, optional: {opt_tag1, opt_tag2, opt_tag3}, ratings: {rating_min, rating_max}")
         mandatory_tags = [tag for tag in [mand_tag1, mand_tag2, mand_tag3] if tag]
         optional_tags = [tag for tag in [opt_tag1, opt_tag2, opt_tag3] if tag]
-
+        
         scored_image_objects: List[Tuple[Image, float, List[Tuple[str, float]]]] = [] # Store (Image object, score, contributing_tags_list)
 
-        # If no tags are selected, return all images
-        if not mandatory_tags and not optional_tags:
-            print("No tags selected for advanced search. Returning all images.")
-            all_image_objects = self._query_handler.query_images()
-            for img_obj in all_image_objects:
-                # For all images, assign a default score of 0 and no contributing tags
-                scored_image_objects.append((img_obj, 0.0, [])) 
+        # Build the MongoDB query for tags and ratings
+        mongo_query: Dict[str, Any] = {}
+
+        # Add mandatory tags criteria
+        if mandatory_tags:
+            mongo_query['$and'] = [{f'tags.tags_wd.{tag}': {'$exists': True}} for tag in mandatory_tags]
+
+        # Add optional tags criteria - this part remains the same as before, influencing score calculation
+        # Add ratings filter criteria
+        ratings = list(range(int(rating_min), int(rating_max) + 1))
+        mongo_query['rating'] = {'$in': ratings}  # Use $in operator for multiple ratings
+
+        # If no criteria are added (no tags, no ratings), it's an "all images" query:
+        if not mongo_query:
+            print("No tags or ratings selected. Returning all images.")
         else:
-            print(f"Advanced search: Mandatory tags: {mandatory_tags}, Optional tags: {opt_tag1, opt_tag2, opt_tag3}")
-            all_image_objects = self._query_handler.query_images()
+            print(f"Advanced search with MongoDB query: {mongo_query}")
 
-            for img_obj in all_image_objects:
-                image_data = img_obj.data
-                if not image_data or 'tags' not in image_data or 'tags_wd' not in image_data['tags']:
-                    continue
+        all_image_objects = self._query_handler.query_images(mongo_query)
 
-                wd_tags = image_data['tags']['tags_wd']
-                current_score = 0.0
-                contributing_tags: List[Tuple[str, float]] = []
-                
-                all_mandatory_present = True
-                for m_tag in mandatory_tags:
-                    if m_tag not in wd_tags:
-                        all_mandatory_present = False
-                        break
-                    else:
-                        current_score += wd_tags[m_tag]
-                        contributing_tags.append((m_tag, wd_tags[m_tag]))
-                
-                if not all_mandatory_present:
-                    continue
-
+        # Scoring and contributing tags logic (same as before but now operating on filtered images)
+        for img_obj in all_image_objects:
+            current_score = 0.0
+            contributing_tags: List[Tuple[str, float]] = []
+            if optional_tags and img_obj.data and 'tags' in img_obj.data and 'tags_wd' in img_obj.data['tags']:
+                wd_tags = img_obj.data['tags']['tags_wd']
                 for o_tag in optional_tags:
                     if o_tag in wd_tags:
                         current_score += wd_tags[o_tag]
                         contributing_tags.append((o_tag, wd_tags[o_tag]))
+            scored_image_objects.append((img_obj, current_score, contributing_tags))
+        scored_image_objects.sort(key=lambda x: x[1], reverse=True)
 
-                if current_score > 0:
-                    scored_image_objects.append((img_obj, current_score, contributing_tags))
-            
-            # Sort images by score in descending order
-            scored_image_objects.sort(key=lambda x: x[1], reverse=True)
-            
         print(f"Found {len(scored_image_objects)} images matching advanced search criteria.")
 
         # Initialize pagination to the first page

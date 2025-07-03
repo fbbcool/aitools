@@ -1,0 +1,177 @@
+
+import base64
+from io import BytesIO
+from PIL import Image as PILImage
+import html
+from typing import List, Tuple
+from aidb.image import Image
+import gradio as gr
+
+class AppImageCell:
+    """
+    A helper class to encapsulate the HTML generation logic for a single image cell
+    in the Gradio grid display.
+    """
+
+    @staticmethod
+    def make(
+        image_obj: Image,
+        score: float, # Expected to be float
+        contributing_tags: List[Tuple[str, float]],
+        get_full_image_data_trigger_id: str,
+        rating_update_trigger_id: str
+    ) -> str:
+        """
+        Generates the HTML string for a single image cell.
+
+        Args:
+            image_obj (Image): The Image object for which to generate the cell.
+            score (float): The numerical score for the image.
+            contributing_tags (List[Tuple[str, float]]): List of tags and their probabilities that contributed to the score.
+            get_full_image_data_trigger_id (str): The HTML ID of the hidden button to trigger modal data fetch.
+            rating_update_trigger_id (str): The HTML ID of the hidden button to trigger rating update.
+
+        Returns:
+            str: The HTML string for the image cell.
+        """
+        grid_thumb_pil = image_obj.thumbnail 
+        
+        if grid_thumb_pil:
+            grid_img_base64 = AppImageCell._pil_to_base64(grid_thumb_pil)
+        else:
+            grid_img_base64 = "" # Or a base64 encoded placeholder image
+            print(f"Warning: No thumbnail available for image ID: {image_obj.image_id}. Displaying empty image.")
+
+        current_rating = image_obj.data.get("rating", -1) # Get current rating, default -1
+
+        rating_options_html = ""
+        for r in range(-2, 6): # Ratings from -2 to 5
+            checked = "checked" if current_rating == r else ""
+            # if clicked it should immediatly highlight
+            # The onclick event now uses a more robust pattern:
+            # 1. Find the hidden 'data bus' textbox.
+            # 2. Set its value to the 'image_id,rating' string.
+            # 3. Dispatch an 'input' event so Gradio recognizes the change.
+            # 4. Programmatically click the hidden trigger button.
+            onclick_js = f"""
+            event.stopPropagation();
+            const bus = document.querySelector('#rating_data_bus_elem textarea');
+            bus.value = '{image_obj.image_id},{r}';
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            document.getElementById('{rating_update_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
+            rating_options_html += f"""
+                <input type="radio" id="rating-{image_obj.image_id}-{r}" name="rating-{image_obj.image_id}" value="{r}" {checked}
+                       onclick="{onclick_js}">
+                <label for="rating-{image_obj.image_id}-{r}" class="rating-label-btn">{r}</label>
+                """
+                
+        # Format contributing tags for display
+        contributing_tags_html = ""
+        if contributing_tags:
+            contributing_tags_html = "<div class='tag-contribution'><strong>Tags:</strong><br>"
+            for tag, prob in sorted(contributing_tags, key=lambda x: x[1], reverse=True): # Sort contributing tags by probability
+                contributing_tags_html += f"{html.escape(tag)}: {prob:.2f}<br>"
+            contributing_tags_html += "</div>"
+        
+        caption = f"Score: {score:.2f} (ID: {image_obj.image_id})"
+
+        # The onclick for the image now also uses the data bus pattern.
+        img_onclick_js = f"""
+        const bus = document.querySelector('#image_id_bus_elem textarea');
+        bus.value = '{image_obj.image_id}';
+        bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        document.getElementById('{get_full_image_data_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
+
+        return f"""
+        <div class="image-item" id="image-{image_obj.image_id}">
+            <img src="data:image/png;base64,{grid_img_base64}" alt="Image Preview" onclick="{img_onclick_js}">
+            <div class="image-caption">{caption}</div>
+            <div class="image-controls">
+                <div class="rating-label">Rating:</div>
+                <div class="rating-radio-group">
+                    {rating_options_html}
+                </div>
+            </div>
+            {contributing_tags_html}
+        </div>
+        """
+
+    @staticmethod
+    def _pil_to_base64(pil_image: PILImage.Image) -> str:
+        """Converts a PIL Image to a base64 encoded string."""
+        buffered = BytesIO()
+        pil_image.save(buffered, format="PNG")
+        return base64.b64encode(buffered.getvalue()).decode()
+    
+    @staticmethod
+    def html_image_modal() -> gr.HTML:
+        # Pure HTML for the full-page image overlay (modal)
+        return gr.HTML("""
+        <style>
+            #fullPageImageOverlay {
+                display: none; /* Hidden by default */
+                position: fixed; /* Stay in place */
+                z-index: 1000; /* Sit on top */
+                left: 0;
+                top: 0;
+                width: 100%; /* Full width */
+                height: 100%; /* Full height */
+                overflow: auto; /* Enable scroll if needed */
+                background-color: rgba(0,0,0,0.9); /* Black w/ opacity */
+                /* Removed display: flex; from here. It will be set by JS when shown. */
+                justify-content: center;
+                align-items: center;
+                flex-direction: column; /* To stack image and details */
+            }
+            #fullPageImageOverlay img {
+                max-width: 90%;
+                max-height: 80%;
+                object-fit: contain;
+                margin-bottom: 20px;
+            }
+            #fullPageImageDetails {
+                background-color: #333333; /* Dark grey background for details */
+                padding: 20px;
+                border-radius: 8px;
+                max-width: 80%;
+                overflow-y: auto; /* Allow scrolling for long details */
+                max-height: 15%; /* Limit height to prevent overflow */
+                color: #ffffff; /* White text for details */
+            }
+            #fullPageImageDetails h4 {
+                color: #ffffff; /* White heading */
+            }
+            #fullPageImageDetails p {
+                color: #cccccc; /* Light grey text for paragraphs */
+            }
+            #fullPageImageDetails strong {
+                color: #ffffff; /* White for strong tags */
+            }
+            #fullPageImageDetails pre {
+                background-color: #555555; /* Slightly lighter grey for preformatted text */
+                color: #ffffff; /* White text for preformatted text */
+            }
+            #fullPageCloseButton {
+                position: absolute;
+                top: 15px;
+                right: 35px;
+                color: #f1f1f1;
+                font-size: 40px;
+                font-weight: bold;
+                transition: 0.3s;
+                cursor: pointer;
+            }
+            #fullPageCloseButton:hover,
+            #fullPageCloseButton:focus {
+                color: #bbb;
+                text-decoration: none;
+                cursor: pointer;
+            }
+        </style>
+        <div id="fullPageImageOverlay" onclick="this.style.display='none';">
+            <span id="fullPageCloseButton" onclick="event.stopPropagation(); document.getElementById('fullPageImageOverlay').style.display='none';">&times;</span>
+            <img id="fullPageImage" src="" alt="Full Size Image">
+            <div id="fullPageImageDetails"></div>
+        </div>
+        """)
+
