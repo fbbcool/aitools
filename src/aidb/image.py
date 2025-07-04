@@ -1,5 +1,5 @@
 import pathlib
-from typing import List, Dict, Optional, Union, Any, Tuple
+from typing import List, Dict, Literal, Optional, Union, Any, Tuple
 from bson.objectid import ObjectId
 from PIL import Image as PILImage # Import Image from Pillow and alias it to avoid conflict with our class name
 
@@ -12,7 +12,7 @@ class Image:
     in the MongoDB database.
     """
 
-    def __init__(self, db_manager: DBManager, image_id: str) -> None:
+    def __init__(self, db_manager: DBManager, image_id: str, doc: Optional[Dict[str, Any]] = None) -> None:
         """
         Initializes the Image object with a reference to the DBManager
         and the MongoDB _id of the image.
@@ -20,6 +20,8 @@ class Image:
         Args:
             db_manager (DBManager): An instance of the DBManager class.
             image_id (str): The string representation of the MongoDB '_id' for this image.
+            doc (Optional[Dict[str, Any]]): An optional pre-fetched document from the database.
+                                             If provided, it prevents an extra database call.
         """
         if not isinstance(db_manager, DBManager):
             raise TypeError("db_manager must be an instance of DBManager.")
@@ -32,8 +34,11 @@ class Image:
 
         self._db_manager = db_manager
         self._image_id = image_id
-        self._data = None
-        #print(f"Image object initialized for ID: {self._image_id}")
+        self._data = doc # Store the pre-fetched document
+        self.score = 0.0
+        self.contributing_tags = []
+        self.operation : Literal['nop','rate','scene'] = 'nop'
+
 
     @property
     def image_id(self) -> str:
@@ -66,7 +71,26 @@ class Image:
         if self.data is None:
             return {}
         return self.data.get("tags", {}) # Use .get to safely access, return empty dict if 'tags' is missing
+    
+    def get_tags_custom(self, category: str) -> list[str]:
+        """Returns tags of a custom category."""
+        tags = self.tags
+        if "custom" in tags:
+            custom_tags = tags["custom"]
+        else:
+            return []
+        if category in custom_tags:
+            return custom_tags[category]
+        else:
+            return []
 
+
+    def set_tags_custom(self, category: str, tags_category: list[str]) -> int:
+        """Sets custom category tags"""
+        tags = self.tags
+        tags_custom = tags["custom"] if "custom" in tags else {}
+        tags_custom[category] = tags_category
+        return self.update_tags({"custom": tags_custom})
     
     def generate_tags(self) -> dict:
         """
@@ -327,7 +351,9 @@ class Image:
     def update_tags(self, tags: List[Dict[str, Any]]) -> Optional[int]:
         """Updates the tags field of the image."""
         print(f"Updating tags for image {self._image_id}")
-        return self._db_manager.update_image(self._image_id, tags=tags)
+        new_tags = self.tags
+        new_tags |= tags
+        return self._db_manager.update_image(self._image_id, tags=new_tags)
 
     def init_tags(self, force: bool = False) -> Optional[int]:
         """Initializes the tags field of the image."""
@@ -410,3 +436,29 @@ class Image:
         return tags_dict.get(tag, 0.0)
 
 
+    def calc_score_based_on_tags(self, tags: list[str]) -> None:
+        """
+        Calcs the score wrt. the given tags and stores the score in the object.
+        It also stores the contributing tags in the object.
+        """
+        current_score = 0.0
+        contributing_tags: List[Tuple[str, float]] = []
+        if self.data and 'tags' in self.data and 'tags_wd' in self.data['tags']:
+            wd_tags = self.data['tags']['tags_wd']
+            for o_tag in tags:
+                if o_tag in wd_tags:
+                    current_score += wd_tags[o_tag]
+                    contributing_tags.append((o_tag, wd_tags[o_tag]))
+        self.score = current_score
+        self.contributing_tags = contributing_tags
+        
+    def run_operation(self, value: Any) -> int:
+        if self.operation == 'nop':
+            return True
+        elif self.operation == 'rate':
+            return self.update_rating(value)
+        elif self.operation == 'scene':
+            tags = {"scene": value}
+            return self.update_tags(tags)
+        else:
+            return False

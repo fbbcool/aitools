@@ -3,48 +3,122 @@ import base64
 from io import BytesIO
 from PIL import Image as PILImage
 import html
-from typing import List, Tuple
+from typing import Final, List, Tuple
 from aidb.image import Image
+from aidb.tagger import TAGS_CUSTOM
 import gradio as gr
 
 class AppImageCell:
     """
     A helper class to encapsulate the HTML generation logic for a single image cell
-    in the Gradio grid display.
+    in the Gradio grid display for showing rating and contributing tags.
+    The rating can be changed by clicking.
     """
 
     @staticmethod
     def make(
-        image_obj: Image,
-        score: float, # Expected to be float
-        contributing_tags: List[Tuple[str, float]],
+        img: Image,
         get_full_image_data_trigger_id: str,
-        rating_update_trigger_id: str
+        rating_update_trigger_id: str,
+        scene_update_trigger_id: str,
     ) -> str:
         """
         Generates the HTML string for a single image cell.
 
         Args:
             image_obj (Image): The Image object for which to generate the cell.
-            score (float): The numerical score for the image.
-            contributing_tags (List[Tuple[str, float]]): List of tags and their probabilities that contributed to the score.
             get_full_image_data_trigger_id (str): The HTML ID of the hidden button to trigger modal data fetch.
             rating_update_trigger_id (str): The HTML ID of the hidden button to trigger rating update.
 
         Returns:
             str: The HTML string for the image cell.
         """
-        grid_thumb_pil = image_obj.thumbnail 
+        grid_thumb_pil = img.thumbnail 
         
         if grid_thumb_pil:
             grid_img_base64 = AppImageCell._pil_to_base64(grid_thumb_pil)
         else:
             grid_img_base64 = "" # Or a base64 encoded placeholder image
-            print(f"Warning: No thumbnail available for image ID: {image_obj.image_id}. Displaying empty image.")
+            print(f"Warning: No thumbnail available for image ID: {img.image_id}. Displaying empty image.")
 
-        current_rating = image_obj.data.get("rating", -1) # Get current rating, default -1
+        # Format contributing tags for display
+        contributing_tags_html = ""
+        if img.contributing_tags:
+            contributing_tags_html = "<div class='tag-contribution'><strong>Tags:</strong><br>"
+            for tag, prob in sorted(img.contributing_tags, key=lambda x: x[1], reverse=True): # Sort contributing tags by probability
+                contributing_tags_html += f"{html.escape(tag)}: {prob:.2f}<br>"
+            contributing_tags_html += "</div>"
+        
+        caption = f"Score: {img.score:.2f} (ID: {img.image_id})"
 
-        rating_options_html = ""
+        # The onclick for the image now also uses the data bus pattern.
+        img_onclick_js = f"""
+        const bus = document.querySelector('#image_id_bus_elem textarea');
+        bus.value = '{img.image_id}';
+        bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        document.getElementById('{get_full_image_data_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
+
+        return f"""
+        <div class="image-item" id="image-{img.image_id}">
+            <img src="data:image/png;base64,{grid_img_base64}" alt="Image Preview" onclick="{img_onclick_js}">
+            <div class="image-caption">{caption}</div>
+            <div class="image-controls">
+                {AppImageCell.html_operation(img, rating_update_trigger_id, scene_update_trigger_id)}
+            </div>
+            {contributing_tags_html}
+        </div>
+        """
+
+    @staticmethod
+    def html_operation(img: Image, rating_update_trigger_id: str, scene_update_trigger_id: str) -> str:
+        if img.operation is None:
+            return ""
+        elif img.operation == "nop":
+            return ""
+        elif img.operation == "rate":
+            return AppImageCell._html_op_rate(img, rating_update_trigger_id)
+        elif img.operation == "scene":
+            return AppImageCell._html_op_scene(img, scene_update_trigger_id)
+
+    
+    @staticmethod
+    def _html_op_scene(img: Image, update_trigger_id: str) -> str:
+        current_tags = img.get_tags_custom("bodypart")
+
+
+        operation_html = ""
+        for bodypart in TAGS_CUSTOM["bodypart"]:
+            checked =  "checked" if bodypart in current_tags else ""
+            # if clicked it should immediatly highlight
+            # The onclick event now uses a more robust pattern:
+            # 1. Find the hidden 'data bus' textbox.
+            # 2. Set its value to the 'image_id,rating' string.
+            # 3. Dispatch an 'input' event so Gradio recognizes the change.
+            # 4. Programmatically click the hidden trigger button.
+            onclick_js = f"""
+            event.stopPropagation();
+            const bus = document.querySelector('#scene_data_bus_elem textarea');
+            bus.value = '{img.image_id},{bodypart}';
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            document.getElementById('{update_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
+            operation_html += f"""
+                <input type="checkbox" id="scene-{img.image_id}-{bodypart}" name="scene-{img.image_id}" value="{bodypart}" {checked}
+                       onclick="{onclick_js}">
+                <label for="scene-{img.image_id}-{bodypart}" class="scene-label-btn">{bodypart}</label>
+                """
+        
+        return f"""
+                <div class="scene-label">Scene:</div>
+                <div class="operation-checkbox-group">
+                    {operation_html}
+                </div>
+                """
+    
+    @staticmethod
+    def _html_op_rate(img: Image, update_trigger_id: str) -> str:
+        current_rating = img.data.get("rating", -1) # Get current rating, default -1
+
+        operation_html = ""
         for r in range(-2, 6): # Ratings from -2 to 5
             checked = "checked" if current_rating == r else ""
             # if clicked it should immediatly highlight
@@ -56,45 +130,21 @@ class AppImageCell:
             onclick_js = f"""
             event.stopPropagation();
             const bus = document.querySelector('#rating_data_bus_elem textarea');
-            bus.value = '{image_obj.image_id},{r}';
+            bus.value = '{img.image_id},{r}';
             bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            document.getElementById('{rating_update_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
-            rating_options_html += f"""
-                <input type="radio" id="rating-{image_obj.image_id}-{r}" name="rating-{image_obj.image_id}" value="{r}" {checked}
+            document.getElementById('{update_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
+            operation_html += f"""
+                <input type="radio" id="rating-{img.image_id}-{r}" name="rating-{img.image_id}" value="{r}" {checked}
                        onclick="{onclick_js}">
-                <label for="rating-{image_obj.image_id}-{r}" class="rating-label-btn">{r}</label>
+                <label for="rating-{img.image_id}-{r}" class="rating-label-btn">{r}</label>
                 """
-                
-        # Format contributing tags for display
-        contributing_tags_html = ""
-        if contributing_tags:
-            contributing_tags_html = "<div class='tag-contribution'><strong>Tags:</strong><br>"
-            for tag, prob in sorted(contributing_tags, key=lambda x: x[1], reverse=True): # Sort contributing tags by probability
-                contributing_tags_html += f"{html.escape(tag)}: {prob:.2f}<br>"
-            contributing_tags_html += "</div>"
         
-        caption = f"Score: {score:.2f} (ID: {image_obj.image_id})"
-
-        # The onclick for the image now also uses the data bus pattern.
-        img_onclick_js = f"""
-        const bus = document.querySelector('#image_id_bus_elem textarea');
-        bus.value = '{image_obj.image_id}';
-        bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        document.getElementById('{get_full_image_data_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
-
         return f"""
-        <div class="image-item" id="image-{image_obj.image_id}">
-            <img src="data:image/png;base64,{grid_img_base64}" alt="Image Preview" onclick="{img_onclick_js}">
-            <div class="image-caption">{caption}</div>
-            <div class="image-controls">
                 <div class="rating-label">Rating:</div>
-                <div class="rating-radio-group">
-                    {rating_options_html}
+                <div class="operation-radio-group">
+                    {operation_html}
                 </div>
-            </div>
-            {contributing_tags_html}
-        </div>
-        """
+                """
 
     @staticmethod
     def _pil_to_base64(pil_image: PILImage.Image) -> str:

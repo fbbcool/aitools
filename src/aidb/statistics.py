@@ -55,7 +55,7 @@ class Statistics:
                 print("No image documents found in the database.")
                 return {}
             # Convert documents to Image objects for consistent processing
-            images_to_process = [Image(self._db_manager, str(doc['_id'])) for doc in image_docs if '_id' in doc]
+            images_to_process = [Image(self._db_manager, str(doc['_id']), doc=doc) for doc in image_docs if '_id' in doc]
             print(f"Found {len(images_to_process)} images in the database.")
 
 
@@ -118,7 +118,7 @@ class Statistics:
                 print("No image documents found in the database.")
                 return {}
             # Convert documents to Image objects for consistent processing
-            images_to_process = [Image(self._db_manager, str(doc['_id'])) for doc in image_docs if '_id' in doc]
+            images_to_process = [Image(self._db_manager, str(doc['_id']), doc=doc) for doc in image_docs if '_id' in doc]
             print(f"Found {len(images_to_process)} images in the database.")
 
         if not images_to_process:
@@ -156,4 +156,3 @@ class Statistics:
     #     Provides statistics per container, e.g., number of images, average rating.
     #     """
     #     pass
-

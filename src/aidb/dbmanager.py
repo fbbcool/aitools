@@ -1,3 +1,4 @@
+import json
 from bson import ObjectId
 import pymongo
 import pymongo.collection
@@ -368,7 +369,7 @@ class DBManager:
                 "description": [], # Set description to empty list
                 "creation_date": file_creation_date,
                 "last_modified_date": file_last_modified_date,
-                "tags": [], # Set tags to empty list
+                "tags": {}, # Set tags to empty dict
                 "dimensions": {
                     "width": 0,  # Placeholder, actual dimensions require image processing library
                     "height": 0, # Placeholder
@@ -518,4 +519,111 @@ class DBManager:
             print("MongoDB connection closed.")
         else:
             print("No active MongoDB connection to close.")
+    
+    def export_db(self):
+        """exports the current db to a file named like the current db name. if the file already exists, it will be overwritten."""
+        if self.db is None:
+            print("Database not connected. Cannot export.")
+            return
 
+        db_name = self.db.name
+        export_file_name = f"{db_name}_export.json"
+        
+        export_data = {}
+        for collection_name in self.db.list_collection_names():
+            collection = self.db[collection_name]
+            export_data[collection_name] = []
+            for document in collection.find({}):
+                # Convert ObjectId to string for JSON serialization
+                document['_id'] = str(document['_id'])
+                # Convert any other ObjectIds in the document to string
+                for key, value in document.items():
+                    if isinstance(value, ObjectId):
+                        document[key] = str(value)
+                    elif isinstance(value, list):
+                        document[key] = [str(item) if isinstance(item, ObjectId) else item for item in value]
+                export_data[collection_name].append(document)
+
+        try:
+            with open(export_file_name, 'w') as f:
+                json.dump(export_data, f, indent=4)
+            print(f"Database '{db_name}' exported successfully to '{export_file_name}'.")
+        except IOError as e:
+            print(f"Error writing export file '{export_file_name}': {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred during database export: {e}")
+
+    def import_db(self, import_file_name: str, db_name: str) -> None:
+        """imports a database from a file to a new database. if the database already exists, the export is canceled."""
+        if self.client is None:
+            print("MongoDB client not initialized. Cannot import.")
+            return
+
+        # Check if the target database already exists
+        if db_name in self.client.list_database_names():
+            print(f"Error: Database '{db_name}' already exists. Import canceled to prevent accidental overwrite.")
+            print("Please drop the existing database or choose a different name for import.")
+            return
+
+        try:
+            with open(import_file_name, 'r') as f:
+                import_data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: Import file '{import_file_name}' not found.")
+            return
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON from '{import_file_name}': {e}")
+            return
+        except Exception as e:
+            print(f"An unexpected error occurred while reading import file '{import_file_name}': {e}")
+            return
+
+        # Connect to the new database
+        new_db = self.client[db_name]
+        print(f"Attempting to import data into new database '{db_name}'...")
+
+        for collection_name, documents in import_data.items():
+            collection = new_db[collection_name]
+            docs_to_insert = []
+            for doc in documents:
+                # Convert string _id back to ObjectId
+                if '_id' in doc:
+                    doc['_id'] = ObjectId(doc['_id'])
+                # Convert any other ObjectIds back
+                for key, value in doc.items():
+                    if isinstance(value, str):
+                        try:
+                            # Check if it's a valid ObjectId string
+                            if len(value) == 24 and all(c in '0123456789abcdefABCDEF' for c in value):
+                                doc[key] = ObjectId(value)
+                        except Exception:
+                            pass # Not an ObjectId string
+                    elif isinstance(value, list):
+                        new_list = []
+                        for item in value:
+                            if isinstance(item, str):
+                                try:
+                                    if len(item) == 24 and all(c in '0123456789abcdefABCDEF' for c in item):
+                                        new_list.append(ObjectId(item))
+                                    else:
+                                        new_list.append(item)
+                                except Exception:
+                                    new_list.append(item)
+                            else:
+                                new_list.append(item)
+                        doc[key] = new_list
+                docs_to_insert.append(doc)
+            
+            if docs_to_insert:
+                try:
+                    collection.insert_many(docs_to_insert)
+                    print(f"Imported {len(docs_to_insert)} documents into collection '{collection_name}'.")
+                except OperationFailure as e:
+                    print(f"Error inserting documents into '{collection_name}': {e}")
+            else:
+                print(f"No documents to insert into collection '{collection_name}'.")
+        
+        print(f"Database '{db_name}' imported successfully from '{import_file_name}'.")
+        # Update the current DBManager's connection to the newly imported database
+        self.db = new_db
+        self._db_name = db_name

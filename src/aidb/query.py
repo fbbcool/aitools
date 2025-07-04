@@ -1,9 +1,9 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from bson.objectid import ObjectId
 
 # Local imports for DBManager and Image classes
 from aidb.dbmanager import DBManager
-from aidb.image import Image # Assuming Image class is in image_class.py
+from aidb.image import Image
 
 class Query:
     """
@@ -41,7 +41,7 @@ class Query:
         """
         print(f"Executing query for images: {query}")
         
-        # Ensure _id and container_db_id in query are ObjectId if they are strings
+        # Ensure _id, container_db_id and rating in query are ObjectId if they are strings
         processed_query = {}
         if query:
             for key, value in query.items():
@@ -64,7 +64,7 @@ class Query:
                 # MongoDB's _id is an ObjectId, convert to string for Image class constructor
                 if '_id' in doc:
                     try:
-                        image_objects.append(Image(self._db_manager, str(doc['_id'])))
+                        image_objects.append(Image(self._db_manager, str(doc['_id']), doc=doc))
                     except ValueError as e:
                         print(f"Error creating Image object for document {doc.get('_id')}: {e}")
                 else:
@@ -73,72 +73,62 @@ class Query:
             print("No image documents found matching the query.")
             
         return image_objects
+    
+    def query_by_tags(self, tags_mand: List[str], tags_opt: List[str], rating_min: int, rating_max: int) -> List[Image]:
+        """
+        Queries images based on mandatory and optional tags, and a rating range.
 
-# Example Usage (for testing purposes, typically in a separate script)
-# if __name__ == "__main__":
-#     # Assuming you have a running MongoDB and db_manager.py and image_class.py in the same directory
-#     # Initialize DBManager
-#     db_manager_instance = DBManager(host='localhost', port=27017, db_name='metadata_db')
+        Args:
+            tags_mand (List[str]): List of tags that must be present in the image's tags_wd.
+            tags_opt (List[str]): List of optional tags that contribute to a score.
+            rating_min (int): Minimum rating (inclusive).
+            rating_max (int): Maximum rating (inclusive).
 
-#     if db_manager_instance.db: # Only proceed if DBManager connected successfully
-#         query_handler = Query(db_manager_instance)
+        Returns:
+            List[Image]: A list of Image objects matching the criteria.
+        """
+        print(f"Querying by tags: Mandatory={tags_mand}, Optional={tags_opt}, Rating={rating_min}-{rating_max}")
 
-#         # --- Example 1: Add a dummy container and image for querying ---
-#         print("\n--- Setting up dummy data for query test ---")
-#         test_dir = pathlib.Path("query_test_container")
-#         test_dir.mkdir(exist_ok=True)
-#         (test_dir / "query_image_1.jpg").write_text("dummy image content 1")
-#         (test_dir / "query_image_2.png").write_text("dummy image content 2")
+        mongo_query: Dict[str, Any] = {}
+
+        # Add mandatory tags criteria
+        if tags_mand:
+            # For each mandatory tag, ensure it exists in tags.tags_wd
+            # MongoDB query for existence of a field: { "field": { "$exists": true } }
+            # To check for multiple mandatory tags, use $and
+            mongo_query['$and'] = [{f'tags.tags_wd.{tag}': {'$exists': True}} for tag in tags_mand]
+
+        # Add ratings filter criteria
+        # The rating field is directly in the image document
+        mongo_query['rating'] = {'$gte': rating_min, '$lte': rating_max}
+        print(f"Mongo query: {mongo_query}")
+
+        # Execute the query to get image documents
+        image_docs = self._db_manager.find_documents('images', mongo_query)
+
+        image_objects: List[Image] = []
+        if not image_docs:
+            return []
+
+        for doc in image_docs:
+            if '_id' in doc:
+                try:
+                    # Create ONE Image object, passing the pre-fetched doc to avoid re-querying
+                    img_obj = Image(self._db_manager, str(doc['_id']), doc=doc)
+                    # Use the object's own method to calculate the score
+                    img_obj.calc_score_based_on_tags(tags_opt+tags_mand)
+                    image_objects.append(img_obj)
+                except ValueError as e:
+                    print(f"Error creating Image object for document {doc.get('_id')}: {e}")
         
-#         container_id = db_manager_instance.add_container(str(test_dir))
-#         
-#         # Give some time for async operations if any, or ensure they complete
-#         # In a real app, you might have more robust ways to ensure data is written
-#         import time
-#         time.sleep(1) 
-
-#         # --- Example 2: Query all images ---
-#         print("\n--- Querying all images ---")
-#         all_images = query_handler.query_images()
-#         print(f"Found {len(all_images)} images:")
-#         for img in all_images:
-#             print(f"  Image ID: {img.image_id}, Full Path: {img.get_full_path()}")
-#             # You can now use methods from the Image class on these objects
-#             # e.g., img.update_rating(4)
-
-#         # --- Example 3: Query images by container_db_id ---
-#         if container_id:
-#             print(f"\n--- Querying images by container ID: {container_id} ---")
-#             images_in_container = query_handler.query_images({"container_db_id": container_id})
-#             print(f"Found {len(images_in_container)} images in container {container_id}:")
-#             for img in images_in_container:
-#                 print(f"  Image ID: {img.image_id}, Full Path: {img.get_full_path()}")
-
-#         # --- Example 4: Query images by a custom field (e.g., rating) ---
-#         # First, update a dummy image's rating to make it queryable
-#         if all_images:
-#             first_image_id = all_images[0].image_id
-#             print(f"\n--- Updating rating of image {first_image_id} to 5 ---")
-#             db_manager_instance.update_image(first_image_id, rating=5)
-#             time.sleep(1) # Give time for update to propagate
-
-#             print("\n--- Querying images with rating 5 ---")
-#             high_rated_images = query_handler.query_images({"rating": 5})
-#             print(f"Found {len(high_rated_images)} images with rating 5:")
-#             for img in high_rated_images:
-#                 print(f"  Image ID: {img.image_id}, Rating: {db_manager_instance.find_documents('images', {'_id': ObjectId(img.image_id)})[0].get('rating')}")
+        return self._sort_images_by_score(image_objects)
 
 
-#         # --- Clean up dummy data ---
-#         print("\n--- Cleaning up dummy data ---")
-#         if container_id:
-#             db_manager_instance.delete_document('containers', {"_id": ObjectId(container_id)})
-#         db_manager_instance.delete_document('images', {"container_local_path": str(test_dir)})
-#         if test_dir.exists():
-#             for f in test_dir.iterdir():
-#                 f.unlink()
-#             test_dir.rmdir()
-#         print("Dummy data cleaned up.")
-
-#     db_manager_instance.close_connection()
-
+    @staticmethod
+    def _sort_images_by_score(images: List[Image]) -> List[Image]:
+        """
+        Sorts a list of Image objects by their 'score' attribute in descending order.
+        Assumes that the 'score' attribute has been set on the Image objects.
+        """
+        return sorted(images, key=lambda img: getattr(img, 'score', 0.0), reverse=True)
+    

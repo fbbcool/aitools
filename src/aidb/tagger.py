@@ -5,7 +5,11 @@ import onnxruntime as rt
 import pandas as pd
 from PIL import Image
 
-
+TAGS_CUSTOM: Final = {
+    "bodypart": ["body", "pussy", "ass", "breast", "face", "foot", "leg", "mouth", "hand", "thigh", "__tbr"],
+    "interaction": ["in", "front", "none", "__tbr"],
+    "trigger": ["1gts", "1hairy", "1legs", "1fbb", "__tbr"]
+}
 # Files to download from the repos
 MODEL_FILENAME: Final = "/Volumes/data/Project/AI/REPOS/aitools/build/models/wdtagger/model.onnx"
 LABEL_FILENAME: Final = "/Volumes/data/Project/AI/REPOS/aitools/build/models/wdtagger/selected_tags.csv"

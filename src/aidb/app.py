@@ -4,13 +4,14 @@ from aidb.query import Query
 from aidb.statistics import Statistics
 from aidb.image import Image
 from aidb.app.cell_image import AppImageCell
-from typing import Optional, List, Dict, Any, Tuple
-import pathlib
+from aidb.app.tab_search_and_rate import AppTabSearchAndRate
+from typing import Final, Optional, List, Dict, Any, Tuple
 import html
 import json # Import json for robust string escaping
 
 # Define images per page constant
-IMAGES_PER_PAGE = 250
+IMAGES_PER_PAGE: Final = 250
+TAGS_TRIGGER: Final = ["1gts", "1hairy", "1legs", "1fbb", "1busty"]
 
 class AIDBGradioApp:
     """
@@ -34,11 +35,14 @@ class AIDBGradioApp:
         self._statistics_handler = Statistics(db_manager)
         print("AIDBGradioApp initialized with DBManager, Query, and Statistics references.")
 
-        # Define explicit elem_ids for hidden components for reliable JS targeting
+        # hidden update triggers
         self._get_full_image_data_trigger_elem_id = "get_full_image_data_trigger_btn"
         self._rating_update_trigger_elem_id = "rating_update_trigger_btn"
+        self._scene_update_trigger_elem_id = "scene_update_trigger_btn"
+        # hidden data busses
         self._image_id_bus_elem_id = "image_id_bus_elem"
         self._rating_data_bus_elem_id = "rating_data_bus_elem"
+        self._scene_data_bus_elem_id = "scene_data_bus_elem"
 
         self.interface = self._create_interface()
 
@@ -63,12 +67,14 @@ class AIDBGradioApp:
 
             # --- Hidden Components for Robust Event Handling ---
             # Trigger buttons (no data, just event triggers)
-            rating_update_trigger = gr.Button("Hidden Rating Update Trigger", visible=False, elem_id=self._rating_update_trigger_elem_id)
             get_full_image_data_trigger = gr.Button("Get Full Image Data Trigger", visible=False, elem_id=self._get_full_image_data_trigger_elem_id)
+            rating_update_trigger = gr.Button("Hidden Rating Update Trigger", visible=False, elem_id=self._rating_update_trigger_elem_id)
+            scene_update_trigger = gr.Button("Hidden Scene Update Trigger", visible=False, elem_id=self._scene_update_trigger_elem_id)
 
             # Data bus textboxes (hold data passed from JS to Python)
             image_id_bus = gr.Textbox(visible=False, elem_id=self._image_id_bus_elem_id)
             rating_data_bus = gr.Textbox(visible=False, elem_id=self._rating_data_bus_elem_id)
+            scene_data_bus = gr.Textbox(visible=False, elem_id=self._scene_data_bus_elem_id)
             
             # Data bus textboxes for the image modal
             modal_img_data_bus = gr.Textbox(visible=False, elem_id="modal_img_data_bus_elem")
@@ -81,7 +87,8 @@ class AIDBGradioApp:
                 status_output = gr.Textbox(label="MongoDB Connection Status", interactive=False)
                 check_status_btn = gr.Button("Check DB Connection")
                 check_status_btn.click(self._check_db_status, outputs=status_output)
-            
+
+            AppTabSearchAndRate._create_interface()            
             with gr.Tab("Image Search"): # Renamed tab for clarity
                 gr.Markdown("## Advanced Image Search with Mandatory and Optional Tags")
                 gr.Markdown("Select up to 3 mandatory tags (all must be present) and up to 3 optional tags (contribute to score).")
@@ -99,7 +106,8 @@ class AIDBGradioApp:
                 with gr.Row():
                     rating_min = gr.Dropdown(label="Rating Min", choices=[str(x) for x in list(range(-2, 6))], value="3", allow_custom_value=False, interactive=True)
                     rating_max = gr.Dropdown(label="Rating Max", choices=[str(x) for x in list(range(-2, 6))], value="5", allow_custom_value=False, interactive=True)
-
+                    operation = gr.Dropdown(label="Operation", choices=["None", "Rate", "Scene"], value="Rate", allow_custom_value=False, interactive=True)
+                
                 search_button = gr.Button("Search Images")
                 
                 with gr.Column(visible=True) as advanced_search_list_view:
@@ -113,10 +121,10 @@ class AIDBGradioApp:
                         refresh_button = gr.Button("Refresh Current Page") # NEW Refresh button
 
                 search_button.click(
-                    self._get_images_by_advanced_tags_initial,
+                    self._imgs_search_and_op,
                     inputs=[
                         mandatory_tag_1, mandatory_tag_2, mandatory_tag_3,
-                        optional_tag_1, optional_tag_2, optional_tag_3, rating_min, rating_max
+                        optional_tag_1, optional_tag_2, optional_tag_3, rating_min, rating_max,operation
                     ],
                     outputs=[advanced_search_html_display, advanced_search_image_cache, advanced_search_current_page, advanced_search_page_info]
                 )
@@ -139,7 +147,7 @@ class AIDBGradioApp:
 
                 # NEW: Refresh button click event
                 refresh_button.click(
-                    self._refresh_image_grid, # Call the new refresh function
+                    self._refresh_image_grid,
                     inputs=[advanced_search_image_cache, advanced_search_current_page],
                     outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info]
                 )
@@ -190,7 +198,17 @@ class AIDBGradioApp:
                 outputs=[] # This function doesn't update UI directly
             ).then( # Chain .then() to refresh the grid
                 self._refresh_image_grid,
-                inputs=[advanced_search_image_cache, advanced_search_current_page], # Pass the cache and current page state
+                inputs=[advanced_search_image_cache, advanced_search_current_page],
+                outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info] # Update the grid
+            )
+            
+            scene_update_trigger.click(
+                self._update_image_scene, # Call the update function first
+                inputs=[scene_data_bus], # Input is the data bus textbox
+                outputs=[] # This function doesn't update UI directly
+            ).then( # Chain .then() to refresh the grid
+                self._refresh_image_grid,
+                inputs=[advanced_search_image_cache, advanced_search_current_page],
                 outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info] # Update the grid
             )
             
@@ -225,7 +243,7 @@ class AIDBGradioApp:
         print(f"Found {len(tag_names)} unique WD tags.")
         return tag_names
 
-    def _generate_image_html(self, images_on_page_data: List[Tuple[Image, float, List[Tuple[str, float]]]]) -> str:
+    def _generate_image_html(self, images_on_page_data: list[Image]) -> str:
         """
         Generates HTML for a two-column grid of images with captions, rating controls,
         and contributing tags.
@@ -234,6 +252,7 @@ class AIDBGradioApp:
         # Get the dynamically generated IDs for the hidden Gradio components
         get_full_image_data_trigger_id = self._get_full_image_data_trigger_elem_id
         rating_update_trigger_id = self._rating_update_trigger_elem_id
+        scene_update_trigger_id = self._scene_update_trigger_elem_id
         
         html_content = f"""
         <style>
@@ -276,16 +295,16 @@ class AIDBGradioApp:
                 padding: 0 10px;
                 color: #ffffff; /* White font for controls */
             }}
-            .rating-radio-group {{
+            .operation-radio-group {{
                 display: flex;
                 justify-content: center;
                 gap: 5px;
                 flex-wrap: wrap; /* Allow wrapping for smaller screens */
             }}
-            .rating-radio-group input[type="radio"] {{
+            .operation-radio-group input[type="radio"] {{
                 display: none; /* Hide default radio button */
             }}
-            .rating-radio-group label {{
+            .operation-radio-group label {{
                 padding: 5px 8px;
                 border: 1px solid #ccc;
                 border-radius: 5px;
@@ -295,14 +314,42 @@ class AIDBGradioApp:
                 background-color: #555555; /* Slightly lighter grey for radio buttons */
                 color: #ffffff; /* White font for radio button labels */
             }}
-            .rating-radio-group input[type="radio"]:checked + label {{
+            .operation-radio-group input[type="radio"]:checked + label {{
                 background-color: #4CAF50; /* Green for selected */
                 color: white;
                 border-color: #4CAF50;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             }}
-            .rating-radio-group label:hover {{
+            .operation-radio-group label:hover {{
                 background-color: #777777; /* Darker hover for radio buttons */
+            }}
+            .operation-checkbox-group {{
+                display: flex;
+                justify-content: center;
+                gap: 5px;
+                flex-wrap: wrap; /* Allow wrapping for smaller screens */
+            }}
+            .operation-checkbox-group input[type="checkbox"] {{
+                display: none; /* Hide default checkbox button */
+            }}
+            .operation-checkbox-group label {{
+                padding: 5px 8px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 0.8em;
+                transition: all 0.2s ease;
+                background-color: #555555; /* Slightly lighter grey for checkbox buttons */
+                color: #ffffff; /* White font for checkbox button labels */
+            }}
+            .operation-checkbox-group input[type="checkbox"]:checked + label {{
+                background-color: #4CAF50; /* Green for selected */
+                color: white;
+                border-color: #4CAF50;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            }}
+            .operation-checkbox-group label:hover {{
+                background-color: #777777; /* Darker hover for checkbox buttons */
             }}
             .tag-contribution {{
                 font-size: 0.8em;
@@ -318,21 +365,20 @@ class AIDBGradioApp:
         <div class="image-grid">
         """
 
-        for img_obj, score, contributing_tags in images_on_page_data:
+        for img in images_on_page_data:
             # Call AppImageCell.make to get the HTML for each cell
             html_content += AppImageCell.make(
-                image_obj=img_obj,
-                score=score,
-                contributing_tags=contributing_tags,
+                img,
                 get_full_image_data_trigger_id=get_full_image_data_trigger_id,
-                rating_update_trigger_id=rating_update_trigger_id
+                rating_update_trigger_id=rating_update_trigger_id,
+                scene_update_trigger_id=scene_update_trigger_id,
             )
         
         html_content += "</div>"
         return html_content
 
     def _paginate_images(self, 
-                         image_cache_tuples: List[Tuple[Image, float, List[Tuple[str, float]]]], # Now expects tuples with contributing tags
+                         image_cache: List[Image],
                          current_page: int, 
                          direction: int
                          ) -> Tuple[str, int, str]:
@@ -340,10 +386,10 @@ class AIDBGradioApp:
         Handles pagination for image displays.
         `direction` is -1 for previous, 1 for next.
         """
-        if not image_cache_tuples:
+        if not image_cache:
             return "", 1, "Page 0/0"
 
-        total_images = len(image_cache_tuples)
+        total_images = len(image_cache)
         total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
         
         new_page = current_page + direction
@@ -351,29 +397,25 @@ class AIDBGradioApp:
 
         start_idx = (new_page - 1) * IMAGES_PER_PAGE
         end_idx = start_idx + IMAGES_PER_PAGE
-        
-        images_on_page_data = []
-        for img_obj, score, contributing_tags in image_cache_tuples[start_idx:end_idx]: # Unpack tuple
-            # Pass the numerical score directly
-            images_on_page_data.append((img_obj, score, contributing_tags)) 
-            
-        html_output = self._generate_image_html(images_on_page_data)
+
+        images_on_page = image_cache[start_idx:end_idx]
+        html_output = self._generate_image_html(images_on_page)
         page_info_text = f"Page {new_page}/{total_pages}"
         
         return html_output, new_page, page_info_text
 
     def _go_to_specific_page(self,
-                             image_cache_tuples: List[Tuple[Image, float, List[Tuple[str, float]]]],
+                             image_cache: List[Image],
                              current_page: int, # This is the current page before the jump
                              target_page_number: float # Gradio's Number component returns float
                             ) -> Tuple[str, int, str]:
         """
         Jumps to a specific page in the image display.
         """
-        if not image_cache_tuples:
+        if not image_cache:
             return "", 1, "Page 0/0"
 
-        total_images = len(image_cache_tuples)
+        total_images = len(image_cache)
         total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
 
         # Ensure target_page_number is an integer and within valid bounds
@@ -381,76 +423,44 @@ class AIDBGradioApp:
         target_page = max(1, min(target_page, total_pages))
 
         # Call paginate_images with the calculated target page and no relative direction
-        return self._paginate_images(image_cache_tuples, target_page, 0)
+        return self._paginate_images(image_cache, target_page, 0)
 
 
-    def _get_images_by_advanced_tags_initial(self, 
+    def _imgs_search_and_op(self, 
                                      mand_tag1: Optional[str], mand_tag2: Optional[str], mand_tag3: Optional[str],
                                      opt_tag1: Optional[str], opt_tag2: Optional[str], opt_tag3: Optional[str],
-                                     rating_min: Optional[str], rating_max: List[str]  # Add ratings filter
-                                     ) -> Tuple[str, List[Tuple[Image, float, List[Tuple[str, float]]]], int, str]:
+                                     rating_min: Optional[str], rating_max: Optional[str],
+                                     operation: Optional[str]
+                                     ) -> Tuple[str, List[Image], int, str]:
         """
         Performs an advanced search and initializes pagination.
         Returns (html_content, image_cache, current_page, page_info_text).
         """
-        print(f"DEBUG: _get_images_by_advanced_tags_initial called with mandatory: {mand_tag1, mand_tag2, mand_tag3}, optional: {opt_tag1, opt_tag2, opt_tag3}, ratings: {rating_min, rating_max}")
         mandatory_tags = [tag for tag in [mand_tag1, mand_tag2, mand_tag3] if tag]
         optional_tags = [tag for tag in [opt_tag1, opt_tag2, opt_tag3] if tag]
-        
-        scored_image_objects: List[Tuple[Image, float, List[Tuple[str, float]]]] = [] # Store (Image object, score, contributing_tags_list)
 
-        # Build the MongoDB query for tags and ratings
-        mongo_query: Dict[str, Any] = {}
+        # get scored image list
+        imgs = self._query_handler.query_by_tags(mandatory_tags, optional_tags, int(rating_min), int(rating_max))
 
-        # Add mandatory tags criteria
-        if mandatory_tags:
-            mongo_query['$and'] = [{f'tags.tags_wd.{tag}': {'$exists': True}} for tag in mandatory_tags]
+        # add chosen operation to images
+        for img in imgs:
+            img.operation = operation.lower() if operation else 'nop'
 
-        # Add optional tags criteria - this part remains the same as before, influencing score calculation
-        # Add ratings filter criteria
-        ratings = list(range(int(rating_min), int(rating_max) + 1))
-        mongo_query['rating'] = {'$in': ratings}  # Use $in operator for multiple ratings
-
-        # If no criteria are added (no tags, no ratings), it's an "all images" query:
-        if not mongo_query:
-            print("No tags or ratings selected. Returning all images.")
-        else:
-            print(f"Advanced search with MongoDB query: {mongo_query}")
-
-        all_image_objects = self._query_handler.query_images(mongo_query)
-
-        # Scoring and contributing tags logic (same as before but now operating on filtered images)
-        for img_obj in all_image_objects:
-            current_score = 0.0
-            contributing_tags: List[Tuple[str, float]] = []
-            if optional_tags and img_obj.data and 'tags' in img_obj.data and 'tags_wd' in img_obj.data['tags']:
-                wd_tags = img_obj.data['tags']['tags_wd']
-                for o_tag in optional_tags:
-                    if o_tag in wd_tags:
-                        current_score += wd_tags[o_tag]
-                        contributing_tags.append((o_tag, wd_tags[o_tag]))
-            scored_image_objects.append((img_obj, current_score, contributing_tags))
-        scored_image_objects.sort(key=lambda x: x[1], reverse=True)
-
-        print(f"Found {len(scored_image_objects)} images matching advanced search criteria.")
+        print(f"Found {len(imgs)} images matching advanced search criteria.")
 
         # Initialize pagination to the first page
-        total_images = len(scored_image_objects)
+        total_images = len(imgs)
         total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
         current_page = 1
 
         start_idx = (current_page - 1) * IMAGES_PER_PAGE
         end_idx = start_idx + IMAGES_PER_PAGE
         
-        images_on_page_data = []
-        for img_obj, score, contributing_tags in scored_image_objects[start_idx:end_idx]:
-            # Pass the numerical score directly
-            images_on_page_data.append((img_obj, score, contributing_tags))
-        
-        html_output = self._generate_image_html(images_on_page_data)
+        images_on_page = imgs[start_idx:end_idx]
+        html_output = self._generate_image_html(images_on_page)
         page_info_text = f"Page {current_page}/{total_pages}"
 
-        return html_output, scored_image_objects, current_page, page_info_text
+        return html_output, imgs, current_page, page_info_text
 
     def _get_full_image_data_for_modal(self, image_id: str) -> Tuple[str, str]:
         """
@@ -543,9 +553,58 @@ class AIDBGradioApp:
             
         return None 
 
+    def _update_image_scene(self, 
+                             data_str: str,
+                            ) -> None: # No outputs from this function
+        """
+        Updates an image's scene tag in the database.
+        This function is triggered by a hidden button and receives its data from a hidden 'data bus' textbox.
+        The UI refresh is handled by a subsequent .then() call in the event chain.
+        """
+        print(f"DEBUG: _update_scene_rating called with data from bus: '{data_str}'")
+
+        if not data_str or not isinstance(data_str, str):
+            print(f"ERROR: Invalid or empty data received for scene update: {data_str}")
+            gr.Warning("Could not update scene: Invalid data received from frontend.")
+            return None
+
+        # We expect a string like "image_id,new_val"
+        parts = data_str.split(',')
+        if len(parts) != 2:
+            print(f"ERROR: Invalid data format for _update_image_scene: {data_str}")
+            gr.Warning(f"Could not update scene: Malformed data '{data_str}'.")
+            return None
+        
+        image_id = parts[0].strip()
+        try:
+            new_data = parts[1].strip()
+        except ValueError:
+            print(f"ERROR: Invalid scene value received in data: {data_str}")
+            gr.Warning(f"Could not update: Invalid scene value in '{data_str}'.")
+            return None
+        print(f"DEBUG: _update_image_scene called for image {image_id} with scene {new_data}")
+        # Update the database
+        img = Image(self._db_manager, image_id)
+        bodyparts = img.get_tags_custom("bodypart")
+        if new_data not in bodyparts:
+            bodyparts.append(new_data)
+        else:
+            # remove new_data from bodyparts
+            bodyparts.remove(new_data)
+            
+        ret = img.set_tags_custom("bodypart", bodyparts)
+        # This function now explicitly returns None, as it's not directly updating Gradio outputs.
+        # give gradio info based on ret
+        if ret and ret > 0:
+            gr.Info(f"Scene tag for image {image_id} updated to {new_data}.")
+        else:
+            gr.Warning(f"Failed to update scene tag for image {image_id}.")
+            
+        return None 
+
 
     def _refresh_image_grid(self, 
-                            advanced_search_image_cache: List[Tuple[Image, float, List[Tuple[str, float]]]],
+                            advanced_search_image_cache: List[Image],
                             advanced_search_current_page: int
                            ) -> Tuple[str, int, str]:
         """
@@ -559,10 +618,6 @@ class AIDBGradioApp:
 
 
     def launch(self, **kwargs):
-        """
-        Launches the Gradio application.
-        Any keyword keywords are passed directly to gr.Blocks.launch().
-        """
         print("Launching Gradio application...")
         self.interface.launch(**kwargs)
 
