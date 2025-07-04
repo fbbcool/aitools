@@ -74,7 +74,7 @@ class Query:
             
         return image_objects
     
-    def query_by_tags(self, tags_mand: List[str], tags_opt: List[str], rating_min: int, rating_max: int) -> List[Image]:
+    def query_by_tags(self, tags_mand: List[str], tags_opt: List[str], rating_min: int, rating_max: int, bodypart: str) -> List[Image]:
         """
         Queries images based on mandatory and optional tags, and a rating range.
 
@@ -120,6 +120,17 @@ class Query:
                     image_objects.append(img_obj)
                 except ValueError as e:
                     print(f"Error creating Image object for document {doc.get('_id')}: {e}")
+        
+        # ignore bodypart
+        if bodypart == "Ignore":
+            return self._sort_images_by_score(image_objects)
+
+        # filter bodyparts
+        if bodypart and bodypart != "Empty":
+            image_objects = [img for img in image_objects if bodypart in img.get_tags_custom("bodypart")]
+        elif bodypart == "Empty":
+            # only imgs w/ empty bodyparts
+            image_objects = [img for img in image_objects if not img.get_tags_custom("bodypart")]
         
         return self._sort_images_by_score(image_objects)
 

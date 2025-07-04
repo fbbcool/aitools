@@ -3,6 +3,7 @@ from aidb.dbmanager import DBManager
 from aidb.query import Query
 from aidb.statistics import Statistics
 from aidb.image import Image
+from aidb.tagger import TAGS_CUSTOM
 from aidb.app.cell_image import AppImageCell
 from aidb.app.tab_search_and_rate import AppTabSearchAndRate
 from typing import Final, Optional, List, Dict, Any, Tuple
@@ -106,7 +107,9 @@ class AIDBGradioApp:
                 with gr.Row():
                     rating_min = gr.Dropdown(label="Rating Min", choices=[str(x) for x in list(range(-2, 6))], value="3", allow_custom_value=False, interactive=True)
                     rating_max = gr.Dropdown(label="Rating Max", choices=[str(x) for x in list(range(-2, 6))], value="5", allow_custom_value=False, interactive=True)
+                with gr.Row():
                     operation = gr.Dropdown(label="Operation", choices=["None", "Rate", "Scene"], value="Rate", allow_custom_value=False, interactive=True)
+                    bodypart = gr.Dropdown(label="Bodypart", choices=["Ignore", "Empty"] + TAGS_CUSTOM["bodypart"], value="Ignore", allow_custom_value=False, interactive=True)
                 
                 search_button = gr.Button("Search Images")
                 
@@ -124,7 +127,7 @@ class AIDBGradioApp:
                     self._imgs_search_and_op,
                     inputs=[
                         mandatory_tag_1, mandatory_tag_2, mandatory_tag_3,
-                        optional_tag_1, optional_tag_2, optional_tag_3, rating_min, rating_max,operation
+                        optional_tag_1, optional_tag_2, optional_tag_3, rating_min, rating_max,operation,bodypart
                     ],
                     outputs=[advanced_search_html_display, advanced_search_image_cache, advanced_search_current_page, advanced_search_page_info]
                 )
@@ -430,7 +433,8 @@ class AIDBGradioApp:
                                      mand_tag1: Optional[str], mand_tag2: Optional[str], mand_tag3: Optional[str],
                                      opt_tag1: Optional[str], opt_tag2: Optional[str], opt_tag3: Optional[str],
                                      rating_min: Optional[str], rating_max: Optional[str],
-                                     operation: Optional[str]
+                                     operation: Optional[str],
+                                     bodypart: Optional[str],
                                      ) -> Tuple[str, List[Image], int, str]:
         """
         Performs an advanced search and initializes pagination.
@@ -440,7 +444,7 @@ class AIDBGradioApp:
         optional_tags = [tag for tag in [opt_tag1, opt_tag2, opt_tag3] if tag]
 
         # get scored image list
-        imgs = self._query_handler.query_by_tags(mandatory_tags, optional_tags, int(rating_min), int(rating_max))
+        imgs = self._query_handler.query_by_tags(mandatory_tags, optional_tags, int(rating_min), int(rating_max),bodypart)
 
         # add chosen operation to images
         for img in imgs:
