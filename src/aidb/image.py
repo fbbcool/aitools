@@ -74,6 +74,10 @@ class Image:
         return self.data.get("tags", {}) # Use .get to safely access, return empty dict if 'tags' is missing
     
     @property
+    def tags_prompt(self) -> list[str]:
+        return tagger.tags_prompt(self.tags)
+    
+    @property
     def rating(self) -> int | None:
         """Returns the rating of the image."""
         if self.data is None:
@@ -284,7 +288,15 @@ class Image:
         else:
             print(f"Failed to create or save training image for image ID '{self._image_id}'.")
             return None
-                     
+    
+    @property
+    def url_train_image(self) -> str | None:
+        """
+        Returns the URL of the training image.
+        """
+        if self.data is None:
+            return None
+        return self.data.get("train_image_url")
 
     @property
     def statistics(self) -> dict:
@@ -643,3 +655,50 @@ class Image:
             return self.update_tags(tags)
         else:
             return False
+    
+    def export_train(self, to_folder: str) -> None:
+        """
+        Exports all necessary training files to the export folder:
+        1. copy the training image from the url to_folder/image_id.png
+        2. create a to_folder/image_id.tags file with comma seperated prompt tags as on string
+        """
+        export_path = pathlib.Path(to_folder)
+        export_path.mkdir(parents=True, exist_ok=True)
+
+        # 1. Copy the training image by just trying its url. if url doesnt exist, abort.
+        train_image_path_str = self.url_train_image
+        if not train_image_path_str:
+            print(f"No training image URL found for image {self.image_id}. Aborting export.")
+            return
+
+        train_image_source_path = pathlib.Path(train_image_path_str)
+        if not train_image_source_path.exists():
+            print(f"Training image file not found at {train_image_source_path} for image {self.image_id}. Aborting export.")
+            return
+
+        train_image_destination_path = export_path / f"{self.image_id}.png"
+        try:
+            import shutil
+            shutil.copy(train_image_source_path, train_image_destination_path)
+            print(f"Copied training image to {train_image_destination_path}")
+        except Exception as e:
+            print(f"Error copying training image for {self.image_id}: {e}")
+            return
+            
+
+        # 2. Create the tags file
+        tags_export_path = export_path / f"{self.image_id}.tags"
+        prompt_tags = self.tags_prompt
+        if prompt_tags:
+            tags_string = ", ".join(prompt_tags)
+            try:
+                with open(tags_export_path, "w", encoding="utf-8") as f:
+                    f.write(tags_string)
+                print(f"Exported tags to {tags_export_path}")
+            except Exception as e:
+                print(f"Error exporting tags for {self.image_id}: {e}")
+        else:
+            print(f"No prompt tags found for {self.image_id}, skipping tags export.")
+            
+
+

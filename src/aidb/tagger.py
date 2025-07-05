@@ -169,6 +169,41 @@ TAGS_FOCUS: Final = {
     "whip": 27,
     "foot worship": 25,
 }
+TAGS_AVOID: Final = {
+    "solo": 4522,
+    "solo focus": 3147,
+    "muscular male": 2545,
+    "multiple boys": 1798,
+    "2boys": 1430,
+    "manly": 1192,
+    "minigirl": 1148,
+    "multiple girls": 1072,
+    "2girls": 965,
+    "statue": 509,
+    "blood": 454,
+    "horror (theme)": 439,
+    "no humans": 427,
+    "child": 360,
+    "small breasts": 290,
+    ":d": 256,
+    "baby": 235,
+    "fat man": 226,
+    "1other": 226,
+    "6+boys": 199,
+    "incest": 188,
+    "mother and son": 187,
+    "doll": 159,
+    "3boys": 140,
+    "genderswap": 131,
+    "death": 113,
+    "3girls": 95,
+    "6+girls": 81,
+    "4boys": 67,
+    "corpse": 58,
+    "character doll": 56,
+    "5boys": 47,
+    "4girls": 41,
+}
 # Files to download from the repos
 MODEL_FILENAME: Final = "/Volumes/data/Project/AI/REPOS/aitools/build/models/wdtagger/model.onnx"
 LABEL_FILENAME: Final = "/Volumes/data/Project/AI/REPOS/aitools/build/models/wdtagger/selected_tags.csv"
@@ -305,5 +340,51 @@ class TaggerWD:
         )
 
         return {"tags_sorted": sorted_general_strings, "rating": rating, "tags_wd": general_res}
+    
+    def tags_prompt(self, tags_raw: dict) -> list[str]:
+        """
+        Creates a list of tags which consist of:
+        1. all occuring focus tags in the image tags_sorted (splitted and whitespace removed)
+        2. the 7 first tags_sorted but substracted with avoid_tags
+        3. the bodypart tags expanded to "interaction with giantess {bodypart}"
+        """
+        tags_wd = tags_raw.get("tags_wd", {})
+        
+        # 1. All occurring focus tags
+        focus_tags_in_image = []
+        for tag in TAGS_FOCUS.keys():
+            if tag in tags_wd and tags_wd[tag] > 0: # Check if the tag exists and has a probability > 0
+                focus_tags_in_image.append(tag)
+        
+        # 2. The 7 first tags_sorted but subtracted with avoid_tags
+        # tags_sorted is already a comma-separated string, need to split and clean
+        sorted_tags_str = tags_raw["tags_sorted"]
+        all_sorted_tags = [t.strip() for t in sorted_tags_str.split(',') if t.strip()]
+        
+        avoid_tags_set = set(TAGS_AVOID.keys())
+        
+        filtered_sorted_tags = []
+        for tag in all_sorted_tags:
+            if tag not in avoid_tags_set:
+                filtered_sorted_tags.append(tag)
+            if len(filtered_sorted_tags) >= 7:
+                break
+        
+        # 3. Bodypart tags expanded
+        bodypart_tags_expanded = []
+        custom_tags = tags_raw.get("custom", {})
+        bodypart_tags = custom_tags.get("bodypart", [])
+        for bp_tag in bodypart_tags:
+            if bp_tag != "__tbr": # Exclude the "to be removed" tag
+                bodypart_tags_expanded.append(f"interaction with giantess {bp_tag}")
 
+        # Combine all generated tags
+        final_tags = []
+        final_tags += bodypart_tags_expanded
+        final_tags += filtered_sorted_tags
+        final_tags += focus_tags_in_image
+        
+        # Remove duplicates and return
+        return list(set(final_tags))
+        
 tagger_wd = TaggerWD()

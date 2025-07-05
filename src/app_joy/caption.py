@@ -10,12 +10,12 @@ import os
 
 
 CLIP_PATH = "google/siglip-so400m-patch14-384"
-VLM_PROMPT = "is this of giantess and female dominance context?"
+VLM_PROMPT = "describe this image in a giantess and female dominance context, with likely additional tags: "
 MODEL_PATH = "meta-llama/Meta-Llama-3.1-8B"
 #MODEL_PATH="FluffyKaeloky/MistralThinker-v1.1-exl2-6.0bpw"
 CHECKPOINT_PATH = Path("/workspace/___aitools/src/app_joy/ckpt")
 TITLE = "<h1><center>JoyCaption Pre-Alpha (2024-07-30a)</center></h1>"
-WORKSPACE = Path("/workspace/origs")
+WORKSPACE = Path("/workspace/img")
 
 HF_TOKEN = os.environ.get("HF_TOKEN", None)
 
@@ -127,6 +127,15 @@ with gr.Blocks() as demo:
 
 def run_captions():
 	for file in WORKSPACE.glob("*.png"):
+		# load tags from .tags file
+		tags_file = file.parent / Path(file.stem).with_suffix(".tags")
+		tags = ""
+		if tags_file.exists():
+			with tags_file.open(mode="rt") as f:
+				tags = f.read()
+		else:
+			tags = "giantess, 1boy."
+		prompt = VLM_PROMPT + tags
 		print(f"cap ... {str(file)}")
 		try:
 			img = Image.open(file)
@@ -139,7 +148,7 @@ def run_captions():
 			continue
 		cap = ""
 		try:
-			cap = stream_chat(img, VLM_PROMPT)
+			cap = stream_chat(img, prompt)
 		except:
 			pass
 		file_cap = file.parent / Path(file.stem).with_suffix(".txt")
