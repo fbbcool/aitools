@@ -132,6 +132,32 @@ class DBManager:
         
 
     @property
+    def image_ids(self):
+        """Returns a generator of Images id's for all images in the db"""
+        if self.db is None:
+            print("Database not connected. Cannot retrieve image IDs.")
+            return
+
+        image_docs = self.find_documents('images', query={}, projection={'_id': 1}) # Only fetch _id
+        for doc in image_docs:
+            yield str(doc['_id'])
+
+
+    @property
+    def images(self):
+        """Returns a generator of Images instances for all images in the db"""
+        if self.db is None:
+            print("Database not connected. Cannot retrieve images.")
+            return
+
+        from aidb.image import Image # Import here to avoid circular dependency
+
+        image_docs = self.find_documents('images')
+        for doc in image_docs:
+            # Ensure _id is converted to string for Image object initialization
+            yield Image(self, str(doc['_id']), doc=doc)
+
+    @property
     def default_thumbnail_dir(self) -> pathlib.Path:
         """
         Returns the default directory for storing thumbnails.
@@ -509,6 +535,37 @@ class DBManager:
             return None
 
         return self.update_document('images', {"_id": object_id}, {"$set": update_fields})
+    
+    def img_add_field(self, img_id: str, fieldname: str, value: Any = {}, force=False):
+        """Adds a new data field to the image document. If the field already exists, the force option is taken into account."""
+        collection = self._get_collection('images')
+        if collection is not None:
+            try:
+                # Check if the field already exists
+                existing_doc = collection.find_one({"_id": ObjectId(img_id)}, {fieldname: 1})
+                if existing_doc and fieldname in existing_doc:
+                    if not force:
+                        print(f"Field '{fieldname}' already exists for image {img_id}. Use force=True to overwrite.")
+                        return 0
+                    else:
+                        print(f"Field '{fieldname}' already exists for image {img_id}. Overwriting as force=True.")
+                
+                # Add or overwrite the field
+                result = collection.update_one(
+                    {"_id": ObjectId(img_id)},
+                    {"$set": {fieldname: value}}
+                )
+                if result.modified_count > 0:
+                    print(f"Field '{fieldname}' added/updated for image {img_id}.")
+                    return result.modified_count
+                else:
+                    print(f"Image {img_id} not found or field '{fieldname}' not modified.")
+                    return 0
+            except OperationFailure as e:
+                print(f"Failed to add/update field '{fieldname}' for image {img_id}: {e}")
+            except Exception as e:
+                print(f"An unexpected error occurred while adding/updating field '{fieldname}' for image {img_id}: {e}")
+        return None
 
     def close_connection(self) -> None:
         """

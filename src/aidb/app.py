@@ -114,7 +114,9 @@ class AIDBGradioApp:
                 search_button = gr.Button("Search Images")
                 
                 with gr.Column(visible=True) as advanced_search_list_view:
-                    advanced_search_html_display = gr.HTML(label="Matching Images (Highest Score First)")
+                    # in the title, the number of selected images should be shown
+                    curr_label = "Matching Images (Highest Score First)"
+                    advanced_search_html_display = gr.HTML(label=curr_label)
                     with gr.Row():
                         advanced_search_prev_btn = gr.Button("Previous Page")
                         advanced_search_page_info = gr.Textbox(label="Page", interactive=False, scale=0)
@@ -278,6 +280,48 @@ class AIDBGradioApp:
                 height: 100%;
             }}
             .image-item img {{
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 0 auto;
+                border-bottom: 1px solid #eee;
+                padding: 5px;
+                cursor: pointer; /* Indicate clickable only on image itself */
+            }}
+            .image-item-warning {{
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                overflow: hidden;
+                text-align: center;
+                background-color: #aaaa33; /* Dark grey background */
+                padding-bottom: 10px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                height: 100%;
+            }}
+            .image-item-error img {{
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 0 auto;
+                border-bottom: 1px solid #eee;
+                padding: 5px;
+                cursor: pointer; /* Indicate clickable only on image itself */
+            }}
+            .image-item-error {{
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                overflow: hidden;
+                text-align: center;
+                background-color: #ff3333; /* Dark grey background */
+                padding-bottom: 10px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                height: 100%;
+            }}
+            .image-item-warning img {{
                 max-width: 100%;
                 height: auto;
                 display: block;
@@ -462,7 +506,7 @@ class AIDBGradioApp:
         
         images_on_page = imgs[start_idx:end_idx]
         html_output = self._generate_image_html(images_on_page)
-        page_info_text = f"Page {current_page}/{total_pages}"
+        page_info_text = f"Page {current_page}/{total_pages} ({total_images} imgs)"
 
         return html_output, imgs, current_page, page_info_text
 

@@ -1,7 +1,8 @@
 import pathlib
 from typing import List, Dict, Literal, Optional, Union, Any, Tuple
 from bson.objectid import ObjectId
-from PIL import Image as PILImage # Import Image from Pillow and alias it to avoid conflict with our class name
+from PIL import Image as PILImage
+import numpy as np # Import Image from Pillow and alias it to avoid conflict with our class name
 
 from aidb.dbmanager import DBManager # Updated import
 from aidb.tagger import tagger_wd as tagger # Updated import
@@ -71,6 +72,14 @@ class Image:
         if self.data is None:
             return {}
         return self.data.get("tags", {}) # Use .get to safely access, return empty dict if 'tags' is missing
+    
+    @property
+    def rating(self) -> int | None:
+        """Returns the rating of the image."""
+        if self.data is None:
+            return None
+        return self.data.get("rating")
+
     
     def get_tags_custom(self, category: str) -> list[str]:
         """Returns tags of a custom category."""
@@ -218,7 +227,60 @@ class Image:
         else:
             print(f"Failed to create or save thumbnail for image ID '{self._image_id}'.")
             return None
+    
+    @property
+    def statistics(self) -> dict:
+        """
+        Returns the statistics section of the metadata.
+        
+        If no statistics are available, it returns an empty dictionary.
+        """
+        if self.data is None:
+            return {}
+        return self.data.get("statistics", {})
+    
+    @property
+    def focus_vector(self) -> np.ndarray | None:
+        """
+        Returns the focus vector  from the statistics of the image as an np.ndarray.
 
+        If no focus vector is available, it returns None.
+        """
+        if self.statistics is None:
+            return None
+        
+        focus_vector_list = self.statistics.get("focus_vector")
+        if focus_vector_list is None:
+            return None
+        
+        return np.array(focus_vector_list)
+
+    @property
+    def neighbors(self) -> dict[str,float]:
+        """
+        Returns the neighbors dictionary from the metadata.
+
+        If no neighbors are available, it returns an empty dictionary.
+        """
+        if self.statistics is None:
+            return {}
+        return self.statistics.get("neighbors", {})
+    
+    @property
+    def neighbor0(self) -> tuple[str,float] | None:
+        """Returns the nearest neighbor"""
+        neighbors = self.neighbors
+        if not neighbors:
+            return None
+        
+        # Neighbors are already sorted by distance (lowest first)
+        # Get the first item (key, value) from the dictionary
+        first_neighbor_id = next(iter(neighbors))
+        first_neighbor_distance = neighbors[first_neighbor_id]
+        return (first_neighbor_id, first_neighbor_distance)
+    
+    def get_other_by_id(self, iid: str):
+        return Image(self._db_manager, iid)
 
     def save_png_image(self, 
                        output_path: Union[str, pathlib.Path], 

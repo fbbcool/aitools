@@ -1,0 +1,7 @@
+686388ce6e0214a2407441f8:
+    n0 = 0.38: same picture, but lesser resolution
+    should be deleted
+68628be276ec6461bf283214:
+686295bfffefd6432b1ddcc1:
+68628f30ffefd6432b1ddab9:
+    n0 with lesser res.
