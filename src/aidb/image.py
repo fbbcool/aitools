@@ -79,7 +79,15 @@ class Image:
         if self.data is None:
             return None
         return self.data.get("rating")
-
+    
+    def set_rating(self, rating: int) -> int:
+        """Sets the rating of the image."""
+        if not isinstance(rating, int):
+            raise TypeError("Rating must be an integer.")
+        if not (-2 <= rating <= 5):
+            raise ValueError("Rating must be between -2 and 5.")
+        print(f"Setting rating for image {self._image_id} to {rating}")
+        return self._db_manager.update_image(self._image_id, rating=rating)
     
     def get_tags_custom(self, category: str) -> list[str]:
         """Returns tags of a custom category."""

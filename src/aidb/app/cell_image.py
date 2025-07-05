@@ -61,12 +61,14 @@ class AppImageCell:
         elif n0[1] < .4:
             err_lvl = 2
         if err_lvl > 0:
-            class_img = "image-item-warning"
+            #class_img = "image-item-warning"
             n0_img = img.get_other_by_id(n0[0])
             if img.rating == n0_img.rating:
                 err_mult = 3
         err_lvl *= err_mult
-        if err_lvl > 4:
+        if err_lvl == 6:
+            class_img = f"image-item-error"
+        if err_lvl == 12:
             class_img = f"image-item-error"
 
         img_onclick_js = f"""
