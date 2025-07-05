@@ -385,6 +385,7 @@ class TaggerWD:
         final_tags += focus_tags_in_image
         
         # Remove duplicates and return
-        return list(set(final_tags))
+        ret =  list(set(final_tags))
+        return ["1gts"] + ret
         
 tagger_wd = TaggerWD()

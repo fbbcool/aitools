@@ -687,7 +687,7 @@ class Image:
             
 
         # 2. Create the tags file
-        tags_export_path = export_path / f"{self.image_id}.tags"
+        tags_export_path = export_path / f"{self.image_id}.txt"
         prompt_tags = self.tags_prompt
         if prompt_tags:
             tags_string = ", ".join(prompt_tags)
