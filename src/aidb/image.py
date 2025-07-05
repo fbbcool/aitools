@@ -237,6 +237,56 @@ class Image:
             return None
     
     @property
+    def train_image(self) -> Optional[PILImage.Image]:
+        """
+        Retrieves the training image as a PIL (Pillow) Image object.
+        If a training image URL exists in the database and the file exists, it loads it.
+        Otherwise, it generates a new training image, saves it, updates the database,
+        and then loads and returns the newly created training image.
+        """
+        if self.data is None:
+            print(f"Cannot get training image: Image data not available for ID '{self._image_id}'.")
+            return None
+
+        train_image_url_str = self.data.get("train_image_url")
+        
+        # Get training image settings from DBManager's properties
+        output_train_image_dir = self._db_manager.default_train_image_dir
+        output_train_image_size = self._db_manager.default_train_image_size
+
+        # 1. Check if training image URL exists and file exists on disk
+        if train_image_url_str:
+            train_image_path = pathlib.Path(train_image_url_str)
+            if train_image_path.exists():
+                try:
+                    train_pil_image = PILImage.open(train_image_path)
+                    # print(f"Successfully loaded existing training image for ID '{self._image_id}'.")
+                    return train_pil_image
+                except Exception as e:
+                    print(f"Warning: Could not load existing training image '{train_image_path}' for ID '{self._image_id}': {e}. Attempting to regenerate.")
+        
+        # 2. If not found or failed to load, generate and save a new one
+        print(f"Generating new training image for image ID '{self._image_id}'.")
+        created_train_image_path = self.save_train_image_and_update_db(
+            output_directory=output_train_image_dir,
+            train_image_size=output_train_image_size
+        )
+
+        if created_train_image_path:
+            try:
+                # Load the newly created training image
+                new_train_pil_image = PILImage.open(created_train_image_path)
+                print(f"Successfully loaded newly generated training image for ID '{self._image_id}'.")
+                return new_train_pil_image
+            except Exception as e:
+                print(f"Error loading newly created training image '{created_train_image_path}' for ID '{self._image_id}': {e}")
+                return None
+        else:
+            print(f"Failed to create or save training image for image ID '{self._image_id}'.")
+            return None
+                     
+
+    @property
     def statistics(self) -> dict:
         """
         Returns the statistics section of the metadata.
@@ -402,6 +452,67 @@ class Image:
             print(f"Error generating or saving thumbnail for image '{self._image_id}': {e}")
             return None
 
+    def save_train_image_and_update_db(self, 
+                                     output_directory: Union[str, pathlib.Path], 
+                                     train_image_size: Tuple[int, int] = (128, 128)
+                                    ) -> Optional[str]:
+        """
+        Generates a training image for the image, saves it as a PNG in the specified directory,
+        and updates the 'train_image_url' field in the database.
+        """
+        pil_image = self.pil
+        if pil_image is None:
+            print(f"Failed to get PIL image for thumbnail generation for ID '{self._image_id}'.")
+            return None
+
+        output_dir_path = pathlib.Path(output_directory)
+        output_dir_path.mkdir(parents=True, exist_ok=True) # Ensure output directory exists
+
+        train_img_filename = f"{self._image_id}_1024.png"
+        full_train_img_path = output_dir_path / train_img_filename
+
+        try:
+            # Create a copy to ensure the original PIL image object is not modified
+            train_pil_image = pil_image.copy()
+            # Rescale longest edge to size, upscaling if necessary
+            width, height = train_pil_image.size
+            if width > height:
+                # Landscape or square
+                new_width = train_image_size[0]
+                new_height = int(new_width * height / width) if width > 0 else 0
+                train_pil_image = train_pil_image.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
+            else:
+                # Portrait
+                new_height = train_image_size[1]
+                new_width = int(new_height * width / height) if height > 0 else 0
+                train_pil_image = train_pil_image.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
+
+            
+            train_pil_image.save(full_train_img_path, "PNG", optimize=True, compress_level=6)
+            print(f"Train image for image '{self._image_id}' saved to '{full_train_img_path}'.")
+
+            # Update the database with the new thumbnail URL
+            # For simplicity, we'll store the local file path as the URL.
+            # In a web application, this might be a URL to a served static file.
+            updated_count = self._db_manager.update_image(
+                self._image_id, 
+                train_image_url=str(full_train_img_path)
+            )
+
+            if updated_count and updated_count > 0:
+                print(f"Train image URL updated in DB for image '{self._image_id}'.")
+                # Clear cached data so next .data access fetches updated thumbnail_url
+                self._data = None 
+                return str(full_train_img_path)
+            else:
+                print(f"Failed to update thumbnail URL in DB for image '{self._image_id}'.")
+                return None
+
+        except Exception as e:
+            print(f"Error generating or saving thumbnail for image '{self._image_id}': {e}")
+            return None
+
+            
 
     def update_description(self, description: List[Dict[str, str]]) -> Optional[int]:
         """Updates the description field of the image."""

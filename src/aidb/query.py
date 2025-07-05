@@ -133,6 +133,32 @@ class Query:
             image_objects = [img for img in image_objects if not img.get_tags_custom("bodypart")]
         
         return self._sort_images_by_score(image_objects)
+    
+    def query_by_rating(self, rating_min: int, rating_max: int) -> List[Image]:
+        """
+        Queries images based on a rating range.
+        """
+        print(f"Querying by rating: Minimum={rating_min}, Maximum={rating_max}")
+
+        mongo_query: Dict[str, Any] = {
+            'rating': {'$gte': rating_min, '$lte': rating_max}
+        }
+
+        image_docs = self._db_manager.find_documents('images', mongo_query)
+
+        image_objects: List[Image] = []
+        if not image_docs:
+            return []
+
+        for doc in image_docs:
+            if '_id' in doc:
+                try:
+                    img_obj = Image(self._db_manager, str(doc['_id']), doc=doc)
+                    image_objects.append(img_obj)
+                except ValueError as e:
+                    print(f"Error creating Image object for document {doc.get('_id')}: {e}")
+        
+        return image_objects
 
 
     @staticmethod

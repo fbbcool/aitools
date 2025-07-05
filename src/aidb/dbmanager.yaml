@@ -15,3 +15,13 @@ thumbnail_settings:
   # Default size [width, height] for generated thumbnails
   # The aspect ratio of the original image will be preserved.
   default_thumbnail_size: [256, 256]
+
+# Training set generation settings
+train_image_settings:
+  # Default directory to save generated training images
+  # This path is relative to where the application is run.
+  default_train_image_dir: "/Volumes/data/pool/___train_images_1024" 
+  
+  # Default size [width, height] for generated thumbnails
+  # The aspect ratio of the original image will be preserved.
+  default_train_image_size: [1024, 1024]

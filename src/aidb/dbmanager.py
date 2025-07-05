@@ -44,6 +44,10 @@ class DBManager:
         self._default_thumbnail_dir: pathlib.Path = pathlib.Path("./default_thumbnails")
         self._default_thumbnail_size: Tuple[int, int] = (128, 128)
 
+        # Private members for default train image settings, initialized with hardcoded fallbacks
+        self._default_train_image_dir: pathlib.Path = pathlib.Path("./default_train_images")
+        self._default_train_image_size: Tuple[int, int] = (1024, 1024)
+
         # Load configuration from YAML file if provided. This will populate self._host, etc.
         if config_file:
             self._load_config_from_yaml(config_file)
@@ -122,6 +126,19 @@ class DBManager:
                     print(f"Thumbnail configuration loaded from '{config_file}'.")
                 else:
                     print(f"Warning: 'thumbnail_settings' section not found or malformed in '{config_file}'. Using default thumbnail settings.")
+
+                # Load train images settings
+                if "train_image_settings" in config and isinstance(config["train_image_settings"], dict):
+                    train_img_settings = config["train_image_settings"]
+                    if "default_train_image_dir" in train_img_settings and isinstance(train_img_settings["default_train_image_dir"], str):
+                        self._default_train_image_dir = pathlib.Path(train_img_settings["default_train_image_dir"])
+                    if "default_train_image_size" in train_img_settings and isinstance(train_img_settings["default_train_image_size"], list) and len(train_img_settings["default_train_image_size"]) == 2:
+                        self._default_train_image_size = tuple(train_img_settings["default_train_image_size"])
+                    print(f"Train image configuration loaded from '{config_file}'.")
+                else:
+                    print(f"Warning: 'train_image_settings' section not found or malformed in '{config_file}'. Using default train image settings.")
+                    
+
             else:
                 print(f"Warning: Configuration file '{config_file}' is empty or malformed. Using constructor/default settings.")
 
@@ -164,12 +181,29 @@ class DBManager:
         """
         return self._default_thumbnail_dir
 
+
     @property
     def default_thumbnail_size(self) -> Tuple[int, int]:
         """
         Returns the default size (width, height) for generated thumbnails.
         """
         return self._default_thumbnail_size
+
+    # properties for train images defaults
+    @property
+    def default_train_image_dir(self) -> pathlib.Path:
+        """
+        Returns the default directory for storing train images.
+        """
+        return self._default_train_image_dir
+
+    @property
+    def default_train_image_size(self) -> Tuple[int, int]:
+        """
+        Returns the default size (width, height) for generated train images.
+        """
+        return self._default_train_image_size
+        
 
     def insert_document(self, collection_name: str, document: Dict[str, Any]) -> Optional[str]:
         """
@@ -404,6 +438,7 @@ class DBManager:
                 "container_local_path": str(base_container_path_obj), # This refers to the local path of the container
                 "relative_url": str(relative_path_from_container), # Relative to the container_path
                 "thumbnail_url": "", # Default thumbnail URL is an empty string
+                "train_image_url": "", # Default thumbnail URL is an empty string
                 "rating": -1, # Default rating is -1
                 "category": "Uncategorized", # Default category
                 "file_type": image_extensions[file_extension],
@@ -478,6 +513,7 @@ class DBManager:
                      tags: Optional[List[Dict[str, Any]]] = None, # Tags can have 'source' and 'values'
                      dimensions: Optional[Dict[str, Union[int, str]]] = None, 
                      thumbnail_url: Optional[str] = None, 
+                     train_image_url: Optional[str] = None, 
                      rating: Optional[int] = None, 
                      category: Optional[str] = None,
                      container_db_id: Optional[str] = None # Allow updating container_db_id
@@ -493,6 +529,7 @@ class DBManager:
             tags (Optional[List[Dict[str, Any]]]): New list of tag objects for the image.
             dimensions (Optional[Dict[str, Union[int, str]]]): New dimensions object (width, height, unit).
             thumbnail_url (Optional[str]): New URL for the thumbnail.
+            train_image_url (Optional[str]): New URL for the training image.
             rating (Optional[int]): New rating for the image (e.g., 1-5).
             category (Optional[str]): New category for the image.
             container_db_id (Optional[str]): New string representation of MongoDB '_id' for the parent container.
@@ -513,6 +550,8 @@ class DBManager:
             update_fields["dimensions"] = dimensions
         if thumbnail_url is not None:
             update_fields["thumbnail_url"] = thumbnail_url
+        if train_image_url is not None:
+            update_fields["train_image_url"] = train_image_url
         if rating is not None:
             update_fields["rating"] = rating
         if category is not None:
