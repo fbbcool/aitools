@@ -6,7 +6,7 @@ import pandas as pd
 from PIL import Image
 
 TAGS_CUSTOM: Final = {
-    "bodypart": ["body", "pussy", "ass", "breast", "face", "foot", "leg", "mouth", "hand", "thigh", "__tbr"],
+    "bodypart": ["body", "pussy", "ass", "breast", "face", "foot", "leg", "mouth", "hand", "thigh", "_step", "__tbr"],
     "interaction": ["in", "front", "none", "__tbr"],
     "trigger": ["1gts", "1hairy", "1legs", "1fbb", "__tbr"]
 }

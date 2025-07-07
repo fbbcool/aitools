@@ -159,6 +159,38 @@ class Query:
                     print(f"Error creating Image object for document {doc.get('_id')}: {e}")
         
         return image_objects
+    
+    def query_by_bodyparts(self, bodyparts: list[str], rating_min: int = 3, rating_max: int = 5) -> List[Image]:
+        """
+        Queries images based on the bodyparts tags and a rating range.
+        """
+        print(f"Querying by bodyparts: {bodyparts}, Rating={rating_min}-{rating_max}")
+
+        mongo_query: Dict[str, Any] = {
+            'rating': {'$gte': rating_min, '$lte': rating_max}
+        }
+
+        # If bodyparts are specified, add them to the query
+        if bodyparts:
+            # Use $all to ensure all specified bodyparts are present in the 'custom.bodypart' array
+            # Or use $in if any of the specified bodyparts is sufficient
+            mongo_query['tags.custom.bodypart'] = {'$in': bodyparts}
+        
+        image_docs = self._db_manager.find_documents('images', mongo_query)
+
+        image_objects: List[Image] = []
+        if not image_docs:
+            return []
+
+        for doc in image_docs:
+            if '_id' in doc:
+                try:
+                    img_obj = Image(self._db_manager, str(doc['_id']), doc=doc)
+                    image_objects.append(img_obj)
+                except ValueError as e:
+                    print(f"Error creating Image object for document {doc.get('_id')}: {e}")
+        
+        return image_objects
 
 
     @staticmethod

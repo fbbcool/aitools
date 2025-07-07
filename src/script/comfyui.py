@@ -261,7 +261,7 @@ class ModelInst:
             elif self.model == ModelType.Unet:
                 folder_model = "unet"
         if self.target == TargetType.Kohyass:
-            path_models = "/workspace/Kohyass/models"
+            path_models = "/workspace/kohya_ss/models"
             if self.model == ModelType.Checkpoint:
                 folder_model = "ckpt"
             elif self.model == ModelType.VAE:

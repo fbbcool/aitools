@@ -686,15 +686,16 @@ class Image:
             return
             
 
-        # 2. Create the tags file
-        tags_export_path = export_path / f"{self.image_id}.txt"
-        prompt_tags = self.tags_prompt
-        if prompt_tags:
-            tags_string = ", ".join(prompt_tags)
+        # 2. Create caption file
+        caption_export_path = export_path / f"{self.image_id}.txt"
+        #caption_tags = self.tags_prompt
+        caption_tags = ["1step"]
+        if caption_tags:
+            tags_string = ", ".join(caption_tags)
             try:
-                with open(tags_export_path, "w", encoding="utf-8") as f:
+                with open(caption_export_path, "w", encoding="utf-8") as f:
                     f.write(tags_string)
-                print(f"Exported tags to {tags_export_path}")
+                print(f"Exported tags to {caption_export_path}")
             except Exception as e:
                 print(f"Error exporting tags for {self.image_id}: {e}")
         else:
