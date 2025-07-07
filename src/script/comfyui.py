@@ -26,10 +26,14 @@ class DownloadGroup(Enum):
     FLUX = auto()
     FLUX_REFINE = auto()
     HIDREAM = auto()
+    KOHYASS_FLUX = auto()
+    KOHYASS_SDXL = auto()
+    FLUXGYM = auto()
+    CURRENT = auto()
 class TargetType(Enum):
     Comfy = auto()
-    SD = auto()
     Kohyass = auto()
+    Fluxgym = auto()
 class ModelType(Enum):
     Checkpoint = auto()
     Controlnet = auto()
@@ -44,9 +48,9 @@ class ModelType(Enum):
 
 
 class ModelInst:
-    UrlStorageModels: Final = "/workspace/storage/stable_diffusion/models"
-    token_hf: Final = "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"
-    token_cai: Final = "1423e869488279e47332eddf85f68c3e"
+    token_hf = os.environ.get("HF_TOKEN", "")
+    token_cai = os.environ.get("CAI_TOKEN", "")
+    
     CHUNK_SIZE: Final = 1638400
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 
@@ -237,7 +241,51 @@ class ModelInst:
         if self.target == TargetType.Comfy:
             path_models = "/workspace/ComfyUI/models"
             if self.model == ModelType.Checkpoint:
-                folder_model = "checkpoints"
+                folder_model = "ckpt"
+            elif self.model == ModelType.VAE:
+                folder_model = "vae"
+            elif self.model == ModelType.Controlnet:
+                folder_model = "controlnet"
+            elif self.model == ModelType.CustomNode:
+                folder_model = "nodes"
+            elif self.model == ModelType.Lora:
+                folder_model = "loras"
+            elif self.model == ModelType.Embedding:
+                folder_model = "embeddings"
+            elif self.model == ModelType.Clip:
+                folder_model = "clip"
+            elif self.model == ModelType.ClipVision:
+                folder_model = "clip_vision"
+            elif self.model == ModelType.IPAdapter:
+                folder_model = "ipadapter"
+            elif self.model == ModelType.Unet:
+                folder_model = "unet"
+        if self.target == TargetType.Kohyass:
+            path_models = "/workspace/Kohyass/models"
+            if self.model == ModelType.Checkpoint:
+                folder_model = "ckpt"
+            elif self.model == ModelType.VAE:
+                folder_model = "vae"
+            elif self.model == ModelType.Controlnet:
+                folder_model = "controlnet"
+            elif self.model == ModelType.CustomNode:
+                folder_model = "nodes"
+            elif self.model == ModelType.Lora:
+                folder_model = "loras"
+            elif self.model == ModelType.Embedding:
+                folder_model = "embeddings"
+            elif self.model == ModelType.Clip:
+                folder_model = "clip"
+            elif self.model == ModelType.ClipVision:
+                folder_model = "clip_vision"
+            elif self.model == ModelType.IPAdapter:
+                folder_model = "ipadapter"
+            elif self.model == ModelType.Unet:
+                folder_model = "unet"
+        if self.target == TargetType.Fluxgym:
+            path_models = "/workspace/fluxgym/models"
+            if self.model == ModelType.Checkpoint:
+                folder_model = "ckpt"
             elif self.model == ModelType.VAE:
                 folder_model = "vae"
             elif self.model == ModelType.Controlnet:
@@ -264,10 +312,11 @@ class ModelInst:
     
 class ModelInstComfyUi:
     def __init__(self, group = DownloadGroup.SD15) -> None:
-        t = TargetType.Comfy
         wget = DownloadMethod.Wget
         hf = DownloadMethod.Hugging
         cai = DownloadMethod.Civitai
+
+        t = TargetType.Comfy
         models_sd15: list[ModelInst] = [
             #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/256915", "cyberrealistic"),
             #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/143906", "EpicRealism"),
@@ -318,6 +367,8 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Controlnet, hf, "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_softedge.pth?download=true", "control_softedge-fp16", ext="pth"),
             #ModelInst(t, ModelType.CustomNode, wget "https://github.com/ssitu/ComfyUI_UltimateSDUpscale", "ComfyUI_UltimateSDUpscale"),
         ]
+
+        t = TargetType.Comfy
         models_sdxl: list[ModelInst] = [
             #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/149868", "BBBvolup"),
             #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/344487", "RealVisXL V4.0"),
@@ -376,6 +427,8 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Controlnet, hf, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_sketch.safetensors", ""),
             #ModelInst(t, ModelType.Controlnet, hf, "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_xl_openpose.safetensors", ""),
         ]
+
+        t = TargetType.Comfy
         models_flux: list[ModelInst] = [
             ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q8_0.gguf", ""),
             ModelInst(t, ModelType.Unet, cai, "https://civitai.com/api/download/models/1245049?type=Model&format=GGUF&size=full&fp=bf16", ""),
@@ -404,29 +457,29 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1050233?type=Model&format=SafeTensor", "Hairy_girls"),
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/786275?type=Model&format=SafeTensor", ""),
         ]
+
+        t = TargetType.Comfy
         models_flux_refine: list[ModelInst] = [
-            ModelInst(t, ModelType.Unet, hf, "https://civitai.com/api/download/models/1755367?type=Model&format=SafeTensor&size=pruned&fp=fp8", ""),
-            #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/1795909?type=Model&format=SafeTensor&size=full&fp=fp16", ""),
-
-            #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q8_0.gguf", ""),
-            #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/979329?type=Model&format=SafeTensor&size=full&fp=fp16", ""),
-
-            #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q4_0.gguf", ""),
-            #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", s"),
-            #ModelInst(t, ModelType.Unet, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors?download=true", "flux1-schnell"),
-            #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/461409", "EpicRealismXL_v6"),
+            # flux1-dev fp16
+            #ModelInst(t, ModelType.Checkpoint, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", ""),
+            # flux1-dev Q8
+            ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q8_0.gguf?download=true", ""),
             
-            ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/vae/diffusion_pytorch_model.safetensors?download=true", "vae_flux1"),
+            # VAE
+            ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true", "ae"),
 
+            # clip
             #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
             ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/blob/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-TE-only-HF.safetensors", "clip_l_improve"),
             #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
             #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
             ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q8_0.gguf?download=true", "t5_q8_gguf"),
-            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-f16.gguf?download=true", "t5_gguf"),
+            #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-f16.gguf?download=true", "t5_gguf"),
             
+            # control
             #ModelInst(t, ModelType.Controlnet, hf, "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro/resolve/main/diffusion_pytorch_model.safetensors?download=true", ""),
             
+            # lora
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/844798?type=Model&format=SafeTensor", ""),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1206221?type=Model&format=SafeTensor", ""),
             ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1434864?type=Model&format=SafeTensor", ""),
@@ -479,6 +532,8 @@ class ModelInstComfyUi:
             # flux fill
             #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/YarvixPA/FLUX.1-Fill-dev-gguf/resolve/main/flux1-fill-dev-Q8_0.gguf", ""),
         ]
+
+        t = TargetType.Comfy
         models_hidream: list[ModelInst] = [
             ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/HiDream-I1-Dev-gguf/resolve/main/hidream-i1-dev-Q6_K.gguf?download=true", ""),
             
@@ -500,6 +555,133 @@ class ModelInstComfyUi:
             
             #ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/844798?type=Model&format=SafeTensor", ""),
         ]
+
+        t = TargetType.Fluxgym
+        models_fluxgym: list[ModelInst] = [
+            # flux1-dev fp16
+            ModelInst(t, ModelType.Checkpoint, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", ""),
+            
+            # VAE
+            ModelInst(t, ModelType.VAE, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true", "ae"),
+
+            # clip
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-f16.gguf?download=true", "t5_gguf"),
+            #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/blob/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-TE-only-HF.safetensors", "clip_l_improve"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
+            #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q8_0.gguf?download=true", "t5_q8_gguf"),
+        ]
+
+        t = TargetType.Kohyass
+        models_kohyass_flux: list[ModelInst] = [
+            # flux1-dev fp16
+            ModelInst(t, ModelType.Checkpoint, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", ""),
+            
+            # VAE
+            ModelInst(t, ModelType.VAE, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true", "ae"),
+
+            # clip
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-f16.gguf?download=true", "t5_gguf"),
+            #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/blob/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-TE-only-HF.safetensors", "clip_l_improve"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
+            #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q8_0.gguf?download=true", "t5_q8_gguf"),
+        ]
+
+
+        t = TargetType.Kohyass
+        models_kohyass_sdxl: list[ModelInst] = [
+            # flux1-dev fp16
+            ModelInst(t, ModelType.Checkpoint, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", ""),
+            
+            # VAE
+            ModelInst(t, ModelType.VAE, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true", "ae"),
+
+            # clip
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-f16.gguf?download=true", "t5_gguf"),
+            #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/blob/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-TE-only-HF.safetensors", "clip_l_improve"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
+            #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q8_0.gguf?download=true", "t5_q8_gguf"),
+        ]
+
+        t = TargetType.Comfy
+        models_current: list[ModelInst] = [
+            # flux1-dev fp16
+            #ModelInst(t, ModelType.Checkpoint, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", ""),
+            # flux1-dev Q8
+            ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q8_0.gguf?download=true", ""),
+            
+            # VAE
+            ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true", "ae"),
+
+            # clip
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/blob/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-TE-only-HF.safetensors", "clip_l_improve"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
+            #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
+            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q8_0.gguf?download=true", "t5_q8_gguf"),
+            #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-f16.gguf?download=true", "t5_gguf"),
+            
+            # control
+            #ModelInst(t, ModelType.Controlnet, hf, "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro/resolve/main/diffusion_pytorch_model.safetensors?download=true", ""),
+            
+            # lora
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/844798?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1206221?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1434864?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/804967?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1084068?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/954444?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/780667?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/942345?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1108920?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/744704?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/847761?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1108920?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/921305?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/921572?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/883090?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/780207?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1022834?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/911511?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1391187?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1188167?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/996187?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1395084?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1329624?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1250624?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/763914?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/819988?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1498538?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1051223?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1082682?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1307059?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1130635?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/773149?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/973465?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1252337?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1252040?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1302081?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/810590?type=Model&format=SafeTensor", ""),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756663?type=Model&format=SafeTensor", "F1_GiantwithMiniperson"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/746948?type=Model&format=SafeTensor", "F1_Muscular_woman"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/720252?type=Model&format=SafeTensor", "F1_Featasic"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/723657?type=Model&format=SafeTensor", "F1_Pony_round breasts"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/756686?type=Model&format=SafeTensor", "F1_Pony_nsfw"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/751657?type=Model&format=SafeTensor", "F1_hairy"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/827325?type=Model&format=SafeTensor", "F1_skin"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/1050233?type=Model&format=SafeTensor", "Hairy_girls"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/892207?type=Model&format=SafeTensor", "big cock"),
+            ModelInst(t, ModelType.Lora, cai, "https://civitai.com/api/download/models/817076?type=Model&format=SafeTensor", ""),
+
+            
+            # flux fill
+            #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/YarvixPA/FLUX.1-Fill-dev-gguf/resolve/main/flux1-fill-dev-Q8_0.gguf", ""),
+        ]
         model_db = {
             DownloadGroup.SD15: models_sd15,
             DownloadGroup.SDXL: models_sdxl,
@@ -507,6 +689,10 @@ class ModelInstComfyUi:
             DownloadGroup.FLUX: models_flux,
             DownloadGroup.FLUX_REFINE: models_flux_refine,
             DownloadGroup.HIDREAM: models_hidream,
+            DownloadGroup.FLUXGYM: models_fluxgym,
+            DownloadGroup.KOHYASS_FLUX: models_kohyass_flux,
+            DownloadGroup.KOHYASS_SDXL: models_kohyass_sdxl,
+            DownloadGroup.CURRENT: models_current,
         }
         for model in model_db[group]:
             model.install
