@@ -711,8 +711,16 @@ if __name__ == "__main__":
         group = DownloadGroup.FLUX_REFINE
     elif str_group == "hidream":
         group = DownloadGroup.HIDREAM
+    elif str_group == "fluxgym":
+        group = DownloadGroup.FLUXGYM
+    elif str_group == "kohyass_flux":
+        group = DownloadGroup.KOHYASS_FLUX
+    elif str_group == "kohyass_sdxl":
+        group = DownloadGroup.KOHYASS_SDXL
+    elif str_group == "current":
+        group = DownloadGroup.CURRENT
     else:
-        str_group = "sd15"
+        str_group = "current"
         group = DownloadGroup.SD15
     
 

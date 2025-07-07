@@ -33,6 +33,23 @@ comfyui_hidream() {
     python3 $ENV_HOME/src/script/comfyui.py "hidream"
 }
 
+comfyui_fluxgym() {
+    python3 $ENV_HOME/src/script/comfyui.py "fluxgym"
+}
+
+comfyui_kohyass_flux() {
+    python3 $ENV_HOME/src/script/comfyui.py "kohyass_flux"
+}
+
+comfyui_kohyass_sdxl() {
+    python3 $ENV_HOME/src/script/comfyui.py "kohyass_sdxl"
+}
+
+comfyui_current() {
+    python3 $ENV_HOME/src/script/comfyui.py "current"
+}
+
+
 
 #export ENV_POOLS=$ENV_HOME/pools
 #export ENV_TRAINS=$ENV_HOME/trains

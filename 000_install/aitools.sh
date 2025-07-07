@@ -52,3 +52,23 @@ ___hidream () {
     comfyui_hidream
 }
 
+___fluxgym () {
+    git -C $ENV_HOME pull
+    comfyui_fluxgym
+}
+
+___kohyass_flux () {
+    git -C $ENV_HOME pull
+    comfyui_kohyass_flux
+}
+
+___kohyass_sdxl () {
+    git -C $ENV_HOME pull
+    comfyui_kohyass_sdxl
+}
+
+___current () {
+    git -C $ENV_HOME pull
+    comfyui_current
+}
+
