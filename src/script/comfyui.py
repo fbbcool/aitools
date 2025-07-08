@@ -464,6 +464,8 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Checkpoint, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors?download=true", ""),
             # flux1-dev Q8
             ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q8_0.gguf?download=true", ""),
+            # flux1-kontext Q8
+            #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/QuantStack/FLUX.1-Kontext-dev-GGUF/resolve/main/flux1-kontext-dev-Q8_0.gguf?download=true", ""),
             
             # VAE
             ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true", "ae"),

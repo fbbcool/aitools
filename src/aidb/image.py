@@ -1,3 +1,4 @@
+import json
 import pathlib
 from typing import List, Dict, Literal, Optional, Union, Any, Tuple
 from bson.objectid import ObjectId
@@ -656,7 +657,7 @@ class Image:
         else:
             return False
     
-    def export_train(self, to_folder: str) -> None:
+    def export_train(self, to_folder: str, export_cap_files = False) -> None:
         """
         Exports all necessary training files to the export folder:
         1. copy the training image from the url to_folder/image_id.png
@@ -664,6 +665,14 @@ class Image:
         """
         export_path = pathlib.Path(to_folder)
         export_path.mkdir(parents=True, exist_ok=True)
+        train_path = export_path / "train"
+        train_path.mkdir(parents=True, exist_ok=True)
+        images_path = train_path / "images"
+        images_path.mkdir(parents=True, exist_ok=True)
+        if export_cap_files:
+            text_path = train_path / "text"
+            text_path.mkdir(parents=True, exist_ok=True)
+
 
         # 1. Copy the training image by just trying its url. if url doesnt exist, abort.
         train_image_path_str = self.url_train_image
@@ -676,7 +685,7 @@ class Image:
             print(f"Training image file not found at {train_image_source_path} for image {self.image_id}. Aborting export.")
             return
 
-        train_image_destination_path = export_path / f"{self.image_id}.png"
+        train_image_destination_path = images_path / f"{self.image_id}.png"
         try:
             import shutil
             shutil.copy(train_image_source_path, train_image_destination_path)
@@ -686,20 +695,35 @@ class Image:
             return
             
 
-        # 2. Create caption file
-        caption_export_path = export_path / f"{self.image_id}.txt"
         #caption_tags = self.tags_prompt
-        caption_tags = ["1step"]
+        caption_tags = ["a giantess woman 1stepping on a small man."]
+        
+        # make 1 string
         if caption_tags:
-            tags_string = ", ".join(caption_tags)
+            caption_string = ", ".join(caption_tags)
+
+        # 2. Create caption file
+        if export_cap_files:
+            caption_export_path = text_path / f"{self.image_id}.txt"
             try:
                 with open(caption_export_path, "w", encoding="utf-8") as f:
-                    f.write(tags_string)
+                    f.write(caption_string)
                 print(f"Exported tags to {caption_export_path}")
             except Exception as e:
                 print(f"Error exporting tags for {self.image_id}: {e}")
-        else:
-            print(f"No prompt tags found for {self.image_id}, skipping tags export.")
+
+        # 3. or expand metadata.jsonl
+        line_json = {"file_name": "images/" + train_image_destination_path.name, "text": caption_string}
+        # add line to extisting "metadata.jsonl" or create file if not exist
+        metadata_file_path = train_path / "metadata.jsonl"
+        try:
+            with open(metadata_file_path, "a", encoding="utf-8") as f:
+                json.dump(line_json, f)
+                f.write("\n")
+            print(f"Added metadata to {metadata_file_path}")
+        except Exception as e:
+            print(f"Error writing to metadata.jsonl for {self.image_id}: {e}")
+
             
 
 
