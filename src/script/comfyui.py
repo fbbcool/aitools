@@ -49,7 +49,7 @@ class ModelType(Enum):
 
 class ModelInst:
     token_hf = os.environ.get("HF_TOKEN", "")
-    token_cai = os.environ.get("CAI_TOKEN", "")
+    token_cai = os.environ.get("CAI_TOKEN", "2c1cdcc01625085bff329ba907d64948")
     
     CHUNK_SIZE: Final = 1638400
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
