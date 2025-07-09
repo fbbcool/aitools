@@ -6,7 +6,7 @@ import pandas as pd
 from PIL import Image
 
 TAGS_CUSTOM: Final = {
-    "bodypart": ["body", "pussy", "ass", "breast", "face", "foot", "leg", "mouth", "hand", "thigh", "_step", "__tbr"],
+    "bodypart": ["body", "pussy", "ass", "breast", "face", "foot", "leg", "mouth", "hand", "thigh", "_step","_penis","+penis", "__tbr"],
     "interaction": ["in", "front", "none", "__tbr"],
     "trigger": ["1gts", "1hairy", "1legs", "1fbb", "__tbr"]
 }
@@ -170,6 +170,8 @@ TAGS_FOCUS: Final = {
     "foot worship": 25,
 }
 TAGS_AVOID: Final = {
+    "1girl": 0,
+    "1boy": 0,
     "solo": 4522,
     "solo focus": 3147,
     "muscular male": 2545,
@@ -341,11 +343,11 @@ class TaggerWD:
 
         return {"tags_sorted": sorted_general_strings, "rating": rating, "tags_wd": general_res}
     
-    def tags_prompt(self, tags_raw: dict) -> list[str]:
+    def tags_prompt(self, tags_raw: dict, thresh: float = 0.3, main_tag: str = "", do_bodypart: bool = False) -> list[str]:
         """
         Creates a list of tags which consist of:
         1. all occuring focus tags in the image tags_sorted (splitted and whitespace removed)
-        2. the 7 first tags_sorted but substracted with avoid_tags
+        2. the 20 first tags_sorted but substracted with avoid_tags
         3. the bodypart tags expanded to "interaction with giantess {bodypart}"
         """
         tags_wd = tags_raw.get("tags_wd", {})
@@ -361,22 +363,38 @@ class TaggerWD:
         sorted_tags_str = tags_raw["tags_sorted"]
         all_sorted_tags = [t.strip() for t in sorted_tags_str.split(',') if t.strip()]
         
-        avoid_tags_set = set(TAGS_AVOID.keys())
+        avoid_tags_set = list(TAGS_AVOID.keys())
+        if main_tag:
+            avoid_tags_set += [main_tag]
+        
+        # reduce sorted tags by only tags with a probability above a threshold
+        # Filter tags_wd by probability > 0.3
+        high_prob_tags = [tag for tag, prob in tags_wd.items() if prob > thresh]
+        
+        # Filter all_sorted_tags to include only those present in high_prob_tags
+        # and not in avoid_tags_set, taking the first 20
+        filtered_sorted_tags_from_high_prob = []
+        for tag in all_sorted_tags:
+            if tag in high_prob_tags and tag not in avoid_tags_set:
+                filtered_sorted_tags_from_high_prob.append(tag)
+            if len(filtered_sorted_tags_from_high_prob) >= 20:
+                break
         
         filtered_sorted_tags = []
-        for tag in all_sorted_tags:
+        for tag in filtered_sorted_tags_from_high_prob:
             if tag not in avoid_tags_set:
                 filtered_sorted_tags.append(tag)
-            if len(filtered_sorted_tags) >= 7:
+            if len(filtered_sorted_tags) >= 20:
                 break
         
         # 3. Bodypart tags expanded
         bodypart_tags_expanded = []
-        custom_tags = tags_raw.get("custom", {})
-        bodypart_tags = custom_tags.get("bodypart", [])
-        for bp_tag in bodypart_tags:
-            if bp_tag != "__tbr": # Exclude the "to be removed" tag
-                bodypart_tags_expanded.append(f"interaction with giantess {bp_tag}")
+        if do_bodypart:
+            custom_tags = tags_raw.get("custom", {})
+            bodypart_tags = custom_tags.get("bodypart", [])
+            for bp_tag in bodypart_tags:
+                if bp_tag != "__tbr": # Exclude the "to be removed" tag
+                    bodypart_tags_expanded.append(f"interaction with giantess {bp_tag}")
 
         # Combine all generated tags
         final_tags = []
@@ -385,7 +403,7 @@ class TaggerWD:
         final_tags += focus_tags_in_image
         
         # Remove duplicates and return
-        ret =  list(set(final_tags))
-        return ["1gts"] + ret
+        #ret =  list(set(final_tags))
+        return final_tags
         
 tagger_wd = TaggerWD()

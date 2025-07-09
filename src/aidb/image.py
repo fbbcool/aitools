@@ -74,9 +74,8 @@ class Image:
             return {}
         return self.data.get("tags", {}) # Use .get to safely access, return empty dict if 'tags' is missing
     
-    @property
-    def tags_prompt(self) -> list[str]:
-        return tagger.tags_prompt(self.tags)
+    def tags_prompt(self, main_tag:str = "") -> list[str]:
+        return tagger.tags_prompt(self.tags, main_tag=main_tag)
     
     @property
     def rating(self) -> int | None:
@@ -657,7 +656,7 @@ class Image:
         else:
             return False
     
-    def export_train(self, to_folder: str, export_cap_files = False) -> None:
+    def export_train(self, to_folder: str, main_tag: str = "", export_cap_files = False) -> None:
         """
         Exports all necessary training files to the export folder:
         1. copy the training image from the url to_folder/image_id.png
@@ -695,8 +694,9 @@ class Image:
             return
             
 
-        #caption_tags = self.tags_prompt
-        caption_tags = ["a giantess woman 1stepping on a small man."]
+        # TODO: this is specific to 1penis!
+        caption_tags = ["1penis", "a giantess woman and a naked small man with a 1penis"]
+        caption_tags += self.tags_prompt(main_tag=main_tag)
         
         # make 1 string
         if caption_tags:
