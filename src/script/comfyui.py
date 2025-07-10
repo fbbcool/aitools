@@ -470,7 +470,7 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/1938215?type=Model&format=SafeTensor&size=pruned&fp=fp8", ""),
             
             # VAE
-            ModelInst(t, ModelType.VAE, wget, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true", "ae"),
+            ModelInst(t, ModelType.VAE, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true", "ae"),
 
             # clip
             #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", "clip_l"),
