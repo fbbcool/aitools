@@ -697,7 +697,7 @@ class Image:
         # TODO: this is specific to 1penis!
         #caption_tags = ["1penis", "a giantess woman and a naked small man with a 1penis"]
         # TODO: this is specific to 1gts!
-        caption_tags = ["a 1gts woman and a small man are interacting with each other in an intimate private way."]
+        caption_tags = [trigger, "a woman and a man are interacting with each other in an intimate private way."]
         caption_tags += self.tags_prompt(trigger=trigger)
         
         # make 1 string
