@@ -715,7 +715,8 @@ class Image:
                 print(f"Error exporting tags for {self.image_id}: {e}")
 
         # 3. or expand metadata.jsonl
-        line_json = {"file_name": "images/" + train_image_destination_path.name, "text": caption_string}
+        #line_json = {"file_name": "images/" + train_image_destination_path.name, "text": caption_string, "tags": json.dumps(self.tags)}
+        line_json = {"file_name": "images/" + train_image_destination_path.name, "tags": json.dumps(self.tags)}
         # add line to extisting "metadata.jsonl" or create file if not exist
         metadata_file_path = train_path / "metadata.jsonl"
         try:

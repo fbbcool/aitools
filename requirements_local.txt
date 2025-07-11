@@ -10,3 +10,4 @@ liger-kernel==0.5.9
 tqdm
 gradio
 datasets
+jsonlines

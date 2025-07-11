@@ -23,6 +23,7 @@
     },
     "editor.formatOnSave": true,
     "terminal.integrated.env.osx": {
-        "PYTHONPATH": "${workspaceFolder}/src"
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "HF_TOKEN": "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"
     },
 }
