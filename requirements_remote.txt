@@ -1,3 +1,10 @@
 huggingface_hub
+accelerate
+torch
+transformers
+sentencepiece
+torchvision
+liger-kernel==0.5.9
 tqdm
 gradio
+datasets
