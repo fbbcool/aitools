@@ -1,10 +1,29 @@
 import json
 from pathlib import Path
 import shutil
+from typing import Final
 import jsonlines
 from huggingface_hub import hf_hub_download
 from datasets import load_dataset
 from PIL import Image
+
+map_bodypart: Final = {
+    "body": "body",
+    "pussy": "pussy",
+    "ass": "ass",
+    "breast": "breast",
+    "face": "face",
+    "foot": "foot",
+    "leg": "leg",
+    "mouth": "mouth",
+    "hand": "hand",
+    "thigh": "thigh",
+    "_step": "stepping on small man",
+    "_penis": "penis",
+    "+penis": "penis",
+    "_1gts0": "",
+    "__tbr": "",
+}
 
 class HFDatasetImg:
     def __init__(self, repo_id: str, file_meta: str = "metadata.jsonl"):
@@ -114,7 +133,7 @@ class HFDatasetImg:
         except Exception as e:
             print(f"Error saving data to JSONL: {e}")
 
-    def make_caption(self, idx: int) -> str | None: 
+    def make_caption_prompt(self, idx: int) -> str | None: 
         if not isinstance(idx, int):
             raise ValueError("Index not an integer!")
         # check idx vs. size
@@ -124,8 +143,24 @@ class HFDatasetImg:
             raise IndexError("Index out of bounds for tags list.")
 
         ret = "TODO: caption"
-        return ret
 
+        # read the bodyparts tags
+        tags_custom = self._tags[idx].get("custom", {})
+        bodypart_tags = tags_custom.get("bodypart", [])
+        
+        # build the prompt
+        bp_prompt = []
+        for bp_tag in bodypart_tags:
+            mapped_tag = map_bodypart.get(bp_tag)
+            if not mapped_tag:
+                continue
+            bp_prompt.append(bp_tag)
+        
+        # comma separated string
+        bp_str = ",".join(bp_prompt)
+        prompt = f"Write a very long detailed description for this image, especially about the interaction of the female giantess woman and the small man in terms of {bp_str}."
+
+        return prompt
 
     def make_folder_train(self, to_folder:str = "", force = False) -> None:
         # create folder
@@ -141,7 +176,7 @@ class HFDatasetImg:
 
         for idx in range(len(self)):
             # caption
-            caption = self.make_caption(idx)
+            caption = self.make_caption_prompt(idx)
             if caption:
                 caption_path = Path(to_folder) / Path(self.img_files[idx]).with_suffix(".txt").name
                 # write caption string to file
