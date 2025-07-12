@@ -4,7 +4,7 @@ from threading import Thread
 from typing import Generator
 
 from transformers import LlavaForConditionalGeneration, TextIteratorStreamer, AutoProcessor
-#from liger_kernel.transformers import apply_liger_kernel_to_llama
+from liger_kernel.transformers import apply_liger_kernel_to_llama
 import torch
 
 

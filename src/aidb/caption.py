@@ -1,7 +1,7 @@
 from aidb.caption_joy import CapJoy
 from aidb.hfdataset import HFDatasetImg
 
-caper = CapJoy(configure_ai=False)
+caper = CapJoy(configure_ai=True)
 hfd = HFDatasetImg(repo_id="fbbcool/gts01_r5")
 
 n = 4
