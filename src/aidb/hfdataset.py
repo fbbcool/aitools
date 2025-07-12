@@ -33,6 +33,7 @@ class HFDatasetImg:
         self._meta = self._load_meta()
         self._img_files = ["train/" + line["file_name"] for line in self._meta]
         self._tags:list[dict] = [json.loads(line["tags"]) for line in self._meta]
+        self._captions:list[str] = [line["caption_joy"] for line in self._meta]
 
     def _load_meta(self):
         try:
@@ -63,6 +64,10 @@ class HFDatasetImg:
     @property
     def tags(self) -> list[dict]:
         return self._tags
+    
+    @property
+    def captions(self) -> list[str]:
+        return self._captions
     
     @property
     def data(self):
