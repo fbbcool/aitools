@@ -133,7 +133,7 @@ class HFDatasetImg:
         except Exception as e:
             print(f"Error saving data to JSONL: {e}")
 
-    def make_caption_prompt(self, idx: int) -> str | None: 
+    def prompt(self, idx: int) -> str | None: 
         if not isinstance(idx, int):
             raise ValueError("Index not an integer!")
         # check idx vs. size
@@ -141,8 +141,6 @@ class HFDatasetImg:
             raise IndexError("Index out of bounds for tags list.")
         if idx >= len(self):
             raise IndexError("Index out of bounds for tags list.")
-
-        ret = "TODO: caption"
 
         # read the bodyparts tags
         tags_custom = self._tags[idx].get("custom", {})
@@ -160,6 +158,8 @@ class HFDatasetImg:
         bp_str = ",".join(bp_prompt)
         prompt = f"Write a very long detailed description for this image, especially about the interaction of the female giantess woman and the small man in terms of {bp_str}."
 
+        # TODO
+        print(prompt)
         return prompt
 
     def make_folder_train(self, to_folder:str = "", force = False) -> None:
@@ -176,7 +176,7 @@ class HFDatasetImg:
 
         for idx in range(len(self)):
             # caption
-            caption = self.make_caption_prompt(idx)
+            caption = self.prompt(idx)
             if caption:
                 caption_path = Path(to_folder) / Path(self.img_files[idx]).with_suffix(".txt").name
                 # write caption string to file

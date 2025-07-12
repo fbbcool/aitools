@@ -4,7 +4,7 @@ from threading import Thread
 from typing import Generator
 
 from transformers import LlavaForConditionalGeneration, TextIteratorStreamer, AutoProcessor
-from liger_kernel.transformers import apply_liger_kernel_to_llama
+#from liger_kernel.transformers import apply_liger_kernel_to_llama
 import torch
 
 
@@ -51,7 +51,7 @@ class CapJoy():
 		apply_liger_kernel_to_llama(model=self.model.language_model)  # Meow
 
 
-	def _process(self, img: Image.Image, prompt: str) -> Generator[str]:
+	def _process(self, img: Image.Image, prompt: str) -> Generator[str, None, None]:
 		# Format the conversation
 		# WARNING: HF's handling of chat's on Llava models is very fragile.  This specific combination of processor.apply_chat_template(), and processor() works
 		# but if using other combinations always inspect the final input_ids to ensure they are correct.  Often times you will end up with multiple <bos> tokens
@@ -94,6 +94,7 @@ class CapJoy():
 		# mock AI
 		else:
 			streamer_mock = ["null", ",", "null"]	
+			generated_text = ""
 			for new_text in streamer_mock:
 				generated_text += new_text
 				yield generated_text
