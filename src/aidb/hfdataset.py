@@ -33,7 +33,7 @@ class HFDatasetImg:
         self._meta = self._load_meta()
         self._img_files = ["train/" + line["file_name"] for line in self._meta]
         self._tags:list[dict] = [json.loads(line["tags"]) for line in self._meta]
-        self._captions:list[str] = [line["caption_joy"] for line in self._meta]
+        self._captions:list[str] = [line.get("caption_joy", "") for line in self._meta]
         self._ids: list[str] = [Path(file).stem for file in self.img_files]
 
     def _load_meta(self):
