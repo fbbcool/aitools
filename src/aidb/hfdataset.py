@@ -34,6 +34,7 @@ class HFDatasetImg:
         self._img_files = ["train/" + line["file_name"] for line in self._meta]
         self._tags:list[dict] = [json.loads(line["tags"]) for line in self._meta]
         self._captions:list[str] = [line["caption_joy"] for line in self._meta]
+        self._ids: list[str] = [Path(file).stem for file in self.img_files]
 
     def _load_meta(self):
         try:
@@ -62,6 +63,13 @@ class HFDatasetImg:
         return self._img_files
     
     @property
+    def ids(self) -> list[str]:
+        return self._ids
+    
+    def has_id(self, id: str) -> bool:
+        return id in self._ids
+    
+    @property
     def tags(self) -> list[dict]:
         return self._tags
     
@@ -81,7 +89,7 @@ class HFDatasetImg:
                 return idx
         return None
     
-    def pil(self, idx: int) -> Image.Image:
+    def pil(self, idx: int) -> Image.Image | None:
         if not isinstance(idx, int):
             raise ValueError("Index not an integer!")
         # check idx vs. size
@@ -91,7 +99,10 @@ class HFDatasetImg:
             raise IndexError("Index out of bounds for tags list.")
 
         file_img = hf_hub_download(repo_id=self.repo_id, filename=self.img_files[idx], repo_type="dataset")
-        return Image.open(file_img)
+        img = Image.open(file_img)
+
+        return img
+
 
     def img_extend_tags(self, idx: int, tags_extend: dict):
         if not isinstance(idx, int):
@@ -127,10 +138,15 @@ class HFDatasetImg:
     def __getitem__(self, idx):
         return self._meta[idx]
 
-    def save_to_jsonl(self):
+    def save_to_jsonl(self, force: bool = False):
         if self._meta is None:
             print("No meta to save.")
             return
+        # if exists and not force, do nothing
+        if Path(self.file_meta).exists() and not force:
+            print(f"File '{self.file_meta}' already exists. Use force=True to overwrite.")
+            return
+            
         try:
             with jsonlines.open(self.file_meta, mode='w') as writer:
                 writer.write_all(self._meta)
@@ -157,7 +173,7 @@ class HFDatasetImg:
             mapped_tag = map_bodypart.get(bp_tag)
             if not mapped_tag:
                 continue
-            bp_prompt.append(bp_tag)
+            bp_prompt.append(mapped_tag)
         
         # comma separated string
         bp_str = ",".join(bp_prompt)
@@ -167,7 +183,7 @@ class HFDatasetImg:
         print(prompt)
         return prompt
 
-    def make_folder_train(self, to_folder:str = "", force = False) -> None:
+    def make_folder_train(self, to_folder:str = "", trigger: str = "", ids: list[str] = [], force = False) -> None:
         # create folder
         path_folder = Path(to_folder)
         if path_folder.exists() and not force:
@@ -179,9 +195,20 @@ class HFDatasetImg:
             
         path_folder.mkdir(parents=True, exist_ok=True)
 
-        for idx in range(len(self)):
+        idxs = range(len(self))
+        if ids:
+            idxs = []
+            for id in ids:
+                idx = self.id2idx(id)
+                if idx:
+                    idxs.append(idx)
+
+        for idx in idxs:
             # caption
-            caption = self.prompt(idx)
+            caption = ""
+            if trigger:
+                caption = f"{trigger}, "
+            caption += self.captions[idx]
             if caption:
                 caption_path = Path(to_folder) / Path(self.img_files[idx]).with_suffix(".txt").name
                 # write caption string to file

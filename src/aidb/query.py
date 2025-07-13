@@ -201,3 +201,11 @@ class Query:
         """
         return sorted(images, key=lambda img: getattr(img, 'score', 0.0), reverse=True)
     
+    @staticmethod
+    def imgs_to_ids(imgs: list[Image]) -> list[str]:
+        """
+        Converts a list of images to a list of image ids
+        """
+        return [img.id for img in imgs]
+        
+    
