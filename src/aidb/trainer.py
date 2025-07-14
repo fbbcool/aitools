@@ -8,8 +8,8 @@ from huggingface_hub import hf_hub_download
 from aidb.hfdataset import HFDatasetImg
 
 class TrainerKohya:
-    #ROOT: Final = Path("/workspace/train")
-    ROOT: Final = Path("/Volumes/data/Project/AI/REPOS/aitools/build/train")
+    ROOT: Final = Path("/workspace/train")
+    #ROOT: Final = Path("/Volumes/data/Project/AI/REPOS/aitools/build/train")
     FILENAME_CONFIG: Final = "config_trainer.json"
     FILE_CONFIG: Final = ROOT / FILENAME_CONFIG
     FOLDER_DATASET: Final = ROOT / "dataset"
@@ -225,6 +225,10 @@ accelerate launch \\
             print(f"Config successfully saved to {configfile}")
         except Exception as e:
             print(f"Error saving config to JSON: {e}")
+    
+    @staticmethod
+    def filename_config() -> str:
+        return TrainerKohya.FILENAME_CONFIG
 
         
 
