@@ -1,0 +1,15 @@
+{
+    "repo_id": "fbbcool/gts01_r35",
+    "batch_size": 2,
+    "trigger": "1gts",
+    "name": "1tgs_01",
+    "prompts": [
+        "prompt1",
+        "prompt2"
+    ],
+    "imgs": [
+        "686295c0ffefd6432b1de15c",
+        "68628be276ec6461bf2831ba",
+        "68628be376ec6461bf283296"
+    ]
+}

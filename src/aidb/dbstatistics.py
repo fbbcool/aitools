@@ -210,12 +210,12 @@ class Statistics:
         for img_to_compare in images_to_compare:
             # Ensure we don't compare an image to itself if it's in the list
             if not self_compare:
-                if img_to_compare.image_id == (img0.image_id if isinstance(img0, Image) else img0):
+                if img_to_compare.id == (img0.id if isinstance(img0, Image) else img0):
                     continue
             
             vec_compare = self.img_calc_focus_vector(img_to_compare)
             distance = self.dist_focus_vector(vec0, vec_compare)
-            distances[img_to_compare.image_id] = distance
+            distances[img_to_compare.id] = distance
         
         return Statistics.sort_tags(distances, highest2lowest=False)
 
@@ -234,13 +234,13 @@ class Statistics:
 
         # Check if 'statistics' field already exists
         if img_obj.data and 'statistics' in img_obj.data:
-            print(f"Statistics already initialized for image {img_obj.image_id}.")
+            print(f"Statistics already initialized for image {img_obj.id}.")
             if not force:
                 print(f"\tNo force option: Skipping!")
                 return
         
         # create an empty statistics section in the db and store it
-        self._db_manager.img_add_field(img.image_id, 'statistics', {}, force=True)
+        self._db_manager.img_add_field(img.id, 'statistics', {}, force=True)
 
         # Initialize an empty statistics dictionary
         initial_statistics = {
@@ -250,16 +250,16 @@ class Statistics:
 
         # Update the image document in the database
         update_result = self.img_statistics_save(
-            img_obj.image_id,
+            img_obj.id,
             initial_statistics,
             force = True
         )
         if update_result is not None and update_result > 0:
-            print(f"Statistics initialized for image {img_obj.image_id}.")
+            print(f"Statistics initialized for image {img_obj.id}.")
             # Invalidate cached data to ensure next access includes new 'statistics' field
             img_obj._data = None 
         else:
-            print(f"Failed to initialize statistics for image {img_obj.image_id}.")
+            print(f"Failed to initialize statistics for image {img_obj.id}.")
                 
     def img_statistics_save(self, img: Image | str, statistics: dict, force: bool = False) -> int:
         """
@@ -278,25 +278,25 @@ class Statistics:
         # Check if 'statistics' field exists and handle force option
         if img_obj.data and 'statistics' in img_obj.data:
             if not force:
-                print(f"Statistics already exist for image {img_obj.image_id}. Use force=True to overwrite.")
+                print(f"Statistics already exist for image {img_obj.id}. Use force=True to overwrite.")
                 return 0
             else:
-                print(f"Overwriting existing statistics for image {img_obj.image_id} as force=True.")
+                print(f"Overwriting existing statistics for image {img_obj.id} as force=True.")
         
         # Update the image document in the database
         update_result = self._db_manager.update_document(
             'images',
-            {"_id": ObjectId(img_obj.image_id)},
+            {"_id": ObjectId(img_obj.id)},
             {"$set": {"statistics": statistics}}
         )
         
         if update_result is not None and update_result > 0:
-            print(f"Statistics saved for image {img_obj.image_id}.")
+            print(f"Statistics saved for image {img_obj.id}.")
             # Invalidate cached data to ensure next access includes new 'statistics' field
             img_obj._data = None 
             return update_result
         else:
-            print(f"Failed to save statistics for image {img_obj.image_id}.")
+            print(f"Failed to save statistics for image {img_obj.id}.")
             return 0
     
     def imgs_calc_neighborhood(self, imgs: list[Image], size: int = 10) -> dict[str, dict[str, float]]:
@@ -312,10 +312,10 @@ class Statistics:
         # Pre-calculate all focus vectors to avoid redundant calculations
         focus_vectors: dict[str, np.ndarray] = {}
         for img in imgs:
-            focus_vectors[img.image_id] = img.focus_vector
+            focus_vectors[img.id] = img.focus_vector
 
         for i, img_i in enumerate(imgs):
-            current_image_id = img_i.image_id
+            current_image_id = img_i.id
             distances_to_others: dict[str, float] = {}
             
             # Retrieve focus vector for the current image
@@ -328,7 +328,7 @@ class Statistics:
                 if i == j: # Don't compare an image to itself
                     continue
                 
-                other_image_id = img_j.image_id
+                other_image_id = img_j.id
                 vec_j = focus_vectors.get(other_image_id)
                 if vec_j is None:
                     print(f"Warning: Focus vector not found for image {other_image_id}. Skipping comparison with {current_image_id}.")

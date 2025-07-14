@@ -546,7 +546,7 @@ class AIDBGradioApp:
         modal_formatted_tags = "".join([f"{html.escape(tag)}: {prob:.2f}<br>" for tag, prob in sorted_tags_wd])
         
         image_details = {
-            "id": str(img_obj.image_id),
+            "id": str(img_obj.id),
             "full_path": str(img_obj.get_full_path()) if img_obj.get_full_path() else "N/A",
             "rating": img_obj.data.get('rating', 'N/A'),
             "category": img_obj.data.get('category', 'N/A'),

@@ -39,7 +39,7 @@ class AppImageCell:
             grid_img_base64 = AppImageCell._pil_to_base64(grid_thumb_pil)
         else:
             grid_img_base64 = "" # Or a base64 encoded placeholder image
-            print(f"Warning: No thumbnail available for image ID: {img.image_id}. Displaying empty image.")
+            print(f"Warning: No thumbnail available for image ID: {img.id}. Displaying empty image.")
 
         # Format contributing tags for display
         contributing_tags_html = ""
@@ -51,19 +51,19 @@ class AppImageCell:
         
         #n0 = img.neighbor0
         #caption = f"Score: {img.score:.2f} ({img.image_id}, {n0[1]:.2f}->{n0[0]}) "
-        caption = f"Score: {img.score:.2f} ({img.image_id})"
+        caption = f"Score: {img.score:.2f} ({img.id})"
 
         # The onclick for the image now also uses the data bus pattern.
         class_img = "image-item"
 
         img_onclick_js = f"""
         const bus = document.querySelector('#image_id_bus_elem textarea');
-        bus.value = '{img.image_id}';
+        bus.value = '{img.id}';
         bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
         document.getElementById('{get_full_image_data_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
 
         return f"""
-        <div class="{class_img}" id="image-{img.image_id}">
+        <div class="{class_img}" id="image-{img.id}">
             <img src="data:image/png;base64,{grid_img_base64}" alt="Image Preview" onclick="{img_onclick_js}">
             <div class="image-caption">{caption}</div>
             <div class="image-controls">
@@ -102,13 +102,13 @@ class AppImageCell:
             onclick_js = f"""
             event.stopPropagation();
             const bus = document.querySelector('#scene_data_bus_elem textarea');
-            bus.value = '{img.image_id},{bodypart}';
+            bus.value = '{img.id},{bodypart}';
             bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
             document.getElementById('{update_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
             operation_html += f"""
-                <input type="checkbox" id="scene-{img.image_id}-{bodypart}" name="scene-{img.image_id}" value="{bodypart}" {checked}
+                <input type="checkbox" id="scene-{img.id}-{bodypart}" name="scene-{img.id}" value="{bodypart}" {checked}
                        onclick="{onclick_js}">
-                <label for="scene-{img.image_id}-{bodypart}" class="scene-label-btn">{bodypart}</label>
+                <label for="scene-{img.id}-{bodypart}" class="scene-label-btn">{bodypart}</label>
                 """
         
         return f"""
@@ -134,13 +134,13 @@ class AppImageCell:
             onclick_js = f"""
             event.stopPropagation();
             const bus = document.querySelector('#rating_data_bus_elem textarea');
-            bus.value = '{img.image_id},{r}';
+            bus.value = '{img.id},{r}';
             bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
             document.getElementById('{update_trigger_id}').click();""".replace('\n', ' ').replace('"', '&quot;')
             operation_html += f"""
-                <input type="radio" id="rating-{img.image_id}-{r}" name="rating-{img.image_id}" value="{r}" {checked}
+                <input type="radio" id="rating-{img.id}-{r}" name="rating-{img.id}" value="{r}" {checked}
                        onclick="{onclick_js}">
-                <label for="rating-{img.image_id}-{r}" class="rating-label-btn">{r}</label>
+                <label for="rating-{img.id}-{r}" class="rating-label-btn">{r}</label>
                 """
         
         return f"""

@@ -131,6 +131,18 @@ class HFDatasetImg:
             raise ValueError("Caption not a String!")
         
         self._meta[idx] |= {"caption_joy": caption}
+    
+    def img_download(self, idx: int) -> Path:
+        if not isinstance(idx, int):
+            raise ValueError("Index not an integer!")
+        # check idx vs. size
+        if idx < 0:
+            raise IndexError("Index out of bounds for tags list.")
+        if idx >= len(self):
+            raise IndexError("Index out of bounds for tags list.")
+
+        file_img = hf_hub_download(repo_id=self.repo_id, filename=self.img_files[idx], repo_type="dataset")
+        return Path(file_img)
 
     def __len__(self):
         return len(self._meta)
@@ -186,6 +198,9 @@ class HFDatasetImg:
         return prompt
 
     def make_folder_train(self, to_folder:str = "", trigger: str = "", ids: list[str] = [], force = False) -> None:
+        """
+        TODO: maybe not the right place here! there is an explicit trainer class!
+        """
         # create folder
         path_folder = Path(to_folder)
         if path_folder.exists() and not force:

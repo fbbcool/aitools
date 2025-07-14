@@ -43,7 +43,7 @@ class Image:
 
 
     @property
-    def image_id(self) -> str:
+    def id(self) -> str:
         """Returns the MongoDB _id of this image."""
         return self._image_id
     
@@ -676,21 +676,21 @@ class Image:
         # 1. Copy the training image by just trying its url. if url doesnt exist, abort.
         train_image_path_str = self.url_train_image
         if not train_image_path_str:
-            print(f"No training image URL found for image {self.image_id}. Aborting export.")
+            print(f"No training image URL found for image {self.id}. Aborting export.")
             return
 
         train_image_source_path = pathlib.Path(train_image_path_str)
         if not train_image_source_path.exists():
-            print(f"Training image file not found at {train_image_source_path} for image {self.image_id}. Aborting export.")
+            print(f"Training image file not found at {train_image_source_path} for image {self.id}. Aborting export.")
             return
 
-        train_image_destination_path = images_path / f"{self.image_id}.png"
+        train_image_destination_path = images_path / f"{self.id}.png"
         try:
             import shutil
             shutil.copy(train_image_source_path, train_image_destination_path)
             print(f"Copied training image to {train_image_destination_path}")
         except Exception as e:
-            print(f"Error copying training image for {self.image_id}: {e}")
+            print(f"Error copying training image for {self.id}: {e}")
             return
             
 
@@ -706,13 +706,13 @@ class Image:
 
         # 2. Create caption file
         if export_cap_files:
-            caption_export_path = text_path / f"{self.image_id}.txt"
+            caption_export_path = text_path / f"{self.id}.txt"
             try:
                 with open(caption_export_path, "w", encoding="utf-8") as f:
                     f.write(caption_string)
                 print(f"Exported tags to {caption_export_path}")
             except Exception as e:
-                print(f"Error exporting tags for {self.image_id}: {e}")
+                print(f"Error exporting tags for {self.id}: {e}")
 
         # 3. or expand metadata.jsonl
         #line_json = {"file_name": "images/" + train_image_destination_path.name, "text": caption_string, "tags": json.dumps(self.tags)}
@@ -725,7 +725,7 @@ class Image:
                 f.write("\n")
             print(f"Added metadata to {metadata_file_path}")
         except Exception as e:
-            print(f"Error writing to metadata.jsonl for {self.image_id}: {e}")
+            print(f"Error writing to metadata.jsonl for {self.id}: {e}")
 
             
 

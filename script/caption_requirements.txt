@@ -5,3 +5,4 @@ transformers==4.51.0
 sentencepiece
 torchvision
 liger-kernel==0.5.9
+timm
