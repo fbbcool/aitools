@@ -111,9 +111,9 @@ class TrainerKohya:
                 print(f"{e}\n{id} not downloadable!")
                 continue
             
-            # move file to dataset folder
+            # copy file to dataset folder
             img_file = self.FOLDER_DATASET / img_file_dl.name
-            shutil.move(img_file_dl, img_file)
+            shutil.copy(str(img_file_dl), str(img_file))
 
             # write caption to file
             cap_file = img_file.with_suffix(".txt")
@@ -225,10 +225,3 @@ accelerate launch \\
             print(f"Config successfully saved to {configfile}")
         except Exception as e:
             print(f"Error saving config to JSON: {e}")
-    
-    @staticmethod
-    def filename_config() -> str:
-        return TrainerKohya.FILENAME_CONFIG
-
-        
-
