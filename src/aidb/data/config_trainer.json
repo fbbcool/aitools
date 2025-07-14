@@ -1,8 +1,9 @@
 {
     "repo_id": "fbbcool/gts01_r35",
-    "batch_size": 2,
     "trigger": "1gts",
     "name": "1tgs_01",
+    "netdim": 32,
+    "batch_size": 2,
     "prompts": [
         "prompt1",
         "prompt2"

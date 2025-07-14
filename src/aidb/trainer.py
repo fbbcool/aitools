@@ -179,7 +179,7 @@ accelerate launch \\
     --mixed_precision bf16 \\
     --save_precision bf16 \\
     --network_module networks.lora_flux \\
-    --network_dim 32 \\
+    --network_dim {self._config["netdim"]} \\
     --optimizer_type adamw8bit \\
     --sample_prompts="{self.FILE_SAMPLE_PROMPTS}" \\
     --sample_every_n_steps="100" \\
@@ -210,11 +210,12 @@ accelerate launch \\
         """ takes a list of image ids and makes a default config file"""
         config: dict = {}
         config["repo_id"] = "fbbcool/gts01_r35"
-        config["imgs"] = imgs
         config["trigger"] = "1gts"
         config["name"] = "gts"
+        config["netdim"] = 32
         config["batch_size"] = 1
         config["prompts"] = ["a muscular giantess female bride is towering in a bright wedding empty cathedral. she is wearing black sandal high heels. at her feet is her small groom."]
+        config["imgs"] = imgs
 
         configfile = Path(f"./{TrainerKohya.FILENAME_CONFIG}")
 
