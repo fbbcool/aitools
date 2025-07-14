@@ -9,6 +9,9 @@ error = 0
 for idx in range(n):
     print(f"{idx}:\n")
     try:
+        if hfd.captions[idx]:
+            print("already captionized.")
+            continue
         img = hfd.pil(idx)
         prompt = hfd.prompt(idx)
         caption = caper.img_caption(img, prompt)

@@ -177,7 +177,9 @@ class HFDatasetImg:
         
         # comma separated string
         bp_str = ",".join(bp_prompt)
-        prompt = f"Write a very long detailed description for this image, especially about the interaction of the female giantess woman and the small man in terms of {bp_str}."
+        if bp_str:
+            bp_str = f" in terms of {bp_str}"
+        prompt = f"Write a very long detailed description for this image, especially about the interaction of the female giantess woman and the small man{bp_str}."
 
         # TODO
         print(prompt)
