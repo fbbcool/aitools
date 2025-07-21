@@ -180,6 +180,7 @@ accelerate launch \\
     --save_precision bf16 \\
     --network_module networks.lora_flux \\
     --network_dim {self._config["netdim"]} \\
+    --network_alpha {self._config["netdim"]} \\
     --optimizer_type adamw8bit \\
     --sample_prompts="{self.FILE_SAMPLE_PROMPTS}" \\
     --sample_every_n_steps="100" \\
