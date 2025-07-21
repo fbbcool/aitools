@@ -1,6 +1,7 @@
 export ENV_REPOS='https://github.com/fbbcool/aitools.git'
 export ENV_PWD=`pwd`
 export ENV_HOME=$ENV_PWD/___aitools
+export PYTHONPATH=$ENV_HOME/src
 
 ___train() {
     rm -rf $ENV_HOME
