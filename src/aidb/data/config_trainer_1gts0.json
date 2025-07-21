@@ -1,11 +1,16 @@
 {
     "repo_id": "fbbcool/gts01_r35",
+    "model": {
+        "cai": {
+            "url": "https://civitai.com/api/download/models/1905927?type=Model&format=SafeTensor&size=full&fp=fp16"
+        }
+    },
     "trigger": "1gts",
     "name": "gts",
     "netdim": 32,
     "batch_size": 1,
     "prompts": [
-        "a muscular giantess female bride is towering in a bright wedding empty cathedral. she is wearing black sandal high heels. at her feet is her small groom."
+        "a muscular giantess female bride is towering in a bright wedding empty cathedral. she is wearing black sandal high heels. at her feet is her small naked groom."
     ],
     "imgs": [
         "6862865eb1cb971098a808a9",
