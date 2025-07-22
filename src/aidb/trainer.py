@@ -42,8 +42,8 @@ class TrainerKohya:
         self._hfdl_vae: tuple[str,str] = ("black-forest-labs/FLUX.1-dev", "ae.safetensors")
         self._hfdl_clipl: tuple[str,str] = ("comfyanonymous/flux_text_encoders", "clip_l.safetensors")
 
-        #self._hfdl_t5xxl: tuple[str,str] = ("comfyanonymous/flux_text_encoders", "t5xxl_fp16.safetensors")
-        self._hfdl_t5xxl: tuple[str,str] = ("comfyanonymous/flux_text_encoders", "t5xxl_fp8_e4m3fn_scaled.safetensors")
+        self._hfdl_t5xxl: tuple[str,str] = ("comfyanonymous/flux_text_encoders", "t5xxl_fp16.safetensors")
+        #self._hfdl_t5xxl: tuple[str,str] = ("comfyanonymous/flux_text_encoders", "t5xxl_fp8_e4m3fn_scaled.safetensors")
         self._file_ckpt: str = ""
         self._file_vae: str = ""
         self._file_clipl: str = ""
@@ -219,7 +219,6 @@ accelerate launch \\
     --save_precision bf16 \\
     --network_module networks.lora_flux \\
     --network_dim {self._config["netdim"]} \\
-    --network_alpha {self._config["netdim"]} \\
     --optimizer_type adamw8bit \\
     --sample_prompts="{self.FILE_SAMPLE_PROMPTS}" \\
     --sample_every_n_steps="100" \\
