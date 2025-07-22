@@ -23,6 +23,8 @@ class TrainerKohya:
     FILE_SAMPLE_PROMPTS: Final = ROOT / "sample_prompts.txt"
     FILE_CONFIG_DATASET: Final = ROOT / "dataset.toml"
     FILE_TRAIN_SCRIPT: Final = ROOT / "train.sh"
+    MODEL_REPO_ID_FLUX: Final = "Kijai/flux-fp8"
+    MODEL_FILE_FLUX: Final = "flux1-dev-fp8.safetensors"
     CHUNK_SIZE: Final = 1638400
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 
@@ -35,10 +37,13 @@ class TrainerKohya:
         self._ids_used = []
         self._batch_size = 1
 
-        self._hfdl_ckpt: tuple[str,str] | None = ("black-forest-labs/FLUX.1-dev", "flux1-dev.safetensors")
+        #self._hfdl_ckpt: tuple[str,str] | None = ("black-forest-labs/FLUX.1-dev", "flux1-dev.safetensors")
+        self._hfdl_ckpt: tuple[str,str] | None = (self.MODEL_REPO_ID_FLUX, self.MODEL_FILE_FLUX)
         self._hfdl_vae: tuple[str,str] = ("black-forest-labs/FLUX.1-dev", "ae.safetensors")
         self._hfdl_clipl: tuple[str,str] = ("comfyanonymous/flux_text_encoders", "clip_l.safetensors")
-        self._hfdl_t5xxl: tuple[str,str] = ("comfyanonymous/flux_text_encoders", "t5xxl_fp16.safetensors")
+
+        #self._hfdl_t5xxl: tuple[str,str] = ("comfyanonymous/flux_text_encoders", "t5xxl_fp16.safetensors")
+        self._hfdl_t5xxl: tuple[str,str] = ("comfyanonymous/flux_text_encoders", "t5xxl_fp8_e4m3fn_scaled.safetensors")
         self._file_ckpt: str = ""
         self._file_vae: str = ""
         self._file_clipl: str = ""
@@ -65,10 +70,21 @@ class TrainerKohya:
             model = self._config["model"]
             self._hfdl_ckpt = None
             self._caidl_ckpt = None
-            if "hf" in model:
-                self._hfdl_ckpt = (model["hf"]["repo_id"], model["hf"]["file"])
-            elif "cai" in model:
-                self._caidl_ckpt = (model["cai"]["url"], "")
+            
+            # if cai model is given, it is used first
+            if "cai" in model:
+                url_cai = model["cai"].get("url", "")
+                if url_cai:
+                    self._caidl_ckpt = (url_cai, "")
+            
+            if self._caidl_ckpt is None:
+                if "hf" in model:
+                    file_ = model["hf"].get("file", "")
+                    repo_id_ = model["hf"].get("repo_id", "")
+                    if file_ and repo_id_:
+                        self._hfdl_ckpt = (model["hf"]["repo_id"], model["hf"]["file"])
+                if self._hfdl_ckpt is None:
+                    raise ValueError("model section is given in config but not set!")
 
 
 
@@ -229,8 +245,8 @@ accelerate launch \\
         self.FILE_TRAIN_SCRIPT.chmod(0o777)
     
 
-    @staticmethod
-    def make_config(imgs: list[str]) -> None:
+    @classmethod
+    def make_config(cls, imgs: list[str]) -> None:
         """ takes a list of image ids and makes a default config file"""
         config: dict = {}
         config["repo_id"] = "fbbcool/gts01_r35"
@@ -239,6 +255,7 @@ accelerate launch \\
         config["netdim"] = 32
         config["batch_size"] = 1
         config["prompts"] = ["a muscular giantess female bride is towering in a bright wedding empty cathedral. she is wearing black sandal high heels. at her feet is her small groom."]
+        config["model"] = {"hf": {"repo_id": cls.MODEL_REPO_ID_FLUX, "file": cls.MODEL_FILE_FLUX}, "cai": {"url": ""}}
         config["imgs"] = imgs
 
         configfile = Path(f"./{TrainerKohya.FILENAME_CONFIG}")
