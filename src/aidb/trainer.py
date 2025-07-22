@@ -120,7 +120,7 @@ class TrainerKohya:
         if self._hfdl_ckpt:
             self._file_ckpt = hf_hub_download(repo_id=self._hfdl_ckpt[0], filename=self._hfdl_ckpt[1], cache_dir=self.FOLDER_MODELS)
         elif self._caidl_ckpt:
-            self._file_ckpt = self._download_civitai(self._caidl_ckpt[0], self.FOLDER_MODELS)
+            self._file_ckpt = self._download_civitai(self._caidl_ckpt[0])
         self._file_clipl = hf_hub_download(repo_id=self._hfdl_clipl[0], filename=self._hfdl_clipl[1], cache_dir=self.FOLDER_MODELS)
         self._file_t5xxl = hf_hub_download(repo_id=self._hfdl_t5xxl[0], filename=self._hfdl_t5xxl[1], cache_dir=self.FOLDER_MODELS)
         self._file_vae = hf_hub_download(repo_id=self._hfdl_vae[0], filename=self._hfdl_vae[1], cache_dir=self.FOLDER_MODELS)
@@ -267,8 +267,7 @@ accelerate launch \\
         except Exception as e:
             print(f"Error saving config to JSON: {e}")
     
-    def _download_civitai(self, url: str, ofolder: Path) -> Path:
-        opath = str(ofolder)
+    def _download_civitai(self, url: str) -> Path:
         # get token from env TOKEN_CIVITAI
         #token = os.environ.get("CAI_TOKEN", "")
         token = os.environ.get("CAI_TOKEN", "2c1cdcc01625085bff329ba907d64948")
@@ -313,9 +312,13 @@ accelerate launch \\
         if total_size is not None:
             total_size = int(total_size)
 
-        output_file = os.path.join(opath, filename)
+        output_file = self.FOLDER_MODELS / filename
 
-        with open(output_file, 'wb') as f:
+        if output_file.exists():
+            print(f"\t already downloaded: {output_file.name}")
+            return output_file
+
+        with output_file.open('wb') as f:
             downloaded = 0
             start_time = time.time()
 
@@ -355,4 +358,4 @@ accelerate launch \\
         print(f'Download completed. File saved as: {filename}')
         print(f'Downloaded in {time_str}')
 
-        return self.FOLDER_MODELS / filename
+        return output_file
