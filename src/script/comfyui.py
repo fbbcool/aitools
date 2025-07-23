@@ -230,6 +230,14 @@ class ModelInst:
                 print(f"installing from hugging: {self.url} -> {url_model}")
                 self.download_hf(self.url, url_model)
                 
+            if self.method == DownloadMethod.Hugging2:
+                path_model = Path(url_model)
+                repo_id = self.url
+                filename = path_model.name
+                ofolder = path_model.parent
+                print(f"installing from hugging_2: {repo_id} / {filename} -> {ofolder}")
+                self.download_hf_2(repo_id, filename, ofolder)
+                
             if self.method == DownloadMethod.Civitai:
                 print(f"installing from hugging: {self.url} -> {url_model}")
                 self.download_civitai(self.url, url_model)
