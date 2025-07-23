@@ -15,6 +15,7 @@ from urllib.parse import urlparse, parse_qs, unquote
 
 class DownloadMethod(Enum):
     Hugging = auto()
+    Hugging2 = auto()
     Civitai = auto()
     Wget = auto()
     GDrive = auto()
@@ -86,6 +87,18 @@ class ModelInst:
         except:
             print(f"Url download went wrong: {url}")
 
+    def download_hf_2(self, repo_id: str, filename: str, ofolder: str | Path) -> Path:
+        ofolder_str = ""
+        if isinstance(ofolder, Path):
+            ofolder_str = str(ofolder)
+        elif isinstance(ofolder, str):
+            ofolder_str = ofolder
+            ofolder = Path(ofolder)
+        else:
+            raise TypeError("ofolder has no correct type")
+        ofile_str = hf_hub_download(repo_id=repo_id, filename=filename, local_dir=ofolder_str)
+        return Path(ofile_str)
+    
     def download_hf(self, url: str, fname: str):
         urlp = urlparse(url)
         path = Path(urlp.path)
@@ -314,6 +327,7 @@ class ModelInstComfyUi:
     def __init__(self, group = DownloadGroup.SD15) -> None:
         wget = DownloadMethod.Wget
         hf = DownloadMethod.Hugging
+        hf2 = DownloadMethod.Hugging2
         cai = DownloadMethod.Civitai
 
         t = TargetType.Comfy
@@ -471,23 +485,33 @@ class ModelInstComfyUi:
             # aphrodite fp16
             #ModelInst(t, ModelType.Checkpoint, cai, "https://civitai.com/api/download/models/897489?type=Model&format=SafeTensor&size=full&fp=fp16", ""),
             # flux reality nsfw fp8
-            ModelInst(t, ModelType.Unet, cai, "https://civitai.com/api/download/models/1908093?type=Model&format=SafeTensor&size=full&fp=fp8", ""),
+            #ModelInst(t, ModelType.Unet, cai, "https://civitai.com/api/download/models/1908093?type=Model&format=SafeTensor&size=full&fp=fp8", ""),
+            # 1gts
+            ModelInst(t, ModelType.Unet, hf2, "fbbcool/1gts", "1gts_base.safetensors", ""),
 
             # VAE
-            ModelInst(t, ModelType.VAE, hf, "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true", "ae"),
+            ModelInst(t, ModelType.VAE, hf2, "black-forest-labs/FLUX.1-dev", "ae.safetensors", ""),
 
             # clip
-            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true", ""),
+            ModelInst(t, ModelType.Clip, hf2, "comfyanonymous/flux_text_encoders", "clip_l.safetensors", ""),
+            ModelInst(t, ModelType.Clip, hf2, "city96/t5-v1_1-xxl-encoder-gguf", "t5-v1_1-xxl-encoder-Q8_0.gguf", ""),
             #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/blob/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-TE-only-HF.safetensors", "clip_l_improve"),
             #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true", "t5xxl_fp16"),
             #ModelInst(t, ModelType.Clip, wget, "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors?download=true", "t5xxl_fp8_e4m3fn"),
-            ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q8_0.gguf?download=true", "t5_q8_gguf"),
             #ModelInst(t, ModelType.Clip, hf, "https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-f16.gguf?download=true", "t5_gguf"),
             
             # control
             #ModelInst(t, ModelType.Controlnet, hf, "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro/resolve/main/diffusion_pytorch_model.safetensors?download=true", ""),
             
             # lora
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_r5_afro-mid.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_r5-low.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_chloe.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_cock.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_breast.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_chubby.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_muscle.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_nhj.safetensors", ""),
 
             
             # flux fill
