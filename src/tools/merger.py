@@ -19,9 +19,13 @@ def merge_lora_with_checkpoint(stem_ckpt: str, stem_lora: str, ratio: float):
 
     file_ckpt = FOLDER_UNET / stem_ckpt
     file_ckpt = file_ckpt.with_suffix(model_suffix)
+    if not file_ckpt.exists():
+        raise FileExistsError(f"{str(file_ckpt)} doesn't exist!")
 
     file_lora = FOLDER_LORA / stem_lora
     file_lora = file_lora.with_suffix(model_suffix)
+    if not file_lora.exists():
+        raise FileExistsError(f"{str(file_lora)} doesn't exist!")
 
     lora_data = load_file(file_lora)
     checkpoint_data = load_file(file_ckpt)

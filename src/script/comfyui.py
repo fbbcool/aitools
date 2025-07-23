@@ -371,10 +371,11 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_chubby.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_muscle.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_nhj.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts", "1gts_cumshot.safetensors", ""),
 
             
             # flux fill
-            #ModelInst(t, ModelType.Unet, hf, "https://huggingface.co/YarvixPA/FLUX.1-Fill-dev-gguf/resolve/main/flux1-fill-dev-Q8_0.gguf", ""),
+            ModelInst(t, ModelType.Unet, hf2, "YarvixPA/FLUX.1-Fill-dev-gguf", "flux1-fill-dev-Q8_0.gguf", ""),
         ]
         model_db = {
             DownloadGroup.FLUX_REFINE: models_flux_refine,
