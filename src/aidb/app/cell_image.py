@@ -175,21 +175,21 @@ class AppImageCell:
                 /* Removed display: flex; from here. It will be set by JS when shown. */
                 justify-content: center;
                 align-items: center;
-                flex-direction: column; /* To stack image and details */
+                flex-direction: row; /* To stack image and details side-by-side */
+                gap: 20px;
             }
             #fullPageImageOverlay img {
-                max-width: 90%;
-                max-height: 80%;
+                max-width: 60%;
+                max-height: 90%;
                 object-fit: contain;
-                margin-bottom: 20px;
             }
             #fullPageImageDetails {
                 background-color: #333333; /* Dark grey background for details */
                 padding: 20px;
                 border-radius: 8px;
-                max-width: 80%;
+                max-width: 35%;
                 overflow-y: auto; /* Allow scrolling for long details */
-                max-height: 15%; /* Limit height to prevent overflow */
+                max-height: 90%;
                 color: #ffffff; /* White text for details */
             }
             #fullPageImageDetails h4 {
@@ -228,4 +228,3 @@ class AppImageCell:
             <div id="fullPageImageDetails"></div>
         </div>
         """)
-

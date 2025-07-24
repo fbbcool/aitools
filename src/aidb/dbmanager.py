@@ -11,6 +11,8 @@ import mimetypes
 from typing import List, Dict, Optional, Union, Any, Tuple
 import yaml # Import the yaml library
 
+from aidb.hfdataset import HFDatasetImg
+
 # Define the DBManager class for handling metadata operations
 class DBManager:
     """
@@ -20,7 +22,14 @@ class DBManager:
     from a YAML file if specified.
     """
 
-    def __init__(self, config_file: Optional[str] = None, host: str = 'localhost', port: int = 27017, db_name: str = 'metadata_db') -> None:
+    def __init__(
+            self,
+            config_file: Optional[str] = None,
+            host: str = 'localhost',
+            port: int = 27017,
+            db_name: str = 'metadata_db',
+            hfd_repo_id: str = "fbbcool/gts01_r35",
+            ) -> None:
         """
         Initializes the MongoDB connection. Configuration can be loaded from a YAML file.
 
@@ -39,6 +48,10 @@ class DBManager:
         self._host: str = host
         self._port: int = port
         self._db_name: str = db_name
+
+        # Hf dataset
+        self._hfd_repo_id = hfd_repo_id
+        self._hfd: HFDatasetImg | None = None
 
         # Private members for default thumbnail settings, initialized with hardcoded fallbacks
         self._default_thumbnail_dir: pathlib.Path = pathlib.Path("./default_thumbnails")
@@ -71,6 +84,15 @@ class DBManager:
             print(f"An unexpected error occurred during MongoDB connection: {e}")
             self.client = None
             self.db = None
+
+        try:
+            self._hfd = HFDatasetImg(self._hfd_repo_id)
+        except Exception as e:
+            print(f"Failed connecting to HF dataset: {self._hfd_repo_id}\n{e}")
+            self._hfd = None
+        else:
+            print(f"Successfully connected to HF dataset: {self._hfd_repo_id}")
+        
 
     def _get_collection(self, collection_name: str) -> Optional[pymongo.collection.Collection]:
         """
