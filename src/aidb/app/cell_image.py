@@ -176,6 +176,7 @@ class AppImageCell:
                 justify-content: center;
                 align-items: center;
                 flex-direction: row; /* To stack image and details side-by-side */
+                /*flex-direction: column;*/ /* To stack image and details */
                 gap: 20px;
             }
             #fullPageImageOverlay img {
@@ -183,13 +184,43 @@ class AppImageCell:
                 max-height: 90%;
                 object-fit: contain;
             }
+            #fullPageImageOverlay textarea {
+                width: 100%;
+                height: 100px;
+            }
+            #fullPageImageCaption {
+                background-color: #333333; /* Dark grey background for details */
+                padding: 20px;
+                border-radius: 8px;
+                color: #ffffff; /* White text for details */
+            }
+            #modalRightColumn {
+                display: flex;
+                max-width: 100%;
+                overflow-y: auto; /* Allow scrolling for long details */
+                max-height: 40%;
+                color: #ffffff; /* White text for details */
+            }
+            #fullPageImageCaption h4 {
+                color: #ffffff; /* White heading */
+            }
+            #fullPageImageCaption p {
+                color: #cccccc; /* Light grey text for paragraphs */
+            }
+            #fullPageImageCaption strong {
+                color: #ffffff; /* White for strong tags */
+            }
+            #fullPageImageCaption pre {
+                background-color: #555555; /* Slightly lighter grey for preformatted text */
+                color: #ffffff; /* White text for preformatted text */
+            }
             #fullPageImageDetails {
                 background-color: #333333; /* Dark grey background for details */
                 padding: 20px;
                 border-radius: 8px;
-                max-width: 35%;
+                max-width: 100%;
                 overflow-y: auto; /* Allow scrolling for long details */
-                max-height: 90%;
+                max-height: 50%;
                 color: #ffffff; /* White text for details */
             }
             #fullPageImageDetails h4 {
@@ -223,8 +254,11 @@ class AppImageCell:
             }
         </style>
         <div id="fullPageImageOverlay" onclick="this.style.display='none';">
-            <span id="fullPageCloseButton" onclick="event.stopPropagation(); document.getElementById('fullPageImageOverlay').style.display='none';">&times;</span>
+            <span id="fullPageCloseButton" onclick="event.stopPropagation(); var copyText = document.getElementById('imgCaptionString'); navigator.clipboard.writeText(copyText.value); document.getElementById('fullPageImageOverlay').style.display='none';">&times;</span>
             <img id="fullPageImage" src="" alt="Full Size Image">
-            <div id="fullPageImageDetails"></div>
+            <div id="modalRightColumn">
+                <div id="fullPageImageCaption"></div><br>
+                <div id="fullPageImageDetails"></div>
+            </div>
         </div>
         """)

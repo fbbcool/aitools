@@ -40,7 +40,9 @@ class Image:
         self.score = 0.0
         self.contributing_tags = []
         self.operation : Literal['nop','rate','scene'] = 'nop'
-
+        self._caption : str | None = None
+        self._caption_hfd : str | None = None
+        
 
     @property
     def id(self) -> str:
@@ -83,6 +85,20 @@ class Image:
         if self.data is None:
             return None
         return self.data.get("rating")
+    
+        pass 
+    @property
+    def caption(self) -> str | None:
+        if self._caption is None:
+            if self._caption_hfd is None:
+                _hfd = self._db_manager.hfd
+                self._caption_hfd = _hfd.captions[_hfd.id2idx(self.id)]
+            if self._caption_hfd is None:
+                self._caption_hfd = ""
+
+            self._caption = self._caption_hfd
+
+        return self._caption
     
     def set_rating(self, rating: int) -> int:
         """Sets the rating of the image."""

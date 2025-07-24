@@ -93,6 +93,9 @@ class DBManager:
         else:
             print(f"Successfully connected to HF dataset: {self._hfd_repo_id}")
         
+    @property
+    def hfd(self) -> HFDatasetImg | None:
+        return self._hfd
 
     def _get_collection(self, collection_name: str) -> Optional[pymongo.collection.Collection]:
         """

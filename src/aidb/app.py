@@ -191,10 +191,15 @@ class AIDBGradioApp:
                             <h4>WD Tags (Tag: Probability):</h4>
                             <pre>${details.tags_html}</pre>
                         `;
+                        document.getElementById('fullPageImageCaption').innerHTML = `
+                            <h4>Caption:</h4>
+                            <input type="text" value="${details.caption}" id="imgCaptionString">
+                        `;
                     }
                     document.getElementById('fullPageImageOverlay').style.display = 'flex'; // Use flex to center
                 }
                 """
+
             )
 
             rating_update_trigger.click(
@@ -217,7 +222,7 @@ class AIDBGradioApp:
                 outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info] # Update the grid
             )
             
-        return demo
+        return demo 
 
     def _check_db_status(self) -> str:
         """
@@ -510,7 +515,7 @@ class AIDBGradioApp:
 
         return html_output, imgs, current_page, page_info_text
 
-    def _get_full_image_data_for_modal(self, image_id: str) -> Tuple[str, str]:
+    def _get_full_image_data_for_modal(self, image_id: str) -> Tuple[str, str, str]:
         """
         Fetches full image data for the modal display.
         Returns a raw base64 string and a JSON-serialized string of the image details.
@@ -537,6 +542,10 @@ class AIDBGradioApp:
         if pil_img is None:
             print(f"ERROR: Could not load PIL image file for image ID: {image_id}.")
             return "", json.dumps({"error": f"Could not load image file for ID: {image_id}."})
+        
+        img_caption = img_obj.caption
+        if img_caption is None:
+            img_caption = ""
 
         full_img_base64 = AppImageCell._pil_to_base64(pil_img)
 
@@ -555,7 +564,8 @@ class AIDBGradioApp:
             "dimensions_unit": image_data.get('dimensions', {}).get('unit', ''),
             "creation_date": image_data.get('creation_date', 'N/A'),
             "last_modified_date": image_data.get('last_modified_date', 'N/A'),
-            "tags_html": modal_formatted_tags if modal_formatted_tags else 'No WD tags available.'
+            "tags_html": modal_formatted_tags if modal_formatted_tags else 'No WD tags available.',
+            "caption": img_caption,
         }
         
         return full_img_base64, json.dumps(image_details)
