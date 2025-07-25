@@ -12,7 +12,7 @@ import urllib
 
 from aidb.hfdataset import HFDatasetImg
 
-class TrainerKohya:
+class Trainer:
     ROOT: Final = Path("/workspace/train")
     #ROOT: Final = Path("/Volumes/data/Project/AI/REPOS/aitools/build/train")
     FILENAME_CONFIG: Final = "config_trainer.json"
@@ -257,7 +257,7 @@ accelerate launch \\
         config["model"] = {"hf": {"repo_id": cls.MODEL_REPO_ID_FLUX, "file": cls.MODEL_FILE_FLUX}, "cai": {"url": ""}}
         config["imgs"] = imgs
 
-        configfile = Path(f"./{TrainerKohya.FILENAME_CONFIG}")
+        configfile = Path(f"./{Trainer.FILENAME_CONFIG}")
 
         # write config file with pathlib
         try:
