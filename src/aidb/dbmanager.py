@@ -4,7 +4,7 @@ import pymongo
 import pymongo.collection
 import pymongo.database
 from pymongo.errors import ConnectionFailure, OperationFailure
-import pathlib
+from  pathlib import Path
 import datetime
 import uuid
 import mimetypes
@@ -54,11 +54,11 @@ class DBManager:
         self._hfd: HFDatasetImg | None = None
 
         # Private members for default thumbnail settings, initialized with hardcoded fallbacks
-        self._default_thumbnail_dir: pathlib.Path = pathlib.Path("./default_thumbnails")
+        self._default_thumbnail_dir: Path = Path("./default_thumbnails")
         self._default_thumbnail_size: Tuple[int, int] = (128, 128)
 
         # Private members for default train image settings, initialized with hardcoded fallbacks
-        self._default_train_image_dir: pathlib.Path = pathlib.Path("./default_train_images")
+        self._default_train_image_dir: Path = Path("./default_train_images")
         self._default_train_image_size: Tuple[int, int] = (1024, 1024)
 
         # Load configuration from YAML file if provided. This will populate self._host, etc.
@@ -118,7 +118,7 @@ class DBManager:
         Loads configuration settings from a YAML file.
         Updates private members for MongoDB connection and thumbnail settings.
         """
-        config_path = pathlib.Path(config_file)
+        config_path = Path(config_file)
         if not config_path.exists():
             print(f"Warning: Configuration file '{config_file}' not found. Using constructor/default settings.")
             return
@@ -145,7 +145,7 @@ class DBManager:
                 if "thumbnail_settings" in config and isinstance(config["thumbnail_settings"], dict):
                     thumb_settings = config["thumbnail_settings"]
                     if "default_thumbnail_dir" in thumb_settings and isinstance(thumb_settings["default_thumbnail_dir"], str):
-                        self._default_thumbnail_dir = pathlib.Path(thumb_settings["default_thumbnail_dir"])
+                        self._default_thumbnail_dir = Path(thumb_settings["default_thumbnail_dir"])
                     if "default_thumbnail_size" in thumb_settings and isinstance(thumb_settings["default_thumbnail_size"], list) and len(thumb_settings["default_thumbnail_size"]) == 2:
                         self._default_thumbnail_size = tuple(thumb_settings["default_thumbnail_size"])
                     print(f"Thumbnail configuration loaded from '{config_file}'.")
@@ -156,7 +156,7 @@ class DBManager:
                 if "train_image_settings" in config and isinstance(config["train_image_settings"], dict):
                     train_img_settings = config["train_image_settings"]
                     if "default_train_image_dir" in train_img_settings and isinstance(train_img_settings["default_train_image_dir"], str):
-                        self._default_train_image_dir = pathlib.Path(train_img_settings["default_train_image_dir"])
+                        self._default_train_image_dir = Path(train_img_settings["default_train_image_dir"])
                     if "default_train_image_size" in train_img_settings and isinstance(train_img_settings["default_train_image_size"], list) and len(train_img_settings["default_train_image_size"]) == 2:
                         self._default_train_image_size = tuple(train_img_settings["default_train_image_size"])
                     print(f"Train image configuration loaded from '{config_file}'.")
@@ -200,7 +200,18 @@ class DBManager:
             yield Image(self, str(doc['_id']), doc=doc)
 
     @property
-    def default_thumbnail_dir(self) -> pathlib.Path:
+    def container_names(self):
+        """Returns a generator of for all container names in the db"""
+        if self.db is None:
+            print("Database not connected.")
+            return
+
+        docs = self.find_documents('containers')
+        for doc in docs:
+            yield doc["name"]
+
+    @property
+    def default_thumbnail_dir(self) -> Path:
         """
         Returns the default directory for storing thumbnails.
         """
@@ -216,7 +227,7 @@ class DBManager:
 
     # properties for train images defaults
     @property
-    def default_train_image_dir(self) -> pathlib.Path:
+    def default_train_image_dir(self) -> Path:
         """
         Returns the default directory for storing train images.
         """
@@ -327,7 +338,7 @@ class DBManager:
                 print(f"An unexpected error occurred during deleting documents from '{collection_name}': {e}")
         return None
 
-    def add_container(self, container_local_path: str, recursive: bool = False) -> Optional[str]:
+    def add_container(self, container_local_path: str | Path, recursive: bool = False) -> Optional[str]:
         """
         Creates a new container based on a local path and adds all images
         contained in that path, optionally recursively.
@@ -340,10 +351,19 @@ class DBManager:
         Returns:
             str or None: The string representation of the MongoDB '_id' of the newly created container, or None on failure.
         """
-        container_path_obj = pathlib.Path(container_local_path)
+        if isinstance(container_local_path, str):
+            container_path_obj = Path(container_local_path)
+        elif isinstance(container_local_path, Path):
+            container_path_obj = container_local_path
+        else:
+            raise TypeError(f"{container_local_path} has wrong type!")
 
         if not container_path_obj.is_dir():
             print(f"Error: Container path '{container_local_path}' does not exist or is not a directory.")
+            return None
+
+        if not container_path_obj.exists():
+            print(f"Error: Container path '{container_local_path}' exists, force option not implemented!")
             return None
 
         # Generate container metadata
@@ -419,7 +439,7 @@ class DBManager:
 
         return inserted_container_id
 
-    def _process_image_file(self, full_image_path_obj: pathlib.Path, base_container_path_obj: pathlib.Path, image_extensions: Dict[str, str], parent_container_db_id: ObjectId) -> Optional[str]:
+    def _process_image_file(self, full_image_path_obj: Path, base_container_path_obj: Path, image_extensions: Dict[str, str], parent_container_db_id: ObjectId) -> Optional[str]:
         """
         Helper method to process a single image file and insert its metadata.
         
@@ -467,7 +487,9 @@ class DBManager:
                 "rating": -1, # Default rating is -1
                 "category": "Uncategorized", # Default category
                 "file_type": image_extensions[file_extension],
-                "container_db_id": parent_container_db_id # MongoDB reference to the parent container
+                "container_db_id": parent_container_db_id, # MongoDB reference to the parent container
+                "statistics": {},
+                "train_image_url": ""
             }
             return self.insert_document('images', image_metadata)
         else:
