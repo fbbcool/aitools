@@ -248,7 +248,8 @@ class ModelInst:
 
             if self.method == DownloadMethod.Git:
                 print(f"git clone: {self.url} -> {url_repos}")
-                self.git_clone(self.url, url_folder)
+                print("currently not implemented!")
+                #self.git_clone(self.url, url_folder)
         except:
             print(f"sth went wrong!")
 
@@ -265,7 +266,7 @@ class ModelInst:
             elif self.model == ModelType.Controlnet:
                 folder_model = "controlnet"
             elif self.model == ModelType.CustomNode:
-                folder_model = "nodes"
+                folder_model = "../custom_nodes"
             elif self.model == ModelType.Lora:
                 folder_model = "loras"
             elif self.model == ModelType.Embedding:
@@ -334,6 +335,7 @@ class ModelInstComfyUi:
         hf = DownloadMethod.Hugging
         hf2 = DownloadMethod.Hugging2
         cai = DownloadMethod.Civitai
+        git = DownloadMethod.Git
 
         t = TargetType.Comfy
         models_flux_refine: list[ModelInst] = [
@@ -377,8 +379,36 @@ class ModelInstComfyUi:
             # flux fill
             ModelInst(t, ModelType.Unet, hf2, "YarvixPA/FLUX.1-Fill-dev-gguf", "flux1-fill-dev-Q8_0.gguf", ""),
         ]
+        t = TargetType.Comfy
+        models_current: list[ModelInst] = [
+            # checkpoint
+            # 1gts
+            ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan14BT2VFusionX-Q8_0.gguf", ""),
+            ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_VACE-Q8_0.gguf", ""),
+
+            # VAE
+            ModelInst(t, ModelType.VAE, hf2, "Aitrepreneur/FLX", "wan_2.1_vae.safetensors", ""),
+
+            # clip
+            ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
+            
+            # lora
+            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
+        
+            # custom nodes
+            #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/city96", "ComfyUI-GGUF", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/rgthree", "rgthree-comfy", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/yolain", "ComfyUI-Easy-Use", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/kijai", "ComfyUI-KJNodes", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/cubiq", "ComfyUI_essentials", ""),
+        ]
+
         model_db = {
             DownloadGroup.FLUX_REFINE: models_flux_refine,
+            DownloadGroup.CURRENT: models_current,
         }
         for model in model_db[group]:
             model.install

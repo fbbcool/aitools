@@ -92,7 +92,9 @@ class Image:
         if self._caption is None:
             if self._caption_hfd is None:
                 _hfd = self._db_manager.hfd
-                self._caption_hfd = _hfd.captions[_hfd.id2idx(self.id)]
+                idx = _hfd.id2idx(self.id)
+                if idx is not None:
+                    self._caption_hfd = _hfd.captions[_hfd.id2idx(self.id)]
             if self._caption_hfd is None:
                 self._caption_hfd = ""
 

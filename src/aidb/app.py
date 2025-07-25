@@ -11,7 +11,7 @@ import html
 import json # Import json for robust string escaping
 
 # Define images per page constant
-IMAGES_PER_PAGE: Final = 250
+IMAGES_PER_PAGE: Final = 252
 TAGS_TRIGGER: Final = ["1gts", "1hairy", "1legs", "1fbb", "1busty"]
 
 class AIDBGradioApp:
