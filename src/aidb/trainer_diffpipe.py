@@ -143,6 +143,7 @@ class Trainer:
         self._file_llm = hf_hub_download(repo_id=self._hfdl_llm_wan[0], filename=self._hfdl_llm_wan[1], cache_dir=self.FOLDER_MODELS)
         #self._file_vae = hf_hub_download(repo_id=self._hfdl_vae_flux[0], filename=self._hfdl_vae_flux[1], cache_dir=self.FOLDER_MODELS)
         self._file_vae = None
+        # TODO: huggingface-cli download Wan-AI/Wan2.1-T2V-14B --local-dir /workspace/train/models/Wan2.1-T2V-14B --exclude "diffusion_pytorch_model*" "models_t5*"
 
     
     def _make_dataset(self) -> None:
@@ -274,6 +275,7 @@ num_repeats = 1
         str_file = f"""
 # Output path for training runs. Each training run makes a new directory in here.
 output_dir = '{self.FOLDER_OUTPUT}'
+dataset = '{self.FILE_CONFIG_DATASET}'
 
 # training settings
 
@@ -368,9 +370,9 @@ video_clip_mode = 'single_beginning'
 [model]
 type = 'wan'
 #ckpt_path = '/data2/imagegen_models/Wan2.1-T2V-1.3B'
-ckpt_path = '{self._file_ckpt}'
+ckpt_path = '/workspace/train/models/Wan2.1-T2V-14B'
 #transformer_path = '/data2/imagegen_models/wan_comfyui/wan2.1_t2v_1.3B_bf16.safetensors'
-#transformer_path = '{self._file_transformer}'
+transformer_path = '{self._file_ckpt}'
 #llm_path = '/data2/imagegen_models/wan_comfyui/wrapper/umt5-xxl-enc-bf16.safetensors'
 llm_path = '{self._file_llm}'
 dtype = 'bfloat16'

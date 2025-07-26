@@ -384,8 +384,8 @@ class ModelInstComfyUi:
             # checkpoint
             # 1gts
             ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
-            ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan14BT2VFusionX-Q8_0.gguf", ""),
-            ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_VACE-Q8_0.gguf", ""),
+            #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan14BT2VFusionX-Q8_0.gguf", ""),
+            #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_VACE-Q8_0.gguf", ""),
 
             # VAE
             ModelInst(t, ModelType.VAE, hf2, "Aitrepreneur/FLX", "wan_2.1_vae.safetensors", ""),
@@ -405,6 +405,17 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/kijai", "ComfyUI-KJNodes", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/cubiq", "ComfyUI_essentials", ""),
+            #git clone https://github.com/ltdrdata/ComfyUI-Manager.git
+            #git clone https://github.com/Fannovel16/comfyui_controlnet_aux
+            #git clone https://github.com/city96/ComfyUI-GGUF
+            #git clone https://github.com/rgthree/rgthree-comfy
+            #git clone https://github.com/yolain/ComfyUI-Easy-Use
+            #git clone https://github.com/kijai/ComfyUI-KJNodes
+            #git clone https://github.com/ssitu/ComfyUI_UltimateSDUpscale
+            #git clone https://github.com/cubiq/ComfyUI_essentials
+            #git clone https://github.com/Zehong-Ma/ComfyUI-MagCache
+            #git clone https://github.com/wallish77/wlsh_nodes
+            #git clone https://github.com/vrgamegirl19/comfyui-vrgamedevgirl
         ]
 
         model_db = {
