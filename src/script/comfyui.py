@@ -384,6 +384,7 @@ class ModelInstComfyUi:
             # checkpoint
             # 1gts
             ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
+            ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy", "Wan2_1-I2V-14B-720P_fp8_e5m2.safetensors", ""),
             #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan14BT2VFusionX-Q8_0.gguf", ""),
             #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_VACE-Q8_0.gguf", ""),
 
