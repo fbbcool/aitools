@@ -392,6 +392,9 @@ class ModelInstComfyUi:
 
             # clip
             ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
+
+            #clip vision
+            ModelInst(t, ModelType.ClipVision, hf2, "Kijai/WanVideo_comfy", "open-clip-xlm-roberta-large-vit-huge-14_visual_fp16", ""),
             
             # lora
             ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
