@@ -402,6 +402,8 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
         
+            #https://huggingface.co/camenduru/stmfnet/resolve/main/stmfnet.pth?download=true
+            ModelInst(t, ModelType.CustomNode, hf2, "camenduru/stmfnet", "stmfnet.pth", ""),
             # custom nodes
             #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/city96", "ComfyUI-GGUF", ""),
