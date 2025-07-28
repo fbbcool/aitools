@@ -381,30 +381,50 @@ class ModelInstComfyUi:
         ]
         t = TargetType.Comfy
         models_current: list[ModelInst] = [
+            # MVP first
             # checkpoint
-            # 1gts
             ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
+            # VAE
+            ModelInst(t, ModelType.VAE, hf2, "Aitrepreneur/FLX", "wan_2.1_vae.safetensors", ""),
+            # clip
+            ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
+            # lora
+            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_mid.safetensors", ""),
+            # custom nodes
+            #https://huggingface.co/camenduru/stmfnet/resolve/main/stmfnet.pth?download=true
+            ModelInst(t, ModelType.CustomNode, hf2, "camenduru/stmfnet", "stmfnet.pth", ""),
+
+            # checkpoint
+            #ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
             #ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy", "Wan2_1-I2V-14B-720P_fp8_e5m2.safetensors", ""),
             #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan14BT2VFusionX-Q8_0.gguf", ""),
             #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_VACE-Q8_0.gguf", ""),
 
             # VAE
-            ModelInst(t, ModelType.VAE, hf2, "Aitrepreneur/FLX", "wan_2.1_vae.safetensors", ""),
+            #ModelInst(t, ModelType.VAE, hf2, "Aitrepreneur/FLX", "wan_2.1_vae.safetensors", ""),
 
             # clip
-            ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
+            #ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
             #ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
 
             #clip vision
             #ModelInst(t, ModelType.ClipVision, hf2, "Kijai/WanVideo_comfy", "open-clip-xlm-roberta-large-vit-huge-14_visual_fp16.safetensors", ""),
             
             # lora
-            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_cum.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_deepthroat.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_SmokeMonday.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_Sophie.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_dreamjob.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "SECRET_SAUCE_WAN2.1_14B_fp8.safetensors", ""),
         
+            # custom nodes
             #https://huggingface.co/camenduru/stmfnet/resolve/main/stmfnet.pth?download=true
             ModelInst(t, ModelType.CustomNode, hf2, "camenduru/stmfnet", "stmfnet.pth", ""),
-            # custom nodes
             #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/city96", "ComfyUI-GGUF", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/rgthree", "rgthree-comfy", ""),
