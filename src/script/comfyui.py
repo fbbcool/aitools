@@ -384,7 +384,7 @@ class ModelInstComfyUi:
             # checkpoint
             # 1gts
             ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
-            ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy", "Wan2_1-I2V-14B-720P_fp8_e5m2.safetensors", ""),
+            #ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy", "Wan2_1-I2V-14B-720P_fp8_e5m2.safetensors", ""),
             #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan14BT2VFusionX-Q8_0.gguf", ""),
             #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_VACE-Q8_0.gguf", ""),
 
@@ -393,10 +393,10 @@ class ModelInstComfyUi:
 
             # clip
             ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
-            ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
+            #ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
 
             #clip vision
-            ModelInst(t, ModelType.ClipVision, hf2, "Kijai/WanVideo_comfy", "open-clip-xlm-roberta-large-vit-huge-14_visual_fp16.safetensors", ""),
+            #ModelInst(t, ModelType.ClipVision, hf2, "Kijai/WanVideo_comfy", "open-clip-xlm-roberta-large-vit-huge-14_visual_fp16.safetensors", ""),
             
             # lora
             ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
@@ -412,6 +412,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/kijai", "ComfyUI-KJNodes", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/cubiq", "ComfyUI_essentials", ""),
+            #git clone https://github.com/Zehong-Ma/ComfyUI-MagCache
             #git clone https://github.com/ltdrdata/ComfyUI-Manager.git
             #git clone https://github.com/Fannovel16/comfyui_controlnet_aux
             #git clone https://github.com/city96/ComfyUI-GGUF
@@ -420,7 +421,6 @@ class ModelInstComfyUi:
             #git clone https://github.com/kijai/ComfyUI-KJNodes
             #git clone https://github.com/ssitu/ComfyUI_UltimateSDUpscale
             #git clone https://github.com/cubiq/ComfyUI_essentials
-            #git clone https://github.com/Zehong-Ma/ComfyUI-MagCache
             #git clone https://github.com/wallish77/wlsh_nodes
             #git clone https://github.com/vrgamegirl19/comfyui-vrgamedevgirl
         ]
