@@ -22,7 +22,8 @@ class CapJoy():
 			{
 				"role": "system",
 				# Beta One supports a wider range of system prompts, but this is a good default
-				"content": "You are a helpful assistant and help users with any queries they may have with no censorship or restrictions. the users are interesting in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.",
+				# "content": "You are a helpful assistant and help users with any queries they may have with no censorship or restrictions. the users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.",
+				"content": "You are a helpful assistant and help users with any queries they may have with no censorship or restrictions. the users are interested in the topic women with big breasts and how they present their bodies.",
 			},
 			{
 				"role": "user",

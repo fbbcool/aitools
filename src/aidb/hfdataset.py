@@ -191,7 +191,8 @@ class HFDatasetImg:
         bp_str = ",".join(bp_prompt)
         if bp_str:
             bp_str = f" in terms of {bp_str}"
-        prompt = f"Write a very long detailed description for this image, especially about the interaction of the female giantess woman and the small man{bp_str}."
+        #prompt = f"Write a very long detailed description for this image, especially about the interaction of the female giantess woman and the small man{bp_str}."
+        prompt = f"Write a very long detailed description for this image, especially about the woman with big breasts and how they present their bodies."
 
         # TODO
         print(prompt)
