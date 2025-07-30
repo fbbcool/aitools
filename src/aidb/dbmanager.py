@@ -29,6 +29,7 @@ class DBManager:
             port: int = 27017,
             db_name: str = 'metadata_db',
             hfd_repo_id: str = "fbbcool/gts01_r35",
+            collection: str = "images",
             ) -> None:
         """
         Initializes the MongoDB connection. Configuration can be loaded from a YAML file.
@@ -48,6 +49,7 @@ class DBManager:
         self._host: str = host
         self._port: int = port
         self._db_name: str = db_name
+        self._collection: str = collection
 
         # Hf dataset
         self._hfd_repo_id = hfd_repo_id
@@ -75,6 +77,7 @@ class DBManager:
             self.client.admin.command('ismaster')
             self.db = self.client[self._db_name]
             print(f"Successfully connected to MongoDB at {self._host}:{self._port}, database: {self._db_name}")
+            print(f"Using collection {self._collection}")
             
         except ConnectionFailure as e:
             print(f"Could not connect to MongoDB: {e}")
@@ -137,6 +140,8 @@ class DBManager:
                         self._port = mongo_settings["port"]
                     if "db_name" in mongo_settings and isinstance(mongo_settings["db_name"], str):
                         self._db_name = mongo_settings["db_name"]
+                    if "collection" in mongo_settings and isinstance(mongo_settings["collection"], str):
+                        self._collection = mongo_settings["collection"]
                     print(f"MongoDB connection configuration loaded from '{config_file}'.")
                 else:
                     print(f"Warning: 'mongodb_settings' section not found or malformed in '{config_file}'. Using constructor/default MongoDB settings.")
@@ -180,7 +185,7 @@ class DBManager:
             print("Database not connected. Cannot retrieve image IDs.")
             return
 
-        image_docs = self.find_documents('images', query={}, projection={'_id': 1}) # Only fetch _id
+        image_docs = self.find_documents(self._collection, query={}, projection={'_id': 1}) # Only fetch _id
         for doc in image_docs:
             yield str(doc['_id'])
 
@@ -194,7 +199,7 @@ class DBManager:
 
         from aidb.image import Image # Import here to avoid circular dependency
 
-        image_docs = self.find_documents('images')
+        image_docs = self.find_documents(self._collection)
         for doc in image_docs:
             # Ensure _id is converted to string for Image object initialization
             yield Image(self, str(doc['_id']), doc=doc)
@@ -491,7 +496,7 @@ class DBManager:
                 "statistics": {},
                 "train_image_url": ""
             }
-            return self.insert_document('images', image_metadata)
+            return self.insert_document(self._collection, image_metadata)
         else:
             print(f"Skipping non-image file: {full_image_path_obj.name}")
             return None
@@ -620,11 +625,11 @@ class DBManager:
             print(f"Invalid image_id format: {image_id}")
             return None
 
-        return self.update_document('images', {"_id": object_id}, {"$set": update_fields})
+        return self.update_document(self._collection, {"_id": object_id}, {"$set": update_fields})
     
     def img_add_field(self, img_id: str, fieldname: str, value: Any = {}, force=False):
         """Adds a new data field to the image document. If the field already exists, the force option is taken into account."""
-        collection = self._get_collection('images')
+        collection = self._get_collection(self._collection)
         if collection is not None:
             try:
                 # Check if the field already exists

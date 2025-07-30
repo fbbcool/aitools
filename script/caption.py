@@ -2,7 +2,8 @@ from aidb.caption_joy import CapJoy
 from aidb.hfdataset import HFDatasetImg
 
 caper = CapJoy(configure_ai=True)
-hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
+#hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
+hfd = HFDatasetImg(repo_id="fbbcool/1woman_lara01")
 
 n = len(hfd)
 error = 0

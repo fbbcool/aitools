@@ -56,7 +56,7 @@ class Statistics:
         else:
             # Retrieve all image documents if no specific list is provided
             print("No specific images provided, fetching all images from database.")
-            image_docs = self._db_manager.find_documents('images')
+            image_docs = self._db_manager.find_documents(self._db_manager._collection)
             if not image_docs:
                 print("No image documents found in the database.")
                 return {}
@@ -147,7 +147,7 @@ class Statistics:
     @property
     def img_rand(self) -> Image:
         """picks a random existing image from the db."""
-        image_docs = self._db_manager.find_documents('images')
+        image_docs = self._db_manager.find_documents(self._db_manager._collection)
         if not image_docs:
             raise ValueError("No images found in the database.")
         
@@ -184,7 +184,7 @@ class Statistics:
         distances: dict[str,float] = {}
         if not imgl:
             # If imgl is empty, use all images from the database
-            image_docs = self._db_manager.find_documents('images')
+            image_docs = self._db_manager.find_documents(self._db_manager._collection)
             if not image_docs:
                 return distances # No images in DB
             
@@ -285,7 +285,7 @@ class Statistics:
         
         # Update the image document in the database
         update_result = self._db_manager.update_document(
-            'images',
+            self._db_manager._collection,
             {"_id": ObjectId(img_obj.id)},
             {"$set": {"statistics": statistics}}
         )

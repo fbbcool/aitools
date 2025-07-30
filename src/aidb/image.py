@@ -58,7 +58,7 @@ class Image:
             return self._data
 
         # Fetch the image document from the database
-        image_doc = self._db_manager.find_documents('images', {"_id": ObjectId(self._image_id)})
+        image_doc = self._db_manager.find_documents(self._db_manager._collection, {"_id": ObjectId(self._image_id)})
 
         if not image_doc:
             print(f"Error: Image with ID '{self._image_id}' not found in the database.")

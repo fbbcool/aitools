@@ -56,7 +56,7 @@ class Query:
                 else:
                     processed_query[key] = value
 
-        image_docs = self._db_manager.find_documents('images', processed_query)
+        image_docs = self._db_manager.find_documents(self._db_manager._collection, processed_query)
         
         image_objects: List[Image] = []
         if image_docs:
@@ -104,7 +104,7 @@ class Query:
         print(f"Mongo query: {mongo_query}")
 
         # Execute the query to get image documents
-        image_docs = self._db_manager.find_documents('images', mongo_query)
+        image_docs = self._db_manager.find_documents(self._db_manager._collection, mongo_query)
 
         image_objects: List[Image] = []
         if not image_docs:
@@ -144,7 +144,7 @@ class Query:
             'rating': {'$gte': rating_min, '$lte': rating_max}
         }
 
-        image_docs = self._db_manager.find_documents('images', mongo_query)
+        image_docs = self._db_manager.find_documents(self._db_manager._collection, mongo_query)
 
         image_objects: List[Image] = []
         if not image_docs:
@@ -176,7 +176,7 @@ class Query:
             # Or use $in if any of the specified bodyparts is sufficient
             mongo_query['tags.custom.bodypart'] = {'$in': bodyparts}
         
-        image_docs = self._db_manager.find_documents('images', mongo_query)
+        image_docs = self._db_manager.find_documents(self._db_manager._collection, mongo_query)
 
         image_objects: List[Image] = []
         if not image_docs:
