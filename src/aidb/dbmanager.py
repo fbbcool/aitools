@@ -27,9 +27,9 @@ class DBManager:
             config_file: Optional[str] = None,
             host: str = 'localhost',
             port: int = 27017,
-            db_name: str = 'metadata_db',
-            hfd_repo_id: str = "fbbcool/gts01_r35",
-            collection: str = "images",
+            db_name: str = '',
+            hfd_repo_id: str = "",
+            collection: str = "",
             ) -> None:
         """
         Initializes the MongoDB connection. Configuration can be loaded from a YAML file.
@@ -167,6 +167,16 @@ class DBManager:
                     print(f"Train image configuration loaded from '{config_file}'.")
                 else:
                     print(f"Warning: 'train_image_settings' section not found or malformed in '{config_file}'. Using default train image settings.")
+                
+                # Load HF dataset
+                if "hf_settings" in config and isinstance(config["hf_settings"], dict):
+                    hf_settings = config["hf_settings"]
+                    if "repo_id_dataset" in hf_settings and isinstance(hf_settings["repo_id_dataset"], str):
+                        self._hfd_repo_id = hf_settings["repo_id_dataset"]
+                    print(f"Hugging Face Dataset configuration loaded as '{self._hfd_repo_id}'.")
+                else:
+                    print(f"Warning: 'hf_dataset_settings' section not found or malformed in '{config_file}'. Using default HF dataset settings.")
+                    
                     
 
             else:

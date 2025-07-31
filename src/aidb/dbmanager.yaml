@@ -5,6 +5,7 @@ mongodb_settings:
   host: "mongodb://mongo:mongo@n100"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
   port: 27017        # Or your MongoDB port
   db_name: "prod_ai" # Or your database name, e.g., "prod_ai"
+  #collection: "images"   # Or your collection name, e.g., "images"
   collection: "imgs_lara"   # Or your collection name, e.g., "images"
 
 # Thumbnail generation settings
@@ -28,5 +29,6 @@ train_image_settings:
   default_train_image_size: [1024, 1024]
 
 # Huggingface settings
-huggingface_settings:
-  repo_id_dataset: "fbbcool/1gts01_r35"
+hf_settings:
+  #repo_id_dataset: "fbbcool/1gts01_r35"
+  repo_id_dataset: "fbbcool/1woman_lara02"

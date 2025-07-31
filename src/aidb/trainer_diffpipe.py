@@ -143,6 +143,7 @@ class Trainer:
         self._file_llm = hf_hub_download(repo_id=self._hfdl_llm_wan[0], filename=self._hfdl_llm_wan[1], cache_dir=self.FOLDER_MODELS)
         #self._file_vae = hf_hub_download(repo_id=self._hfdl_vae_flux[0], filename=self._hfdl_vae_flux[1], cache_dir=self.FOLDER_MODELS)
         self._file_vae = None
+        print("DONT FORGET TO DO:\nhuggingface-cli download Wan-AI/Wan2.1-T2V-14B --local-dir /workspace/train/models/Wan2.1-T2V-14B --exclude \"diffusion_pytorch_model*\" \"models_t5*\"")
         # TODO: huggingface-cli download Wan-AI/Wan2.1-T2V-14B --local-dir /workspace/train/models/Wan2.1-T2V-14B --exclude "diffusion_pytorch_model*" "models_t5*"
 
     
@@ -425,9 +426,7 @@ eps = 1e-8
 
     def _make_file_train_script(self) -> None:
         str_file = f"""
-python train.py \\
-    --trust_cache \\
-    --config {self.FILE_CONFIG_DIFFPIPE}
+NCCL_P2P_DISABLE="1" NCCL_IB_DISABLE="1" deepspeed --num_gpus=1 train.py --deepspeed --config {self.FILE_CONFIG_DIFFPIPE}
 """ 
         # save train string to train script and chmod 777 it.
         with self.FILE_TRAIN_SCRIPT.open("w", encoding="utf-8") as f:
@@ -439,13 +438,25 @@ python train.py \\
     def make_config(cls, imgs: list[str]) -> None:
         """ takes a list of image ids and makes a default config file"""
         config: dict = {}
-        config["repo_id"] = "fbbcool/gts01_r35"
-        config["trigger"] = "1gts"
-        config["name"] = "gts"
+        
+        # 1gts
+        #config["repo_id"] = "fbbcool/gts01_r35"
+        #config["trigger"] = "1gts"
+        #config["name"] = "gts"
+        #config["netdim"] = 32
+        #config["batch_size"] = 1
+        #config["prompts"] = ["a muscular giantess female bride is towering in a bright wedding empty cathedral. she is wearing black sandal high heels. at her feet is her small groom."]
+        #config["model"] = {"hf": {"repo_id": cls.MODEL_REPO_ID_FLUX, "file": cls.MODEL_FILE_FLUX}, "cai": {"url": ""}}
+        #config["imgs"] = imgs
+
+        # 1woman
+        config["repo_id"] = "fbbcool/1woman_lara02"
+        config["trigger"] = "1woman"
+        config["name"] = "lara02"
         config["netdim"] = 32
         config["batch_size"] = 1
-        config["prompts"] = ["a muscular giantess female bride is towering in a bright wedding empty cathedral. she is wearing black sandal high heels. at her feet is her small groom."]
-        config["model"] = {"hf": {"repo_id": cls.MODEL_REPO_ID_FLUX, "file": cls.MODEL_FILE_FLUX}, "cai": {"url": ""}}
+        config["prompts"] = []
+        config["model"] = {"hf": {"repo_id": cls.MODEL_REPO_ID_WAN, "file": cls.MODEL_FILE_WAN}, "cai": {"url": ""}}
         config["imgs"] = imgs
 
         configfile = Path(f"./{Trainer.FILENAME_CONFIG}")
