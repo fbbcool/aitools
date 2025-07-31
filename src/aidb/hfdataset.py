@@ -26,11 +26,11 @@ map_bodypart: Final = {
 }
 
 class HFDatasetImg:
-    def __init__(self, repo_id: str, file_meta: str = "metadata.jsonl", force=False):
+    def __init__(self, repo_id: str, file_meta: str = "metadata.jsonl", force_meta_dl: bool = False):
         self.repo_id = repo_id
         self.file_meta = file_meta
         self._data = None
-        self._meta = self._load_meta(force_download=force)
+        self._meta = self._load_meta(force_download=force_meta_dl)
         self._img_files = ["train/" + line["file_name"] for line in self._meta]
         self._tags:list[dict] = [json.loads(line["tags"]) for line in self._meta]
         self._captions:list[str] = [line.get("caption_joy", "") for line in self._meta]
