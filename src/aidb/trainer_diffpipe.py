@@ -96,7 +96,7 @@ class Trainer:
 
         # load HF dataset
         repo_id = self._config["repo_id"]
-        self._hfd = HFDatasetImg(repo_id)
+        self._hfd = HFDatasetImg(repo_id, force=True)
         
         # make datatset folder
         if self.FOLDER_DATASET.exists():

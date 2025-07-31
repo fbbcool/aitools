@@ -26,19 +26,19 @@ map_bodypart: Final = {
 }
 
 class HFDatasetImg:
-    def __init__(self, repo_id: str, file_meta: str = "metadata.jsonl"):
+    def __init__(self, repo_id: str, file_meta: str = "metadata.jsonl", force=False):
         self.repo_id = repo_id
         self.file_meta = file_meta
         self._data = None
-        self._meta = self._load_meta()
+        self._meta = self._load_meta(force_download=force)
         self._img_files = ["train/" + line["file_name"] for line in self._meta]
         self._tags:list[dict] = [json.loads(line["tags"]) for line in self._meta]
         self._captions:list[str] = [line.get("caption_joy", "") for line in self._meta]
         self._ids: list[str] = [Path(file).stem for file in self.img_files]
 
-    def _load_meta(self):
+    def _load_meta(self, force_download:bool = False):
         try:
-            file_path = hf_hub_download(repo_id=self.repo_id, filename="train/"+self.file_meta, repo_type="dataset")
+            file_path = hf_hub_download(repo_id=self.repo_id, filename="train/"+self.file_meta, repo_type="dataset", force_download=force_download)
             if self.file_meta.endswith('.json'):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
