@@ -193,6 +193,9 @@ class HFDatasetImg:
             bp_str = f" in terms of {bp_str}"
         #prompt = f"Write a very long detailed description for this image, especially about the interaction of the female giantess woman and the small man{bp_str}."
         prompt = f"Write a very long detailed description for this image, especially about the woman with big breasts and how they present their bodies."
+        
+        # !!! PROPOSAL more universal !!!
+        #prompt = f"Write a very long detailed description for this image, especially wrt. the topics giantess and small man, femdom, giving handjob."
 
         # TODO
         print(prompt)
