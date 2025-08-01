@@ -420,6 +420,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_SmokeMonday.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_Sophie.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_dreamjob.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1dreamplay.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_boobphysics.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "SECRET_SAUCE_WAN2.1_14B_fp8.safetensors", ""),
         
