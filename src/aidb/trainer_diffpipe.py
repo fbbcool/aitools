@@ -164,8 +164,8 @@ class Trainer:
                 continue
 
             # TODO more generic, and take care that the dataset isnt polluted with trigger words
-            caption.replace("1gts", "")
-            caption.replace("1woman", "")
+            caption.replace("1gts,", "")
+            caption.replace("1woman,", "")
 
             caption = f"{self._trigger}," + caption
             
