@@ -543,7 +543,9 @@ class AIDBGradioApp:
             print(f"ERROR: Could not load PIL image file for image ID: {image_id}.")
             return "", json.dumps({"error": f"Could not load image file for ID: {image_id}."})
         
-        img_caption = img_obj.caption
+        img_caption = img_obj.meta_prompt
+        if img_caption is None:
+            img_caption = img_obj.caption
         if img_caption is None:
             img_caption = ""
 
