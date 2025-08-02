@@ -138,8 +138,8 @@ class Image:
         if not prompt:
             return None
         # TODO: more general
-        prompt.replace("1gts,", "")
-        prompt.replace("1woman,", "")
+        prompt = prompt.replace("1gts,", "")
+        prompt = prompt.replace("1woman,", "")
         return prompt
     
     def set_rating(self, rating: int) -> int:
