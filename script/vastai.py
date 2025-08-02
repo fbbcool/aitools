@@ -251,10 +251,10 @@ class ModelInst:
                 print(f"git clone hook: {self.url} -> {url_repos}")
                 url_account = self.url
                 name_repo = self.name
-                repo = Path(url_account) / name_repo
-                #self.git_clone(self.url, url_folder)
-                POST_HOOK.add_line(f"git clone {repo} {self.url_inst}")
-                file_requirements = Path(self.url_inst) / name_repo / "requirements.txt"
+                repo_ext = Path(url_account) / name_repo
+                repo_local = Path(self.url_inst) / name_repo
+                POST_HOOK.add_line(f"git clone {repo_ext} {repo_local}")
+                file_requirements = repo_local / "requirements.txt"
                 POST_HOOK.add_line(f"pip install -r {str(file_requirements)}")
         except Exception as e:
             print(f"sth went wrong:\n{e}")
