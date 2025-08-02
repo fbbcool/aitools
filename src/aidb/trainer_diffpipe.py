@@ -162,6 +162,11 @@ class Trainer:
                 lost += 1
                 print(f"{id}: caption missed!")
                 continue
+
+            # TODO more generic, and take care that the dataset isnt polluted with trigger words
+            caption.replace("1gts", "")
+            caption.replace("1woman", "")
+
             caption = f"{self._trigger}," + caption
             
             # img file
@@ -283,7 +288,7 @@ dataset = '{self.FILE_CONFIG_DATASET}'
 # training settings
 
 # I usually set this to a really high value because I don't know how long I want to train.
-epochs = 20
+epochs = 40
 # Batch size of a single forward/backward pass for one GPU.
 micro_batch_size_per_gpu = {self._batch_size}
 # For mixed video / image training, you can have a different batch size for images.
