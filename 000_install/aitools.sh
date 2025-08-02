@@ -17,7 +17,12 @@ ___hook () {
 }
 ___current () {
     python3 $ENV_HOME/script/vastai.py "current"
-    #___hook
+}
+
+___all () {
+    ___install
+    ___current
+    ___hook
 }
 
 ___sd15 () {
