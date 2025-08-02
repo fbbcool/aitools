@@ -19,7 +19,7 @@ class Trainer:
     FILE_CONFIG: Final = ROOT / FILENAME_CONFIG
     FOLDER_DATASET: Final = ROOT / "dataset"
     FOLDER_OUTPUT: Final = ROOT / "output"
-    FOLDER_MODELS: Final = ROOT / "models"
+    FOLDER_MODELS: Final = Path("/workspace/models")
     FILE_SAMPLE_PROMPTS: Final = ROOT / "sample_prompts.txt"
     FILE_CONFIG_DIFFPIPE: Final = ROOT / "diffpipe.toml"
     FILE_CONFIG_DATASET: Final = ROOT / "dataset.toml"
