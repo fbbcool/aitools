@@ -253,7 +253,7 @@ class ModelInst:
                 name_repo = self.name
                 repo_ext = Path(url_account) / name_repo
                 repo_local = Path(self.url_inst) / name_repo
-                POST_HOOK.add_line(f"git clone {repo_ext} {repo_local}")
+                POST_HOOK.add_line(f"git clone https://{repo_ext} {repo_local}")
                 file_requirements = repo_local / "requirements.txt"
                 POST_HOOK.add_line(f"if [ -x {str(file_requirements)} ]; then")
                 POST_HOOK.add_line(f"\tpip install -r {str(file_requirements)}")
@@ -436,17 +436,17 @@ class ModelInstComfyUi:
             # to comfyui-frame-interpolation/ckpts/stmfnet/
             ModelInst(t, ModelType.CustomNode, hf2, "camenduru/stmfnet", "stmfnet.pth", ""),
             #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/city96", "ComfyUI-GGUF", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/rgthree", "rgthree-comfy", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/yolain", "ComfyUI-Easy-Use", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/kijai", "ComfyUI-KJNodes", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/cubiq", "ComfyUI_essentials", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/Fannovel16", "ComfyUI-Frame-Interpolation", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/ltdrdata", "ComfyUI-Inspire-Pack", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
-            ModelInst(t, ModelType.CustomNode, git, "https://github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/city96", "ComfyUI-GGUF", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/rgthree", "rgthree-comfy", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/yolain", "ComfyUI-Easy-Use", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-KJNodes", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/cubiq", "ComfyUI_essentials", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/Fannovel16", "ComfyUI-Frame-Interpolation", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/ltdrdata", "ComfyUI-Inspire-Pack", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
             #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
             #git clone https://github.com/Fannovel16/comfyui_controlnet_aux
             #git clone https://github.com/wallish77/wlsh_nodes
