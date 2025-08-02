@@ -443,6 +443,11 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/cubiq", "ComfyUI_essentials", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/Fannovel16", "ComfyUI-Frame-Interpolation", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/ltdrdata", "ComfyUI-Inspire-Pack", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
             #git clone https://github.com/Fannovel16/comfyui_controlnet_aux
             #git clone https://github.com/wallish77/wlsh_nodes
             #git clone https://github.com/vrgamegirl19/comfyui-vrgamedevgirl
