@@ -10,7 +10,7 @@ error = 0
 for idx in range(n):
     print(f"{idx}:\n")
     try:
-        if hfd.captions[idx]:
+        if hfd.captions_joy[idx]:
             print("already captionized.")
             continue
         img = hfd.pil(idx)

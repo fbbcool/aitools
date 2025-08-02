@@ -33,7 +33,15 @@ class HFDatasetImg:
         self._meta = self._load_meta(force_download=force_meta_dl)
         self._img_files = ["train/" + line["file_name"] for line in self._meta]
         self._tags:list[dict] = [json.loads(line["tags"]) for line in self._meta]
-        self._captions:list[str] = [line.get("caption_joy", "") for line in self._meta]
+        
+        self._captions:list[str] = [line.get("caption", "") for line in self._meta]
+        self._captions_joy:list[str] = [line.get("caption_joy", "") for line in self._meta]
+        for idx, caption in enumerate(self._captions):
+            if not caption:
+                capjoy = self._captions_joy[idx]
+                if capjoy:
+                    self._captions[idx] = capjoy
+        
         self._ids: list[str] = [Path(file).stem for file in self.img_files]
 
     def _load_meta(self, force_download:bool = False):
@@ -76,6 +84,9 @@ class HFDatasetImg:
     @property
     def captions(self) -> list[str]:
         return self._captions
+    @property
+    def captions_joy(self) -> list[str]:
+        return self._captions_joy
     
     @property
     def data(self):
@@ -118,6 +129,20 @@ class HFDatasetImg:
         
         self._tags[idx] |= tags_extend
 
+    def img_set_caption(self, idx: int, caption: str):
+        if not isinstance(idx, int):
+            raise ValueError("Index not an integer!")
+        # check idx vs. size
+        if idx < 0:
+            raise IndexError("Index out of bounds for tags list.")
+        if idx >= len(self):
+            raise IndexError("Index out of bounds for tags list.")
+
+        if not isinstance(caption, str):
+            raise ValueError("Caption not a String!")
+        
+        self._meta[idx] |= {"caption": caption}
+    
     def img_set_caption_joy(self, idx: int, caption: str):
         if not isinstance(idx, int):
             raise ValueError("Index not an integer!")

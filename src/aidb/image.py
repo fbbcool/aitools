@@ -40,8 +40,7 @@ class Image:
         self.score = 0.0
         self.contributing_tags = []
         self.operation : Literal['nop','rate','scene'] = 'nop'
-        self._caption : str | None = None
-        self._caption_hfd : str | None = None
+        self._caption: str | None = None
         
 
     @property
@@ -90,17 +89,55 @@ class Image:
     @property
     def caption(self) -> str | None:
         if self._caption is None:
-            if self._caption_hfd is None:
-                _hfd = self._db_manager.hfd
-                idx = _hfd.id2idx(self.id)
-                if idx is not None:
-                    self._caption_hfd = _hfd.captions[_hfd.id2idx(self.id)]
-            if self._caption_hfd is None:
-                self._caption_hfd = ""
-
-            self._caption = self._caption_hfd
-
+            caption_new = self._hfd_caption
+            if caption_new is None:
+                self._caption = ""
+            else:
+                self._caption = caption_new
+        
+        # always return None, regardless of None or empty.
+        if not self._caption:
+            return None
         return self._caption
+    
+    @property
+    def _hfd_caption_joy(self) -> str | None:
+        _hfd = self._db_manager.hfd
+        idx = _hfd.id2idx(self.id)
+        if idx is not None:
+            return _hfd.captions_joy[_hfd.id2idx(self.id)]
+        return None
+
+    @property
+    def _hfd_caption(self) -> str | None:
+        _hfd = self._db_manager.hfd
+        idx = _hfd.id2idx(self.id)
+        if idx is not None:
+            return _hfd.captions[_hfd.id2idx(self.id)]
+        return None
+    
+    @property
+    def meta_prompt(self) -> str | None:
+        prompt = None
+        try:
+            pil = self.pil 
+            pil.load() # necessary after .open() for metadata!
+            data  = json.loads(pil.info["prompt"])
+            ksampler = {}
+            for id in data:
+                if data[id]["class_type"] == "KSampler":
+                    ksampler = data[id]
+                    break
+            id_pos = ksampler["inputs"]["positive"][0]
+            node_pos = data[id_pos]
+            prompt = node_pos["inputs"]["text"]
+        except Exception as e:
+                return None
+
+        # always return None, regardless of None or empty.
+        if not prompt:
+            prompt = None
+        return prompt
     
     def set_rating(self, rating: int) -> int:
         """Sets the rating of the image."""
@@ -715,30 +752,12 @@ class Image:
             print(f"Error copying training image for {self.id}: {e}")
             return
             
-
-        # TODO: this is specific to 1penis!
-        #caption_tags = ["1penis", "a giantess woman and a naked small man with a 1penis"]
-        # TODO: this is specific to 1gts!
-        caption_tags = [trigger, "a woman and a man are interacting with each other in an intimate private way."]
-        caption_tags += self.tags_prompt(trigger=trigger)
-        
-        # make 1 string
-        if caption_tags:
-            caption_string = ", ".join(caption_tags)
-
-        # 2. Create caption file
-        if export_cap_files:
-            caption_export_path = text_path / f"{self.id}.txt"
-            try:
-                with open(caption_export_path, "w", encoding="utf-8") as f:
-                    f.write(caption_string)
-                print(f"Exported tags to {caption_export_path}")
-            except Exception as e:
-                print(f"Error exporting tags for {self.id}: {e}")
-
         # 3. or expand metadata.jsonl
         #line_json = {"file_name": "images/" + train_image_destination_path.name, "text": caption_string, "tags": json.dumps(self.tags)}
-        line_json = {"file_name": "images/" + train_image_destination_path.name, "tags": json.dumps(self.tags)}
+        prompt = self.meta_prompt
+        caption = self.caption
+        capjoy = self._hfd_caption_joy
+        line_json = {"file_name": "images/" + train_image_destination_path.name, "tags": json.dumps(self.tags), "prompt": prompt, "caption": caption, "caption_joy": capjoy}
         # add line to extisting "metadata.jsonl" or create file if not exist
         metadata_file_path = train_path / "metadata.jsonl"
         try:

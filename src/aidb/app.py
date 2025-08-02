@@ -682,7 +682,7 @@ class AIDBGradioApp:
 # Example Usage (for testing purposes, typically in a separate script or main application file)
 if __name__ == "__main__":
     # Initialize DBManager (assuming MongoDB is running)
-    db_manager_instance = DBManager(config_file='/Volumes/data/Project/AI/REPOS/aitools/src/aidb/dbmanager.yaml')
+    db_manager_instance = DBManager(config_file='/Volumes/data/Project/AI/REPOS/aitools/src/aidb/dbmanager.yaml', hfd_refresh=True)
 
     # Create and launch the Gradio app
     if db_manager_instance.db is not None: # Only proceed if DBManager connected successfully

@@ -28,8 +28,9 @@ class DBManager:
             host: str = 'localhost',
             port: int = 27017,
             db_name: str = '',
-            hfd_repo_id: str = "",
             collection: str = "",
+            hfd_repo_id: str = "",
+            hfd_refresh: bool = False,
             ) -> None:
         """
         Initializes the MongoDB connection. Configuration can be loaded from a YAML file.
@@ -89,7 +90,7 @@ class DBManager:
             self.db = None
 
         try:
-            self._hfd = HFDatasetImg(self._hfd_repo_id)
+            self._hfd = HFDatasetImg(self._hfd_repo_id, force_meta_dl=hfd_refresh)
         except Exception as e:
             print(f"Failed connecting to HF dataset: {self._hfd_repo_id}\n{e}")
             self._hfd = None
