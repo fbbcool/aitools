@@ -253,10 +253,9 @@ class ModelInst:
                 name_repo = self.name
                 repo = Path(url_account) / name_repo
                 #self.git_clone(self.url, url_folder)
-                POST_HOOK.add_line(f"git clone {self.url} {self.url_inst}")
+                POST_HOOK.add_line(f"git clone {repo} {self.url_inst}")
                 file_requirements = Path(self.url_inst) / name_repo / "requirements.txt"
-                if file_requirements.exists():
-                    POST_HOOK.add_line(f"pip install -r {str(file_requirements)}")
+                POST_HOOK.add_line(f"pip install -r {str(file_requirements)}")
         except Exception as e:
             print(f"sth went wrong:\n{e}")
 
