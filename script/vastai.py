@@ -255,7 +255,9 @@ class ModelInst:
                 repo_local = Path(self.url_inst) / name_repo
                 POST_HOOK.add_line(f"git clone {repo_ext} {repo_local}")
                 file_requirements = repo_local / "requirements.txt"
-                POST_HOOK.add_line(f"pip install -r {str(file_requirements)}")
+                POST_HOOK.add_line(f"if [ -x {str(file_requirements)} ]; then")
+                POST_HOOK.add_line(f"\tpip install -r {str(file_requirements)}")
+                POST_HOOK.add_line("fi")
         except Exception as e:
             print(f"sth went wrong:\n{e}")
 
@@ -440,15 +442,8 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/kijai", "ComfyUI-KJNodes", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
             ModelInst(t, ModelType.CustomNode, git, "https://github.com/cubiq", "ComfyUI_essentials", ""),
-            #git clone https://github.com/Zehong-Ma/ComfyUI-MagCache
-            #git clone https://github.com/ltdrdata/ComfyUI-Manager.git
+            ModelInst(t, ModelType.CustomNode, git, "https://github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
             #git clone https://github.com/Fannovel16/comfyui_controlnet_aux
-            #git clone https://github.com/city96/ComfyUI-GGUF
-            #git clone https://github.com/rgthree/rgthree-comfy
-            #git clone https://github.com/yolain/ComfyUI-Easy-Use
-            #git clone https://github.com/kijai/ComfyUI-KJNodes
-            #git clone https://github.com/ssitu/ComfyUI_UltimateSDUpscale
-            #git clone https://github.com/cubiq/ComfyUI_essentials
             #git clone https://github.com/wallish77/wlsh_nodes
             #git clone https://github.com/vrgamegirl19/comfyui-vrgamedevgirl
         ]
