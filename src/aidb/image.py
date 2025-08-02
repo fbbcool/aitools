@@ -1,5 +1,5 @@
 import json
-import pathlib
+from pathlib import Path
 from typing import List, Dict, Literal, Optional, Union, Any, Tuple
 from bson.objectid import ObjectId
 from PIL import Image as PILImage
@@ -142,7 +142,7 @@ class Image:
             print(f"Warning: Cannot generate tags for image {self._image_id} as PIL image could not be loaded.")
             return {}
 
-    def get_full_path(self) -> Optional[pathlib.Path]:
+    def get_full_path(self) -> Optional[Path]:
         """
         Retrieves the full local file system path of the image.
 
@@ -166,8 +166,8 @@ class Image:
             return None
 
         try:
-            base_path = pathlib.Path(container_local_path_str)
-            relative_path = pathlib.Path(relative_url_str)
+            base_path = Path(container_local_path_str)
+            relative_path = Path(relative_url_str)
             full_path = base_path / relative_path
             return full_path
         except Exception as e:
@@ -192,8 +192,12 @@ class Image:
             return None
 
         if not full_path.exists():
-            print(f"Error: Image file not found at '{full_path}' for image ID '{self._image_id}'.")
-            return None
+            print(f"Warning: Image file not found at '{full_path}' for image ID '{self._image_id}'.")
+            if Path(self.url_train_image).exists():
+                print(f"Ok, using train image instead for image ID '{self._image_id}'.")
+                full_path = self.url_train_image
+            else:
+                return None
 
         try:
             pil_image = PILImage.open(full_path)
@@ -229,7 +233,7 @@ class Image:
 
         # 1. Check if thumbnail URL exists and file exists on disk
         if thumbnail_url_str:
-            thumbnail_path = pathlib.Path(thumbnail_url_str)
+            thumbnail_path = Path(thumbnail_url_str)
             if thumbnail_path.exists():
                 try:
                     thumb_pil_image = PILImage.open(thumbnail_path)
@@ -278,7 +282,7 @@ class Image:
 
         # 1. Check if training image URL exists and file exists on disk
         if train_image_url_str:
-            train_image_path = pathlib.Path(train_image_url_str)
+            train_image_path = Path(train_image_url_str)
             if train_image_path.exists():
                 try:
                     train_pil_image = PILImage.open(train_image_path)
@@ -371,9 +375,9 @@ class Image:
         return Image(self._db_manager, iid)
 
     def save_png_image(self, 
-                       output_path: Union[str, pathlib.Path], 
+                       output_path: Union[str, Path], 
                        compression: int = 6, 
-                       size: Optional[Tuple[int, int]] = None) -> Optional[pathlib.Path]:
+                       size: Optional[Tuple[int, int]] = None) -> Optional[Path]:
         """
         Saves the image as a PNG file to the specified output path.
         The filename will be the image's MongoDB _id with a .png extension.
@@ -394,7 +398,7 @@ class Image:
             print(f"Failed to get PIL image for saving PNG for ID '{self._image_id}'.")
             return None
 
-        output_dir_path = pathlib.Path(output_path)
+        output_dir_path = Path(output_path)
         output_dir_path.mkdir(parents=True, exist_ok=True) # Ensure output directory exists
 
         output_filename = f"{self._image_id}.png"
@@ -424,7 +428,7 @@ class Image:
             return None
 
     def save_thumbnail_and_update_db(self, 
-                                     output_directory: Union[str, pathlib.Path], 
+                                     output_directory: Union[str, Path], 
                                      thumbnail_size: Tuple[int, int] = (128, 128)
                                     ) -> Optional[str]:
         """
@@ -447,7 +451,7 @@ class Image:
             print(f"Failed to get PIL image for thumbnail generation for ID '{self._image_id}'.")
             return None
 
-        output_dir_path = pathlib.Path(output_directory)
+        output_dir_path = Path(output_directory)
         output_dir_path.mkdir(parents=True, exist_ok=True) # Ensure output directory exists
 
         thumbnail_filename = f"{self._image_id}_thumb.png"
@@ -483,7 +487,7 @@ class Image:
             return None
 
     def save_train_image_and_update_db(self, 
-                                     output_directory: Union[str, pathlib.Path], 
+                                     output_directory: Union[str, Path], 
                                      train_image_size: Tuple[int, int] = (128, 128)
                                     ) -> Optional[str]:
         """
@@ -495,7 +499,7 @@ class Image:
             print(f"Failed to get PIL image for thumbnail generation for ID '{self._image_id}'.")
             return None
 
-        output_dir_path = pathlib.Path(output_directory)
+        output_dir_path = Path(output_directory)
         output_dir_path.mkdir(parents=True, exist_ok=True) # Ensure output directory exists
 
         train_img_filename = f"{self._image_id}_1024.png"
@@ -680,7 +684,7 @@ class Image:
         1. copy the training image from the url to_folder/image_id.png
         2. create a to_folder/image_id.tags file with comma seperated prompt tags as on string
         """
-        export_path = pathlib.Path(to_folder)
+        export_path =Path(to_folder)
         export_path.mkdir(parents=True, exist_ok=True)
         train_path = export_path / "train"
         train_path.mkdir(parents=True, exist_ok=True)
@@ -697,7 +701,7 @@ class Image:
             print(f"No training image URL found for image {self.id}. Aborting export.")
             return
 
-        train_image_source_path = pathlib.Path(train_image_path_str)
+        train_image_source_path = Path(train_image_path_str)
         if not train_image_source_path.exists():
             print(f"Training image file not found at {train_image_source_path} for image {self.id}. Aborting export.")
             return

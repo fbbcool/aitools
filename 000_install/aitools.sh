@@ -1,25 +1,23 @@
 export ENV_REPOS='https://github.com/fbbcool/aitools.git'
-export ENV_PWD=`pwd`
-export ENV_HOME=$ENV_PWD/___aitools
+export ENV_WORKSPACE='/workspace'
+export ENV_HOME=$ENV_WORKSPACE/___aitools
+export ENV_POST_HOOK=$ENV_WORKSPACE/post_install_hook.sh
 export PYTHONPATH=$ENV_HOME/src
 
-___train() {
+___install() {
     rm -rf $ENV_HOME
     git clone $ENV_REPOS $ENV_HOME
-    source $ENV_HOME/env_aitools/env_train.sh
-    env_inst
+    pip install -r $ENV_HOME/requirements.txt
+    #pip install -r $ENV_HOME/requirements_remote.txt
 }
-___gen () {
-    rm -rf $ENV_HOME
-    git clone $ENV_REPOS $ENV_HOME
-    source $ENV_HOME/env_aitools/env_gen.sh
-    env_inst
+zzzenv_post_install_hook () {
+    if [ -x $ENV_POST_HOOK ]; then
+        $ENV_POST_HOOK
+    fi
 }
-___comfy () {
-    rm -rf $ENV_HOME
-    git clone $ENV_REPOS $ENV_HOME
-    source $ENV_HOME/env_aitools/env_comfy.sh
-    env_inst
+___current () {
+    zzzenv_post_install_hook
+    python3 $ENV_HOME/script/vastai.py "current"
 }
 
 ___sd15 () {
@@ -36,7 +34,6 @@ ___sdall () {
     git -C $ENV_HOME pull
     comfyui_sdall
 }
-
 
 ___flux () {
     git -C $ENV_HOME pull
@@ -67,9 +64,3 @@ ___kohyass_sdxl () {
     git -C $ENV_HOME pull
     comfyui_kohyass_sdxl
 }
-
-___current () {
-    git -C $ENV_HOME pull
-    comfyui_current
-}
-
