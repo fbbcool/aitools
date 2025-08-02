@@ -16,8 +16,8 @@ zzzenv_post_install_hook () {
     fi
 }
 ___current () {
-    zzzenv_post_install_hook
     python3 $ENV_HOME/script/vastai.py "current"
+    zzzenv_post_install_hook
 }
 
 ___sd15 () {
