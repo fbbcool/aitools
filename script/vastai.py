@@ -210,7 +210,7 @@ class ModelInst:
     
     @property
     def install(self, force: bool = False) -> None:
-        url_folder = self.url_models
+        url_folder = self.url_inst
         url_repos = f"{url_folder}/{self.name}"
         url_model = url_repos
         if self.ext:
@@ -248,14 +248,20 @@ class ModelInst:
                 #gdown.download(id = self.url, output = url_model)
 
             if self.method == DownloadMethod.Git:
-                print(f"git clone: {self.url} -> {url_repos}")
-                print("currently not implemented!")
+                print(f"git clone hook: {self.url} -> {url_repos}")
+                url_account = self.url
+                name_repo = self.name
+                repo = Path(url_account) / name_repo
                 #self.git_clone(self.url, url_folder)
-        except:
-            print(f"sth went wrong!")
+                POST_HOOK.add_line(f"git clone {self.url} {self.url_inst}")
+                file_requirements = Path(self.url_inst) / name_repo / "requirements.txt"
+                if file_requirements.exists():
+                    POST_HOOK.add_line(f"pip install -r {str(file_requirements)}")
+        except Exception as e:
+            print(f"sth went wrong:\n{e}")
 
     @property
-    def url_models(self) -> str:
+    def url_inst(self) -> str:
         path_models = ""
         folder_model = ""
         if self.target == TargetType.Comfy:
@@ -480,7 +486,7 @@ def _hook_current():
     # print the name of this method
     #print(sys._getframe(0).f_code.co_name)
 
-    POST_HOOK.add_line("echo sepp is a depp")
+    POST_HOOK.add_line(f"git cl")
             
     print("\t!!!_hook_current!!!")
 

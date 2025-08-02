@@ -10,14 +10,14 @@ ___install() {
     pip install -r $ENV_HOME/requirements.txt
     #pip install -r $ENV_HOME/requirements_remote.txt
 }
-zzzenv_post_install_hook () {
+___hook () {
     if [ -x $ENV_POST_HOOK ]; then
         $ENV_POST_HOOK
     fi
 }
 ___current () {
     python3 $ENV_HOME/script/vastai.py "current"
-    zzzenv_post_install_hook
+    #___hook
 }
 
 ___sd15 () {
