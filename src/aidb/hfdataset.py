@@ -34,6 +34,8 @@ class HFDatasetImg:
         self._img_files = ["train/" + line["file_name"] for line in self._meta]
         self._tags:list[dict] = [json.loads(line["tags"]) for line in self._meta]
         
+        self._prompts:list[str] = [line.get("prompt", "") for line in self._meta]
+
         self._captions:list[str] = [line.get("caption", "") for line in self._meta]
         self._captions_joy:list[str] = [line.get("caption_joy", "") for line in self._meta]
         for idx, caption in enumerate(self._captions):
@@ -80,6 +82,10 @@ class HFDatasetImg:
     @property
     def tags(self) -> list[dict]:
         return self._tags
+    
+    @property
+    def prompts(self) -> list[str]:
+        return self._prompts
     
     @property
     def captions(self) -> list[str]:

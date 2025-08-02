@@ -154,8 +154,9 @@ class Trainer:
             if not idx:
                 continue
             
-            # caption fetch
-            caption = self._hfd.captions[idx]
+            # caption or prompt fetch
+            #caption = self._hfd.captions[idx]
+            caption = self._hfd.prompts[idx]
             if not caption:
                 caption = self._trigger
                 lost += 1
@@ -209,7 +210,8 @@ class Trainer:
 # as many times as the length of this list.
 # If you just want to use predetermined (width, height, frames) size buckets, see the example cosmos_dataset.toml
 # file for how you can do that.
-resolutions = [1024]
+#resolutions = [1024]
+resolutions = [768]
 
 # You can give resolutions as (width, height) pairs also. This doesn't do anything different, it's just
 # another way of specifying the area(s) (i.e. total number of pixels) you want to train on.
@@ -440,24 +442,24 @@ NCCL_P2P_DISABLE="1" NCCL_IB_DISABLE="1" deepspeed --num_gpus=1 train.py --deeps
         config: dict = {}
         
         # 1gts
-        #config["repo_id"] = "fbbcool/gts01_r35"
-        #config["trigger"] = "1gts"
-        #config["name"] = "gts"
-        #config["netdim"] = 32
-        #config["batch_size"] = 1
-        #config["prompts"] = ["a muscular giantess female bride is towering in a bright wedding empty cathedral. she is wearing black sandal high heels. at her feet is her small groom."]
-        #config["model"] = {"hf": {"repo_id": cls.MODEL_REPO_ID_FLUX, "file": cls.MODEL_FILE_FLUX}, "cai": {"url": ""}}
-        #config["imgs"] = imgs
-
-        # 1woman
-        config["repo_id"] = "fbbcool/1woman_lara02"
-        config["trigger"] = "1woman"
-        config["name"] = "lara02"
-        config["netdim"] = 32
-        config["batch_size"] = 1
+        config["repo_id"] = "fbbcool/1gts_wan01"
+        config["trigger"] = "1gts"
+        config["name"] = "1gts_wan01"
+        config["netdim"] = 48
+        config["batch_size"] = 2
         config["prompts"] = []
         config["model"] = {"hf": {"repo_id": cls.MODEL_REPO_ID_WAN, "file": cls.MODEL_FILE_WAN}, "cai": {"url": ""}}
         config["imgs"] = imgs
+
+        # 1woman
+        #config["repo_id"] = "fbbcool/1woman_lara02"
+        #config["trigger"] = "1woman"
+        #config["name"] = "lara02"
+        #config["netdim"] = 32
+        #config["batch_size"] = 1
+        #config["prompts"] = []
+        #config["model"] = {"hf": {"repo_id": cls.MODEL_REPO_ID_WAN, "file": cls.MODEL_FILE_WAN}, "cai": {"url": ""}}
+        #config["imgs"] = imgs
 
         configfile = Path(f"./{Trainer.FILENAME_CONFIG}")
 
