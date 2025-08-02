@@ -491,6 +491,10 @@ def _hook_current():
     #print(sys._getframe(0).f_code.co_name)
 
     POST_HOOK.add_line(f"# hook by current")
+    dir_fi_model = "/workspace/ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/stmfnet"
+    POST_HOOK.add_line(f"mkdir -p {dir_fi_model}")
+    POST_HOOK.add_line(f"cp /workspace/ComfyUI/custom_nodes/stmfnet.pth {dir_fi_model}")
+
             
     print("\t!!!_hook_current!!!")
 
