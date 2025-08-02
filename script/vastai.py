@@ -44,6 +44,7 @@ class ModelType(Enum):
     Clip = auto()
     IPAdapter = auto()
     CustomNode = auto()
+    Upscale = auto()
     VAE = auto()
     Unet = auto()
 
@@ -287,6 +288,8 @@ class ModelInst:
                 folder_model = "ipadapter"
             elif self.model == ModelType.Unet:
                 folder_model = "unet"
+            elif self.model == ModelType.Upscale:
+                folder_model = "upscale_models"
         if self.target == TargetType.Kohyass:
             path_models = "/workspace/kohya_ss/models"
             if self.model == ModelType.Checkpoint:
@@ -400,8 +403,10 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_mid.safetensors", ""),
+            # upscale
+            ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x2.pth", ""),
+            ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x4.pth", ""),
             # custom nodes
-            #https://huggingface.co/camenduru/stmfnet/resolve/main/stmfnet.pth?download=true
             ModelInst(t, ModelType.CustomNode, hf2, "camenduru/stmfnet", "stmfnet.pth", ""),
 
             # checkpoint
