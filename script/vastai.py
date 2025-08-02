@@ -485,7 +485,7 @@ def _hook_current():
     # print the name of this method
     #print(sys._getframe(0).f_code.co_name)
 
-    POST_HOOK.add_line(f"git cl")
+    POST_HOOK.add_line(f"# hook by current")
             
     print("\t!!!_hook_current!!!")
 
