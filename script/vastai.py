@@ -255,7 +255,7 @@ class ModelInst:
                 repo_local = Path(self.url_inst) / name_repo
                 POST_HOOK.add_line(f"git clone https://{repo_ext} {repo_local}")
                 file_requirements = repo_local / "requirements.txt"
-                POST_HOOK.add_line(f"if [ -x {str(file_requirements)} ]; then")
+                POST_HOOK.add_line(f"if [ -e {str(file_requirements)} ]; then")
                 POST_HOOK.add_line(f"\tpip install -r {str(file_requirements)}")
                 POST_HOOK.add_line("fi")
         except Exception as e:
