@@ -428,6 +428,7 @@ class ModelInstComfyUi:
             # lora
             #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
             #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1woman_lara.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_cum.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_deepthroat.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_SmokeMonday.safetensors", ""),

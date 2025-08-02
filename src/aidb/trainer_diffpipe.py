@@ -378,7 +378,7 @@ video_clip_mode = 'single_beginning'
 [model]
 type = 'wan'
 #ckpt_path = '/data2/imagegen_models/Wan2.1-T2V-1.3B'
-ckpt_path = '/workspace/train/models/Wan2.1-T2V-14B'
+ckpt_path = '/workspace/models/Wan2.1-T2V-14B'
 #transformer_path = '/data2/imagegen_models/wan_comfyui/wan2.1_t2v_1.3B_bf16.safetensors'
 transformer_path = '{self._file_ckpt}'
 #llm_path = '/data2/imagegen_models/wan_comfyui/wrapper/umt5-xxl-enc-bf16.safetensors'
