@@ -46,6 +46,7 @@ class Trainer:
         self._name = ""
         self._ids_used = []
         self._batch_size = 1
+        self._num_repeats = 1
 
         #self._hfdl_ckpt: tuple[str,str] | None = ("black-forest-labs/FLUX.1-dev", "flux1-dev.safetensors")
         self._hfdl_ckpt_flux: tuple[str,str] | None = (self.MODEL_REPO_ID_FLUX, self.MODEL_FILE_FLUX)
@@ -82,6 +83,7 @@ class Trainer:
         self._trigger = self._config.get("trigger", "")
         self._name = self._config.get("name", "")
         self._batch_size = self._config.get("batch_size", 1)
+        self._num_repeats = self._config.get("num_repeats", 1)
 
         # if model key doesnt exist do nothing
         if "model" in self._config:
@@ -328,7 +330,7 @@ path = '{self.FOLDER_DATASET}'
 
 # How many repeats for 1 epoch. The dataset will act like it is duplicated this many times.
 # The semantics of this are the same as sd-scripts: num_repeats=1 means one epoch is a single pass over all examples (no duplication).
-num_repeats = 1
+num_repeats = '{self._num_repeats}'
 
 # Example of overriding some settings, and using ar_buckets to directly specify ARs.
 # ar_buckets = [[448, 576]]
