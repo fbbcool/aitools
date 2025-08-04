@@ -170,7 +170,7 @@ class Trainer:
         threads = []
         for i in range(n):
             ids =  self._ids_img
-            thread = threading.Thread(target=self._process_img, args=ids[i])
+            thread = threading.Thread(target=self._process_img, args=[ids[i],])
             threads.append(thread)
             thread.start()
         for i in range(n):
