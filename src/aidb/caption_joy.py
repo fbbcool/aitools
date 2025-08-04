@@ -28,6 +28,7 @@ CONTENT_PROMPT: Final = {
 class CapJoy():
 	def __init__(self, trigger: str = "", configure_ai: bool = True):
 		self.lock = Lock()
+		self._count = 0
 		self._ai = configure_ai
 		self._tokens = 512
 		self._top_p = 0.9
@@ -61,7 +62,9 @@ class CapJoy():
 		with self.lock:
 			for caption in self._process(img, prompt):
 				pass
-			return caption
+			self._count += 1
+			print(f"caption #{self._count}")
+		return caption
 
 	def _configure_ai(self) -> None:
 		# Load model
