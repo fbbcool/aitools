@@ -176,49 +176,52 @@ class Trainer:
         for i in range(n):
             threads[i].join()
     
-    def _process_img(self, id: str = "") -> None:
-        if id == "":
+    def _process_img(self, ids: list[str]) -> None:
+        if not ids:
             return
 
-        idx = self._hfd.id2idx(id)
-        if not idx:
-            return
-        
-        # caption or prompt fetch
-        #caption = self._hfd.captions[idx]
-        caption = self._hfd.prompts[idx]
-        if not caption:
-            caption = self._trigger
-            lost += 1
-            print(f"{id}: caption missed!")
-            return
+        for id in ids:
+            if not id:
+                continue
+            idx = self._hfd.id2idx(id)
+            if not idx:
+                continue
+            
+            # caption or prompt fetch
+            #caption = self._hfd.captions[idx]
+            caption = self._hfd.prompts[idx]
+            if not caption:
+                caption = self._trigger
+                lost += 1
+                print(f"{id}: caption missed!")
+                continue
 
-        # TODO more generic, and take care that the dataset isnt polluted with trigger words
-        caption = caption.replace("1gts,", "")
-        caption = caption.replace("1woman,", "")
+            # TODO more generic, and take care that the dataset isnt polluted with trigger words
+            caption = caption.replace("1gts,", "")
+            caption = caption.replace("1woman,", "")
 
-        caption = f"{self._trigger}," + caption
-        
-        # img file
-        try:
-            img_file_dl = self._hfd.img_download(idx)
-        except Exception as e:
-            lost += 1
-            print(f"{e}\n{id} not downloadable!")
-            return
-        
-        # copy file to dataset folder
-        img_file = self.FOLDER_DATASET / img_file_dl.name
-        shutil.copy(str(img_file_dl), str(img_file))
+            caption = f"{self._trigger}," + caption
+            
+            # img file
+            try:
+                img_file_dl = self._hfd.img_download(idx)
+            except Exception as e:
+                lost += 1
+                print(f"{e}\n{id} not downloadable!")
+                continue
+            
+            # copy file to dataset folder
+            img_file = self.FOLDER_DATASET / img_file_dl.name
+            shutil.copy(str(img_file_dl), str(img_file))
 
-        # write caption to file
-        cap_file = img_file.with_suffix(".txt")
-        with cap_file.open("w", encoding="utf-8") as f:
-            f.write(caption)
-        
-        # ok
-        print(f"{id}: successfully added.")
-        self._ids_used.append(id)
+            # write caption to file
+            cap_file = img_file.with_suffix(".txt")
+            with cap_file.open("w", encoding="utf-8") as f:
+                f.write(caption)
+            
+            # ok
+            print(f"{id}: successfully added.")
+            self._ids_used.append(id)
 
 
     def _make_file_sample_prompts(self) -> None:
