@@ -1,4 +1,4 @@
-git clone https://github.com/tdrussell/diffusion-pipe -C /workspace
+git clone https://github.com/tdrussell/diffusion-pipe /workspace/diffusion-pipe
 cd /workspace/diffusion-pipe
 git submodule update --init --recursive
-pip install -r requierments.txt
+pip install -r requirements.txt
