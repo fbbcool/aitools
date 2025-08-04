@@ -207,9 +207,7 @@ class Trainer:
             #caption = self._hfd.captions[idx]
             caption = self._hfd.prompts[idx]
             if not caption:
-                caption = self._trigger
                 lost += 1
-                print(f"{id}: caption missed!")
                 if self._caper is not None:
                     img = self._hfd.pil(idx)
                     prompt = self._hfd.prompt(idx)
@@ -217,6 +215,7 @@ class Trainer:
                     print(f"\tcreated caption: {caption}")
                     self._hfd.img_set_caption_joy(idx, caption)
                 else:
+                    print(f"{id}: caption missed!")
                     continue
 
             # TODO more generic, and take care that the dataset isnt polluted with trigger words
