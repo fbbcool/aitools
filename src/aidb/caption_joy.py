@@ -11,7 +11,7 @@ import torch
 MODEL_PATH = "fancyfeast/llama-joycaption-beta-one-hf-llava"
 
 class CapJoy():
-	def __init__(self, configure_ai: bool = False):
+	def __init__(self, configure_ai: bool = True):
 		self.lock = Lock()
 		self._ai = configure_ai
 		self._tokens = 512
