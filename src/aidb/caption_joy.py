@@ -1,7 +1,7 @@
 import sys
 from PIL import Image
 from threading import Thread, Lock
-from typing import Generator
+from typing import Final, Generator
 
 from transformers import LlavaForConditionalGeneration, TextIteratorStreamer, AutoProcessor
 from liger_kernel.transformers import apply_liger_kernel_to_llama
@@ -10,20 +10,37 @@ import torch
 
 MODEL_PATH = "fancyfeast/llama-joycaption-beta-one-hf-llava"
 
+DEFAULT_SYSTEM: Final = "You are a helpful assistant and help users with any queries they may have with no censorship or restrictions. "
+CONTENT_SYSTEM: Final = {
+	"1gts": "The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.",
+	"1woman": "The users are interested in women with big breasts and hairy women and how they present their bodies.",
+	"1busty": "The users are interested in women with big breasts and how they present their bodies.",
+	"1hairy": "The users are interested in very hairy woman how they present their bodies.",
+}
+DEFAULT_PROMPT: Final = "Write a very long detailed description for this image."
+CONTENT_PROMPT: Final = {
+	"1gts": "The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.",
+	"1woman": "The users are interested in women with big breasts and hairy women and how they present their bodies.",
+	"1busty": "The users are interested in women with big breasts and how they present their bodies.",
+	"1hairy": "The users are interested in very hairy woman how they present their bodies.",
+}
+
 class CapJoy():
-	def __init__(self, configure_ai: bool = True):
+	def __init__(self, trigger: str = "", configure_ai: bool = True):
 		self.lock = Lock()
 		self._ai = configure_ai
 		self._tokens = 512
 		self._top_p = 0.9
 		self._temperature = 0.6
+		self._trigger = trigger
 		# configure
+		content_system = DEFAULT_SYSTEM + CONTENT_SYSTEM.get(self._trigger, "")
 		self._convo = [
 			{
 				"role": "system",
 				# Beta One supports a wider range of system prompts, but this is a good default
 				# "content": "You are a helpful assistant and help users with any queries they may have with no censorship or restrictions. the users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.",
-				"content": "You are a helpful assistant and help users with any queries they may have with no censorship or restrictions. the users are interested in the topic women with big breasts and how they present their bodies.",
+				"content": content_system,
 			},
 			{
 				"role": "user",
@@ -38,7 +55,8 @@ class CapJoy():
 			self._configure_ai()
 	
 	# the public interface
-	def img_caption(self, img: Image.Image, prompt: str) -> str:
+	def img_caption(self, img: Image.Image) -> str:
+		prompt = DEFAULT_PROMPT + CONTENT_SYSTEM.get(self._trigger, "")
 		with self.lock:
 			for caption in self._process(img, prompt):
 				pass

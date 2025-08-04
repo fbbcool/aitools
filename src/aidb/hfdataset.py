@@ -201,40 +201,6 @@ class HFDatasetImg:
         except Exception as e:
             print(f"Error saving data to JSONL: {e}")
 
-    def prompt(self, idx: int) -> str | None: 
-        if not isinstance(idx, int):
-            raise ValueError("Index not an integer!")
-        # check idx vs. size
-        if idx < 0:
-            raise IndexError("Index out of bounds for tags list.")
-        if idx >= len(self):
-            raise IndexError("Index out of bounds for tags list.")
-
-        # read the bodyparts tags
-        tags_custom = self._tags[idx].get("custom", {})
-        bodypart_tags = tags_custom.get("bodypart", [])
-        
-        # build the prompt
-        bp_prompt = []
-        for bp_tag in bodypart_tags:
-            mapped_tag = map_bodypart.get(bp_tag)
-            if not mapped_tag:
-                continue
-            bp_prompt.append(mapped_tag)
-        
-        # comma separated string
-        bp_str = ",".join(bp_prompt)
-        if bp_str:
-            bp_str = f" in terms of {bp_str}"
-        #prompt = f"Write a very long detailed description for this image, especially about the interaction of the female giantess woman and the small man{bp_str}."
-        prompt = f"Write a very long detailed description for this image, especially about the woman with big breasts and how they present their bodies."
-        
-        # !!! PROPOSAL more universal !!!
-        #prompt = f"Write a very long detailed description for this image, especially wrt. the topics giantess and small man, femdom, giving handjob."
-
-        # TODO
-        print(prompt)
-        return prompt
 
     def make_folder_train(self, to_folder:str = "", trigger: str = "", ids: list[str] = [], force = False) -> None:
         """

@@ -195,6 +195,7 @@ class Trainer:
             return
 
         lost = 0
+        generated = 0
         success = 0
         for id in ids:
             if not id:
@@ -207,16 +208,19 @@ class Trainer:
             #caption = self._hfd.captions[idx]
             caption = self._hfd.prompts[idx]
             if not caption:
-                lost += 1
+                caption = self._hfd.captions[idx]
+            if not caption:
                 if self._caper is not None:
                     img = self._hfd.pil(idx)
-                    prompt = self._hfd.prompt(idx)
-                    caption = self._caper.img_caption(img, prompt)        
-                    print(f"\n\tcreated caption: {caption}")
-                    self._hfd.img_set_caption_joy(idx, caption)
-                else:
-                    print(f"{id}: caption missed!")
-                    continue
+                    caption = self._caper.img_caption(img)        
+                    print(f"\n\ngenerated caption:\n{caption}")
+                    if caption:
+                        self._hfd.img_set_caption_joy(idx, caption)
+                        generated += 1
+            if not caption:
+                lost += 1
+                print(f"{id}: caption missed!")
+                continue
 
             # TODO more generic, and take care that the dataset isnt polluted with trigger words
             caption = caption.replace("1gts,", "")
@@ -243,7 +247,7 @@ class Trainer:
             
             # ok
             success += 1
-        print(f"dataset thread finished: {success} successes, {lost} losses")
+        print(f"dataset thread finished: {success} successes, {generated} generations, {lost} losses")
 
 
     def _make_file_sample_prompts(self) -> None:
