@@ -212,7 +212,7 @@ class Trainer:
                     img = self._hfd.pil(idx)
                     prompt = self._hfd.prompt(idx)
                     caption = self._caper.img_caption(img, prompt)        
-                    print(f"\tcreated caption: {caption}")
+                    print(f"\n\tcreated caption: {caption}")
                     self._hfd.img_set_caption_joy(idx, caption)
                 else:
                     print(f"{id}: caption missed!")
