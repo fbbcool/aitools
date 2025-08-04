@@ -16,8 +16,8 @@ from more_itertools import chunked_even
 from aidb.hfdataset import HFDatasetImg
 
 class Trainer:
-    ROOT: Final = Path("/workspace/train")
-    #ROOT: Final = Path("/Volumes/data/Project/AI/REPOS/aitools/build/train")
+    #ROOT: Final = Path("/workspace/train")
+    ROOT: Final = Path("/Volumes/data/Project/AI/REPOS/aitools/build/train")
     FILENAME_CONFIG: Final = "config_trainer.json"
     FILE_CONFIG: Final = ROOT / FILENAME_CONFIG
     FOLDER_DATASET: Final = ROOT / "dataset"
@@ -34,7 +34,9 @@ class Trainer:
     CHUNK_SIZE: Final = 1638400
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 
-    def __init__(self, load_models: bool = True, cache_full_dataset: bool = False) -> None:
+    def __init__(self, repo_id: str, load_models: bool = True, cache_full_dataset: bool = False, mutlitread: bool = False) -> None:
+        self._repo_id = repo_id
+
         self._config: dict = {}
         self._ids_img: list[str] = []
         self._hfd: HFDatasetImg = None
@@ -61,6 +63,10 @@ class Trainer:
         
         self._caidl_ckpt: tuple[str,str] | None = None
         
+        self.ROOT.mkdir(exist_ok=True)
+        # download train config
+        hf_hub_download(repo_id=self._repo_id, filename=self.FILENAME_CONFIG, repo_type="dataset", force_download=True, local_dir=self.ROOT)
+
         # read config file with pathlib and store the dict
         try:
             with self.FILE_CONFIG.open('r', encoding='utf-8') as f:
@@ -70,10 +76,10 @@ class Trainer:
             return
         
         # set members
-        self._ids_img = self._config["imgs"]
-        self._trigger = self._config["trigger"]
-        self._name = self._config["name"]
-        self._batch_size = self._config["batch_size"]
+        self._ids_img = self._config.get("imgs", [])
+        self._trigger = self._config.get("trigger", "")
+        self._name = self._config.get("name", "")
+        self._batch_size = self._config.get("batch_size", 1)
 
         # if model key doesnt exist do nothing
         if "model" in self._config:
@@ -96,11 +102,10 @@ class Trainer:
                 if self._hfdl_ckpt_flux is None:
                     raise ValueError("model section is given in config but not set!")
 
-
-
         # load HF dataset
-        repo_id = self._config["repo_id"]
-        self._hfd = HFDatasetImg(repo_id, force_meta_dl=True)
+        self._hfd = HFDatasetImg(self._repo_id, force_meta_dl=True)
+        if not self._ids_img:
+            self._ids_img = self._hfd.ids
         
         # make datatset folder
         if self.FOLDER_DATASET.exists():
@@ -119,7 +124,7 @@ class Trainer:
             #self._download_models_flux()
             self._download_models_wan()
 
-        self._make_dataset(cache_full_dataset)
+        self._make_dataset(cache_full_dataset=cache_full_dataset, multithread=mutlitread)
         #self._make_file_sample_prompts()
         self._make_file_dataset_config()
         self._make_file_diffpipe_config()
@@ -148,38 +153,44 @@ class Trainer:
         self._folder_ckpt_base = snapshot_download(repo_id="Wan-AI/Wan2.1-T2V-14B", ignore_patterns=["diffusion_pytorch_model*", "models_t5*"])
 
     
-    def _make_dataset(self, cache_full_dataset: bool = False) -> None:
+    def _make_dataset(self, cache_full_dataset: bool = False, multithread: bool = False) -> None:
         lost = 0
         
         if cache_full_dataset:
             self._hfd.cache()
         
-        # non multi-threaded
-        #for id in self._ids_img:
-        #    self._process_img(id)
-        
-        # multi-threaded
-        n = 4
-        m = len(self._ids_img)
-        ids = []
-        for batch in chunked_even(self._ids_img,(m//n)+1):
-            ids.append(batch)
-        if (len(ids) != n):
-            raise ValueError("dataset multithreading failed!")
+        if not self._ids_img:
+            raise ValueError("dataset: empty img list!")
 
-        threads = []
-        for i in range(n):
-            ids =  self._ids_img
-            thread = threading.Thread(target=self._process_img, args=[ids[i],])
-            threads.append(thread)
-            thread.start()
-        for i in range(n):
-            threads[i].join()
+        # non multi-threaded
+        if not multithread:
+            self._process_imgs(self._ids_img)
+        else:
+            # multi-threaded
+            n = 8
+            m = len(self._ids_img)
+            ids = []
+            for batch in chunked_even(self._ids_img,(m//n)+1):
+                ids.append(batch)
+            if (len(ids) != n):
+                raise ValueError("dataset multithreading failed!")
+
+            threads = []
+            for i in range(n):
+                thread = threading.Thread(target=self._process_imgs, args=[ids[i],])
+                print(f" dataset thread[{i}]: {len(ids[i])} imgs")
+                threads.append(thread)
+                thread.start()
+            for i in range(n):
+                threads[i].join()
+                print(f" dataset thread[{i}]: joined.")
     
-    def _process_img(self, ids: list[str]) -> None:
+    def _process_imgs(self, ids: list[str]) -> None:
         if not ids:
             return
 
+        lost = 0
+        success = 0
         for id in ids:
             if not id:
                 continue
@@ -220,8 +231,8 @@ class Trainer:
                 f.write(caption)
             
             # ok
-            print(f"{id}: successfully added.")
-            self._ids_used.append(id)
+            success += 1
+        print(f"dataset thread finished: {success} successes, {lost} losses")
 
 
     def _make_file_sample_prompts(self) -> None:
