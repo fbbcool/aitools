@@ -6,9 +6,12 @@ import sys
 import time
 from typing import Final
 from urllib.parse import parse_qs, unquote, urlparse
+import threading
 
 from huggingface_hub import hf_hub_download, snapshot_download
 import urllib
+
+from more_itertools import chunked_even
 
 from aidb.hfdataset import HFDatasetImg
 
@@ -151,47 +154,72 @@ class Trainer:
         if cache_full_dataset:
             self._hfd.cache()
         
-        for id in self._ids_img:
-            idx = self._hfd.id2idx(id)
-            if not idx:
-                continue
-            
-            # caption or prompt fetch
-            #caption = self._hfd.captions[idx]
-            caption = self._hfd.prompts[idx]
-            if not caption:
-                caption = self._trigger
-                lost += 1
-                print(f"{id}: caption missed!")
-                continue
+        # non multi-threaded
+        #for id in self._ids_img:
+        #    self._process_img(id)
+        
+        # multi-threaded
+        n = 4
+        m = len(self._ids_img)
+        ids = []
+        for batch in chunked_even(self._ids_img,(m//n)+1):
+            ids.append(batch)
+        if (len(ids) != n):
+            raise ValueError("dataset multithreading failed!")
 
-            # TODO more generic, and take care that the dataset isnt polluted with trigger words
-            caption = caption.replace("1gts,", "")
-            caption = caption.replace("1woman,", "")
+        threads = []
+        for i in range(n):
+            ids =  self._ids_img
+            thread = threading.Thread(target=self._process_img, args=ids[i])
+            threads.append(thread)
+            thread.start()
+        for i in range(n):
+            threads[i].join()
+    
+    def _process_img(self, id: str = "") -> None:
+        if id == "":
+            return
 
-            caption = f"{self._trigger}," + caption
-            
-            # img file
-            try:
-                img_file_dl = self._hfd.img_download(idx)
-            except Exception as e:
-                lost += 1
-                print(f"{e}\n{id} not downloadable!")
-                continue
-            
-            # copy file to dataset folder
-            img_file = self.FOLDER_DATASET / img_file_dl.name
-            shutil.copy(str(img_file_dl), str(img_file))
+        idx = self._hfd.id2idx(id)
+        if not idx:
+            return
+        
+        # caption or prompt fetch
+        #caption = self._hfd.captions[idx]
+        caption = self._hfd.prompts[idx]
+        if not caption:
+            caption = self._trigger
+            lost += 1
+            print(f"{id}: caption missed!")
+            return
 
-            # write caption to file
-            cap_file = img_file.with_suffix(".txt")
-            with cap_file.open("w", encoding="utf-8") as f:
-                f.write(caption)
-            
-            # ok
-            print(f"{id}: successfully added.")
-            self._ids_used.append(id)
-        print(f"dataset created with {len(self._ids_used)} items and {lost} lost items.")
+        # TODO more generic, and take care that the dataset isnt polluted with trigger words
+        caption = caption.replace("1gts,", "")
+        caption = caption.replace("1woman,", "")
+
+        caption = f"{self._trigger}," + caption
+        
+        # img file
+        try:
+            img_file_dl = self._hfd.img_download(idx)
+        except Exception as e:
+            lost += 1
+            print(f"{e}\n{id} not downloadable!")
+            return
+        
+        # copy file to dataset folder
+        img_file = self.FOLDER_DATASET / img_file_dl.name
+        shutil.copy(str(img_file_dl), str(img_file))
+
+        # write caption to file
+        cap_file = img_file.with_suffix(".txt")
+        with cap_file.open("w", encoding="utf-8") as f:
+            f.write(caption)
+        
+        # ok
+        print(f"{id}: successfully added.")
+        self._ids_used.append(id)
+
 
     def _make_file_sample_prompts(self) -> None:
         str_prompt = []
