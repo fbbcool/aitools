@@ -1,6 +1,6 @@
 import sys
 from PIL import Image
-from threading import Thread
+from threading import Thread, Lock
 from typing import Generator
 
 from transformers import LlavaForConditionalGeneration, TextIteratorStreamer, AutoProcessor
@@ -12,7 +12,7 @@ MODEL_PATH = "fancyfeast/llama-joycaption-beta-one-hf-llava"
 
 class CapJoy():
 	def __init__(self, configure_ai: bool = False):
-
+		self.lock = Lock()
 		self._ai = configure_ai
 		self._tokens = 512
 		self._top_p = 0.9
@@ -39,9 +39,10 @@ class CapJoy():
 	
 	# the public interface
 	def img_caption(self, img: Image.Image, prompt: str) -> str:
-		for caption in self._process(img, prompt):
-			pass
-		return caption
+		with self.lock:
+			for caption in self._process(img, prompt):
+				pass
+			return caption
 
 	def _configure_ai(self) -> None:
 		# Load model

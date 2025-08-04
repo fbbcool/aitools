@@ -14,6 +14,7 @@ import urllib
 from more_itertools import chunked_even
 
 from aidb.hfdataset import HFDatasetImg
+from aidb.caption_joy import CapJoy
 
 class Trainer:
     ROOT: Final = Path("/workspace/train")
@@ -34,12 +35,13 @@ class Trainer:
     CHUNK_SIZE: Final = 1638400
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 
-    def __init__(self, repo_id: str, load_models: bool = True, cache_full_dataset: bool = False, mutlitread: bool = False) -> None:
+    def __init__(self, repo_id: str, load_models: bool = True, cache_full_dataset: bool = False, mutlitread: bool = False, caption_missing=False) -> None:
         self._repo_id = repo_id
 
         self._config: dict = {}
         self._ids_img: list[str] = []
         self._hfd: HFDatasetImg = None
+        self._caper: CapJoy = None
         self._trigger = []
         self._name = ""
         self._ids_used = []
@@ -107,6 +109,9 @@ class Trainer:
         if not self._ids_img:
             self._ids_img = self._hfd.ids
         
+        if caption_missing:
+            self._caper = CapJoy()
+        
         # make datatset folder
         if self.FOLDER_DATASET.exists():
             # remove it
@@ -123,8 +128,8 @@ class Trainer:
         if load_models:
             #self._download_models_flux()
             self._download_models_wan()
-
-        self._make_dataset(cache_full_dataset=cache_full_dataset, multithread=mutlitread)
+        
+        self._make_dataset(cache_full_dataset=cache_full_dataset, multithread=mutlitread, caption_missing=caption_missing)
         #self._make_file_sample_prompts()
         self._make_file_dataset_config()
         self._make_file_diffpipe_config()
@@ -154,8 +159,6 @@ class Trainer:
 
     
     def _make_dataset(self, cache_full_dataset: bool = False, multithread: bool = False) -> None:
-        lost = 0
-        
         if cache_full_dataset:
             self._hfd.cache()
         
@@ -184,6 +187,8 @@ class Trainer:
             for i in range(n):
                 threads[i].join()
                 print(f" dataset thread[{i}]: joined.")
+        
+        self._hfd.save_to_jsonl(force=True)
     
     def _process_imgs(self, ids: list[str]) -> None:
         if not ids:
@@ -205,7 +210,14 @@ class Trainer:
                 caption = self._trigger
                 lost += 1
                 print(f"{id}: caption missed!")
-                continue
+                if self._caper is not None:
+                    img = self._hfd.pil(idx)
+                    prompt = self._hfd.prompt(idx)
+                    caption = self._caper.img_caption(img, prompt)        
+                    print(f"\tcreated caption: {caption}")
+                    self._hfd.img_set_caption_joy(idx, caption)
+                else:
+                    continue
 
             # TODO more generic, and take care that the dataset isnt polluted with trigger words
             caption = caption.replace("1gts,", "")
