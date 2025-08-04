@@ -103,6 +103,9 @@ class Image:
     @property
     def _hfd_caption_joy(self) -> str | None:
         _hfd = self._db_manager.hfd
+        if _hfd is None:
+            return None
+
         idx = _hfd.id2idx(self.id)
         if idx is not None:
             return _hfd.captions_joy[_hfd.id2idx(self.id)]
@@ -111,6 +114,9 @@ class Image:
     @property
     def _hfd_caption(self) -> str | None:
         _hfd = self._db_manager.hfd
+        if _hfd is None:
+            return None
+
         idx = _hfd.id2idx(self.id)
         if idx is not None:
             return _hfd.captions[_hfd.id2idx(self.id)]

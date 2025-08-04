@@ -15,14 +15,14 @@ CONTENT_SYSTEM: Final = {
 	"1gts": "The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.",
 	"1woman": "The users are interested in women with big breasts and hairy women and how they present their bodies.",
 	"1busty": "The users are interested in women with big breasts and how they present their bodies.",
-	"1hairy": "The users are interested in very hairy woman how they present their bodies.",
+	"1hairy": "The users are interested in woman with very hairy pussies and very hairy asses how they present their bodies.",
 }
 DEFAULT_PROMPT: Final = "Write a very long detailed description for this image."
 CONTENT_PROMPT: Final = {
 	"1gts": "The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.",
 	"1woman": "The users are interested in women with big breasts and hairy women and how they present their bodies.",
 	"1busty": "The users are interested in women with big breasts and how they present their bodies.",
-	"1hairy": "The users are interested in very hairy woman how they present their bodies.",
+	"1hairy": "The users are interested in woman with very hairy pussies and very hairy asses how they present their bodies.",
 }
 
 class CapJoy():
