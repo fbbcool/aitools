@@ -129,7 +129,7 @@ class Trainer:
             #self._download_models_flux()
             self._download_models_wan()
         
-        self._make_dataset(cache_full_dataset=cache_full_dataset, multithread=mutlitread, caption_missing=caption_missing)
+        self._make_dataset(cache_full_dataset=cache_full_dataset, multithread=mutlitread)
         #self._make_file_sample_prompts()
         self._make_file_dataset_config()
         self._make_file_diffpipe_config()
