@@ -57,6 +57,7 @@ class CapJoy():
 	# the public interface
 	def img_caption(self, img: Image.Image) -> str:
 		prompt = DEFAULT_PROMPT + CONTENT_SYSTEM.get(self._trigger, "")
+		print(f"caper using prompt:\n\t{prompt}")
 		with self.lock:
 			for caption in self._process(img, prompt):
 				pass

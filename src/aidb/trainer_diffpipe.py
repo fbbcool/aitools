@@ -110,7 +110,7 @@ class Trainer:
             self._ids_img = self._hfd.ids
         
         if caption_missing:
-            self._caper = CapJoy()
+            self._caper = CapJoy(trigger=self._trigger)
         
         # make datatset folder
         if self.FOLDER_DATASET.exists():
