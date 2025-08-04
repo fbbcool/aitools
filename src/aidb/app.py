@@ -264,11 +264,12 @@ class AIDBGradioApp:
         rating_update_trigger_id = self._rating_update_trigger_elem_id
         scene_update_trigger_id = self._scene_update_trigger_elem_id
         
+        img_width = 250
         html_content = f"""
         <style>
             .image-grid {{
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax({img_width}px, 1fr));
                 gap: 15px;
                 padding: 10px;
             }}

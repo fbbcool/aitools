@@ -7,19 +7,19 @@ import time
 from typing import Final
 from urllib.parse import parse_qs, unquote, urlparse
 
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, snapshot_download
 import urllib
 
 from aidb.hfdataset import HFDatasetImg
 
 class Trainer:
-    ROOT: Final = Path("/workspace/train")
-    #ROOT: Final = Path("/Volumes/data/Project/AI/REPOS/aitools/build/train")
+    #ROOT: Final = Path("/workspace/train")
+    ROOT: Final = Path("/Volumes/data/Project/AI/REPOS/aitools/build/train")
     FILENAME_CONFIG: Final = "config_trainer.json"
     FILE_CONFIG: Final = ROOT / FILENAME_CONFIG
     FOLDER_DATASET: Final = ROOT / "dataset"
     FOLDER_OUTPUT: Final = ROOT / "output"
-    FOLDER_MODELS: Final = Path("/workspace/models")
+    FOLDER_MODELS: Final = ROOT / "../models"
     FILE_SAMPLE_PROMPTS: Final = ROOT / "sample_prompts.txt"
     FILE_CONFIG_DIFFPIPE: Final = ROOT / "diffpipe.toml"
     FILE_CONFIG_DATASET: Final = ROOT / "dataset.toml"
@@ -31,7 +31,7 @@ class Trainer:
     CHUNK_SIZE: Final = 1638400
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 
-    def __init__(self, load_models: bool = True) -> None:
+    def __init__(self, load_models: bool = True, cache_full_dataset: bool = False) -> None:
         self._config: dict = {}
         self._ids_img: list[str] = []
         self._hfd: HFDatasetImg = None
@@ -54,6 +54,7 @@ class Trainer:
         self._file_vae: str = ""
         self._file_transformer: str = ""
         self._file_llm: str = ""
+        self._folder_ckpt_base: str = "" # base ckpt full checkout w/o models, only config (e.eg. for WAN)
         
         self._caidl_ckpt: tuple[str,str] | None = None
         
@@ -115,7 +116,7 @@ class Trainer:
             #self._download_models_flux()
             self._download_models_wan()
 
-        self._make_dataset()
+        self._make_dataset(cache_full_dataset)
         #self._make_file_sample_prompts()
         self._make_file_dataset_config()
         self._make_file_diffpipe_config()
@@ -138,17 +139,18 @@ class Trainer:
             self._file_ckpt = hf_hub_download(repo_id=self._hfdl_ckpt_wan[0], filename=self._hfdl_ckpt_wan[1], cache_dir=self.FOLDER_MODELS)
         elif self._caidl_ckpt:
             self._file_ckpt = self._download_civitai(self._caidl_ckpt[0])
-        #self._file_transformer = hf_hub_download(repo_id=self._hfdl_clipl_flux[0], filename=self._hfdl_clipl_flux[1], cache_dir=self.FOLDER_MODELS)
         self._file_transformer = None
         self._file_llm = hf_hub_download(repo_id=self._hfdl_llm_wan[0], filename=self._hfdl_llm_wan[1], cache_dir=self.FOLDER_MODELS)
-        #self._file_vae = hf_hub_download(repo_id=self._hfdl_vae_flux[0], filename=self._hfdl_vae_flux[1], cache_dir=self.FOLDER_MODELS)
         self._file_vae = None
-        print("DONT FORGET TO DO:\nhuggingface-cli download Wan-AI/Wan2.1-T2V-14B --local-dir /workspace/train/models/Wan2.1-T2V-14B --exclude \"diffusion_pytorch_model*\" \"models_t5*\"")
-        # TODO: huggingface-cli download Wan-AI/Wan2.1-T2V-14B --local-dir /workspace/train/models/Wan2.1-T2V-14B --exclude "diffusion_pytorch_model*" "models_t5*"
+        self._folder_ckpt_base = snapshot_download(repo_id="Wan-AI/Wan2.1-T2V-14B", ignore_patterns=["diffusion_pytorch_model*", "models_t5*"])
 
     
-    def _make_dataset(self) -> None:
+    def _make_dataset(self, cache_full_dataset: bool = False) -> None:
         lost = 0
+        
+        if cache_full_dataset:
+            self._hfd.cache()
+        
         for id in self._ids_img:
             idx = self._hfd.id2idx(id)
             if not idx:
@@ -373,15 +375,15 @@ steps_per_print = 1
 # default is single_beginning
 video_clip_mode = 'single_beginning'
 
-# This is how you configure HunyuanVideo. Other models will be different. See docs/supported_models.md for
+# This is how you configure WAN video. Other models will be different. See docs/supported_models.md for
 # details on the configuration and options for each model.
 [model]
 type = 'wan'
-#ckpt_path = '/data2/imagegen_models/Wan2.1-T2V-1.3B'
-ckpt_path = '/workspace/models/Wan2.1-T2V-14B'
-#transformer_path = '/data2/imagegen_models/wan_comfyui/wan2.1_t2v_1.3B_bf16.safetensors'
+# this is the config checkout for the checkpoint but w/o the specific model
+ckpt_path = '{self._folder_ckpt_base}'
+# this is the used checkpoint model (compatible with the base checkpoint config!)
 transformer_path = '{self._file_ckpt}'
-#llm_path = '/data2/imagegen_models/wan_comfyui/wrapper/umt5-xxl-enc-bf16.safetensors'
+# this is the used text encoder model (compatible with the base checkpoint config!)
 llm_path = '{self._file_llm}'
 dtype = 'bfloat16'
 transformer_dtype = 'float8'

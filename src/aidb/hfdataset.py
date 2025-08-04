@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil
 from typing import Final
 import jsonlines
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, snapshot_download
 from datasets import load_dataset
 from PIL import Image
 
@@ -63,6 +63,10 @@ class HFDatasetImg:
         except Exception as e:
             print(f"Error loading dataset from Hugging Face Hub: {e}")
             return None
+
+    def cache(self) -> str:
+        folder_cache = snapshot_download(repo_id=self.repo_id, repo_type="dataset")
+        return folder_cache
 
     @property
     def meta(self):
