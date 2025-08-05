@@ -8,10 +8,12 @@ from  pathlib import Path
 import datetime
 import uuid
 import mimetypes
-from typing import List, Dict, Optional, Union, Any, Tuple
+from typing import Final, List, Dict, Optional, Union, Any, Tuple
 import yaml # Import the yaml library
 
 from aidb.hfdataset import HFDatasetImg
+
+DBM_COLLECTION_IMG_PREFIX: Final = "imgs_"
 
 # Define the DBManager class for handling metadata operations
 class DBManager:
@@ -100,6 +102,56 @@ class DBManager:
     @property
     def hfd(self) -> HFDatasetImg | None:
         return self._hfd
+    
+    def set_collection(self, collection_name: str) -> None:
+        """
+        Sets the currently used collection.
+
+        The collection is only changed if the collection exists, otherwise an Exception is raised.
+        """
+        if self.db is None:
+            print("Database not connected. Cannot set collection.")
+            return
+
+        if collection_name not in self.db.list_collection_names():
+            raise ValueError(f"Collection '{collection_name}' does not exist in the database.")
+        
+        self._collection = collection_name
+        print(f"Collection set to: {self._collection}")
+
+
+    @property
+    def collections_images(self) -> list[str]:
+        """
+        Returns all collection names of the current DB.
+        """
+        if self.db is None:
+            print("Database not connected. Cannot retrieve collection names.")
+            return []
+        
+        # List all collection names in the current database
+        collections = self.db.list_collection_names()
+        collections_filtered = [collection for collection in collections if collection.startswith(DBM_COLLECTION_IMG_PREFIX)]
+        return collections_filtered
+    
+    def collection_rename(self, name_to: str, name_from: str):
+        """
+        Renames a collection in the DB.
+        """
+        if self.db is None:
+            print("Database not connected. Cannot rename collection.")
+            return
+
+        try:
+            self.db[name_from].rename(name_to)
+            print(f"Collection '{name_from}' renamed to '{name_to}'.")
+            # If the current collection name matches the old name, update it
+            if self._collection == name_from:
+                self._collection = name_to
+        except OperationFailure as e:
+            print(f"Failed to rename collection '{name_from}' to '{name_to}': {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred during collection rename: {e}")
 
     def _get_collection(self, collection_name: str) -> Optional[pymongo.collection.Collection]:
         """

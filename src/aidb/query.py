@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Literal, Optional, Tuple
 from bson.objectid import ObjectId
 
 # Local imports for DBManager and Image classes
@@ -24,12 +24,13 @@ class Query:
         self._db_manager = db_manager
         print("Query object initialized.")
 
-    def query_images(self, query: Optional[Dict[str, Any]] = None) -> List[Image]:
+    def query_images(self, collections: list[str] | None = None, query: Optional[Dict[str, Any]] = None) -> List[Image]:
         """
         Queries the 'images' collection in the database and returns a list
         of Image objects matching the given query.
 
         Args:
+            collections: list of collections to be searched. if None, the db managers collection is used.
             query (Optional[Dict[str, Any]]): A dictionary representing the MongoDB query.
                                                If None, all image documents will be returned.
                                                When querying by '_id' or 'container_db_id',
@@ -39,7 +40,11 @@ class Query:
             List[Image]: A list of Image objects matching the query. Returns an empty list
                          if no images are found or if there's a database error.
         """
-        print(f"Executing query for images: {query}")
+        if collections is None:
+            collections = [self._db_manager._collection]
+        if not collections:
+            collections = self._db_manager.collections_images
+        print(f"Executing query for images: {query} for collections {collections}")
         
         # Ensure _id, container_db_id and rating in query are ObjectId if they are strings
         processed_query = {}
@@ -56,25 +61,26 @@ class Query:
                 else:
                     processed_query[key] = value
 
-        image_docs = self._db_manager.find_documents(self._db_manager._collection, processed_query)
         
         image_objects: List[Image] = []
-        if image_docs:
-            for doc in image_docs:
-                # MongoDB's _id is an ObjectId, convert to string for Image class constructor
-                if '_id' in doc:
-                    try:
-                        image_objects.append(Image(self._db_manager, str(doc['_id']), doc=doc))
-                    except ValueError as e:
-                        print(f"Error creating Image object for document {doc.get('_id')}: {e}")
-                else:
-                    print(f"Warning: Document found without '_id' field: {doc}")
-        else:
-            print("No image documents found matching the query.")
+        for collection in collections:
+            image_docs = self._db_manager.find_documents(collection, processed_query)
+            if image_docs:
+                for doc in image_docs:
+                    # MongoDB's _id is an ObjectId, convert to string for Image class constructor
+                    if '_id' in doc:
+                        try:
+                            image_objects.append(Image(self._db_manager, str(doc['_id']), collection=collection, doc=doc))
+                        except ValueError as e:
+                            print(f"Error creating Image object for document {doc.get('_id')}: {e}")
+                    else:
+                        print(f"Warning: Document found without '_id' field: {doc}")
+            else:
+                print("No image documents found matching the query.")
             
         return image_objects
     
-    def query_by_tags(self, tags_mand: List[str], tags_opt: List[str], rating_min: int, rating_max: int, bodypart: str) -> List[Image]:
+    def query_by_tags(self, tags_mand: List[str], tags_opt: List[str], rating_min: int, rating_max: int, bodypart: str, collections: list[str] | None = None) -> List[Image]:
         """
         Queries images based on mandatory and optional tags, and a rating range.
 
@@ -83,11 +89,16 @@ class Query:
             tags_opt (List[str]): List of optional tags that contribute to a score.
             rating_min (int): Minimum rating (inclusive).
             rating_max (int): Maximum rating (inclusive).
+            collections: list of collections to be searched. if None, the db manager collecction is used
 
         Returns:
             List[Image]: A list of Image objects matching the criteria.
         """
-        print(f"Querying by tags: Mandatory={tags_mand}, Optional={tags_opt}, Rating={rating_min}-{rating_max}")
+        if collections is None:
+            collections = [self._db_manager._collection]
+        if not collections:
+            collections = self._db_manager.collections_images
+        print(f"Querying by tags: Mandatory={tags_mand}, Optional={tags_opt}, Rating={rating_min}-{rating_max} in collections {collections}.")
 
         mongo_query: Dict[str, Any] = {}
 
@@ -103,23 +114,25 @@ class Query:
         mongo_query['rating'] = {'$gte': rating_min, '$lte': rating_max}
         print(f"Mongo query: {mongo_query}")
 
-        # Execute the query to get image documents
-        image_docs = self._db_manager.find_documents(self._db_manager._collection, mongo_query)
-
         image_objects: List[Image] = []
-        if not image_docs:
+        # Execute the query to get image documents
+        for collection in collections:
+            image_docs = self._db_manager.find_documents(collection, mongo_query)
+            if not image_docs:
+                continue
+            for doc in image_docs:
+                if '_id' in doc:
+                    try:
+                        # Create ONE Image object, passing the pre-fetched doc to avoid re-querying
+                        img_obj = Image(self._db_manager, str(doc['_id']), doc=doc, collection=collection)
+                        # Use the object's own method to calculate the score
+                        img_obj.calc_score_based_on_tags(tags_opt+tags_mand)
+                        image_objects.append(img_obj)
+                    except ValueError as e:
+                        print(f"Error creating Image object for document {doc.get('_id')}: {e}")
+        
+        if not image_objects:
             return []
-
-        for doc in image_docs:
-            if '_id' in doc:
-                try:
-                    # Create ONE Image object, passing the pre-fetched doc to avoid re-querying
-                    img_obj = Image(self._db_manager, str(doc['_id']), doc=doc)
-                    # Use the object's own method to calculate the score
-                    img_obj.calc_score_based_on_tags(tags_opt+tags_mand)
-                    image_objects.append(img_obj)
-                except ValueError as e:
-                    print(f"Error creating Image object for document {doc.get('_id')}: {e}")
         
         # ignore bodypart
         if bodypart == "Ignore":
@@ -134,37 +147,43 @@ class Query:
         
         return self._sort_images_by_score(image_objects)
     
-    def query_by_rating(self, rating_min: int, rating_max: int) -> List[Image]:
+    def query_by_rating(self, rating_min: int, rating_max: int, collections: list[str] | None = None) -> List[Image]:
         """
         Queries images based on a rating range.
         """
-        print(f"Querying by rating: Minimum={rating_min}, Maximum={rating_max}")
+        if collections is None:
+            collections = [self._db_manager._collection]
+        if not collections:
+            collections = self._db_manager.collections_images
+        print(f"Querying by rating: Minimum={rating_min}, Maximum={rating_max} in collections {collections}.")
 
         mongo_query: Dict[str, Any] = {
             'rating': {'$gte': rating_min, '$lte': rating_max}
         }
 
-        image_docs = self._db_manager.find_documents(self._db_manager._collection, mongo_query)
+        image_objects = []
 
-        image_objects: List[Image] = []
-        if not image_docs:
-            return []
-
-        for doc in image_docs:
-            if '_id' in doc:
-                try:
-                    img_obj = Image(self._db_manager, str(doc['_id']), doc=doc)
-                    image_objects.append(img_obj)
-                except ValueError as e:
-                    print(f"Error creating Image object for document {doc.get('_id')}: {e}")
+        for collection in collections:
+            image_docs = self._db_manager.find_documents(collection, mongo_query)
+            for doc in image_docs:
+                if '_id' in doc:
+                    try:
+                        img_obj = Image(self._db_manager, str(doc['_id']), doc=doc, collection=collection)
+                        image_objects.append(img_obj)
+                    except ValueError as e:
+                        print(f"Error creating Image object for document {doc.get('_id')}: {e}")
         
         return image_objects
     
-    def query_by_bodyparts(self, bodyparts: list[str], rating_min: int = 3, rating_max: int = 5) -> List[Image]:
+    def query_by_bodyparts(self, bodyparts: list[str], rating_min: int = 3, rating_max: int = 5, mode: Literal["and", "or"] = "or", collections: list[str] | None = None) -> List[Image]:
         """
         Queries images based on the bodyparts tags and a rating range.
         """
-        print(f"Querying by bodyparts: {bodyparts}, Rating={rating_min}-{rating_max}")
+        if collections is None:
+            collections = [self._db_manager._collection]
+        if not collections:
+            collections = self._db_manager.collections_images
+        print(f"Querying by bodyparts:{mode} {bodyparts}, Rating={rating_min}-{rating_max} in collections {collections}.")
 
         mongo_query: Dict[str, Any] = {
             'rating': {'$gte': rating_min, '$lte': rating_max}
@@ -174,21 +193,25 @@ class Query:
         if bodyparts:
             # Use $all to ensure all specified bodyparts are present in the 'custom.bodypart' array
             # Or use $in if any of the specified bodyparts is sufficient
-            mongo_query['tags.custom.bodypart'] = {'$in': bodyparts}
+            mode_mongo = '$in'
+            if mode == "or":
+                mode_mongo = '$in'
+            elif mode == "and":
+                mode_mongo = '$all'
+            mongo_query['tags.custom.bodypart'] = {mode_mongo: bodyparts}
         
-        image_docs = self._db_manager.find_documents(self._db_manager._collection, mongo_query)
-
         image_objects: List[Image] = []
-        if not image_docs:
-            return []
-
-        for doc in image_docs:
-            if '_id' in doc:
-                try:
-                    img_obj = Image(self._db_manager, str(doc['_id']), doc=doc)
-                    image_objects.append(img_obj)
-                except ValueError as e:
-                    print(f"Error creating Image object for document {doc.get('_id')}: {e}")
+        for collection in collections:
+            image_docs = self._db_manager.find_documents(collection, mongo_query)
+            if not image_docs:
+                continue
+            for doc in image_docs:
+                if '_id' in doc:
+                    try:
+                        img_obj = Image(self._db_manager, str(doc['_id']), doc=doc, collection=collection)
+                        image_objects.append(img_obj)
+                    except ValueError as e:
+                        print(f"Error creating Image object for document {doc.get('_id')}: {e}")
         
         return image_objects
 

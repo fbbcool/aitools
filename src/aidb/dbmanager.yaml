@@ -5,8 +5,10 @@ mongodb_settings:
   host: "mongodb://mongo:mongo@n100"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
   port: 27017        # Or your MongoDB port
   db_name: "prod_ai" # Or your database name, e.g., "prod_ai"
-  collection: "images"   # Or your collection name, e.g., "images"
+  #collection: "imgs_0"   # Or your collection name, e.g., "images"
   #collection: "imgs_lara"   # Or your collection name, e.g., "images"
+  #collection: "imgs_hairy01"   # Or your collection name, e.g., "images"
+  collection: "imgs_wan01"   # Or your collection name, e.g., "images"
 
 # Thumbnail generation settings
 thumbnail_settings:
@@ -22,13 +24,15 @@ thumbnail_settings:
 train_image_settings:
   # Default directory to save generated training images
   # This path is relative to where the application is run.
-  default_train_image_dir: "/Volumes/data/pool/___train_images_1024" 
+  default_train_image_dir: "/Volumes/data/pool/___train_images_768" 
   
   # Default size [width, height] for generated thumbnails
   # The aspect ratio of the original image will be preserved.
-  default_train_image_size: [1024, 1024]
+  default_train_image_size: [768, 768]
 
 # Huggingface settings
 hf_settings:
   repo_id_dataset: "fbbcool/gts01_r35"
+  #repo_id_dataset: "fbbcool/1gts_wan01"
   #repo_id_dataset: "fbbcool/1woman_lara02"
+  #repo_id_dataset: "fbbcool/1hairy_01"

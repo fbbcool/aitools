@@ -14,7 +14,7 @@ class Image:
     in the MongoDB database.
     """
 
-    def __init__(self, db_manager: DBManager, image_id: str, doc: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, db_manager: DBManager, image_id: str, collection: str | None = None, doc: Optional[Dict[str, Any]] = None) -> None:
         """
         Initializes the Image object with a reference to the DBManager
         and the MongoDB _id of the image.
@@ -24,6 +24,7 @@ class Image:
             image_id (str): The string representation of the MongoDB '_id' for this image.
             doc (Optional[Dict[str, Any]]): An optional pre-fetched document from the database.
                                              If provided, it prevents an extra database call.
+            collection: DB collection which hosts the image data. it can be pulled from the current db manager collection or set directly. the user has to take care of correctness!
         """
         if not isinstance(db_manager, DBManager):
             raise TypeError("db_manager must be an instance of DBManager.")
@@ -41,12 +42,21 @@ class Image:
         self.contributing_tags = []
         self.operation : Literal['nop','rate','scene'] = 'nop'
         self._caption: str | None = None
+        if collection is None:
+            self._collection = self._db_manager._collection
+        else:
+            self._collection = collection
         
 
     @property
     def id(self) -> str:
         """Returns the MongoDB _id of this image."""
         return self._image_id
+    
+    @property
+    def collection(self):
+        """Returns the MongoDB collection of this image."""
+        return self._collection
     
     @property
     def data(self) -> dict:
@@ -57,7 +67,7 @@ class Image:
             return self._data
 
         # Fetch the image document from the database
-        image_doc = self._db_manager.find_documents(self._db_manager._collection, {"_id": ObjectId(self._image_id)})
+        image_doc = self._db_manager.find_documents(self._collection, {"_id": ObjectId(self._image_id)})
 
         if not image_doc:
             print(f"Error: Image with ID '{self._image_id}' not found in the database.")

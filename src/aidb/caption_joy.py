@@ -16,6 +16,7 @@ CONTENT_SYSTEM: Final = {
 	"1woman": "The users are interested in women with big breasts and hairy women and how they present their bodies.",
 	"1busty": "The users are interested in women with big breasts and how they present their bodies.",
 	"1hairy": "The users are interested in woman with very hairy pussies and very hairy asses how they present their bodies.",
+	"1pussy_insert": "The users are interested of tall female giantess woman inserting small adult man into their vagina.",
 }
 DEFAULT_PROMPT: Final = "Write a very long detailed description for this image."
 CONTENT_PROMPT: Final = {
@@ -23,6 +24,7 @@ CONTENT_PROMPT: Final = {
 	"1woman": "The users are interested in women with big breasts and hairy women and how they present their bodies.",
 	"1busty": "The users are interested in women with big breasts and how they present their bodies.",
 	"1hairy": "The users are interested in woman with very hairy pussies and very hairy asses how they present their bodies.",
+	"1pussy_insert": "The users are interested of tall female giantess woman inserting small adult man into their vagina.",
 }
 
 class CapJoy():
