@@ -16,7 +16,7 @@ CONTENT_SYSTEM: Final = {
 	"1woman": "The users are interested in women with big breasts and hairy women and how they present their bodies.",
 	"1busty": "The users are interested in women with big breasts and how they present their bodies.",
 	"1hairy": "The users are interested in woman with very hairy pussies and very hairy asses how they present their bodies.",
-	"1pussy_insert": "The users are interested of tall female giantess woman inserting small adult man into their vagina.",
+	"1pussy_insert": "a giantess woman is inserting a small adult man into her vagina. if you want to use 'the small man is positioned between her legs', use 'inserted in her vagina' instead and describe wether the lower or upper bodypart of the small man is inserted and not visible.",
 }
 DEFAULT_PROMPT: Final = "Write a very long detailed description for this image."
 CONTENT_PROMPT: Final = {
@@ -59,7 +59,7 @@ class CapJoy():
 	
 	# the public interface
 	def img_caption(self, img: Image.Image) -> str:
-		prompt = DEFAULT_PROMPT + CONTENT_SYSTEM.get(self._trigger, "")
+		prompt = DEFAULT_PROMPT + CONTENT_PROMPT.get(self._trigger, "")
 		print(f"caper using prompt:\n\t{prompt}")
 		with self.lock:
 			for caption in self._process(img, prompt):
