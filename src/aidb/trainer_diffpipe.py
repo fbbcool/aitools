@@ -35,7 +35,7 @@ class Trainer:
     CHUNK_SIZE: Final = 1638400
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 
-    def __init__(self, repo_id: str, load_models: bool = True, cache_full_dataset: bool = False, multithread: bool = False, caption_missing=False) -> None:
+    def __init__(self, repo_id: str, load_models: bool = True, cache_full_dataset: bool = False, multithread: bool = False, caption_missing=False, caption_force=False) -> None:
         self._repo_id = repo_id
 
         self._config: dict = {}
@@ -111,7 +111,8 @@ class Trainer:
         if not self._ids_img:
             self._ids_img = self._hfd.ids
         
-        if caption_missing:
+        self._caption_force = caption_force
+        if caption_missing or self._caption_force:
             self._caper = CapJoy(trigger=self._trigger)
         
         # make datatset folder
@@ -208,10 +209,7 @@ class Trainer:
             
             # caption or prompt fetch
             #caption = self._hfd.captions[idx]
-            caption = self._hfd.prompts[idx]
-            if not caption:
-                caption = self._hfd.captions[idx]
-            if not caption:
+            if self._caption_force:
                 if self._caper is not None:
                     img = self._hfd.pil(idx)
                     caption = self._caper.img_caption(img)        
@@ -219,10 +217,22 @@ class Trainer:
                     if caption:
                         self._hfd.img_set_caption_joy(idx, caption)
                         generated += 1
-            if not caption:
-                lost += 1
-                print(f"{id}: caption missed!")
-                continue
+            else:
+                caption = self._hfd.prompts[idx]
+                if not caption:
+                    caption = self._hfd.captions[idx]
+                if not caption:
+                    if self._caper is not None:
+                        img = self._hfd.pil(idx)
+                        caption = self._caper.img_caption(img)        
+                        print(f"\n\ngenerated caption:\n{caption}")
+                        if caption:
+                            self._hfd.img_set_caption_joy(idx, caption)
+                            generated += 1
+                if not caption:
+                    lost += 1
+                    print(f"{id}: caption missed!")
+                    continue
 
             # TODO more generic, and take care that the dataset isnt polluted with trigger words
             caption = caption.replace("1gts,", "")
