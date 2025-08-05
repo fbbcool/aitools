@@ -82,8 +82,8 @@ class Trainer:
         self._ids_img = self._config.get("imgs", [])
         self._trigger = self._config.get("trigger", "")
         self._name = self._config.get("name", "")
-        self._batch_size = self._config.get("batch_size", 1)
-        self._num_repeats = self._config.get("num_repeats", 1)
+        self._batch_size = int(self._config.get("batch_size", 1))
+        self._num_repeats = int(self._config.get("num_repeats", 1))
 
         # if model key doesnt exist do nothing
         if "model" in self._config:
