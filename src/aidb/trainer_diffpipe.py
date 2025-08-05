@@ -35,7 +35,7 @@ class Trainer:
     CHUNK_SIZE: Final = 1638400
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 
-    def __init__(self, repo_id: str, load_models: bool = True, cache_full_dataset: bool = False, mutlitread: bool = False, caption_missing=False) -> None:
+    def __init__(self, repo_id: str, load_models: bool = True, cache_full_dataset: bool = False, multithread: bool = False, caption_missing=False) -> None:
         self._repo_id = repo_id
 
         self._config: dict = {}
@@ -131,7 +131,7 @@ class Trainer:
             #self._download_models_flux()
             self._download_models_wan()
         
-        self._make_dataset(cache_full_dataset=cache_full_dataset, multithread=mutlitread)
+        self._make_dataset(cache_full_dataset=cache_full_dataset, multithread=multithread)
         #self._make_file_sample_prompts()
         self._make_file_dataset_config()
         self._make_file_diffpipe_config()
