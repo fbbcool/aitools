@@ -423,7 +423,7 @@ partition_method = 'parameters'
 # dtype for saving the LoRA or model, if different from training dtype
 save_dtype = 'bfloat16'
 # Batch size for caching latents and text embeddings. Increasing can lead to higher GPU utilization during caching phase but uses more memory.
-caching_batch_size = 1
+caching_batch_size = {self._batch_size}
 
 # Number of parallel processes to use in map() calls when caching the dataset. Defaults to min(8, num_cpu_cores) if unset.
 # If you have a lot of cores and multiple GPUs, raising this can increase throughput of caching, but it may use more memory,
@@ -434,7 +434,7 @@ caching_batch_size = 1
 #compile = true
 
 # How often deepspeed logs to console.
-steps_per_print = 1
+steps_per_print = 10
 # How to extract video clips for training from a single input video file.
 # The video file is first assigned to one of the configured frame buckets, but then we must extract one or more clips of exactly the right
 # number of frames for that bucket.
@@ -461,7 +461,7 @@ timestep_sample_method = 'logit_normal'
 # For models that support full fine tuning, simply delete or comment out the [adapter] table to FFT.
 [adapter]
 type = 'lora'
-rank = {self._config["netdim"]}
+rank = {int(self._config["netdim"])}
 # Dtype for the LoRA weights you are training.
 dtype = 'bfloat16'
 # You can initialize the lora weights from a previously trained lora.
