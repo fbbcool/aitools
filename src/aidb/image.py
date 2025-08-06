@@ -46,6 +46,8 @@ class Image:
             self._collection = self._db_manager._collection
         else:
             self._collection = collection
+        self._hfd_repo_id = None
+        self._hfd = None
         
 
     @property
@@ -95,7 +97,29 @@ class Image:
             return None
         return self.data.get("rating")
     
-        pass 
+    @property
+    def hfd_repo_id(self) -> str | None:
+        if self._hfd_repo_id is None:
+            # _get tries it once! if it fails, it return an emtpy string to avoid second tries!
+            self._hfd_repo_id = self.data.get("hfd_repo_id", "")
+            if not self._hfd_repo_id:
+                self._hfd_repo_id = self._db_manager.get_collection_hfd(self._collection)
+            if self._hfd_repo_id is None:
+                self._hfd_repo_id = ""
+            # now determinig really failed and set it to empty to avoid subsequent tries!
+        
+        elif not self._hfd_repo_id:
+            return None
+        
+        return self._hfd_repo_id
+    
+    @property
+    def hfd(self):
+        repo_id = self.hfd_repo_id
+        if repo_id is None:
+            return None
+        return self._db_manager.get_hfd(self.hfd_repo_id)
+    
     @property
     def caption(self) -> str | None:
         if self._caption is None:
@@ -112,7 +136,7 @@ class Image:
     
     @property
     def _hfd_caption_joy(self) -> str | None:
-        _hfd = self._db_manager.hfd
+        _hfd = self.hfd
         if _hfd is None:
             return None
 
@@ -123,7 +147,7 @@ class Image:
 
     @property
     def _hfd_caption(self) -> str | None:
-        _hfd = self._db_manager.hfd
+        _hfd = self.hfd
         if _hfd is None:
             return None
 

@@ -31,8 +31,6 @@ class DBManager:
             port: int = 27017,
             db_name: str = '',
             collection: str = "",
-            hfd_repo_id: str = "",
-            hfd_refresh: bool = False,
             ) -> None:
         """
         Initializes the MongoDB connection. Configuration can be loaded from a YAML file.
@@ -54,9 +52,12 @@ class DBManager:
         self._db_name: str = db_name
         self._collection: str = collection
 
+        # config
+        self._config = {}
+
         # Hf dataset
-        self._hfd_repo_id = hfd_repo_id
-        self._hfd: HFDatasetImg | None = None
+        self._hfds: dict[str,HFDatasetImg | None] = {}
+        self._collection2hfd: dict[str, str] = {}
 
         # Private members for default thumbnail settings, initialized with hardcoded fallbacks
         self._default_thumbnail_dir: Path = Path("./default_thumbnails")
@@ -91,17 +92,28 @@ class DBManager:
             self.client = None
             self.db = None
 
+    def get_hfd(self, repo_id: str) -> HFDatasetImg | None:
+        """
+        Tries to load a hugging face dataset by repo_id.
+        returns None if creation fails
+        """
+        if repo_id in self._hfds:
+            return self._hfds[repo_id]
         try:
-            self._hfd = HFDatasetImg(self._hfd_repo_id, force_meta_dl=hfd_refresh)
+            hfd = HFDatasetImg(repo_id, force_meta_dl=True)
+            self._hfds[repo_id] = hfd
+            return hfd
         except Exception as e:
-            print(f"Failed connecting to HF dataset: {self._hfd_repo_id}\n{e}")
-            self._hfd = None
-        else:
-            print(f"Successfully connected to HF dataset: {self._hfd_repo_id}")
-        
-    @property
-    def hfd(self) -> HFDatasetImg | None:
-        return self._hfd
+            print(f"Failed connecting to HF dataset: {repo_id}\n{e}")
+            self._hfds[repo_id] = None
+            return None
+    
+    def get_collection_hfd(self, collection: str) -> str | None:
+        if collection is None:
+            return None
+        if not collection:
+            return None
+        return self._collection2hfd.get(collection, None)
     
     def set_collection(self, collection_name: str) -> None:
         """
@@ -184,6 +196,7 @@ class DBManager:
                 config = yaml.safe_load(f)
             
             if config and isinstance(config, dict):
+                self._config = config
                 # Load MongoDB settings
                 if "mongodb_settings" in config and isinstance(config["mongodb_settings"], dict):
                     mongo_settings = config["mongodb_settings"]
@@ -226,6 +239,11 @@ class DBManager:
                     hf_settings = config["hf_settings"]
                     if "repo_id_dataset" in hf_settings and isinstance(hf_settings["repo_id_dataset"], str):
                         self._hfd_repo_id = hf_settings["repo_id_dataset"]
+                    if "collection2hfd" in hf_settings and isinstance(hf_settings["collection2hfd"], list):
+                        collection2hfd = {}
+                        for mapping in hf_settings["collection2hfd"]:
+                            collection2hfd |= mapping
+                        self._collection2hfd = collection2hfd
                     print(f"Hugging Face Dataset configuration loaded as '{self._hfd_repo_id}'.")
                 else:
                     print(f"Warning: 'hf_dataset_settings' section not found or malformed in '{config_file}'. Using default HF dataset settings.")

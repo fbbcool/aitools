@@ -8,7 +8,9 @@ mongodb_settings:
   #collection: "imgs_0"   # Or your collection name, e.g., "images"
   #collection: "imgs_lara"   # Or your collection name, e.g., "images"
   #collection: "imgs_hairy01"   # Or your collection name, e.g., "images"
-  collection: "imgs_wan01"   # Or your collection name, e.g., "images"
+  #collection: "imgs_wan01"   # Or your collection name, e.g., "images"
+  #collection: "imgs_alexandra"   # Or your collection name, e.g., "images"
+  collection: "imgs_fbb01"   # Or your collection name, e.g., "images"
 
 # Thumbnail generation settings
 thumbnail_settings:
@@ -32,7 +34,11 @@ train_image_settings:
 
 # Huggingface settings
 hf_settings:
-  repo_id_dataset: "fbbcool/gts01_r35"
-  #repo_id_dataset: "fbbcool/1gts_wan01"
-  #repo_id_dataset: "fbbcool/1woman_lara02"
-  #repo_id_dataset: "fbbcool/1hairy_01"
+  collection2hfd:
+    - imgs_0: "fbbcool/gts01_r35"
+    - imgs_wan01: "fbbcool/1gts_wan01"
+    - imgs_lara: "fbbcool/1woman_lara02"
+    - imgs_hairy01: "fbbcool/1hairy_01"
+    - imgs_fbb01: "fbbcool/1fbb_01"
+    - imgs_alexandra: "fbbcool/1fem_alexandra"
+    #- imgs_: "fbbcool/1pussy_insert"
