@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Literal, Optional, Tuple
 from bson.objectid import ObjectId
+import random
 
 # Local imports for DBManager and Image classes
 from aidb.dbmanager import DBManager
@@ -214,6 +215,37 @@ class Query:
                         print(f"Error creating Image object for document {doc.get('_id')}: {e}")
         
         return image_objects
+
+
+    @staticmethod
+    def select_rand_prob(imgs: list[Image], probability: float) -> List[Image]:
+        """
+        Selects only a percentage of the given image list wrt. the given probability
+        """
+        if not imgs:
+            return []
+        
+        if not (0.0 <= probability <= 1.0):
+            raise ValueError("Probability must be between 0.0 and 1.0")
+        
+        num_to_select = max(1, int(len(imgs) * probability))
+        return random.sample(imgs, num_to_select)
+        
+    @staticmethod
+    def select_rand_num(imgs: list[Image], num: int) -> List[Image]:
+        """
+        Selects only a certain number of random images wrt. a given image list.
+        """
+        if not imgs:
+            return []
+        
+        if num <= 0:
+            raise ValueError("Number of images to select must be positive.")
+        
+        if num >= len(imgs):
+            return random.sample(imgs, len(imgs)) # Return all if num is greater or equal
+        
+        return random.sample(imgs, num)
 
 
     @staticmethod
