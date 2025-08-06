@@ -13,4 +13,5 @@ torch
 transformers
 sentencepiece
 torchvision
+more_itertools
 #liger-kernel==0.5.9
