@@ -340,7 +340,7 @@ path = '{self.FOLDER_DATASET}'
 
 # How many repeats for 1 epoch. The dataset will act like it is duplicated this many times.
 # The semantics of this are the same as sd-scripts: num_repeats=1 means one epoch is a single pass over all examples (no duplication).
-num_repeats = '{self._num_repeats}'
+num_repeats = {self._num_repeats}
 
 # Example of overriding some settings, and using ar_buckets to directly specify ARs.
 # ar_buckets = [[448, 576]]
