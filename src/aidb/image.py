@@ -5,6 +5,7 @@ from bson.objectid import ObjectId
 from PIL import Image as PILImage
 import numpy as np # Import Image from Pillow and alias it to avoid conflict with our class name
 
+from aidb.dbdefines import TAGS_TRIGGER
 from aidb.dbmanager import DBManager # Updated import
 from aidb.tagger import tagger_wd as tagger # Updated import
 
@@ -42,6 +43,7 @@ class Image:
         self.contributing_tags = []
         self.operation : Literal['nop','rate','scene'] = 'nop'
         self._caption: str | None = None
+        self._prompt: str | None = None
         if collection is None:
             self._collection = self._db_manager._collection
         else:
@@ -157,7 +159,19 @@ class Image:
         return None
     
     @property
-    def meta_prompt(self) -> str | None:
+    def prompt(self) -> str | None:
+        if self._prompt is None:
+            prompt = self._prompt_meta
+            if prompt is None:
+                self._prompt = ""
+            else:
+                self._prompt = prompt
+        if not self._prompt:
+            return None
+        return self._prompt
+
+    @property
+    def _prompt_meta(self) -> str | None:
         prompt = None
         try:
             pil = self.pil 
@@ -177,9 +191,8 @@ class Image:
         # always return None, regardless of None or empty.
         if not prompt:
             return None
-        # TODO: more general
-        prompt = prompt.replace("1gts,", "")
-        prompt = prompt.replace("1woman,", "")
+        for trigger in TAGS_TRIGGER:
+            prompt = prompt.replace(f"{trigger},", "")
         return prompt
     
     def set_rating(self, rating: int) -> int:
@@ -797,7 +810,7 @@ class Image:
             
         # 3. or expand metadata.jsonl
         #line_json = {"file_name": "images/" + train_image_destination_path.name, "text": caption_string, "tags": json.dumps(self.tags)}
-        prompt = self.meta_prompt
+        prompt = self._prompt_meta
         caption = self.caption
         capjoy = self._hfd_caption_joy
         line_json = {"file_name": "images/" + train_image_destination_path.name, "tags": json.dumps(self.tags), "prompt": prompt, "caption": caption, "caption_joy": capjoy}

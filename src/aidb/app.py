@@ -609,9 +609,9 @@ class AIDBGradioApp:
         # This function now explicitly returns None, as it's not directly updating Gradio outputs.
         # give gradio info based on ret
         if ret and ret > 0:
-            gr.Info(f"Rating for image {image_id} updated to {new_rating}.")
+            gr.Info(f"Rating for image {image_id} updated to {new_rating}.",duration=1.0)
         else:
-            gr.Warning(f"Failed to update rating for image {image_id}.")
+            gr.Warning(f"Failed to update rating for image {image_id}.", duration=2.0)
             
         return None 
 
