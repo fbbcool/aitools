@@ -12,11 +12,15 @@ mongodb_settings:
   #collection: "imgs_alexandra"   # Or your collection name, e.g., "images"
   collection: "imgs_fbb01"   # Or your collection name, e.g., "images"
 
+# Directory settings
+directory_settings:
+  root_dir: "/Volumes/data/pool"
+
 # Thumbnail generation settings
 thumbnail_settings:
   # Default directory to save generated thumbnails
   # This path is relative to where the application is run.
-  default_thumbnail_dir: "/Volumes/data/pool/___thumbnails" 
+  default_thumbnail_dir: "___thumbnails" 
   
   # Default size [width, height] for generated thumbnails
   # The aspect ratio of the original image will be preserved.
@@ -26,7 +30,7 @@ thumbnail_settings:
 train_image_settings:
   # Default directory to save generated training images
   # This path is relative to where the application is run.
-  default_train_image_dir: "/Volumes/data/pool/___train_images_768" 
+  default_train_image_dir: "___train_images_768" 
   
   # Default size [width, height] for generated thumbnails
   # The aspect ratio of the original image will be preserved.

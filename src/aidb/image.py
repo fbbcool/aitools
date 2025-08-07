@@ -824,7 +824,7 @@ class Image:
         # 3. or expand metadata.jsonl
         #line_json = {"file_name": "images/" + train_image_destination_path.name, "text": caption_string, "tags": json.dumps(self.tags)}
         prompt = self._prompt_meta
-        caption = self.caption
+        caption = self._hfd_caption_search
         capjoy = self._hfd_caption_joy
         line_json = {"file_name": "images/" + train_image_destination_path.name, "tags": json.dumps(self.tags), "prompt": prompt, "caption": caption, "caption_joy": capjoy}
         # add line to extisting "metadata.jsonl" or create file if not exist

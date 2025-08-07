@@ -59,6 +59,7 @@ class DBManager:
         self._hfds: dict[str,HFDatasetImg | None] = {}
         self._collection2hfd: dict[str, str] = {}
 
+        self._root = Path("./")
         # Private members for default thumbnail settings, initialized with hardcoded fallbacks
         self._default_thumbnail_dir: Path = Path("./default_thumbnails")
         self._default_thumbnail_size: Tuple[int, int] = (128, 128)
@@ -217,11 +218,17 @@ class DBManager:
                 else:
                     print(f"Warning: 'mongodb_settings' section not found or malformed in '{config_file}'. Using constructor/default MongoDB settings.")
 
+                # Load directory settings
+                if "directory_settings" in config and isinstance(config["directory_settings"], dict):
+                    directory_settings = config["directory_settings"]
+                    if "root_dir" in directory_settings and isinstance(directory_settings["root_dir"], str):
+                        self._root = Path(directory_settings["root_dir"])
+                
                 # Load thumbnail settings
                 if "thumbnail_settings" in config and isinstance(config["thumbnail_settings"], dict):
                     thumb_settings = config["thumbnail_settings"]
                     if "default_thumbnail_dir" in thumb_settings and isinstance(thumb_settings["default_thumbnail_dir"], str):
-                        self._default_thumbnail_dir = Path(thumb_settings["default_thumbnail_dir"])
+                        self._default_thumbnail_dir = self._root / thumb_settings["default_thumbnail_dir"]
                     if "default_thumbnail_size" in thumb_settings and isinstance(thumb_settings["default_thumbnail_size"], list) and len(thumb_settings["default_thumbnail_size"]) == 2:
                         self._default_thumbnail_size = tuple(thumb_settings["default_thumbnail_size"])
                     print(f"Thumbnail configuration loaded from '{config_file}'.")
@@ -232,7 +239,7 @@ class DBManager:
                 if "train_image_settings" in config and isinstance(config["train_image_settings"], dict):
                     train_img_settings = config["train_image_settings"]
                     if "default_train_image_dir" in train_img_settings and isinstance(train_img_settings["default_train_image_dir"], str):
-                        self._default_train_image_dir = Path(train_img_settings["default_train_image_dir"])
+                        self._default_train_image_dir = self._root / train_img_settings["default_train_image_dir"]
                     if "default_train_image_size" in train_img_settings and isinstance(train_img_settings["default_train_image_size"], list) and len(train_img_settings["default_train_image_size"]) == 2:
                         self._default_train_image_size = tuple(train_img_settings["default_train_image_size"])
                     print(f"Train image configuration loaded from '{config_file}'.")

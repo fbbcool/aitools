@@ -68,6 +68,12 @@ class SetImg:
     def collections(self) -> list[str]:
         return [collection for collection in self._imgs]
     
+    @property
+    def imgs(self):
+        for colllection in self.collections:
+            for img in self._imgs[colllection]:
+                yield img
+    
     def add(self, imgs: Image | list [Image]):
         if not imgs:
             return
@@ -171,3 +177,9 @@ class SetImg:
             print(f"Set '{self.name}' already exist, overwrite not implemented.")
             return
         self._dbm.insert_document('sets_img', self.to_dict)
+    
+    def make_train(self) -> None:
+        folder_train = self._dbm._root / f"___train_{self.name}"
+        for img in self.imgs:
+            img.train_image
+            img.export_train(folder_train, export_cap_files=False, trigger="1noset")
