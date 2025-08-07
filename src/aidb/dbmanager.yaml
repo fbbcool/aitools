@@ -34,6 +34,15 @@ train_image_settings:
 
 # Huggingface settings
 hf_settings:
+  preload:
+    - "fbbcool/gts01_r35"
+    - "fbbcool/1gts_wan01"
+    - "fbbcool/1woman_lara02"
+    - "fbbcool/1hairy_01"
+    - "fbbcool/1fbb_01"
+    - "fbbcool/1fem_alexandra"
+    - "fbbcool/1pussy_insert"
+
   collection2hfd:
     - imgs_0: "fbbcool/gts01_r35"
     - imgs_wan01: "fbbcool/1gts_wan01"

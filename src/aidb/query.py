@@ -240,10 +240,10 @@ class Query:
             return []
         
         if num <= 0:
-            raise ValueError("Number of images to select must be positive.")
+            return imgs
         
         if num >= len(imgs):
-            return random.sample(imgs, len(imgs)) # Return all if num is greater or equal
+            return imgs
         
         return random.sample(imgs, num)
 
@@ -262,5 +262,7 @@ class Query:
         Converts a list of images to a list of image ids
         """
         return [img.id for img in imgs]
+    
+
         
     

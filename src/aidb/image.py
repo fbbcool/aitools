@@ -159,6 +159,19 @@ class Image:
         return None
     
     @property
+    def _hfd_caption_search(self) -> str | None:
+        caption = self._hfd_caption
+        if caption is None:
+            for _hfd in self._db_manager.hfds:
+                idx = _hfd.id2idx(self.id)
+                if idx is None:
+                    continue
+                caption = _hfd.captions[idx]
+                if caption:
+                    break
+        return caption
+
+    @property
     def prompt(self) -> str | None:
         if self._prompt is None:
             prompt = self._prompt_meta

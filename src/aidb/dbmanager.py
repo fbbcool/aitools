@@ -92,6 +92,11 @@ class DBManager:
             self.client = None
             self.db = None
 
+    @property
+    def hfds(self):
+        for repo_id in self._hfds:
+            yield self._hfds[repo_id]
+
     def get_hfd(self, repo_id: str) -> HFDatasetImg | None:
         """
         Tries to load a hugging face dataset by repo_id.
@@ -237,14 +242,14 @@ class DBManager:
                 # Load HF dataset
                 if "hf_settings" in config and isinstance(config["hf_settings"], dict):
                     hf_settings = config["hf_settings"]
-                    if "repo_id_dataset" in hf_settings and isinstance(hf_settings["repo_id_dataset"], str):
-                        self._hfd_repo_id = hf_settings["repo_id_dataset"]
+                    if "preload" in hf_settings and isinstance(hf_settings["preload"], list):
+                        for repo_id in hf_settings["preload"]:
+                            _ = self.get_hfd(repo_id)
                     if "collection2hfd" in hf_settings and isinstance(hf_settings["collection2hfd"], list):
                         collection2hfd = {}
                         for mapping in hf_settings["collection2hfd"]:
                             collection2hfd |= mapping
                         self._collection2hfd = collection2hfd
-                    print(f"Hugging Face Dataset configuration loaded as '{self._hfd_repo_id}'.")
                 else:
                     print(f"Warning: 'hf_dataset_settings' section not found or malformed in '{config_file}'. Using default HF dataset settings.")
                     

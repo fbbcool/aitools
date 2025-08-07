@@ -54,7 +54,7 @@ class AppImageCell:
         tiny_info = []
         if img.caption is not None:
             tiny_info.append("C")
-        if img.meta_prompt is not None:
+        if img.prompt is not None:
             tiny_info.append("P")
         caption = f"Score: {img.score:.2f} ({img.id}) {'/'.join(tiny_info)}"
 
