@@ -3,6 +3,7 @@ from aidb.dbmanager import DBManager
 from aidb.query import Query
 from aidb.dbstatistics import Statistics
 from aidb.image import Image
+from aidb.set import SetImg
 from aidb.tagger import TAGS_CUSTOM
 from aidb.app.cell_image import AppImageCell
 from aidb.app.tab_search_and_rate import AppTabSearchAndRate
@@ -82,11 +83,6 @@ class AIDBGradioApp:
             # --- End Hidden Components ---
 
             AppImageCell.html_image_modal()
-
-            with gr.Tab("Database Status"):
-                status_output = gr.Textbox(label="MongoDB Connection Status", interactive=False)
-                check_status_btn = gr.Button("Check DB Connection")
-                check_status_btn.click(self._check_db_status, outputs=status_output)
 
             AppTabSearchAndRate._create_interface()            
             with gr.Tab("Image Search"): # Renamed tab for clarity
@@ -221,20 +217,81 @@ class AIDBGradioApp:
                 outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info] # Update the grid
             )
             
-        return demo 
+            with gr.Tab("Image Set View"):
+                # drop down menu for image sets stored in the db
+                image_set_dropdown = gr.Dropdown(
+                    label="Select Image Set",
+                    choices=self._db_manager.sets_img_names,
+                    interactive=True
+                )
+                load_image_set_button = gr.Button("Load Image Set")
+                
+                with gr.Column(visible=True) as image_set_list_view:
+                    image_set_html_display = gr.HTML(label="Images in Set")
+                    with gr.Row():
+                        image_set_prev_btn = gr.Button("Previous Page")
+                        image_set_page_info = gr.Textbox(label="Page", interactive=False, scale=0)
+                        image_set_next_btn = gr.Button("Next Page")
+                        image_set_go_to_page_num = gr.Number(label="Go to Page", value=1, precision=0, scale=0)
+                        image_set_go_to_page_btn = gr.Button("Go")
+                        image_set_refresh_button = gr.Button("Refresh Current Page")
+                
+                # State variables for image set pagination
+                image_set_cache = gr.State(value=[])
+                image_set_current_page = gr.State(value=1)
 
-    def _check_db_status(self) -> str:
-        """
-        Checks the status of the MongoDB connection.
-        """
-        if self._db_manager.client and self._db_manager.db:
-            try:
-                self._db_manager.client.admin.command('ping')
-                return "Successfully connected to MongoDB!"
-            except Exception as e:
-                return f"MongoDB connection failed: {e}"
-        else:
-            return "MongoDB client or database not initialized."
+                load_image_set_button.click(
+                    self._load_image_set,
+                    inputs=[image_set_dropdown],
+                    outputs=[image_set_html_display, image_set_cache, image_set_current_page, image_set_page_info]
+                )
+
+                image_set_prev_btn.click(
+                    self._paginate_images,
+                    inputs=[image_set_cache, image_set_current_page, gr.State(-1)],
+                    outputs=[image_set_html_display, image_set_current_page, image_set_page_info]
+                )
+                image_set_next_btn.click(
+                    self._paginate_images,
+                    inputs=[image_set_cache, image_set_current_page, gr.State(1)],
+                    outputs=[image_set_html_display, image_set_current_page, image_set_page_info]
+                )
+                image_set_go_to_page_btn.click(
+                    self._go_to_specific_page,
+                    inputs=[image_set_cache, image_set_current_page, image_set_go_to_page_num],
+                    outputs=[image_set_html_display, image_set_current_page, image_set_page_info]
+                )
+                image_set_refresh_button.click(
+                    self._refresh_image_grid,
+                    inputs=[image_set_cache, image_set_current_page],
+                    outputs=[image_set_html_display, image_set_current_page, image_set_page_info]
+                )
+
+            
+        return demo 
+    
+    def _load_image_set(self, img_set: str):
+        set = SetImg(self._db_manager, name=img_set, autoload=True)
+        imgs = [img for img in set.imgs]
+        # add chosen operation to images
+        for img in imgs:
+            img.operation = 'nop'
+
+        print(f"Found {len(imgs)} images matching advanced search criteria.")
+
+        # Initialize pagination to the first page
+        total_images = len(imgs)
+        total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
+        current_page = 1
+
+        start_idx = (current_page - 1) * IMAGES_PER_PAGE
+        end_idx = start_idx + IMAGES_PER_PAGE
+        
+        images_on_page = imgs[start_idx:end_idx]
+        html_output = self._generate_image_html(images_on_page)
+        page_info_text = f"Page {current_page}/{total_pages} ({total_images} imgs)"
+
+        return html_output, imgs, current_page, page_info_text
 
     def _get_sorted_wd_tags_for_dropdown(self) -> List[str]:
         """

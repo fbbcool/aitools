@@ -298,7 +298,7 @@ class DBManager:
             yield Image(self, str(doc['_id']), doc=doc)
 
     @property
-    def container_names(self):
+    def container_names(self) -> list[str]:
         """Returns a generator of for all container names in the db"""
         if self.db is None:
             print("Database not connected.")
@@ -307,6 +307,11 @@ class DBManager:
         docs = self.find_documents('containers')
         for doc in docs:
             yield doc["name"]
+    
+    @property
+    def sets_img_names(self) -> list[str]:
+        sets = self.find_documents('sets_img')
+        return [s["name"] for s in sets]
 
     @property
     def default_thumbnail_dir(self) -> Path:

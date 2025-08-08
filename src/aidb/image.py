@@ -125,7 +125,7 @@ class Image:
     @property
     def caption(self) -> str | None:
         if self._caption is None:
-            caption_new = self._hfd_caption
+            caption_new = self._hfd_caption_search
             if caption_new is None:
                 self._caption = ""
             else:

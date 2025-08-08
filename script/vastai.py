@@ -395,14 +395,22 @@ class ModelInstComfyUi:
             # MVP first
             # checkpoint
             ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
+            
             # VAE
-            ModelInst(t, ModelType.VAE, hf2, "Aitrepreneur/FLX", "wan_2.1_vae.safetensors", ""),
+            ModelInst(t, ModelType.VAE, hf2, "Kijai/WanVideo_comfy", "Wan2_1_VAE_bf16.safetensors", ""),
+            #ModelInst(t, ModelType.VAE, hf2, "Kijai/WanVideo_comfy", "Wan2_1_VAE_fp32.safetensors", ""),
+            
             # clip
-            ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
+            #ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
+            ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
+            
             # lora
-            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "Kijai/WanVideo_comfy", "Pusa/Wan21_PusaV1_LoRA_14B_rank512_bf16.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v", "loras/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_mid.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
+            
             # upscale
             ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x2.pth", ""),
             ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x4.pth", ""),
@@ -410,24 +418,14 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.CustomNode, hf2, "camenduru/stmfnet", "stmfnet.pth", ""),
 
             # checkpoint
-            #ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
-            #ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy", "Wan2_1-I2V-14B-720P_fp8_e5m2.safetensors", ""),
-            #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan14BT2VFusionX-Q8_0.gguf", ""),
-            #ModelInst(t, ModelType.Unet, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_VACE-Q8_0.gguf", ""),
 
             # VAE
-            #ModelInst(t, ModelType.VAE, hf2, "Aitrepreneur/FLX", "wan_2.1_vae.safetensors", ""),
 
             # clip
-            #ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
-            #ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
 
             #clip vision
-            #ModelInst(t, ModelType.ClipVision, hf2, "Kijai/WanVideo_comfy", "open-clip-xlm-roberta-large-vit-huge-14_visual_fp16.safetensors", ""),
             
             # lora
-            #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
-            #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1woman_lara.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_cum.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_deepthroat.safetensors", ""),
@@ -454,6 +452,11 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.CustomNode, git, "github.com/ltdrdata", "ComfyUI-Inspire-Pack", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-WanVideoWrapper", ""),
+            ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            ModelInst(t, ModelType.CustomNode, git, "", "", ""),
             #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
             #git clone https://github.com/Fannovel16/comfyui_controlnet_aux
             #git clone https://github.com/wallish77/wlsh_nodes

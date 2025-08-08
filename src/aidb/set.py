@@ -183,3 +183,4 @@ class SetImg:
         for img in self.imgs:
             img.train_image
             img.export_train(folder_train, export_cap_files=False, trigger="1noset")
+    
