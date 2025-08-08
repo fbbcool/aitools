@@ -61,6 +61,8 @@ class ModelInst:
         self.method = method
         self.url = url
         self.ext = ext
+        self.repo = url
+        self.path_local = name
         self.name = name
         if not name:
             self.name = os.path.basename(self.url)
@@ -96,7 +98,7 @@ class ModelInst:
             ofolder = Path(ofolder)
         else:
             raise TypeError("ofolder has no correct type")
-        ofile_str = hf_hub_download(repo_id=repo_id, filename=filename, local_dir=ofolder_str)
+        ofile_str = hf_hub_download(repo_id=self.repo, filename=self.path_local, local_dir=ofolder_str)
         return Path(ofile_str)
     
     def download_hf(self, url: str, fname: str):
