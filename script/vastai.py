@@ -47,6 +47,8 @@ class ModelType(Enum):
     Upscale = auto()
     VAE = auto()
     Unet = auto()
+    DiffusionModel = auto()
+    TextEncoder = auto()
 
 
 class ModelInst:
@@ -292,6 +294,10 @@ class ModelInst:
                 folder_model = "unet"
             elif self.model == ModelType.Upscale:
                 folder_model = "upscale_models"
+            elif self.model == ModelType.DiffusionModel:
+                folder_model = "diffusion_models"
+            elif self.model == ModelType.TextEncoder:
+                folder_model = "text_encoders"
         if self.target == TargetType.Kohyass:
             path_models = "/workspace/kohya_ss/models"
             if self.model == ModelType.Checkpoint:
@@ -392,6 +398,90 @@ class ModelInstComfyUi:
             # flux fill
             ModelInst(t, ModelType.Unet, hf2, "YarvixPA/FLUX.1-Fill-dev-gguf", "flux1-fill-dev-Q8_0.gguf", ""),
         ]
+        t = TargetType.Comfy
+        models_template: list[ModelInst] = [
+            # MVP first
+            # checkpoint
+            #ModelInst(t, ModelType.DiffusionModel, hf2, "", "", ""),
+            
+            # VAE
+            #ModelInst(t, ModelType.VAE, hf2, "", "", ""),
+            
+            # clip
+            #ModelInst(t, ModelType.TextEncoder, hf2, "", "", ""),
+            
+            # lora
+            #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
+            
+            # upscale
+            ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x2.pth", ""),
+            ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x4.pth", ""),
+
+            # additional checkpoints
+            
+            # additional loras
+
+            #clip vision
+            
+            # custom nodes
+            # to comfyui-frame-interpolation/ckpts/stmfnet/
+            #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/city96", "ComfyUI-GGUF", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/rgthree", "rgthree-comfy", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/yolain", "ComfyUI-Easy-Use", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-KJNodes", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/cubiq", "ComfyUI_essentials", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/ltdrdata", "ComfyUI-Inspire-Pack", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-WanVideoWrapper", ""),
+        ]
+
+        models_qwen: list[ModelInst] = [
+            # MVP first
+            # checkpoint
+            #ModelInst(t, ModelType.DiffusionModel, hf2, "", "", ""),
+            ModelInst(t, ModelType.DiffusionModel, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", ""),
+            
+            # VAE
+            #ModelInst(t, ModelType.VAE, hf2, "", "", ""),
+            ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/vae/qwen_image_vae.safetensors", ""),
+            
+            # clip
+            #ModelInst(t, ModelType.TextEncoder, hf2, "", "", ""),
+            ModelInst(t, ModelType.TextEncoder, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors", ""),
+            
+            # lora
+            #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
+            
+            # upscale
+            ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x2.pth", ""),
+            ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x4.pth", ""),
+
+            # additional checkpoints
+            
+            # additional loras
+
+            #clip vision
+            
+            # custom nodes
+            # to comfyui-frame-interpolation/ckpts/stmfnet/
+            #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/city96", "ComfyUI-GGUF", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/rgthree", "rgthree-comfy", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/yolain", "ComfyUI-Easy-Use", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-KJNodes", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/cubiq", "ComfyUI_essentials", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/ltdrdata", "ComfyUI-Inspire-Pack", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-WanVideoWrapper", ""),
+        ]
+
         t = TargetType.Comfy
         models_current: list[ModelInst] = [
             # MVP first
@@ -540,3 +630,6 @@ if __name__ == "__main__":
         print(f"creating post hook.")
         hook()
     POST_HOOK.save()
+
+
+# qwen
