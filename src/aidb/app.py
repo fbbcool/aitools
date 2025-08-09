@@ -605,6 +605,8 @@ class AIDBGradioApp:
         if img_caption is None:
             img_caption = img_obj.caption
         if img_caption is None:
+            img_caption = img_obj.prompt
+        if img_caption is None:
             img_caption = ""
 
         full_img_base64 = AppImageCell._pil_to_base64(pil_img)

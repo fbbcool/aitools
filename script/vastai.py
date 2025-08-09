@@ -218,35 +218,45 @@ class ModelInst:
     
     @property
     def install(self, force: bool = False) -> None:
-        url_folder = self.url_inst
-        url_repos = f"{url_folder}/{self.name}"
-        url_model = url_repos
-        if self.ext:
-            url_model = f"{url_model}.{self.ext}"
-        
-        if not force:
-            if ModelInst.url_exit(url_model):
-                return
-            
-        os.makedirs(url_folder, exist_ok=True)
-        
+        self.path_model.mkdir(parents=True, exist_ok=True) 
         try:
-            if self.method == DownloadMethod.Wget:
-                print(f"installing by wget: {self.url} -> {url_model}")
-                self.download_wget(self.url, url_model)
+            if self.method == DownloadMethod.Hugging2:
+                repo_id = self.repo
+                filename = self.path_local
+                print(f"installing from hugging_2: {repo_id} / {filename} -> {self.path_model}")
+                file_hf = hf_hub_download(repo_id=self.repo, filename=self.path_local)
+                # symbolic link to of file_hf to self.path_model folder
+                file_hf_path = Path(file_hf)
+                target_path = self.path_model / file_hf_path.name
+                
+                # Check if the target file already exists and is a symlink to the correct source
+                if target_path.is_symlink() and target_path.resolve() == file_hf_path.resolve():
+                    print(f"Symlink already exists and is correct: {target_path} -> {file_hf_path}")
+                elif target_path.exists():
+                    # If it exists but is not a symlink or points to the wrong place, remove it
+                    print(f"Removing existing file/symlink at {target_path} to create new symlink.")
+                    if target_path.is_dir():
+                        shutil.rmtree(target_path)
+                    else:
+                        os.remove(target_path)
+                    os.symlink(file_hf_path, target_path)
+                    print(f"Created symlink: {target_path} -> {file_hf_path}")
+                else:
+                    # If it doesn't exist, create the symlink
+                    os.symlink(file_hf_path, target_path)
+                    print(f"Created symlink: {target_path} -> {file_hf_path}")
 
             if self.method == DownloadMethod.Hugging:
+                url_model = self.path_model / self.name
                 print(f"installing from hugging: {self.url} -> {url_model}")
-                self.download_hf(self.url, url_model)
+                self.download_hf(self.url, str(url_model))
+            
+            if self.method == DownloadMethod.Wget:
+                url_model = self.path_model / self.name
+                print(f"installing from wget: {self.url} -> {url_model}")
+                self.download_wget(self.url, str(url_model))
                 
-            if self.method == DownloadMethod.Hugging2:
-                path_model = Path(url_model)
-                repo_id = self.url
-                filename = path_model.name
-                ofolder = path_model.parent
-                print(f"installing from hugging_2: {repo_id} / {filename} -> {ofolder}")
-                self.download_hf_2(repo_id, filename, ofolder)
-                
+
             if self.method == DownloadMethod.Civitai:
                 print(f"installing from hugging: {self.url} -> {url_model}")
                 self.download_civitai(self.url, url_model)
@@ -256,11 +266,11 @@ class ModelInst:
                 #gdown.download(id = self.url, output = url_model)
 
             if self.method == DownloadMethod.Git:
-                print(f"git clone hook: {self.url} -> {url_repos}")
-                url_account = self.url
-                name_repo = self.name
+                url_account = self.repo
+                name_repo = self.path_local
+
                 repo_ext = Path(url_account) / name_repo
-                repo_local = Path(self.url_inst) / name_repo
+                repo_local = Path(self.path_model) / name_repo
                 POST_HOOK.add_line(f"git clone https://{repo_ext} {repo_local}")
                 file_requirements = repo_local / "requirements.txt"
                 POST_HOOK.add_line(f"if [ -e {str(file_requirements)} ]; then")
@@ -270,11 +280,12 @@ class ModelInst:
             print(f"sth went wrong:\n{e}")
 
     @property
-    def url_inst(self) -> str:
-        path_models = ""
+    def path_model(self) -> Path:
+        path_models = Path()
         folder_model = ""
+        
         if self.target == TargetType.Comfy:
-            path_models = "/workspace/ComfyUI/models"
+            path_models = Path("/workspace/ComfyUI/models")
             if self.model == ModelType.Checkpoint:
                 folder_model = "ckpt"
             elif self.model == ModelType.VAE:
@@ -301,30 +312,9 @@ class ModelInst:
                 folder_model = "diffusion_models"
             elif self.model == ModelType.TextEncoder:
                 folder_model = "text_encoders"
+        
         if self.target == TargetType.Kohyass:
-            path_models = "/workspace/kohya_ss/models"
-            if self.model == ModelType.Checkpoint:
-                folder_model = "ckpt"
-            elif self.model == ModelType.VAE:
-                folder_model = "vae"
-            elif self.model == ModelType.Controlnet:
-                folder_model = "controlnet"
-            elif self.model == ModelType.CustomNode:
-                folder_model = "nodes"
-            elif self.model == ModelType.Lora:
-                folder_model = "loras"
-            elif self.model == ModelType.Embedding:
-                folder_model = "embeddings"
-            elif self.model == ModelType.Clip:
-                folder_model = "clip"
-            elif self.model == ModelType.ClipVision:
-                folder_model = "clip_vision"
-            elif self.model == ModelType.IPAdapter:
-                folder_model = "ipadapter"
-            elif self.model == ModelType.Unet:
-                folder_model = "unet"
-        if self.target == TargetType.Fluxgym:
-            path_models = "/workspace/fluxgym/models"
+            path_models = Path("/workspace/kohya_ss/models")
             if self.model == ModelType.Checkpoint:
                 folder_model = "ckpt"
             elif self.model == ModelType.VAE:
@@ -349,7 +339,7 @@ class ModelInst:
         if not folder_model:
             raise ValueError("Dir Models unknown!")
         
-        return f"{path_models}/{folder_model}"
+        return path_models / folder_model
     
 class ModelInstComfyUi:
     def __init__(self, group = DownloadGroup.SD15) -> None:

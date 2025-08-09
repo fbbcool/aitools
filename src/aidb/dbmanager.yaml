@@ -10,7 +10,7 @@ mongodb_settings:
   #collection: "imgs_hairy01"   # Or your collection name, e.g., "images"
   #collection: "imgs_wan01"   # Or your collection name, e.g., "images"
   #collection: "imgs_alexandra"   # Or your collection name, e.g., "images"
-  collection: "imgs_0"   # Or your collection name, e.g., "images"
+  collection: "imgs_wan01"   # Or your collection name, e.g., "images"
 
 # Directory settings
 directory_settings:
