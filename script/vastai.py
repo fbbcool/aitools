@@ -30,6 +30,9 @@ class DownloadGroup(Enum):
     KOHYASS_FLUX = auto()
     KOHYASS_SDXL = auto()
     FLUXGYM = auto()
+    QWEN = auto()
+    WAN21 = auto()
+    WAN22 = auto()
     CURRENT = auto()
 class TargetType(Enum):
     Comfy = auto()
@@ -399,7 +402,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Unet, hf2, "YarvixPA/FLUX.1-Fill-dev-gguf", "flux1-fill-dev-Q8_0.gguf", ""),
         ]
         t = TargetType.Comfy
-        models_template: list[ModelInst] = [
+        models_current: list[ModelInst] = [
             # MVP first
             # checkpoint
             #ModelInst(t, ModelType.DiffusionModel, hf2, "", "", ""),
@@ -483,7 +486,7 @@ class ModelInstComfyUi:
         ]
 
         t = TargetType.Comfy
-        models_current: list[ModelInst] = [
+        models_wan21: list[ModelInst] = [
             # MVP first
             # checkpoint
             ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
@@ -558,6 +561,8 @@ class ModelInstComfyUi:
         model_db = {
             DownloadGroup.FLUX_REFINE: models_flux_refine,
             DownloadGroup.CURRENT: models_current,
+            DownloadGroup.WAN21: models_wan21,
+            DownloadGroup.QWEN: models_qwen,
         }
         for model in model_db[group]:
             model.install
@@ -583,7 +588,7 @@ class PostInstHook():
 POST_HOOK: Final = PostInstHook()
 
 
-def _hook_current():
+def _hook_wan21():
     # print the name of this method
     #print(sys._getframe(0).f_code.co_name)
 
@@ -616,8 +621,12 @@ if __name__ == "__main__":
         group = DownloadGroup.KOHYASS_FLUX
     elif str_group == "kohyass_sdxl":
         group = DownloadGroup.KOHYASS_SDXL
+    elif str_group == "qwen":
+        group = DownloadGroup.QWEN
+    elif str_group == "wan21":
+        hook = _hook_wan21 
+        group = DownloadGroup.WAN21
     elif str_group == "current":
-        hook = _hook_current 
         group = DownloadGroup.CURRENT
     else:
         str_group = "current"
@@ -630,6 +639,3 @@ if __name__ == "__main__":
         print(f"creating post hook.")
         hook()
     POST_HOOK.save()
-
-
-# qwen

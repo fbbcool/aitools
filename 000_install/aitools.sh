@@ -15,13 +15,35 @@ ___hook () {
         $ENV_POST_HOOK
     fi
 }
+___setup_qwen () {
+    python3 $ENV_HOME/script/vastai.py "qwen"
+}
+
+___setup_wan21 () {
+    python3 $ENV_HOME/script/vastai.py "wan21"
+}
+
+___setup_wan22 () {
+    python3 $ENV_HOME/script/vastai.py "wan22"
+}
+
 ___current () {
     python3 $ENV_HOME/script/vastai.py "current"
 }
 
-___all () {
+___wan21 () {
     ___install
-    ___current
+    ___setup_wan21
+    ___hook
+}
+___wan22 () {
+    ___install
+    ___setup_wan22
+    ___hook
+}
+___qwen () {
+    ___install
+    ___setup_qwen
     ___hook
 }
 
