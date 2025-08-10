@@ -137,9 +137,10 @@ class Trainer:
             print(f"Error: no models found for type {self._type}")
             return None
         else:
-            print(f"downloading models for type {self._type}")
+            print(f"downloading models for type {self._type}:")
         
         for _type in self.MODEL_TYPES:
+            print(f"\ttrying model {_type} ...")
             if _type in self._models:
                 print(f"\tdownloading model {_type} ...")
                 _model = self._models.get(_type, {})
@@ -148,6 +149,8 @@ class Trainer:
                 _file = _model.get("file", None)
                 _link = self._download_model(_repo_id, file = _file, ignore_patterns = _ignore_patterns)
                 self._model_links[_type] = _link
+            else:
+                print(f"\tno config found for {_type}")
         
     def _download_model(self, repo_id: str, file: str | None = None, ignore_patterns: list[str] | None = None) -> str | None:
         if file is not None:
