@@ -156,7 +156,7 @@ class Trainer:
         if file is not None:
             link = hf_hub_download(repo_id=repo_id, filename=file, cache_dir=self.FOLDER_MODELS)
         elif ignore_patterns is not None:
-            link = snapshot_download(repo_id=repo_id, ignore_patterns=ignore_patterns)
+            link = snapshot_download(repo_id=repo_id, ignore_patterns=ignore_patterns, cache_dir=self.FOLDER_MODELS)
         else:
             return None
         return link
