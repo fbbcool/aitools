@@ -24,7 +24,7 @@ class Trainer:
     AITOOLS: Final = WORKSPACE / "___aitools"
     ROOT: Final = WORKSPACE / "train"
 
-    MODEL_TYPES: Final = Literal["base", "ckpt", "text_encoder", "vae", "clipl"]
+    MODEL_TYPES: list[Literal["base", "ckpt", "text_encoder", "vae", "clipl"]] = ["base", "ckpt", "text_encoder", "vae", "clipl"]
 
     FILENAME_CONFIG_BASE: Final = "config_base.json"
     FILENAME_CONFIG_TRAIN: Final = "config_trainer.json"
