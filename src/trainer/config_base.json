@@ -21,7 +21,7 @@
             "base": {
                 "repo_id": "Qwen/Qwen-Image",
                 "ignore_patterns": [
-                    "diffusion_pytorch_model*"
+                    "transformer/diffusion_pytorch_model*"
                 ]
             },
             "ckpt": {
