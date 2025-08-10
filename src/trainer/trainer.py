@@ -13,7 +13,7 @@ import urllib
 from more_itertools import chunked_even
 
 from aidb.hfdataset import HFDatasetImg
-from aidb.caption_joy import CapJoy
+#from aidb.caption_joy import CapJoy
 
 class Trainer:
     #WORKSPACE: Final = Path("/Volumes/data/Project/AI/REPOS")
@@ -102,7 +102,8 @@ class Trainer:
         #
         self._caption_force = caption_force
         if caption_missing or self._caption_force:
-            self._caper = CapJoy(trigger=self._trigger)
+            #self._caper = CapJoy(trigger=self._trigger)
+            self._caper = None
 
         #
         # folders
