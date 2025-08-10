@@ -21,17 +21,12 @@
             "base": {
                 "repo_id": "Qwen/Qwen-Image",
                 "ignore_patterns": [
-                    "transformer/diffusion_pytorch_model*",
-                    "text_encoder/model-*"
+                    "transformer/diffusion_pytorch_model*"
                 ]
             },
             "ckpt": {
                 "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
                 "file": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors"
-            },
-            "text_encoder": {
-                "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-                "file": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors"
             }
         }
     }

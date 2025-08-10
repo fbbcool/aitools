@@ -624,7 +624,7 @@ diffusers_path = '{self._model_links["base"]}'
 # this is the used checkpoint model (compatible with the base checkpoint config!)
 transformer_path = '{self._model_links["ckpt"]}'
 # this is the used text encoder model (compatible with the base checkpoint config!)
-text_encoder_path = '{self._model_links["text_encoder"]}'
+#text_encoder_path = '{self._model_links["text_encoder"]}'
 dtype = 'bfloat16'
 transformer_dtype = 'float8'
 timestep_sample_method = 'logit_normal'
