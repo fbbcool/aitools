@@ -621,7 +621,7 @@ type = 'qwen_image'
 # this is the config checkout for the checkpoint but w/o the specific model
 diffusers_path = '{self._model_links["base"]}'
 # this is the used checkpoint model (compatible with the base checkpoint config!)
-#transformer_path = '{self._model_links["ckpt"]}'
+transformer_path = '{self._model_links["ckpt"]}'
 # this is the used text encoder model (compatible with the base checkpoint config!)
 #llm_path = '{self._model_links["text_encoder"]}'
 dtype = 'bfloat16'
