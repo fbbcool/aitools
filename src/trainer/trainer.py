@@ -150,6 +150,7 @@ class Trainer:
                 _link = self._download_model(_repo_id, file = _file, ignore_patterns = _ignore_patterns)
                 self._model_links[_type] = _link
             else:
+                self._model_links[_type] = ""
                 print(f"\tno config found for {_type}")
         
     def _download_model(self, repo_id: str, file: str | None = None, ignore_patterns: list[str] | None = None) -> str | None:
