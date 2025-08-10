@@ -1,0 +1,2 @@
+DEBUG: _update_image_rating_and_refresh called with data: 
+ERROR: Invalid rating update data format: . Expected 'image_id,new_rating'.

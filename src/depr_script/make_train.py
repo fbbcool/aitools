@@ -1,4 +1,4 @@
-from src.imgset import ImgPool, Defines
+from src.depr_imgset import ImgPool, Defines
 from src.tags import TagsProfile
 
 iset = ImgPool("lara", 0)

@@ -1,0 +1,21 @@
+{
+    "model": {
+        "wan21": {
+            "base": {
+                "repo_id": "Wan-AI/Wan2.1-T2V-14B",
+                "ignore_pattern": [
+                    "diffusion_pytorch_model*",
+                    "models_t5*"
+                ]
+            },
+            "ckpt": {
+                "repo_id": "NSFW-API/NSFW_Wan_14b",
+                "file": "nsfw_wan_14b_e15_fp8.safetensors"
+            },
+            "text_encoder": {
+                "repo_id": "Kijai/WanVideo_comfy",
+                "file": "umt5-xxl-enc-fp8_e4m3fn.safetensors"
+            }
+        }
+    }
+}

@@ -1,0 +1,9 @@
+{
+    "type": "wan21",
+    "name": "unused",
+    "trigger": "1gts",
+    "netdim": 32,
+    "batch_size": 1,
+    "num_repeats": 1,
+    "imgs": []
+}
