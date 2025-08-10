@@ -350,7 +350,21 @@ num_repeats = {self._num_repeats}
         with self.FILE_CONFIG_DATASET.open("w", encoding="utf-8") as f:
             f.write(str_file)
 
+    #
+    # diffpipe configs
+    #
     def _make_file_diffpipe_config(self) -> None:
+        if self._type == "wan21":
+            self._make_file_diffpipe_config_wan21()
+        elif self._type == "qwen_image":
+            self._make_file_diffpipe_config_qwen_image()
+        else:
+            raise ValueError(f"unknown training type: {self._type}")
+    
+    #
+    # wan21 diffpipe config
+    #
+    def _make_file_diffpipe_config_wan21(self) -> None:
         str_file = f"""
 # Output path for training runs. Each training run makes a new directory in here.
 output_dir = '{self.FOLDER_OUTPUT}'
@@ -381,7 +395,7 @@ warmup_steps = 100
 # of blocks kept offloaded to RAM. Increasing it lowers VRAM use, but has a performance penalty. The
 # exactly performance penalty depends on the model and the type of training you are doing (e.g. images vs video).
 # Block swapping only works for LoRA training, and requires pipeline_stages=1.
-#blocks_to_swap = 20
+blocks_to_swap = 20
 
 # eval settings
 
@@ -501,7 +515,166 @@ eps = 1e-8
 """
         with self.FILE_CONFIG_DIFFPIPE.open("w", encoding="utf-8") as f:
             f.write(str_file)
+    
+    #
+    # qwen-image diffpipe config
+    #
+    def _make_file_diffpipe_config_qwen_image(self) -> None:
+        str_file = f"""
+# Output path for training runs. Each training run makes a new directory in here.
+output_dir = '{self.FOLDER_OUTPUT}'
+dataset = '{self.FILE_CONFIG_DATASET}'
 
+# training settings
+
+# I usually set this to a really high value because I don't know how long I want to train.
+epochs = 40
+# Batch size of a single forward/backward pass for one GPU.
+micro_batch_size_per_gpu = {self._batch_size}
+# For mixed video / image training, you can have a different batch size for images.
+#image_micro_batch_size_per_gpu = 4
+# Pipeline parallelism degree. A single instance of the model is divided across this many GPUs.
+pipeline_stages = 1
+# Number of micro-batches sent through the pipeline for each training step.
+# If pipeline_stages > 1, a higher GAS means better GPU utilization due to smaller pipeline bubbles (where GPUs aren't overlapping computation).
+gradient_accumulation_steps = 4
+# Grad norm clipping.
+gradient_clipping = 1.0
+# Learning rate warmup.
+warmup_steps = 100
+# Force the learning rate to be this value, regardless of what the optimizer or anything else says.
+# Can be used to change learning rate even when resuming from checkpoint.
+#force_constant_lr = 1e-5
+
+# Block swapping is supported for Wan, HunyuanVideo, Flux, and Chroma. This value controls the number
+# of blocks kept offloaded to RAM. Increasing it lowers VRAM use, but has a performance penalty. The
+# exactly performance penalty depends on the model and the type of training you are doing (e.g. images vs video).
+# Block swapping only works for LoRA training, and requires pipeline_stages=1.
+blocks_to_swap = 8
+
+# eval settings
+
+eval_every_n_epochs = 1
+eval_before_first_step = true
+# Might want to set these lower for eval so that less images get dropped (eval dataset size is usually much smaller than training set).
+# Each size bucket of images/videos is rounded down to the nearest multiple of the global batch size, so higher global batch size means
+# more dropped images. Usually doesn't matter for training but the eval set is much smaller so it can matter.
+eval_micro_batch_size_per_gpu = 1
+# Batch size for images when doing mixed image / video training. Will be micro_batch_size_per_gpu if not set.
+#image_eval_micro_batch_size_per_gpu = 4
+eval_gradient_accumulation_steps = 1
+# If using block swap, you can disable it for eval. Eval uses less memory, so depending on block swapping amount you can maybe get away with
+# doing this, and then eval is much faster.
+#disable_block_swap_for_eval = true
+
+# misc settings
+
+# Probably want to set this a bit higher if you have a smaller dataset so you don't end up with a million saved models.
+save_every_n_epochs = 1
+# Can checkpoint the training state every n number of epochs or minutes. Set only one of these. You can resume from checkpoints using the --resume_from_checkpoint flag.
+#checkpoint_every_n_epochs = 1
+#checkpoint_every_n_minutes = 120
+# Always set to true unless you have a huge amount of VRAM.
+# This can also be 'unsloth' to reduce VRAM even more, with a slight performance hit.
+activation_checkpointing = true
+# Use reentrant activation checkpointing method (set this in addition to `activation_checkpointing`). Might be required for some models
+# when using pipeline parallelism (pipeline_stages>1). Otherwise recommended to not use it.
+#reentrant_activation_checkpointing = true
+
+# Controls how Deepspeed decides how to divide layers across GPUs. Probably don't change this.
+partition_method = 'parameters'
+# Alternatively you can use 'manual' in combination with partition_split, which specifies the split points for dividing
+# layers between GPUs. For example, with two GPUs, partition_split=[10] puts layers 0-9 on GPU 0, and the rest on GPU 1.
+# With three GPUs, partition_split=[10, 20] puts layers 0-9 on GPU 0, layers 10-19 on GPU 1, and the rest on GPU 2.
+# Length of partition_split must be pipeline_stages-1.
+#partition_split = [N]
+
+# dtype for saving the LoRA or model, if different from training dtype
+save_dtype = 'bfloat16'
+# Batch size for caching latents and text embeddings. Increasing can lead to higher GPU utilization during caching phase but uses more memory.
+caching_batch_size = 8
+
+# Number of parallel processes to use in map() calls when caching the dataset. Defaults to min(8, num_cpu_cores) if unset.
+# If you have a lot of cores and multiple GPUs, raising this can increase throughput of caching, but it may use more memory,
+# especially for video data.
+#map_num_proc = 32
+
+# Use torch.compile on the model. Can speed up training throughput by a decent amount. Not tested on all models.
+#compile = true
+
+# How often deepspeed logs to console.
+steps_per_print = 10
+
+# How to extract video clips for training from a single input video file.
+# The video file is first assigned to one of the configured frame buckets, but then we must extract one or more clips of exactly the right
+# number of frames for that bucket.
+# single_beginning: one clip starting at the beginning of the video
+# single_middle: one clip from the middle of the video (cutting off the start and end equally)
+# multiple_overlapping: extract the minimum number of clips to cover the full range of the video. They might overlap some.
+# default is single_beginning
+# video_clip_mode = 'single_beginning'
+
+# This is how you configure WAN video. Other models will be different. See docs/supported_models.md for
+# details on the configuration and options for each model.
+[model]
+type = 'qwen_image'
+# this is the config checkout for the checkpoint but w/o the specific model
+diffusers_path = '{self._model_links["base"]}'
+# this is the used checkpoint model (compatible with the base checkpoint config!)
+#transformer_path = '{self._model_links["ckpt"]}'
+# this is the used text encoder model (compatible with the base checkpoint config!)
+#llm_path = '{self._model_links["text_encoder"]}'
+dtype = 'bfloat16'
+transformer_dtype = 'float8'
+timestep_sample_method = 'logit_normal'
+
+# For models that support full fine tuning, simply delete or comment out the [adapter] table to FFT.
+[adapter]
+type = 'lora'
+rank = {int(self._config_train["netdim"])}
+# Dtype for the LoRA weights you are training.
+dtype = 'bfloat16'
+# You can initialize the lora weights from a previously trained lora.
+#init_from_existing = '/data/diffusion_pipe_training_runs/something/epoch50'
+# Experimental. Can fuse LoRAs into the base weights before training. Right now only for Flux.
+
+[optimizer]
+# AdamW from the optimi library is a good default since it automatically uses Kahan summation when training bfloat16 weights.
+# Look at train.py for other options. You could also easily edit the file and add your own.
+#type = 'adamw_optimi'
+#lr = 2e-5
+#betas = [0.9, 0.99]
+#weight_decay = 0.01
+#eps = 1e-8
+
+# Can use this optimizer for a bit less memory usage.
+# [optimizer]
+# type = 'AdamW8bitKahan'
+# lr = 2e-5
+# betas = [0.9, 0.99]
+# weight_decay = 0.01
+# stabilize = false
+
+# Automagic optimizer from AI-Toolkit.
+# In my experience, this gives slightly worse results than AdamW with a properly tuned LR, but you can try it.
+
+# [optimizer]
+type = 'automagic'
+weight_decay = 0.01
+
+# Any optimizer not explicitly supported will be dynamically loaded from the pytorch-optimizer library.
+# [optimizer]
+# type = 'Prodigy'
+# lr = 1
+# betas = [0.9, 0.99]
+# weight_decay = 0.01
+"""
+        with self.FILE_CONFIG_DIFFPIPE.open("w", encoding="utf-8") as f:
+            f.write(str_file)
+
+    #
+    # train script
+    #
     def _make_file_train_script(self) -> None:
         str_file = f"""
 NCCL_P2P_DISABLE="1" NCCL_IB_DISABLE="1" deepspeed --num_gpus=1 train.py --deepspeed --config {self.FILE_CONFIG_DIFFPIPE}

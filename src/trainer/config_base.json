@@ -16,6 +16,12 @@
                 "repo_id": "Kijai/WanVideo_comfy",
                 "file": "umt5-xxl-enc-fp8_e4m3fn.safetensors"
             }
+        },
+        "qwen_image": {
+            "base": {
+                "repo_id": "Qwen/Qwen-Image",
+                "ignore_patterns": []
+            }
         }
     }
 }
