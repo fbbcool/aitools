@@ -5,7 +5,6 @@ import shutil
 import sys
 import time
 from typing import Final, Literal
-from urllib.parse import parse_qs, unquote, urlparse
 import threading
 
 from huggingface_hub import hf_hub_download, snapshot_download
@@ -125,7 +124,6 @@ class Trainer:
         # prepare training toolchain
         #
         if load_models:
-            #self._download_models_flux()
             self._download_models()
         
         self._make_dataset(cache_full_dataset=cache_full_dataset, multithread=multithread)
@@ -138,9 +136,12 @@ class Trainer:
         if self._models is None:
             print(f"Error: no models found for type {self._type}")
             return None
+        else:
+            print(f"downloading models for type {self._type}")
         
         for _type in self.MODEL_TYPES:
             if _type in self._models:
+                print(f"\tdownloading model {_type} ...")
                 _model = self._models.get(_type, {})
                 _repo_id = _model.get("repo_id", None)
                 _ignore_patterns = _model.get("ignore_patterns", None)
