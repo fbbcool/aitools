@@ -448,6 +448,10 @@ class ModelInstComfyUi:
             
             # lora
             #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-07.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-14.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1gts_r5-06.safetensors", ""),
             
             # upscale
             ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x2.pth", ""),
@@ -463,14 +467,14 @@ class ModelInstComfyUi:
             # to comfyui-frame-interpolation/ckpts/stmfnet/
             #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
             #ModelInst(t, ModelType.CustomNode, git, "github.com/city96", "ComfyUI-GGUF", ""),
-            #ModelInst(t, ModelType.CustomNode, git, "github.com/rgthree", "rgthree-comfy", ""),
-            #ModelInst(t, ModelType.CustomNode, git, "github.com/yolain", "ComfyUI-Easy-Use", ""),
-            #ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-KJNodes", ""),
-            #ModelInst(t, ModelType.CustomNode, git, "github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
-            #ModelInst(t, ModelType.CustomNode, git, "github.com/cubiq", "ComfyUI_essentials", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/rgthree", "rgthree-comfy", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/yolain", "ComfyUI-Easy-Use", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-KJNodes", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/cubiq", "ComfyUI_essentials", ""),
             #ModelInst(t, ModelType.CustomNode, git, "github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
-            #ModelInst(t, ModelType.CustomNode, git, "github.com/ltdrdata", "ComfyUI-Inspire-Pack", ""),
-            #ModelInst(t, ModelType.CustomNode, git, "github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/ltdrdata", "ComfyUI-Inspire-Pack", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
             #ModelInst(t, ModelType.CustomNode, git, "github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
             #ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-WanVideoWrapper", ""),
         ]

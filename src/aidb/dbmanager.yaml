@@ -5,12 +5,12 @@ mongodb_settings:
   host: "mongodb://mongo:mongo@n100"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
   port: 27017        # Or your MongoDB port
   db_name: "prod_ai" # Or your database name, e.g., "prod_ai"
-  #collection: "imgs_0"   # Or your collection name, e.g., "images"
+  collection: "imgs_0"   # Or your collection name, e.g., "images"
   #collection: "imgs_lara"   # Or your collection name, e.g., "images"
   #collection: "imgs_hairy01"   # Or your collection name, e.g., "images"
   #collection: "imgs_wan01"   # Or your collection name, e.g., "images"
   #collection: "imgs_alexandra"   # Or your collection name, e.g., "images"
-  collection: "imgs_0"   # Or your collection name, e.g., "images"
+  #collection: "imgs_fbb01"   # Or your collection name, e.g., "images"
 
 # Directory settings
 directory_settings:
