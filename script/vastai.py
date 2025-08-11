@@ -484,6 +484,7 @@ class ModelInstComfyUi:
             # MVP first
             # checkpoint
             ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
+            #ModelInst(t, ModelType.Unet, hf2, "Kamikaze-88/Wan2.1-VACE-14B-fp8", "wan2.1_vace_14B_fp8_e4m3fn.safetensors", ""),
             
             # VAE
             ModelInst(t, ModelType.VAE, hf2, "Kijai/WanVideo_comfy", "Wan2_1_VAE_bf16.safetensors", ""),
@@ -497,7 +498,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, hf2, "Kijai/WanVideo_comfy", "Pusa/Wan21_PusaV1_LoRA_14B_rank512_bf16.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v", "loras/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors", ""),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_mid.safetensors", ""),
-            #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
             #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
             
             # upscale
