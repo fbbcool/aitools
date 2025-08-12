@@ -487,12 +487,14 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Unet, hf2, "Kamikaze-88/Wan2.1-VACE-14B-fp8", "wan2.1_vace_14B_fp8_e4m3fn.safetensors", ""),
             
             # VAE
-            ModelInst(t, ModelType.VAE, hf2, "Kijai/WanVideo_comfy", "Wan2_1_VAE_bf16.safetensors", ""),
+            ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/vae/wan_2.1_vae.safetensors", ""),
+            #ModelInst(t, ModelType.VAE, hf2, "Kijai/WanVideo_comfy", "Wan2_1_VAE_bf16.safetensors", ""),
             #ModelInst(t, ModelType.VAE, hf2, "Kijai/WanVideo_comfy", "Wan2_1_VAE_fp32.safetensors", ""),
             
             # clip
+            ModelInst(t, ModelType.Clip, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors", ""),
             #ModelInst(t, ModelType.Clip, hf2, "Aitrepreneur/FLX", "umt5-xxl-encoder-Q5_K_S.gguf", ""),
-            ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
+            #ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
             
             # lora
             ModelInst(t, ModelType.Lora, hf2, "Kijai/WanVideo_comfy", "Pusa/Wan21_PusaV1_LoRA_14B_rank512_bf16.safetensors", ""),
