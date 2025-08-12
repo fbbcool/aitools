@@ -483,8 +483,8 @@ class ModelInstComfyUi:
         models_wan21: list[ModelInst] = [
             # MVP first
             # checkpoint
-            ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", ""),
-            #ModelInst(t, ModelType.Unet, hf2, "Kamikaze-88/Wan2.1-VACE-14B-fp8", "wan2.1_vace_14B_fp8_e4m3fn.safetensors", ""),
+            ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", "t2v"),
+            ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy_fp8_scaled", "I2V/Wan2_1-I2V-14B-720p_fp8_e4m3fn_scaled_KJ.safetensors", "i2v"),
             
             # VAE
             ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/vae/wan_2.1_vae.safetensors", ""),
@@ -497,11 +497,12 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
             
             # lora
-            ModelInst(t, ModelType.Lora, hf2, "Kijai/WanVideo_comfy", "Pusa/Wan21_PusaV1_LoRA_14B_rank512_bf16.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v", "loras/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "Kijai/WanVideo_comfy", "Pusa/Wan21_PusaV1_LoRA_14B_rank512_bf16.safetensors", "t2v"),
+            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v", "loras/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors", "t2v"),
+            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Wan2.1-I2V-14B-StepDistill-CfgDistill-Lightx2v", "loras/Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors", "i2v"),
+            ModelInst(t, ModelType.Lora, hf2, "vrgamedevgirl84/Wan14BT2VFusioniX", "FusionX_LoRa/Wan2.1_T2V_14B_FusionX_LoRA.safetensors", "t2v"),
+            ModelInst(t, ModelType.Lora, hf2, "vrgamedevgirl84/Wan14BT2VFusioniX", "FusionX_LoRa/Wan2.1_I2V_14B_FusionX_LoRA.safetensors", "i2v"),
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_mid.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan2.1_T2V_14B_FusionX_LoRA.safetensors", ""),
-            #ModelInst(t, ModelType.Lora, hf2, "Aitrepreneur/FLX", "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors", ""),
             
             # upscale
             ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x2.pth", ""),
