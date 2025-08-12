@@ -622,6 +622,7 @@ class ModelInstComfyUi:
             DownloadGroup.FLUX_REFINE: models_flux_refine,
             DownloadGroup.CURRENT: models_current,
             DownloadGroup.WAN21: models_wan21,
+            DownloadGroup.WAN22: models_wan22,
             DownloadGroup.QWEN: models_qwen,
         }
         
@@ -701,6 +702,9 @@ if __name__ == "__main__":
     elif str_group == "wan21":
         hook = _hook_wan21 
         group = DownloadGroup.WAN21
+    elif str_group == "wan22":
+        method_gen = "t2v"
+        group = DownloadGroup.WAN22
     elif str_group == "current":
         group = DownloadGroup.CURRENT
     else:
