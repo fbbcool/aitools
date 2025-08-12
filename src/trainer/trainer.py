@@ -44,7 +44,8 @@ class Trainer:
         self._config_base: dict = {}
         self._config_train: dict = {}
         self._hfd: HFDatasetImg = None
-        self._caper: CapJoy = None
+        #self._caper: CapJoy = None
+        self._caper = None
         
         self._type = None
         self._trigger = ""
@@ -357,6 +358,10 @@ num_repeats = {self._num_repeats}
     #
     def _make_file_diffpipe_config(self) -> None:
         if self._type == "wan21":
+            self._make_file_diffpipe_config_wan21()
+        elif self._type == "wan22_high":
+            self._make_file_diffpipe_config_wan21()
+        elif self._type == "wan22_low":
             self._make_file_diffpipe_config_wan21()
         elif self._type == "qwen_image":
             self._make_file_diffpipe_config_qwen_image()
