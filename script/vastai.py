@@ -60,16 +60,16 @@ class ModelInst:
     CHUNK_SIZE: Final = 1638400
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
 
-    def __init__(self, target: TargetType, model: ModelType, method: DownloadMethod, url: str, name: str="", ext:str ="safetensors") -> None:
+    def __init__(self, target: TargetType, model: ModelType, method_dl: DownloadMethod, repo_id: str, file: str="", method_gen: str | None = None) -> None:
         self.target = target
         self.model = model
-        self.method = method
-        self.url = url
-        self.ext = ext
-        self.repo = url
-        self.path_local = name
-        self.name = name
-        if not name:
+        self.method_dl = method_dl
+        self.method_gen = method_gen
+        self.url = repo_id
+        self.repo = repo_id
+        self.path_local = file
+        self.name = file
+        if not file:
             self.name = os.path.basename(self.url)
             self.ext = ""
     
@@ -217,10 +217,10 @@ class ModelInst:
         return os.path.isfile(url) or os.path.isdir(url)
     
     @property
-    def install(self, force: bool = False) -> None:
+    def install(self) -> None:
         self.path_model.mkdir(parents=True, exist_ok=True) 
         try:
-            if self.method == DownloadMethod.Hugging2:
+            if self.method_dl == DownloadMethod.Hugging2:
                 repo_id = self.repo
                 filename = self.path_local
                 print(f"installing from hugging_2: {repo_id} / {filename} -> {self.path_model}")
@@ -246,26 +246,26 @@ class ModelInst:
                     os.symlink(file_hf_path, target_path)
                     print(f"Created symlink: {target_path} -> {file_hf_path}")
 
-            if self.method == DownloadMethod.Hugging:
+            if self.method_dl == DownloadMethod.Hugging:
                 url_model = self.path_model / self.name
                 print(f"installing from hugging: {self.url} -> {url_model}")
                 self.download_hf(self.url, str(url_model))
             
-            if self.method == DownloadMethod.Wget:
+            if self.method_dl == DownloadMethod.Wget:
                 url_model = self.path_model / self.name
                 print(f"installing from wget: {self.url} -> {url_model}")
                 self.download_wget(self.url, str(url_model))
                 
 
-            if self.method == DownloadMethod.Civitai:
+            if self.method_dl == DownloadMethod.Civitai:
                 print(f"installing from hugging: {self.url} -> {url_model}")
                 self.download_civitai(self.url, url_model)
                 
-            if self.method == DownloadMethod.GDrive:
+            if self.method_dl == DownloadMethod.GDrive:
                 print(f"(NO)installing from gdrive: {self.url} -> {url_model}")
                 #gdown.download(id = self.url, output = url_model)
 
-            if self.method == DownloadMethod.Git:
+            if self.method_dl == DownloadMethod.Git:
                 url_account = self.repo
                 name_repo = self.path_local
 
@@ -342,7 +342,7 @@ class ModelInst:
         return path_models / folder_model
     
 class ModelInstComfyUi:
-    def __init__(self, group = DownloadGroup.SD15) -> None:
+    def __init__(self, group = DownloadGroup.SD15, method_gen: str | None = None) -> None:
         wget = DownloadMethod.Wget
         hf = DownloadMethod.Hugging
         hf2 = DownloadMethod.Hugging2
@@ -543,10 +543,75 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.CustomNode, git, "github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-WanVideoWrapper", ""),
-            ModelInst(t, ModelType.CustomNode, git, "", "", ""),
-            ModelInst(t, ModelType.CustomNode, git, "", "", ""),
-            ModelInst(t, ModelType.CustomNode, git, "", "", ""),
-            ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            #git clone https://github.com/Fannovel16/comfyui_controlnet_aux
+            #git clone https://github.com/wallish77/wlsh_nodes
+            #git clone https://github.com/vrgamegirl19/comfyui-vrgamedevgirl
+        ]
+
+        t = TargetType.Comfy
+        models_wan22: list[ModelInst] = [
+            # MVP first
+            # checkpoint
+            #ModelInst(t, ModelType.Unet, hf2, "", "", ""),
+            ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors", "t2v"),
+            ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors", "t2v"),
+            ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "i2v"),
+            ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors", "i2v"),
+            
+            # VAE
+            #ModelInst(t, ModelType.VAE, hf2, "", "", ""),
+            #ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_vae.safetensors", ""),
+            ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan_2.1_vae.safetensors", ""),
+            
+            # clip
+            #ModelInst(t, ModelType.Clip, hf2, "", "", ""),
+            #ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
+            ModelInst(t, ModelType.Clip, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors", ""),
+            
+            # lora
+            #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
+            # https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors?download=true
+            ModelInst(t, ModelType.Lora, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors", "t2v"),
+            ModelInst(t, ModelType.Lora, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors", "t2v"),
+            ModelInst(t, ModelType.Lora, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors", "i2v"),
+            ModelInst(t, ModelType.Lora, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors", "i2v"),
+
+            
+            # upscale
+            ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x2.pth", ""),
+            ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x4.pth", ""),
+            # custom nodes
+            #ModelInst(t, ModelType.CustomNode, hf2, "camenduru/stmfnet", "stmfnet.pth", ""),
+
+            # checkpoint
+
+            # VAE
+
+            # clip
+
+            #clip vision
+            
+            # lora
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "", ""),
+        
+            # custom nodes
+            # to comfyui-frame-interpolation/ckpts/stmfnet/
+            ModelInst(t, ModelType.CustomNode, hf2, "camenduru/stmfnet", "stmfnet.pth", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/city96", "ComfyUI-GGUF", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/rgthree", "rgthree-comfy", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/yolain", "ComfyUI-Easy-Use", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-KJNodes", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/ssitu", "ComfyUI_UltimateSDUpscale", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/cubiq", "ComfyUI_essentials", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
+            # do w/ comfyui manager
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/Fannovel16", "ComfyUI-Frame-Interpolation", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/ltdrdata", "ComfyUI-Inspire-Pack", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/Derfuu", "Derfuu_ComfyUI_ModdedNodes", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-WanVideoWrapper", ""),
             #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
             #git clone https://github.com/Fannovel16/comfyui_controlnet_aux
             #git clone https://github.com/wallish77/wlsh_nodes
@@ -559,8 +624,22 @@ class ModelInstComfyUi:
             DownloadGroup.WAN21: models_wan21,
             DownloadGroup.QWEN: models_qwen,
         }
+        
+        if not method_gen:
+            method_gen = None
+        
         for model in model_db[group]:
-            model.install
+            install = True
+            if not model.method_gen:
+                model.method_gen = None
+
+            if model.method_gen is not None:
+                if method_gen is not None:
+                    if model.method_gen != method_gen:
+                        install = False
+
+            if install:
+                model.install
 
 class PostInstHook():
     def __init__(self) -> None:
@@ -596,6 +675,7 @@ def _hook_wan21():
     print("\t!!!_hook_current!!!")
 
 hook = None
+method_gen = None
 if __name__ == "__main__":
     str_group = sys.argv[1]
     if str_group == "sd15":
@@ -629,7 +709,7 @@ if __name__ == "__main__":
     
 
     print(f"using download group {str_group}.")
-    ModelInstComfyUi(group=group)
+    ModelInstComfyUi(group=group, method_gen=method_gen)
     if hook is not None:
         print(f"creating post hook.")
         hook()
