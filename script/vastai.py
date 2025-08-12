@@ -561,8 +561,8 @@ class ModelInstComfyUi:
             
             # VAE
             #ModelInst(t, ModelType.VAE, hf2, "", "", ""),
-            #ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_vae.safetensors", ""),
-            ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan_2.1_vae.safetensors", ""),
+            #ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/vae/wan2.2_vae.safetensors", ""),
+            ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/vae/wan_2.1_vae.safetensors", ""),
             
             # clip
             #ModelInst(t, ModelType.Clip, hf2, "", "", ""),
