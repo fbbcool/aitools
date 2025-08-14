@@ -267,6 +267,23 @@ class AIDBGradioApp:
                     outputs=[image_set_html_display, image_set_current_page, image_set_page_info]
                 )
 
+            with gr.Tab("Set Collection"):
+                gr.Markdown("## Set Collection")
+                with gr.Row():
+                    collection_dropdown = gr.Dropdown(
+                        label="Select Collection",
+                        value=self._db_manager._collection,
+                        choices=self._db_manager.collections_images,
+                        interactive=True
+                    )
+                # selected collection is set foe db manager
+                collection_dropdown.change(
+                    lambda x: self._db_manager.set_collection(x),
+                    inputs=[collection_dropdown],
+                    outputs=[]
+                )
+                
+                
             
         return demo 
     

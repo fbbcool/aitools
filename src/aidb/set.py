@@ -126,38 +126,57 @@ class SetImg:
             collection_ratios[collection] = collection_ratios[collection] / norm
         
         self._imgs = {}
+        
+        # as much 5 as possible, the rest is distributed over 4 and 3 by the ratio
         rating_distribution = {
-            5: 0.6,
-            4: 0.2,
-            3: 0.2
+            4: 0.7,
+            3: 0.3
         }
     
         for collection in collection_ratios:
+            majority = int(n * collection_ratios[collection])
+
+            # 5
             rating = 5
             imgs = self._query.query_by_rating(rating,rating, collections=[collection])
-            print(f"[SetImg] got {len(imgs)}.")
-            m = int(n * rating_distribution[rating] * collection_ratios[collection])
+            m = len(imgs)
+            print(f"[SetImg] {collection}[{rating}]:got {len(imgs)}.")
+            #m = int(n * rating_distribution[rating] * collection_ratios[collection])
+            m = min(m, majority)
             imgs = Query.select_rand_num(imgs, m)
             m_r5 = len(imgs)
+            print(f"[SetImg]\t selected from {collection}[{rating}]: {m_r5}")
             self.add(imgs)
-            diff = m - m_r5
 
+            majority -= m_r5
+            if majority <= 0:
+                continue
+
+            #4
             rating = 4
             imgs = self._query.query_by_rating(rating,rating, collections=[collection])
-            print(f"[SetImg] got {len(imgs)}.")
-            m = int(n * rating_distribution[rating] * collection_ratios[collection]) + diff
+            print(f"[SetImg] {collection}[{rating}]:got {len(imgs)}.")
+            m = int(majority * rating_distribution[rating])
+            m = min(m, len(imgs))
             imgs = Query.select_rand_num(imgs, m)
             m_r4 = len(imgs)
+            print(f"[SetImg]\t selected from {collection}[{rating}]: {m_r4}")
             self.add(imgs)
-            diff = m - m_r4
+
+            majority -= m_r4
+            if majority <= 0:
+                continue
 
             rating = 3
             imgs = self._query.query_by_rating(rating,rating, collections=[collection])
-            print(f"[SetImg] got {len(imgs)}.")
-            m = int(n * rating_distribution[rating] * collection_ratios[collection]) + diff
+            print(f"[SetImg] {collection}[{rating}]:got {len(imgs)}.")
+            m = majority
+            m = min(m, len(imgs))
             imgs = Query.select_rand_num(imgs, m)
             m_r3 = len(imgs)
+            print(f"[SetImg]\t selected from {collection}[{rating}]: {m_r3}")
             self.add(imgs)
+
             print(f"[SetImg] selected from {collection} = 5:{m_r5} 4:{m_r4} 3:{m_r3}")
 
     
