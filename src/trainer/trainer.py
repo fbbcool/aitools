@@ -38,7 +38,7 @@ class Trainer:
     FILE_CONFIG_DATASET: Final = ROOT / "dataset.toml"
     FILE_TRAIN_SCRIPT: Final = ROOT / "train.sh"
 
-    def __init__(self, repo_id_hfd: str, load_models: bool = True, cache_full_dataset: bool = False, multithread: bool = False, caption_missing=False, caption_force=False) -> None:
+    def __init__(self, repo_id_hfd: str, type_model: str | None = None, load_models: bool = True, cache_full_dataset: bool = False, multithread: bool = False, caption_missing=False, caption_force=False) -> None:
         self._repo_id_hfd = repo_id_hfd
 
         self._config_base: dict = {}
@@ -47,7 +47,7 @@ class Trainer:
         #self._caper: CapJoy = None
         self._caper = None
         
-        self._type = None
+        self._type_model = None
         self._trigger = ""
         self._name = ""
         self._netdim = 4
@@ -70,7 +70,10 @@ class Trainer:
             print(f"{e}\nError: config json not loadable!")
             return
         # set train config members
-        self._type = self._config_train.get("type", None)
+        if type_model is not None:
+            self._type_model = type_model
+        else:
+            self._type_model = self._config_train.get("type", None)
         self._name = self._config_train.get("name", "")
         self._trigger = self._config_train.get("trigger", "")
         self._netdim = int(self._config_train.get("netdim", 4))
@@ -88,7 +91,7 @@ class Trainer:
             print(f"{e}\nError: config json not loadable!")
             return
         _base_models_all: dict = self._config_base.get("models", {})
-        self._models: dict[str, dict] | None = _base_models_all.get(self._type, None)
+        self._models: dict[str, dict] | None = _base_models_all.get(self._type_model, None)
         self._model_links: dict[str, str] = {}
 
         #
@@ -136,10 +139,10 @@ class Trainer:
 
     def _download_models(self) -> None:
         if self._models is None:
-            print(f"Error: no models found for type {self._type}")
+            print(f"Error: no models found for type {self._type_model}")
             return None
         else:
-            print(f"downloading models for type {self._type}:")
+            print(f"downloading models for type {self._type_model}:")
         
         for _type in self.MODEL_TYPES:
             print(f"\ttrying model {_type} ...")
@@ -357,16 +360,16 @@ num_repeats = {self._num_repeats}
     # diffpipe configs
     #
     def _make_file_diffpipe_config(self) -> None:
-        if self._type == "wan21":
+        if self._type_model == "wan21":
             self._make_file_diffpipe_config_wan21()
-        elif self._type == "wan22_high":
+        elif self._type_model == "wan22_high":
             self._make_file_diffpipe_config_wan21()
-        elif self._type == "wan22_low":
+        elif self._type_model == "wan22_low":
             self._make_file_diffpipe_config_wan21()
-        elif self._type == "qwen_image":
+        elif self._type_model == "qwen_image":
             self._make_file_diffpipe_config_qwen_image()
         else:
-            raise ValueError(f"unknown training type: {self._type}")
+            raise ValueError(f"unknown training type: {self._type_model}")
     
     #
     # wan21 diffpipe config
