@@ -344,11 +344,12 @@ class Image:
 
         if not full_path.exists():
             print(f"Warning: Image file not found at '{full_path}' for image ID '{self._image_id}'.")
-            if Path(self.url_train_image).exists():
-                print(f"Ok, using train image instead for image ID '{self._image_id}'.")
-                full_path = self.url_train_image
-            else:
-                return None
+            for res in [1024, 768]:
+                new_path = self.path_train_image_from_dbm_and_res(res)
+                if new_path.exists():
+                    print(f"Ok, using train image {res} instead for image ID '{self._image_id}'.")
+                    full_path = new_path
+                    break
 
         try:
             pil_image = PILImage.open(full_path)
@@ -425,7 +426,7 @@ class Image:
             print(f"Cannot get training image: Image data not available for ID '{self._image_id}'.")
             return None
 
-        train_image_url_str = self.data.get("train_image_url")
+        train_image_url_str = self.url_train_image
         
         # Get training image settings from DBManager's properties
         output_train_image_dir = self._db_manager.default_train_image_dir
@@ -463,9 +464,29 @@ class Image:
             return None
     
     @property
-    def url_train_image(self) -> str | None:
+    def url_train_image(self) -> str:
+        return str(self.path_train_image_from_dbm)
+
+    @property
+    def path_train_image_from_dbm(self) -> Path:
         """
-        Returns the URL of the training image.
+        Returns the URL of the training image from constructing with dbm config
+        """
+        output_train_image_size = self._db_manager.default_train_image_size
+        return self.path_train_image_from_dbm_and_res(output_train_image_size[0])
+
+    def path_train_image_from_dbm_and_res(self, res: int) -> Path:
+        path_train_imgs = Path(self._db_manager.default_train_image_dir)
+        name_train_img = f"{self._image_id}_{res}"
+        path_train_img = (path_train_imgs / name_train_img).with_suffix(".png")
+        return path_train_img
+
+
+    
+    @property
+    def url_train_image_from_data(self) -> str | None:
+        """
+        Returns the URL of the training image store in the image meta data.
         """
         if self.data is None:
             return None
@@ -653,8 +674,12 @@ class Image:
         output_dir_path = Path(output_directory)
         output_dir_path.mkdir(parents=True, exist_ok=True) # Ensure output directory exists
 
-        train_img_filename = f"{self._image_id}_1024.png"
+        train_img_filename = f"{self._image_id}_{train_image_size[0]}.png"
         full_train_img_path = output_dir_path / train_img_filename
+
+        if full_train_img_path.exists():
+            print(f"Train image for image '{self._image_id}' already exists at '{full_train_img_path}'.")
+            return str(full_train_img_path)
 
         try:
             # Create a copy to ensure the original PIL image object is not modified

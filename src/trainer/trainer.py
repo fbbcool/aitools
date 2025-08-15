@@ -292,8 +292,8 @@ class Trainer:
 # as many times as the length of this list.
 # If you just want to use predetermined (width, height, frames) size buckets, see the example cosmos_dataset.toml
 # file for how you can do that.
-#resolutions = [1024]
-resolutions = [768]
+resolutions = [1024]
+#resolutions = [768]
 
 # You can give resolutions as (width, height) pairs also. This doesn't do anything different, it's just
 # another way of specifying the area(s) (i.e. total number of pixels) you want to train on.
@@ -405,7 +405,8 @@ warmup_steps = 100
 # of blocks kept offloaded to RAM. Increasing it lowers VRAM use, but has a performance penalty. The
 # exactly performance penalty depends on the model and the type of training you are doing (e.g. images vs video).
 # Block swapping only works for LoRA training, and requires pipeline_stages=1.
-blocks_to_swap = 20
+
+#blocks_to_swap = 20
 
 # eval settings
 
