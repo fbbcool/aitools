@@ -399,7 +399,7 @@ class ModelInstComfyUi:
             # MVP first
             # checkpoint
             #ModelInst(t, ModelType.DiffusionModel, hf2, "", "", ""),
-            ModelInst(t, ModelType.DiffusionModel, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", ""),
+            #ModelInst(t, ModelType.DiffusionModel, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", ""),
             ModelInst(t, ModelType.DiffusionModel, hf2, "GuangyuanSD/Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn", "Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn.safetensors", ""),
             
             # VAE
@@ -438,7 +438,7 @@ class ModelInstComfyUi:
             # MVP first
             # checkpoint
             ModelInst(t, ModelType.Unet, hf2, "NSFW-API/NSFW_Wan_14b", "nsfw_wan_14b_e15_fp8.safetensors", "t2v"),
-            ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy_fp8_scaled", "I2V/Wan2_1-I2V-14B-720p_fp8_e4m3fn_scaled_KJ.safetensors", "i2v"),
+            #ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy_fp8_scaled", "I2V/Wan2_1-I2V-14B-720p_fp8_e4m3fn_scaled_KJ.safetensors", "i2v"),
             
             # VAE
             ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/vae/wan_2.1_vae.safetensors", ""),
