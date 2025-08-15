@@ -91,3 +91,9 @@ ___kohyass_sdxl () {
     git -C $ENV_HOME pull
     comfyui_kohyass_sdxl
 }
+
+___clean_gen ()
+{
+    rm -rf /workspace/ComfyUI/output/video
+    rm -rf /workspace/ComfyUI/temp/
+}
