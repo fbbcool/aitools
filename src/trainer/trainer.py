@@ -497,7 +497,7 @@ dtype = 'bfloat16'
 # AdamW from the optimi library is a good default since it automatically uses Kahan summation when training bfloat16 weights.
 # Look at train.py for other options. You could also easily edit the file and add your own.
 type = 'adamw_optimi'
-lr = 2e-5
+lr = 5e-6
 betas = [0.9, 0.99]
 weight_decay = 0.01
 eps = 1e-8
