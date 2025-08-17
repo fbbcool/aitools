@@ -233,30 +233,10 @@ class ModelInst:
                 print(f"installing from hugging_2: {repo_id} / {filename} -> {self.path_model}")
                 if not filename:
                     # use snaphot download
-                    file_hf = snapshot_download(repo_id=self.repo)
+                    file_hf = snapshot_download(repo_id=self.repo, local_dir=self.path_model,local_dir_use_symlinks=True)
                 else:
                     # use hf download
-                    file_hf = hf_hub_download(repo_id=self.repo, filename=self.path_local)
-                # symbolic link to of file_hf to self.path_model folder
-                file_hf_path = Path(file_hf)
-                target_path = self.path_model / file_hf_path.name
-                
-                # Check if the target file already exists and is a symlink to the correct source
-                if target_path.is_symlink() and target_path.resolve() == file_hf_path.resolve():
-                    print(f"Symlink already exists and is correct: {target_path} -> {file_hf_path}")
-                elif target_path.exists():
-                    # If it exists but is not a symlink or points to the wrong place, remove it
-                    print(f"Removing existing file/symlink at {target_path} to create new symlink.")
-                    if target_path.is_dir():
-                        shutil.rmtree(target_path)
-                    else:
-                        os.remove(target_path)
-                    os.symlink(file_hf_path, target_path)
-                    print(f"Created symlink: {target_path} -> {file_hf_path}")
-                else:
-                    # If it doesn't exist, create the symlink
-                    os.symlink(file_hf_path, target_path)
-                    print(f"Created symlink: {target_path} -> {file_hf_path}")
+                    file_hf = hf_hub_download(repo_id=self.repo, filename=self.path_local, local_dir=self.path_model,local_dir_use_symlinks=True)
 
             if self.method_dl == DownloadMethod.Hugging:
                 pass
