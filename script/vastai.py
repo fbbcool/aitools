@@ -231,7 +231,12 @@ class ModelInst:
                 repo_id = self.repo
                 filename = self.path_local
                 print(f"installing from hugging_2: {repo_id} / {filename} -> {self.path_model}")
-                file_hf = hf_hub_download(repo_id=self.repo, filename=self.path_local)
+                if not filename:
+                    # use snaphot download
+                    file_hf = snapshot_download(repo_id=self.repo)
+                else:
+                    # use hf download
+                    file_hf = hf_hub_download(repo_id=self.repo, filename=self.path_local)
                 # symbolic link to of file_hf to self.path_model folder
                 file_hf_path = Path(file_hf)
                 target_path = self.path_model / file_hf_path.name
@@ -254,9 +259,7 @@ class ModelInst:
                     print(f"Created symlink: {target_path} -> {file_hf_path}")
 
             if self.method_dl == DownloadMethod.Hugging:
-                url_model = self.path_model / self.name
-                print(f"installing from hugging: {self.url} -> {url_model}")
-                self.download_hf(self.url, str(url_model))
+                pass
             
             if self.method_dl == DownloadMethod.Wget:
                 url_model = self.path_model / self.name
