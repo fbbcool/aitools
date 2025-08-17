@@ -3,7 +3,7 @@ import os
 import sys
 import shutil
 from typing import Final
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, snapshot_download
 import requests
 from tqdm import tqdm
 from git import Repo  # pip install gitpython
@@ -103,8 +103,15 @@ class ModelInst:
             ofolder = Path(ofolder)
         else:
             raise TypeError("ofolder has no correct type")
-        ofile_str = hf_hub_download(repo_id=self.repo, filename=self.path_local, local_dir=ofolder_str)
-        return Path(ofile_str)
+        
+        if not filename:
+            # use snaphot download
+            link = snapshot_download(repo_id=repo_id, local_dir=ofolder_str)
+        else:
+            # use hf download
+            link = hf_hub_download(repo_id=self.repo, filename=self.path_local, local_dir=ofolder_str)
+
+        return Path(link)
     
     def download_hf(self, url: str, fname: str):
         urlp = urlparse(url)
@@ -520,6 +527,8 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors", "t2v"),
             ModelInst(t, ModelType.Lora, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors", "i2v"),
             ModelInst(t, ModelType.Lora, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors", "i2v"),
+            
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/wan22", "", ""),
 
             
             # upscale
