@@ -19,6 +19,7 @@ CONTENT_SYSTEM: Final = {
 	"1busty": "The users are interested in women with big breasts and how they present their bodies.",
 	"1hairy": "The users are interested in woman with very hairy pussies and very hairy asses how they present their bodies.",
 	"1pussy_insert": "a giantess woman is inserting a small adult man into her vagina. if you want to use 'the small man is positioned between her legs', use 'inserted in her vagina' instead and describe wether the lower or upper bodypart of the small man is inserted and not visible.",
+	"1man": "The image is about a small man with an erect penis on a grey background. describe the man as a 'small man'.",
 }
 DEFAULT_PROMPT: Final = "Write a very long detailed description for this image."
 CONTENT_PROMPT: Final = {
@@ -29,6 +30,7 @@ CONTENT_PROMPT: Final = {
 	"1busty": "The users are interested in women with big breasts and how they present their bodies.",
 	"1hairy": "The users are interested in woman with very hairy pussies and very hairy asses how they present their bodies.",
 	"1pussy_insert": "a giantess woman is inserting a small adult man into her vagina. if you want to use 'the small man is positioned between her legs', use 'inserted in her vagina' instead and describe wether the lower or upper bodypart of the small man is inserted and not visible.",
+	"1man": "The image is about a small man with an erect penis on a grey background. describe the man as a 'small man'.",
 }
 
 class CapJoy():

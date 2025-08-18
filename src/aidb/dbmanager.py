@@ -8,7 +8,7 @@ from  pathlib import Path
 import datetime
 import uuid
 import mimetypes
-from typing import Final, List, Dict, Optional, Union, Any, Tuple
+from typing import Final, Generator, List, Dict, Optional, Union, Any, Tuple
 import yaml # Import the yaml library
 
 from aidb.hfdataset import HFDatasetImg
@@ -121,7 +121,7 @@ class DBManager:
             return None
         return self._collection2hfd.get(collection, None)
     
-    def set_collection(self, collection_name: str) -> None:
+    def set_collection(self, collection_name: str, create: bool = False) -> None:
         """
         Sets the currently used collection.
 
@@ -132,10 +132,24 @@ class DBManager:
             return
 
         if collection_name not in self.db.list_collection_names():
-            raise ValueError(f"Collection '{collection_name}' does not exist in the database.")
+            if create:
+                self.create_collection(collection_name)
+            else:
+                raise ValueError(f"Collection '{collection_name}' does not exist in the database.")
         
         self._collection = collection_name
         print(f"Collection set to: {self._collection}")
+
+    def create_collection(self, collection_name: str) -> None:
+        """
+        Creates a new collection in the current database.
+        """
+        if self.db is None:
+            print("Database not connected. Cannot create collection.")
+            return
+
+        self.db.create_collection(collection_name)
+        print(f"Collection '{collection_name}' created.")
 
 
     @property
@@ -298,7 +312,7 @@ class DBManager:
             yield Image(self, str(doc['_id']), doc=doc)
 
     @property
-    def container_names(self) -> list[str]:
+    def container_names(self) -> Generator:
         """Returns a generator of for all container names in the db"""
         if self.db is None:
             print("Database not connected.")
@@ -441,7 +455,7 @@ class DBManager:
                 print(f"An unexpected error occurred during deleting documents from '{collection_name}': {e}")
         return None
 
-    def add_container(self, container_local_path: str | Path, recursive: bool = False) -> Optional[str]:
+    def add_container(self, container_local_path: str | Path, collection: str | None = None, recursive: bool = False) -> Optional[str]:
         """
         Creates a new container based on a local path and adds all images
         contained in that path, optionally recursively.
@@ -454,6 +468,9 @@ class DBManager:
         Returns:
             str or None: The string representation of the MongoDB '_id' of the newly created container, or None on failure.
         """
+        if collection is not None:
+            self.set_collection(collection, create = True)
+
         if isinstance(container_local_path, str):
             container_path_obj = Path(container_local_path)
         elif isinstance(container_local_path, Path):

@@ -5,10 +5,10 @@ mongodb_settings:
   host: "mongodb://mongo:mongo@n100"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
   port: 27017        # Or your MongoDB port
   db_name: "prod_ai" # Or your database name, e.g., "prod_ai"
-  collection: "imgs_0"   # Or your collection name, e.g., "images"
+  #collection: "imgs_0"   # Or your collection name, e.g., "images"
   #collection: "imgs_lara"   # Or your collection name, e.g., "images"
   #collection: "imgs_hairy01"   # Or your collection name, e.g., "images"
-  #collection: "imgs_wan01"   # Or your collection name, e.g., "images"
+  collection: "imgs_wan01"   # Or your collection name, e.g., "images"
   #collection: "imgs_alexandra"   # Or your collection name, e.g., "images"
   #collection: "imgs_fbb01"   # Or your collection name, e.g., "images"
 
@@ -30,17 +30,18 @@ thumbnail_settings:
 train_image_settings:
   # Default directory to save generated training images
   # This path is relative to where the application is run.
-  default_train_image_dir: "___train_images_768" 
+  default_train_image_dir: "___train_images_1024" 
   
   # Default size [width, height] for generated thumbnails
   # The aspect ratio of the original image will be preserved.
-  default_train_image_size: [768, 768]
+  default_train_image_size: [1024, 1024]
 
 # Huggingface settings
 hf_settings:
   preload:
     - "fbbcool/gts01_r35"
     - "fbbcool/1gts_wan01"
+    - "fbbcool/1gts_03_1k"
     - "fbbcool/1woman_lara02"
     - "fbbcool/1hairy_01"
     #- "fbbcool/1fbb_01"
@@ -55,4 +56,5 @@ hf_settings:
     - imgs_hairy01: "fbbcool/1hairy_01"
     - imgs_fbb01: "fbbcool/1fbb_01"
     - imgs_alexandra: "fbbcool/1fem_alexandra"
+    - imgs_1man: "fbbcool/1fem_alexandra"
     #- imgs_: "fbbcool/1pussy_insert"
