@@ -51,6 +51,7 @@ class Trainer:
         self._netdim = 4
         self._batch_size = 1
         self._num_repeats = 1
+        self._lr = 2e-5
 
         # make root folder
         self.ROOT.mkdir(exist_ok=True)
@@ -76,6 +77,7 @@ class Trainer:
         self._netdim = int(self._config_train.get("netdim", 4))
         self._batch_size = int(self._config_train.get("batch_size", 1))
         self._num_repeats = int(self._config_train.get("num_repeats", 1))
+        self._lr = float(self._config_train.get("lr", 2e-5))
 
         #
         # set base config
@@ -462,7 +464,7 @@ dtype = 'bfloat16'
 # AdamW from the optimi library is a good default since it automatically uses Kahan summation when training bfloat16 weights.
 # Look at train.py for other options. You could also easily edit the file and add your own.
 type = 'adamw_optimi'
-lr = 5e-6
+lr = {self._lr}
 betas = [0.9, 0.99]
 weight_decay = 0.01
 eps = 1e-8
@@ -618,7 +620,7 @@ dtype = 'bfloat16'
 # AdamW from the optimi library is a good default since it automatically uses Kahan summation when training bfloat16 weights.
 # Look at train.py for other options. You could also easily edit the file and add your own.
 type = 'adamw_optimi'
-lr = 5e-6
+lr = {self._lr}
 betas = [0.9, 0.99]
 weight_decay = 0.01
 eps = 1e-8
