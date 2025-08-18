@@ -441,6 +441,7 @@ class ModelInstComfyUi:
             
             # lora
             ModelInst(t, ModelType.Lora, hf2, "Kijai/WanVideo_comfy", "Pusa/Wan21_PusaV1_LoRA_14B_rank512_bf16.safetensors", "t2v"),
+            # https://huggingface.co/lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v/resolve/main/loras/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors?download=true
             ModelInst(t, ModelType.Lora, hf2, "lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v", "loras/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors", "t2v"),
             ModelInst(t, ModelType.Lora, hf2, "lightx2v/Wan2.1-I2V-14B-StepDistill-CfgDistill-Lightx2v", "loras/Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors", "i2v"),
             ModelInst(t, ModelType.Lora, hf2, "vrgamedevgirl84/Wan14BT2VFusioniX", "FusionX_LoRa/Wan2.1_T2V_14B_FusionX_LoRA.safetensors", "t2v"),
@@ -461,15 +462,8 @@ class ModelInstComfyUi:
             #clip vision
             
             # lora
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1woman_lara.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_cum.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_deepthroat.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_SmokeMonday.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_Sophie.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_dreamjob.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1dreamplay.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1gts_boobphysics.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "SECRET_SAUCE_WAN2.1_14B_fp8.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/wan21", "", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/1gts_wan", "1dreamplay.safetensors", ""),
         
             # custom nodes
             #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
