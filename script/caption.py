@@ -1,9 +1,9 @@
 from aidb.caption_joy import CapJoy
 from aidb.hfdataset import HFDatasetImg
 
-caper = CapJoy(configure_ai=True)
+caper = CapJoy(trigger="1man")
 #hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
-hfd = HFDatasetImg(repo_id="fbbcool/1woman_lara01", force_meta_dl=True)
+hfd = HFDatasetImg(repo_id="fbbcool/1man", force_meta_dl=True)
 
 n = len(hfd)
 error = 0
@@ -14,8 +14,7 @@ for idx in range(n):
             print("already captionized.")
             continue
         img = hfd.pil(idx)
-        prompt = hfd.prompt(idx)
-        caption = caper.img_caption(img, prompt)
+        caption = caper.img_caption(img)
         print(f"{caption}\n")
         hfd.img_set_caption_joy(idx, caption)
         if idx % 100 == 0:

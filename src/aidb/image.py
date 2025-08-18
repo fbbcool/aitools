@@ -160,6 +160,9 @@ class Image:
     
     @property
     def _hfd_caption_search(self) -> str | None:
+        _hfd = self.hfd
+        if _hfd is None:
+            return None
         caption = self._hfd_caption
         if caption is None:
             for _hfd in self._db_manager.hfds:
