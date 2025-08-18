@@ -1,1 +1,1 @@
-pip install -r caption_requirements.txt
+pip install -r requirements_caption.txt
