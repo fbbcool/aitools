@@ -1,9 +1,9 @@
 from aidb.caption_joy import CapJoy
 from aidb.hfdataset import HFDatasetImg
 
-caper = CapJoy(trigger="1man")
+caper = CapJoy(trigger="1fem")
 #hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
-hfd = HFDatasetImg(repo_id="fbbcool/1man", force_meta_dl=True)
+hfd = HFDatasetImg(repo_id="fbbcool/1fem", force_meta_dl=True)
 hfd.cache()
 
 n = len(hfd)
