@@ -13,7 +13,6 @@ import urllib
 from more_itertools import chunked_even
 
 from aidb.hfdataset import HFDatasetImg
-#from aidb.caption_joy import CapJoy
 
 class Trainer:
     #WORKSPACE: Final = Path("/Volumes/data/Project/AI/REPOS")
@@ -38,14 +37,13 @@ class Trainer:
     FILE_CONFIG_DATASET: Final = ROOT / "dataset.toml"
     FILE_TRAIN_SCRIPT: Final = ROOT / "train.sh"
 
-    def __init__(self, repo_id_hfd: str, type_model: str | None = None, load_models: bool = True, cache_full_dataset: bool = False, multithread: bool = False, caption_missing=False, caption_force=False) -> None:
-        self._repo_id_hfd = repo_id_hfd
+    def __init__(self, repo_ids_hfd: str | list[str], type_model: str | None = None, load_models: bool = True, multithread: bool = False) -> None:
+        if isinstance(repo_ids_hfd, str):
+            repo_ids_hfd = [repo_ids_hfd]
+        self._repo_ids_hfd: list[str] = repo_ids_hfd
 
         self._config_base: dict = {}
         self._config_train: dict = {}
-        self._hfd: HFDatasetImg = None
-        #self._caper: CapJoy = None
-        self._caper = None
         
         self._type_model = None
         self._trigger = ""
@@ -53,7 +51,6 @@ class Trainer:
         self._netdim = 4
         self._batch_size = 1
         self._num_repeats = 1
-        self._ids_img: list[str] = []
 
         # make root folder
         self.ROOT.mkdir(exist_ok=True)
@@ -61,7 +58,7 @@ class Trainer:
         #
         # set train config
         #
-        hf_hub_download(repo_id=self._repo_id_hfd, filename=self.FILENAME_CONFIG_TRAIN, repo_type="dataset", force_download=True, local_dir=self.ROOT)
+        hf_hub_download(repo_id=self._repo_ids_hfd[0], filename=self.FILENAME_CONFIG_TRAIN, repo_type="dataset", force_download=True, local_dir=self.ROOT)
         # read train config file with pathlib and store the dict
         try:
             with self.FILE_CONFIG_TRAIN.open('r', encoding='utf-8') as f:
@@ -79,7 +76,6 @@ class Trainer:
         self._netdim = int(self._config_train.get("netdim", 4))
         self._batch_size = int(self._config_train.get("batch_size", 1))
         self._num_repeats = int(self._config_train.get("num_repeats", 1))
-        self._ids_img = self._config_train.get("imgs", [])
 
         #
         # set base config
@@ -93,21 +89,6 @@ class Trainer:
         _base_models_all: dict = self._config_base.get("models", {})
         self._models: dict[str, dict] | None = _base_models_all.get(self._type_model, None)
         self._model_links: dict[str, str] = {}
-
-        #
-        # load dataset
-        #
-        self._hfd = HFDatasetImg(self._repo_id_hfd, force_meta_dl=True)
-        if not self._ids_img:
-            self._ids_img = self._hfd.ids
-        
-        #
-        # load caper
-        #
-        self._caption_force = caption_force
-        if caption_missing or self._caption_force:
-            #self._caper = CapJoy(trigger=self._trigger)
-            self._caper = None
 
         #
         # folders
@@ -131,7 +112,7 @@ class Trainer:
         if load_models:
             self._download_models()
         
-        self._make_dataset(cache_full_dataset=cache_full_dataset, multithread=multithread)
+        self._make_dataset(multithread=multithread)
         #self._make_file_sample_prompts()
         self._make_file_dataset_config()
         self._make_file_diffpipe_config()
@@ -167,78 +148,62 @@ class Trainer:
             return None
         return link
 
-    def _make_dataset(self, cache_full_dataset: bool = False, multithread: bool = False) -> None:
-        if cache_full_dataset:
-            self._hfd.cache()
-        
-        if not self._ids_img:
-            raise ValueError("dataset: empty img list!")
+    def _make_dataset(self, multithread: bool = False) -> None:
+        for repo_id in self._repo_ids_hfd:
+            hfd = HFDatasetImg(repo_id, force_meta_dl=True)
+            hfd.cache()
+            self._make_dataset_hfd(hfd, multithread=multithread)
 
+    def _make_dataset_hfd(self, hfd: HFDatasetImg, multithread: bool = False) -> None:
         # non multi-threaded
+        ids_img = hfd.ids
         if not multithread:
-            self._process_imgs(self._ids_img)
+            self._process_imgs(ids_img, hfd)
         else:
             # multi-threaded
             n = 8
-            m = len(self._ids_img)
+            m = len(ids_img)
             ids = []
-            for batch in chunked_even(self._ids_img,(m//n)+1):
+            for batch in chunked_even(ids_img,(m//n)+1):
                 ids.append(batch)
             if (len(ids) != n):
                 raise ValueError("dataset multithreading failed!")
 
             threads = []
             for i in range(n):
-                thread = threading.Thread(target=self._process_imgs, args=[ids[i],])
+                thread = threading.Thread(target=self._process_imgs, args=[ids[i],hfd,])
                 print(f" dataset thread[{i}]: {len(ids[i])} imgs")
                 threads.append(thread)
                 thread.start()
             for i in range(n):
                 threads[i].join()
                 print(f" dataset thread[{i}]: joined.")
-        
-        self._hfd.save_to_jsonl(force=True)
     
-    def _process_imgs(self, ids: list[str]) -> None:
+    def _process_imgs(self, ids: list[str], hfd: HFDatasetImg) -> None:
         if not ids:
             return
 
         lost = 0
-        generated = 0
         success = 0
         for id in ids:
             if not id:
                 continue
-            idx = self._hfd.id2idx(id)
+            idx = hfd.id2idx(id)
             if not idx:
                 continue
             
             # caption or prompt fetch
-            #caption = self._hfd.captions[idx]
-            if self._caption_force:
-                if self._caper is not None:
-                    img = self._hfd.pil(idx)
-                    caption = self._caper.img_caption(img)        
-                    print(f"\n\ngenerated caption:\n{caption}")
-                    if caption:
-                        self._hfd.img_set_caption_joy(idx, caption)
-                        generated += 1
-            else:
-                caption = self._hfd.prompts[idx]
-                if not caption:
-                    caption = self._hfd.captions[idx]
-                if not caption:
-                    if self._caper is not None:
-                        img = self._hfd.pil(idx)
-                        caption = self._caper.img_caption(img)        
-                        print(f"\n\ngenerated caption:\n{caption}")
-                        if caption:
-                            self._hfd.img_set_caption_joy(idx, caption)
-                            generated += 1
-                if not caption:
-                    lost += 1
-                    print(f"{id}: caption missed!")
-                    continue
+            prompt = hfd.prompts[idx]
+            caption = hfd.captions[idx]
+            if not caption:
+                caption = prompt
+            if not prompt:
+                prompt = caption
+
+            if not caption:
+                lost += 1
+                print(f"caption missing for {id}!") 
+                continue
 
             # TODO more generic, and take care that the dataset isnt polluted with trigger words
             caption = caption.replace("1gts,", "")
@@ -248,7 +213,7 @@ class Trainer:
             
             # img file
             try:
-                img_file_dl = self._hfd.img_download(idx)
+                img_file_dl = hfd.img_download(idx)
             except Exception as e:
                 lost += 1
                 print(f"{e}\n{id} not downloadable!")
@@ -265,7 +230,7 @@ class Trainer:
             
             # ok
             success += 1
-        print(f"dataset thread finished: {success} successes, {generated} generations, {lost} losses")
+        print(f"dataset thread finished: {success} successes, {lost} losses")
 
 
     def _make_file_sample_prompts(self) -> None:

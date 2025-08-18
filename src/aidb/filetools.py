@@ -1,5 +1,8 @@
 from pathlib import Path
+import shutil
 import re
+import uuid
+
 
 from aidb.dbdefines import *
 
@@ -50,3 +53,39 @@ def diffpipe_lora_rename(url_models_relative: Path | str, test: bool = False) ->
         print(target_path)
         if not test:
             lora.rename(target_path)
+
+def collect_tagged_files(src_folder: str | Path, to_folder: str | Path | None = None, tag: str = "ai_select", recursive: bool = False) -> list[Path]:
+    import macos_tags
+    src_folder = Path(src_folder)
+    if not src_folder.exists():
+        return []
+    if not src_folder.is_dir():
+        return []
+    
+    # iterate all files
+    files = []
+    if recursive:
+        files = list(src_folder.rglob("*"))
+    else:
+        files = list(src_folder.iterdir())
+
+    tagged_files: list[Path] = []
+    for file in files:
+        if file.is_file():
+            # Check if the file has the specified tag
+            tags_macos = macos_tags.get_all(str(file))
+            for tag_macos in tags_macos:
+                if tag_macos.name == tag:
+                    tagged_files.append(file)
+                    break
+    
+    if to_folder is not None:
+        to_folder = Path(to_folder)
+        if not to_folder.exists():
+            to_folder.mkdir(parents=True)
+        for from_file in tagged_files:
+            to_file = (to_folder / str(uuid.uuid4())).with_suffix(from_file.suffix)
+            print(f"copying {from_file} to {to_file}")
+            shutil.copy(from_file, to_file)
+
+    return tagged_files
