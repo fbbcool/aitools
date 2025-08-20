@@ -18,17 +18,15 @@ def diffpipe_lora_rename(url_models_relative: Path | str, test: bool = False) ->
     name = path_source.name
 
     folders_source: list[Path] = [path_source]
-    # check if "high" exists as a folder
-    if (path_source / "high").exists():
-        folders_source.append(path_source / "high")
-    # check if "low" exists as a folder
-    if (path_source / "low").exists():
-        folders_source.append(path_source / "low")
-    
+    # check if valid subfolders exist
+    valid_folders = ["high", "low", "high_0875", "low_0875"]
+    for valid_folder in valid_folders:
+        if (path_source / valid_folder).exists():
+            folders_source.append(path_source / valid_folder)
     
     loras: list[Path] = []
     for folder in folders_source:
-        for lora in folder.glob(f"{DIFFPIPE_NAME_LORA}*.safetensors"):
+        for lora in folder.glob(f"{DIFFPIPE_NAME_LORA}*{SUFFIX_SAFETENSORS}"):
             loras.append(folder / lora)
     
     if not loras:
