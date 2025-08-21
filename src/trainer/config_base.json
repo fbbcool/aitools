@@ -61,6 +61,10 @@
                 ]
             },
             "ckpt": {
+                "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+                "file": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors"
+            },
+            "ckpt_nsfw": {
                 "repo_id": "GuangyuanSD/Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn",
                 "file": "Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn.safetensors"
             },

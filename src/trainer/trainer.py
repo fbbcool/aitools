@@ -845,7 +845,7 @@ warmup_steps = 100
 # of blocks kept offloaded to RAM. Increasing it lowers VRAM use, but has a performance penalty. The
 # exactly performance penalty depends on the model and the type of training you are doing (e.g. images vs video).
 # Block swapping only works for LoRA training, and requires pipeline_stages=1.
-blocks_to_swap = 8
+#blocks_to_swap = 8
 
 # eval settings
 
