@@ -436,8 +436,7 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.VAE, hf2, "Kijai/WanVideo_comfy", "Wan2_1_VAE_fp32.safetensors", ""),
             
             # clip
-            #ModelInst(t, ModelType.Clip, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors", ""),
-            ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
+            ModelInst(t, ModelType.Clip, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors", ""),
             #ModelInst(t, ModelType.Clip, hf2, "NSFW-API/NSFW-Wan-UMT5-XXL", "nsfw_wan_umt5-xxl_fp8_scaled.safetensors", ""),
             
             # lora
@@ -485,14 +484,12 @@ class ModelInstComfyUi:
             # MVP first
             # checkpoint
             #ModelInst(t, ModelType.Unet, hf2, "", "", ""),
-            # https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled/resolve/main/T2V/Wan2_2-T2V-A14B_HIGH_fp8_e4m3fn_scaled_KJ.safetensors?download=true
-            ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy_fp8_scaled", "T2V/Wan2_2-T2V-A14B_HIGH_fp8_e4m3fn_scaled_KJ.safetensors", "t2v"),
-            # https://hf-mirror.com/Kijai/WanVideo_comfy_fp8_scaled/resolve/main/T2V/Wan2_2-T2V-A14B-LOW_fp8_e4m3fn_scaled_KJ.safetensors?download=true
-            ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy_fp8_scaled", "T2V/Wan2_2-T2V-A14B-LOW_fp8_e4m3fn_scaled_KJ.safetensors", "t2v"),
-            #ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors", "t2v"),
-            #ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors", "t2v"),
-            #ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "i2v"),
-            #ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors", "i2v"),
+            #ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy_fp8_scaled", "T2V/Wan2_2-T2V-A14B_HIGH_fp8_e4m3fn_scaled_KJ.safetensors", "t2v"),
+            #ModelInst(t, ModelType.Unet, hf2, "Kijai/WanVideo_comfy_fp8_scaled", "T2V/Wan2_2-T2V-A14B-LOW_fp8_e4m3fn_scaled_KJ.safetensors", "t2v"),
+            ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors", "t2v"),
+            ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors", "t2v"),
+            ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "i2v"),
+            ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors", "i2v"),
             
             # VAE
             #ModelInst(t, ModelType.VAE, hf2, "", "", ""),
@@ -501,8 +498,7 @@ class ModelInstComfyUi:
             
             # clip
             #ModelInst(t, ModelType.Clip, hf2, "", "", ""),
-            ModelInst(t, ModelType.Clip, hf2, "Kijai/WanVideo_comfy", "umt5-xxl-enc-fp8_e4m3fn.safetensors", ""),
-            ModelInst(t, ModelType.Clip, hf2, "NSFW-API/NSFW-Wan-UMT5-XXL", "nsfw_wan_umt5-xxl_fp8_scaled.safetensors", ""),
+            ModelInst(t, ModelType.Clip, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors", ""),
             
             # lora
             #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
