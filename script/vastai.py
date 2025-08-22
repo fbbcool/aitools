@@ -532,6 +532,8 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.CustomNode, git, "github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-WanVideoWrapper", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/stduhpf", "ComfyUI-WanMoeKSampler", ""),
+            ModelInst(t, ModelType.CustomNode, git, "github.com/ClownsharkBatwing", "RES4LYF", ""),
             # do w/ comfyui manager
             # to comfyui-frame-interpolation/ckpts/stmfnet/
             #ModelInst(t, ModelType.CustomNode, git, "github.com/Fannovel16", "ComfyUI-Frame-Interpolation", ""),
