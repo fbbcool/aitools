@@ -50,6 +50,7 @@ hf_settings:
     - "fbbcool/1pussy_insert"
     - "fbbcool/1man"
     - "fbbcool/1fem"
+    - "fbbcool/1legsemp"
 
   collection2hfd:
     - imgs_0: "fbbcool/gts01_r35"
@@ -60,4 +61,5 @@ hf_settings:
     - imgs_alexandra: "fbbcool/1fem_alexandra"
     - imgs_1man: "fbbcool/1man"
     - imgs_1fem: "fbbcool/1fem"
+    - imgs_1legsemp: "fbbcool/1legsemp"
     #- imgs_: "fbbcool/1pussy_insert"
