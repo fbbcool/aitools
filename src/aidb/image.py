@@ -63,6 +63,27 @@ class Image:
         return self._collection
     
     @property
+    def search_collection(self) -> list[str]:
+        """
+        Searches all image collections and returns all collections which contain this image id.
+        """
+        collections = self._db_manager.collections_images
+        found_collections = []
+        for collection_name in collections:
+            # Check if the image ID exists in this collection
+            if self._db_manager.find_documents(collection_name, {"_id": ObjectId(self._image_id)}):
+                found_collections.append(collection_name)
+        return found_collections
+    
+    @property
+    def container(self) -> str | None:
+        """Returns the container of this image."""
+        container_id = self.data.get("container_id", None)
+        if container_id is None:
+            return None
+        return self._db_manager.name_container(container_id)
+    
+    @property
     def data(self) -> dict:
         """
         Fetches and caches the image's metadata from the database.
@@ -75,7 +96,12 @@ class Image:
 
         if not image_doc:
             print(f"Error: Image with ID '{self._image_id}' not found in the database.")
-            return None
+            collections = self.search_collection
+            if not collections:
+                self._data = {}
+                return self._data
+            self._collection = collections[0]
+            image_doc = self._db_manager.find_documents(self._collection, {"_id": ObjectId(self._image_id)})
         
         # Assuming find_documents returns a list, take the first one
         self._data = image_doc[0]
@@ -196,7 +222,7 @@ class Image:
             ksampler = {}
             for id in data:
                 class_type = data[id]["class_type"]
-                if class_type in ["KSampler", "WanVideoSampler"]:
+                if class_type in ["KSampler", "WanVideoSampler", "WanMoeKSampler"]:
                     ksampler = data[id]
                     break
             inputs = ksampler.get("inputs", None)

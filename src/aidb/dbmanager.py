@@ -671,6 +671,18 @@ class DBManager:
             return None
         
         return self.update_document('containers', {"_id": object_id}, {"$set": update_fields})
+    
+    def name_container(self, container_id: str | ObjectId) -> str | None:
+        """
+        Returns the name of a container.
+        """
+        if isinstance(container_id, str):
+            container_id = ObjectId(container_id)
+        container = self.find_documents('containers', {"_id": container_id})
+        if container:
+            return container[0]["name"]
+        else:
+            return None
 
     def update_image(self, 
                      image_id: str, # This is now expected to be the string representation of MongoDB's _id
