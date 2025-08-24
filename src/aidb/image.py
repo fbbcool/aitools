@@ -806,6 +806,12 @@ class Image:
         """Updates the container_db_id field of the image."""
         print(f"Updating container_db_id for image {self._image_id}")
         return self._db_manager.update_image(self._image_id, container_db_id=container_db_id)
+    
+    def update_collection(self, collection: str) -> Optional[int]:
+        """Updates the collection field of the image."""
+        print(f"Updating collection for image {self._image_id}")
+        return self._db_manager.update_image(self._image_id, collection=collection)
+
 
     def update_all(self, 
                    description: Optional[List[Dict[str, str]]] = None, 

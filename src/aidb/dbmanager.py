@@ -285,6 +285,20 @@ class DBManager:
             print(f"An unexpected error occurred while reading '{config_file}': {e}. Using constructor/default settings.")
         
 
+    def _images_from_collection(self, collection_name: str) -> Generator:
+        """Yields all images in the specified collection."""
+        from aidb.image import Image # Import here to avoid circular dependency
+
+        collection = self._get_collection(collection_name)
+        if collection is not None:
+            try:
+                for doc in collection.find({}):
+                    yield Image(self, str(doc['_id']), collection=collection_name, doc=doc)
+            except OperationFailure as e:
+                print(f"Failed to retrieve images from '{collection_name}': {e}")
+            except Exception as e:
+                print(f"An unexpected error occurred while retrieving images from '{collection_name}': {e}")
+                
     @property
     def image_ids(self):
         """Returns a generator of Images id's for all images in the db"""
@@ -304,12 +318,18 @@ class DBManager:
             print("Database not connected. Cannot retrieve images.")
             return
 
-        from aidb.image import Image # Import here to avoid circular dependency
+        return self._images_from_collection(self._collection)
+    
+    @property
+    def all_images(self):
+        """Returns a generator of all images in the db"""
+        if self.db is None:
+            print("Database not connected. Cannot retrieve images.")
+            return
+        
+        for collection in self.collections_images:
+            yield from self._images_from_collection(collection)
 
-        image_docs = self.find_documents(self._collection)
-        for doc in image_docs:
-            # Ensure _id is converted to string for Image object initialization
-            yield Image(self, str(doc['_id']), doc=doc)
 
     @property
     def container_names(self) -> Generator:
