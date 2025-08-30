@@ -390,8 +390,9 @@ class ModelInstComfyUi:
             # checkpoint
             #ModelInst(t, ModelType.DiffusionModel, hf2, "", "", ""),
             #ModelInst(t, ModelType.DiffusionModel, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", ""),
-            ModelInst(t, ModelType.DiffusionModel, hf2, "GuangyuanSD/Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn", "Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn.safetensors", ""),
-            
+            ModelInst(t, ModelType.DiffusionModel, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/diffusion_models/qwen_image_edit_fp8_e4m3fn.safetensors", ""),
+            #ModelInst(t, ModelType.DiffusionModel, hf2, "GuangyuanSD/Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn", "Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn.safetensors", ""),
+            #https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI/resolve/main/split_files/diffusion_models/qwen_image_edit_fp8_e4m3fn.safetensors?download=true 
             # VAE
             #ModelInst(t, ModelType.VAE, hf2, "", "", ""),
             ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/vae/qwen_image_vae.safetensors", ""),
@@ -400,12 +401,16 @@ class ModelInstComfyUi:
             #ModelInst(t, ModelType.TextEncoder, hf2, "", "", ""),
             ModelInst(t, ModelType.TextEncoder, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors", ""),
             
+            # lora lightning
+            #ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Lightning-4steps-V1.0.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Edit-Lightning-4steps-V1.0.safetensors", ""),
+
             # lora
             #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
-            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-07.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-14.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1gts_r5-06.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-07.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-14.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1gts_r5-06.safetensors", ""),
             
             # upscale
             #ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x2.pth", ""),
