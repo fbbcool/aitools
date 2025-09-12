@@ -6,7 +6,7 @@ from whisper.utils import get_writer
 from pathlib import Path
 from typing import Final
 
-from src.audio.common import _ofile_wo_audio_ext, _ofile_w_ext, _ofile_attach_metadata, EXT_JSON_TRANSCRIBE, EXT_AUDIO, DIR_METADATA
+from audio.common import _ofile_wo_audio_ext, _ofile_w_ext, _ofile_attach_metadata, EXT_JSON_TRANSCRIBE, EXT_AUDIO, DIR_METADATA
 
 def _subtitles(ifile: Path, result: dict, format="srt"):
     opath = ifile.parent

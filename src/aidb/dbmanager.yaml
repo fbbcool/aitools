@@ -53,6 +53,7 @@ hf_settings:
     - "fbbcool/1legsemp"
     - "fbbcool/prompts_01"
     - "fbbcool/1busty"
+    - "fbbcool/prompts_only_01"
 
   collection2hfd:
     - imgs_0: "fbbcool/gts01_r35"
@@ -66,4 +67,5 @@ hf_settings:
     - imgs_1legsemp: "fbbcool/1legsemp"
     - imgs_prompts_01: "fbbcool/prompts_01"
     - imgs_1busty: "fbbcool/1busty"
+    - imgs_prompts_only_01: "fbbcool/prompts_only_01"
     #- imgs_: "fbbcool/1pussy_insert"

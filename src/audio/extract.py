@@ -2,7 +2,7 @@ import subprocess
 import os
 from pathlib import Path
 
-from src.audio.common import _ofile_attach_metadata, _file_link_metadata, EXT_VIDEOS
+from audio.common import _ofile_attach_metadata, _file_link_metadata, EXT_VIDEOS
 
 def _extract_audio_fiorfo(fiorfo: str, output_ext: str =".mp3", force=False):
 
