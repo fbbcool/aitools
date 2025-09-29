@@ -7,8 +7,8 @@ export PYTHONPATH=$ENV_HOME/src
 ___install() {
     rm -rf $ENV_HOME
     git clone $ENV_REPOS $ENV_HOME
-    pip install -r $ENV_HOME/requirements.txt
-    #pip install -r $ENV_HOME/requirements_remote.txt
+    #pip install -r $ENV_HOME/requirements.txt
+    pip install -r $ENV_HOME/requirements_remote.txt
 }
 ___hook () {
     if [ -x $ENV_POST_HOOK ]; then

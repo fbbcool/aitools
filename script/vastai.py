@@ -371,7 +371,7 @@ class ModelInstComfyUi:
             # custom nodes
             # to comfyui-frame-interpolation/ckpts/stmfnet/
             #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
-            ModelInst(t, ModelType.CustomNode, git, "github.com/city96", "ComfyUI-GGUF", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/city96", "ComfyUI-GGUF", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/rgthree", "rgthree-comfy", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/yolain", "ComfyUI-Easy-Use", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-KJNodes", ""),
@@ -539,7 +539,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.CustomNode, hf2, "camenduru/stmfnet", "stmfnet.pth", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/Zehong-Ma", "ComfyUI-MagCache", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/Kosinkadink", "ComfyUI-VideoHelperSuite", ""),
-            ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-WanVideoWrapper", ""),
+            #ModelInst(t, ModelType.CustomNode, git, "github.com/kijai", "ComfyUI-WanVideoWrapper", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/stduhpf", "ComfyUI-WanMoeKSampler", ""),
             ModelInst(t, ModelType.CustomNode, git, "github.com/ClownsharkBatwing", "RES4LYF", ""),
             # do w/ comfyui manager
