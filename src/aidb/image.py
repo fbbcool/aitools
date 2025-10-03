@@ -715,7 +715,11 @@ class Image:
             train_pil_image = pil_image.copy()
             # Rescale longest edge to size, upscaling if necessary
             width, height = train_pil_image.size
-            if width > height:
+            # if size is already ok, just copy the image
+            if width == train_image_size[0] or height == train_image_size[1]:
+                # No resizing needed
+                pass
+            elif width > height:
                 # Landscape or square
                 new_width = train_image_size[0]
                 new_height = int(new_width * height / width) if width > 0 else 0

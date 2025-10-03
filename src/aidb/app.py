@@ -12,7 +12,7 @@ import html
 import json # Import json for robust string escaping
 
 # Define images per page constant
-IMAGES_PER_PAGE: Final = 252
+IMAGES_PER_PAGE: Final = 500
 
 class AIDBGradioApp:
     """
