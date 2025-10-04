@@ -516,6 +516,8 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Lora, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors", "i2v"),
             
             ModelInst(t, ModelType.Lora, hf2, "fbbcool/wan22", "", ""),
+            # ACTIVATE for testing
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/test", "", ""),
 
             
             # upscale
