@@ -31,6 +31,7 @@ class DownloadGroup(Enum):
     KOHYASS_SDXL = auto()
     FLUXGYM = auto()
     QWEN = auto()
+    QWEN_EDIT = auto()
     WAN21 = auto()
     WAN22 = auto()
     CURRENT = auto()
@@ -430,7 +431,7 @@ class ModelInstComfyUi:
         # QWEN-EDIT
         #
         t = TargetType.Comfy
-        models_qwen: list[ModelInst] = [
+        models_qwen_edit: list[ModelInst] = [
             # MVP first
             # checkpoint
             #ModelInst(t, ModelType.DiffusionModel, hf2, "", "", ""),
@@ -676,6 +677,7 @@ class ModelInstComfyUi:
             DownloadGroup.WAN21: models_wan21,
             DownloadGroup.WAN22: models_wan22,
             DownloadGroup.QWEN: models_qwen,
+            DownloadGroup.QWEN_EDIT: models_qwen_edit,
         }
 
         if not method_gen:
@@ -752,6 +754,8 @@ if __name__ == "__main__":
         group = DownloadGroup.KOHYASS_SDXL
     elif str_group == "qwen":
         group = DownloadGroup.QWEN
+    elif str_group == "qwen_edit":
+        group = DownloadGroup.QWEN_EDIT
     elif str_group == "wan21":
         hook = _hook_wan21 
         group = DownloadGroup.WAN21

@@ -19,6 +19,10 @@ ___setup_qwen () {
     python3 $ENV_HOME/script/vastai.py "qwen"
 }
 
+___setup_qwen_edit () {
+    python3 $ENV_HOME/script/vastai.py "qwen_edit"
+}
+
 ___setup_wan21 () {
     python3 $ENV_HOME/script/vastai.py "wan21"
 }
