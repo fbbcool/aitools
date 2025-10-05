@@ -390,8 +390,7 @@ class ModelInstComfyUi:
             # MVP first
             # checkpoint
             #ModelInst(t, ModelType.DiffusionModel, hf2, "", "", ""),
-            #ModelInst(t, ModelType.DiffusionModel, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", ""),
-            ModelInst(t, ModelType.DiffusionModel, hf2, "Comfy-Org/Qwen-Image-Edit_ComfyUI", "split_files/diffusion_models/qwen_image_edit_fp8_e4m3fn.safetensors", ""),
+            ModelInst(t, ModelType.DiffusionModel, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", ""),
             #ModelInst(t, ModelType.DiffusionModel, hf2, "GuangyuanSD/Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn", "Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn.safetensors", ""),
             #https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI/resolve/main/split_files/diffusion_models/qwen_image_edit_fp8_e4m3fn.safetensors?download=true 
             # VAE
@@ -404,7 +403,7 @@ class ModelInstComfyUi:
             
             # lora lightning
             #ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Lightning-4steps-V1.0.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Edit-Lightning-4steps-V2.0.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Lightning-4steps-V2.0.safetensors", ""),
 
             # lora
             #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
@@ -446,7 +445,7 @@ class ModelInstComfyUi:
             
             # lora lightning
             #ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Lightning-4steps-V1.0.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Edit-Lightning-4steps-V2.0.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Lightning-4steps-V2.0.safetensors", ""),
 
             # lora
             #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
