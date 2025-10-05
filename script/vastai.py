@@ -403,7 +403,49 @@ class ModelInstComfyUi:
             
             # lora lightning
             #ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Lightning-4steps-V1.0.safetensors", ""),
-            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Edit-Lightning-4steps-V1.0.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Edit-Lightning-4steps-V2.0.safetensors", ""),
+
+            # lora
+            #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-07.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-14.safetensors", ""),
+            #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1gts_r5-06.safetensors", ""),
+            
+            # upscale
+            #ModelInst(t, ModelType.Upscale, hf2, "ai-forever/Real-ESRGAN", "RealESRGAN_x2.pth", ""),
+
+            # additional checkpoints
+            
+            # additional loras
+
+            #clip vision
+            
+            # custom nodes
+            #ModelInst(t, ModelType.CustomNode, git, "", "", ""),
+            # https://github.com/SXQBW/ComfyUI-Qwen-Omni
+        ]
+
+        #
+        # QWEN-EDIT
+        #
+        t = TargetType.Comfy
+        models_qwen: list[ModelInst] = [
+            # MVP first
+            # checkpoint
+            #ModelInst(t, ModelType.DiffusionModel, hf2, "", "", ""),
+            ModelInst(t, ModelType.DiffusionModel, hf2, "Comfy-Org/Qwen-Image-Edit_ComfyUI", "split_files/diffusion_models/qwen_image_edit_2509_fp8_e4m3fn.safetensors", ""),
+            # VAE
+            #ModelInst(t, ModelType.VAE, hf2, "", "", ""),
+            ModelInst(t, ModelType.VAE, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/vae/qwen_image_vae.safetensors", ""),
+            
+            # clip
+            #ModelInst(t, ModelType.TextEncoder, hf2, "", "", ""),
+            ModelInst(t, ModelType.TextEncoder, hf2, "Comfy-Org/Qwen-Image_ComfyUI", "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors", ""),
+            
+            # lora lightning
+            #ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Lightning-4steps-V1.0.safetensors", ""),
+            ModelInst(t, ModelType.Lora, hf2, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Edit-Lightning-4steps-V2.0.safetensors", ""),
 
             # lora
             #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
