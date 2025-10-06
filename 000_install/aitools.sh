@@ -51,6 +51,12 @@ ___qwen () {
     ___hook
 }
 
+___qwen_edit () {
+    ___install
+    ___setup_qwen_edit
+    ___hook
+}
+
 ___sd15 () {
     git -C $ENV_HOME pull
     comfyui_sd15
