@@ -31,8 +31,8 @@ ___setup_wan22 () {
     python3 $ENV_HOME/script/vastai.py "wan22"
 }
 
-___setup_wan22_itv () {
-    python3 $ENV_HOME/script/vastai.py "wan22_itv"
+___setup_wan22_i2v () {
+    python3 $ENV_HOME/script/vastai.py "wan22_i2v"
 }
 
 ___current () {
@@ -49,9 +49,9 @@ ___wan22 () {
     ___setup_wan22
     ___hook
 }
-___wan22_itv () {
+___wan22_i2v () {
     ___install
-    ___setup_wan22_itv
+    ___setup_wan22_i2v
     ___hook
 }
 ___qwen () {
