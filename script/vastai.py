@@ -761,6 +761,9 @@ if __name__ == "__main__":
     elif str_group == "wan22":
         method_gen = "t2v"
         group = DownloadGroup.WAN22
+    elif str_group == "wan22_i2v":
+        method_gen = "i2v"
+        group = DownloadGroup.WAN22
     elif str_group == "current":
         group = DownloadGroup.CURRENT
     else:

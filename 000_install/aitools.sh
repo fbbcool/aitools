@@ -31,6 +31,10 @@ ___setup_wan22 () {
     python3 $ENV_HOME/script/vastai.py "wan22"
 }
 
+___setup_wan22_itv () {
+    python3 $ENV_HOME/script/vastai.py "wan22_itv"
+}
+
 ___current () {
     python3 $ENV_HOME/script/vastai.py "current"
 }
@@ -43,6 +47,11 @@ ___wan21 () {
 ___wan22 () {
     ___install
     ___setup_wan22
+    ___hook
+}
+___wan22_itv () {
+    ___install
+    ___setup_wan22_itv
     ___hook
 }
 ___qwen () {
