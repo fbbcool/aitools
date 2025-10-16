@@ -274,9 +274,11 @@ class ModelInst:
     def path_model(self) -> Path:
         path_models = Path()
         folder_model = ""
+        # get from ENV_WORKSPACE environment
+        workspace: str = os.environ.get("ENV_WORKSPACE", "/workspace")
         
         if self.target == TargetType.Comfy:
-            path_models = Path("/workspace/ComfyUI/models")
+            path_models = Path(workspace) / "ComfyUI/models"
             if self.model == ModelType.Checkpoint:
                 folder_model = "ckpt"
             elif self.model == ModelType.VAE:
