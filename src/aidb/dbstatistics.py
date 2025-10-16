@@ -372,6 +372,89 @@ class Statistics:
             self.img_statistics_save(image_id, current_statistics, force=force)
 
 
+    def imgs_cluster(self, imgs: list[Image], eps: float = 0.5, min_samples: int = 5) -> dict:
+        """
+        Clusters a list of images based on their focus vector with DBScan.
+        """
+        from sklearn.cluster import DBSCAN
+        from sklearn.preprocessing import StandardScaler
+
+        if not imgs:
+            print("No images provided for clustering.")
+            return {}
+
+        image_ids = [img.id for img in imgs]
+        focus_vectors = []
+        for img in imgs:
+            vec = img.focus_vector
+            if vec is not None:
+                focus_vectors.append(vec)
+            else:
+                print(f"Warning: Image {img.id} has no focus vector. Skipping from clustering.")
+                # Handle cases where focus_vector might be None, e.g., by skipping or assigning a default
+                continue 
+        
+        if not focus_vectors:
+            print("No valid focus vectors found for clustering.")
+            return {}
+
+        # Convert list of numpy arrays to a 2D numpy array
+        X = np.array(focus_vectors)
+
+        # Standardize the data (important for DBSCAN)
+        X_scaled = StandardScaler().fit_transform(X)
+
+        # Perform DBSCAN clustering
+        # You might need to tune eps and min_samples based on your data
+        db = DBSCAN(eps=eps, min_samples=min_samples).fit(X_scaled)
+        
+        labels = db.labels_
+
+        # Group images by cluster label
+        clusters: Dict[int, List[str]] = defaultdict(list)
+        for i, label in enumerate(labels):
+            clusters[label].append(image_ids[i]) # Assuming image_ids and focus_vectors are aligned
+
+        # Convert defaultdict to regular dict for return
+        return dict(clusters)
+    
+    def imgs_stdev(self, imgs: list[Image]) -> float:
+        """
+        Calculates the std dev of a list of images based on their focus vectors.
+        """
+        if not imgs:
+            print("No images provided for std dev calculation.")
+            return 0.0
+
+        focus_vectors = []
+        for img in imgs:
+            if isinstance(img,str):
+                img = Image(self._db_manager, img)
+            vec = img.focus_vector
+            if vec is not None:
+                focus_vectors.append(vec)
+            else:
+                print(f"Warning: Image {img.id} has no focus vector. Skipping from std dev calculation.")
+                continue 
+        
+        if not focus_vectors:
+            print("No valid focus vectors found for std dev calculation.")
+            return 0.0
+
+        # Convert list of numpy arrays to a 2D numpy array
+        X = np.array(focus_vectors)
+
+        # Calculate the standard deviation along each dimension (tag)
+        # and then average these standard deviations.
+        # Or, calculate the Frobenius norm of the covariance matrix, etc.
+        # For simplicity, let's calculate the mean of the standard deviations of each feature.
+        
+        # Calculate standard deviation for each feature (column)
+        std_devs_per_feature = np.std(X, axis=0)
+        
+        # Return the mean of these standard deviations
+        return np.mean(std_devs_per_feature)
+        
 
     @staticmethod
     def dist_focus_vector(vec0: np.ndarray, vec1: np.ndarray) -> float:

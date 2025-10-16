@@ -1,5 +1,9 @@
 export ENV_REPOS='https://github.com/fbbcool/aitools.git'
-export ENV_WORKSPACE='/workspace'
+if [[ -z "${COMFUI_DIR_INST}" ]]; then
+    export ENV_WORKSPACE=$COMFYUI_DIR_INST
+else
+    export ENV_WORKSPACE='/workspace'
+fi
 export ENV_HOME=$ENV_WORKSPACE/___aitools
 export ENV_POST_HOOK=$ENV_WORKSPACE/post_install_hook.sh
 export PYTHONPATH=$ENV_HOME/src
