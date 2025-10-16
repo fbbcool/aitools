@@ -1,5 +1,5 @@
 export ENV_REPOS='https://github.com/fbbcool/aitools.git'
-if [[ -z "${COMFUI_DIR_INST}" ]]; then
+if [[ -z "${COMFYUI_DIR_INST}" ]]; then
     export ENV_WORKSPACE=$COMFYUI_DIR_INST
 else
     export ENV_WORKSPACE='/workspace'
