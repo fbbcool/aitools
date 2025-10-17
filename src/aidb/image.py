@@ -84,6 +84,35 @@ class Image:
         return self._db_manager.name_container(container_id)
     
     @property
+    def container_url_relative(self) -> str:
+        """
+        Returns the relative path of the image container wrt the pool directory in the 
+        container local path.
+        """
+        pool_dir = "pool"
+        container_local_path_str = self.data.get("container_local_path")
+        if container_local_path_str is None:
+            return ""
+        
+        try:
+            container_path = Path(container_local_path_str)
+            # Find the 'pool' directory in the container's local path
+            # and get the part of the path after it.
+            # This assumes 'pool' is a parent directory of the actual container content.
+            parts = container_path.parts
+            if pool_dir in parts:
+                pool_index = parts.index(pool_dir)
+                # Join parts from 'pool' onwards
+                relative_path_parts = parts[pool_index:]
+                return str(Path(*relative_path_parts))
+            else:
+                # If 'pool' is not in the path, return the full container path relative to root
+                return str(container_path)
+        except Exception as e:
+            print(f"Error determining container_url_relative for image ID '{self._image_id}': {e}")
+            return ""
+    
+    @property
     def data(self) -> dict:
         """
         Fetches and caches the image's metadata from the database.
@@ -338,17 +367,8 @@ class Image:
             print(f"Cannot get full path: Image data not available for ID '{self._image_id}'.")
             return None
 
-        container_local_path_str = self.data.get("container_local_path")
-        relative_url_str = self.data.get("relative_url")
-
-        if container_local_path_str is None or relative_url_str is None:
-            print(f"Error: Missing 'container_local_path' or 'relative_url' for image ID '{self._image_id}'.")
-            return None
-
         try:
-            base_path = Path(container_local_path_str)
-            relative_path = Path(relative_url_str)
-            full_path = base_path / relative_path
+            full_path = Path(self._db_manager._root) / self.container_url_relative / self.data.get("relative_url")
             return full_path
         except Exception as e:
             print(f"Error constructing full path for image ID '{self._image_id}': {e}")
@@ -395,6 +415,13 @@ class Image:
             return None
 
     @property
+    def thumbnail_path(self) -> Path:
+        thumbnail_filename = f"{self._image_id}_thumb.png"
+        thumbnail_path = Path(self._db_manager._root) / self._db_manager._default_thumbnail_dir / thumbnail_filename
+        return thumbnail_path
+
+
+    @property
     def thumbnail(self) -> Optional[PILImage.Image]:
         """
         Retrieves the thumbnail image as a PIL (Pillow) Image object.
@@ -402,46 +429,26 @@ class Image:
         Otherwise, it generates a new thumbnail, saves it, updates the database,
         and then loads and returns the newly created thumbnail.
         """
-        if self.data is None:
-            print(f"Cannot get thumbnail: Image data not available for ID '{self._image_id}'.")
-            return None
-
-        thumbnail_url_str = self.data.get("thumbnail_url")
-        
-        # Get thumbnail settings from DBManager's properties
-        output_thumbnail_dir = self._db_manager.default_thumbnail_dir
-        output_thumbnail_size = self._db_manager.default_thumbnail_size
-
-        # 1. Check if thumbnail URL exists and file exists on disk
-        if thumbnail_url_str:
-            thumbnail_path = Path(thumbnail_url_str)
-            if thumbnail_path.exists():
-                try:
-                    thumb_pil_image = PILImage.open(thumbnail_path)
-                    # print(f"Successfully loaded existing thumbnail for ID '{self._image_id}'.")
-                    return thumb_pil_image
-                except Exception as e:
-                    print(f"Warning: Could not load existing thumbnail '{thumbnail_path}' for ID '{self._image_id}': {e}. Attempting to regenerate.")
-        
+        thumbnail_path = self.thumbnail_path
+        if thumbnail_path.exists():
+            try:
+                thumb_pil_image = PILImage.open(thumbnail_path)
+                # print(f"Successfully loaded existing thumbnail for ID '{self._image_id}'.")
+                return thumb_pil_image
+            except Exception as e:
+                print(f"Warning: Could not load existing thumbnail '{thumbnail_path}' for ID '{self._image_id}': {e}. Attempting to regenerate.")
+    
         # 2. If not found or failed to load, generate and save a new one
         print(f"Generating new thumbnail for image ID '{self._image_id}'.")
-        created_thumbnail_path = self.save_thumbnail_and_update_db(
-            output_directory=output_thumbnail_dir,
-            thumbnail_size=output_thumbnail_size
-        )
-
-        if created_thumbnail_path:
+        self.thumbnail_create(thumbnail_path)
+        if thumbnail_path.exists():
             try:
-                # Load the newly created thumbnail
-                new_thumb_pil_image = PILImage.open(created_thumbnail_path)
-                print(f"Successfully loaded newly generated thumbnail for ID '{self._image_id}'.")
-                return new_thumb_pil_image
+                thumb_pil_image = PILImage.open(thumbnail_path)
+                # print(f"Successfully loaded existing thumbnail for ID '{self._image_id}'.")
+                return thumb_pil_image
             except Exception as e:
-                print(f"Error loading newly created thumbnail '{created_thumbnail_path}' for ID '{self._image_id}': {e}")
+                print(f"Warning: Could not load existing thumbnail '{thumbnail_path}' for ID '{self._image_id}': {e}. Regeneration failed!")
                 return None
-        else:
-            print(f"Failed to create or save thumbnail for image ID '{self._image_id}'.")
-            return None
     
     @property
     def train_image(self) -> Optional[PILImage.Image]:
@@ -628,60 +635,22 @@ class Image:
             print(f"Error saving PNG image '{self._image_id}' to '{full_output_path}': {e}")
             return None
 
-    def save_thumbnail_and_update_db(self, 
-                                     output_directory: Union[str, Path], 
-                                     thumbnail_size: Tuple[int, int] = (128, 128)
-                                    ) -> Optional[str]:
+    def thumbnail_create(self, to_path: Path) -> None: 
         """
-        Generates a thumbnail for the image, saves it as a PNG in the specified directory,
-        and updates the 'thumbnail_url' field in the database.
-
-        Args:
-            output_directory (Union[str, pathlib.Path]): The directory where the thumbnail
-                                                          should be saved.
-            thumbnail_size (Tuple[int, int]): A tuple (width, height) for the maximum
-                                              dimensions of the thumbnail. Aspect ratio is preserved.
-                                              Defaults to (128, 128).
-
-        Returns:
-            Optional[str]: The full local path string of the saved thumbnail if successful,
-                           otherwise None.
+        Generates a thumbnail for the image, saves it as a PNG in the specified path.
         """
         pil_image = self.pil
         if pil_image is None:
             print(f"Failed to get PIL image for thumbnail generation for ID '{self._image_id}'.")
             return None
 
-        output_dir_path = Path(output_directory)
-        output_dir_path.mkdir(parents=True, exist_ok=True) # Ensure output directory exists
-
-        thumbnail_filename = f"{self._image_id}_thumb.png"
-        full_thumbnail_path = output_dir_path / thumbnail_filename
-
         try:
             # Create a copy to ensure the original PIL image object is not modified
             thumb_pil_image = pil_image.copy()
-            thumb_pil_image.thumbnail(thumbnail_size, PILImage.Resampling.LANCZOS) # Preserves aspect ratio
+            thumb_pil_image.thumbnail(self._db_manager._default_thumbnail_size, PILImage.Resampling.LANCZOS) # Preserves aspect ratio
             
-            thumb_pil_image.save(full_thumbnail_path, "PNG", optimize=True, compress_level=6)
-            print(f"Thumbnail for image '{self._image_id}' saved to '{full_thumbnail_path}'.")
-
-            # Update the database with the new thumbnail URL
-            # For simplicity, we'll store the local file path as the URL.
-            # In a web application, this might be a URL to a served static file.
-            updated_count = self._db_manager.update_image(
-                self._image_id, 
-                thumbnail_url=str(full_thumbnail_path)
-            )
-
-            if updated_count and updated_count > 0:
-                print(f"Thumbnail URL updated in DB for image '{self._image_id}'.")
-                # Clear cached data so next .data access fetches updated thumbnail_url
-                self._data = None 
-                return str(full_thumbnail_path)
-            else:
-                print(f"Failed to update thumbnail URL in DB for image '{self._image_id}'.")
-                return None
+            thumb_pil_image.save(to_path, "PNG", optimize=True, compress_level=6)
+            print(f"Thumbnail for image '{self._image_id}' saved to '{to_path}'.")
 
         except Exception as e:
             print(f"Error generating or saving thumbnail for image '{self._image_id}': {e}")
