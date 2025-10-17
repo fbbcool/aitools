@@ -2,7 +2,8 @@
 
 # MongoDB connection settings
 mongodb_settings:
-  host: "mongodb://mongo:mongo@n100"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
+  #host: "mongodb://mongo:mongo@n100"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
+  host: "mongodb://mongo:mongo@192.168.0.120"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
   port: 27017        # Or your MongoDB port
   db_name: "prod_ai" # Or your database name, e.g., "prod_ai"
   #collection: "imgs_0"   # Or your collection name, e.g., "images"
@@ -14,7 +15,7 @@ mongodb_settings:
 
 # Directory settings
 directory_settings:
-  root_dir: "/Volumes/data/pool"
+  root_dir: "/home/misw/Data/AI/pool"
 
 # Thumbnail generation settings
 thumbnail_settings:

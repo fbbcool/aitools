@@ -239,8 +239,8 @@ TAGS_AVOID_1GTS = [
 ]
 
 # Files to download from the repos
-MODEL_FILENAME: Final = "/Volumes/data/Project/AI/REPOS/aitools/build/models/wdtagger/model.onnx"
-LABEL_FILENAME: Final = "/Volumes/data/Project/AI/REPOS/aitools/build/models/wdtagger/selected_tags.csv"
+MODEL_FILENAME: Final = "/home/misw/venv/aitools/aitools/build/wdtagger/model.onnx"
+LABEL_FILENAME: Final = "/home/misw/venv/aitools/aitools/build/wdtagger/selected_tags.csv"
 
 # https://github.com/toriato/stable-diffusion-webui-wd14-tagger/blob/a9eacb1eff904552d3012babfa28b57e1d3e295c/tagger/ui.py#L368
 kaomojis = [

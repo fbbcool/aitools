@@ -6,3 +6,5 @@ pep8-naming
 setuptools
 face_recognition
 macos-tags
+onnxruntime
+
