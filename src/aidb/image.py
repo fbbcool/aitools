@@ -86,31 +86,24 @@ class Image:
     @property
     def container_url_relative(self) -> str:
         """
-        Returns the relative path of the image container wrt the pool directory in the 
-        container local path.
+        Returns the relative path of the image container relative to the pool directory in the 
+        container local path without the poll directory itself.
         """
         pool_dir = "pool"
         container_local_path_str = self.data.get("container_local_path")
         if container_local_path_str is None:
             return ""
-        
+
+        # Find the position of "pool" in the path
         try:
-            container_path = Path(container_local_path_str)
-            # Find the 'pool' directory in the container's local path
-            # and get the part of the path after it.
-            # This assumes 'pool' is a parent directory of the actual container content.
-            parts = container_path.parts
-            if pool_dir in parts:
-                pool_index = parts.index(pool_dir)
-                # Join parts from 'pool' onwards
-                relative_path_parts = parts[pool_index:]
-                return str(Path(*relative_path_parts))
-            else:
-                # If 'pool' is not in the path, return the full container path relative to root
-                return str(container_path)
+            pool_index = container_local_path_str.find(pool_dir)
+            if pool_index != -1:
+                # Extract the part of the path after "pool/"
+                relative_path_start_index = pool_index + len(pool_dir) + 1 # +1 for the slash
+                return container_local_path_str[relative_path_start_index:]
         except Exception as e:
-            print(f"Error determining container_url_relative for image ID '{self._image_id}': {e}")
-            return ""
+            print(f"Error parsing container_local_path: {e}")
+        return ""
     
     @property
     def data(self) -> dict:
