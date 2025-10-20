@@ -409,7 +409,7 @@ class ModelInstComfyUi:
 
             # lora
             #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen", "", ""),
             #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-07.safetensors", ""),
             #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-14.safetensors", ""),
             #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1gts_r5-06.safetensors", ""),
@@ -451,7 +451,7 @@ class ModelInstComfyUi:
 
             # lora
             #ModelInst(t, ModelType.Lora, hf2, "", "", ""),
-            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "", ""),
+            ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen", "", ""),
             #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-07.safetensors", ""),
             #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1fbb-14.safetensors", ""),
             #ModelInst(t, ModelType.Lora, hf2, "fbbcool/qwen01", "1gts_r5-06.safetensors", ""),
