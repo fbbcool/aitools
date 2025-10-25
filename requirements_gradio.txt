@@ -1,0 +1,2 @@
+gradio==5.35.0
+gradio_client==1.10.4
