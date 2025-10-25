@@ -541,7 +541,7 @@ class ModelInstComfyUi:
             ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "i2v"),
             ModelInst(t, ModelType.Unet, hf2, "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors", "i2v"),
 
-            ModelInst(t, ModelType.Unet, hf2, "lightx2v/Wan2.2-Distill-Models", "wan2.2_t2v_A14b_high_noise_scaled_fp8_e4m3_lightx2v_4step_comfyui.safetensors", "ti2v"),
+            ModelInst(t, ModelType.Unet, hf2, "lightx2v/Wan2.2-Distill-Models", "wan2.2_t2v_A14b_high_noise_scaled_fp8_e4m3_lightx2v_4step_comfyui.safetensors", "t2v"),
             ModelInst(t, ModelType.Unet, hf2, "lightx2v/Wan2.2-Distill-Models", "wan2.2_t2v_A14b_low_noise_scaled_fp8_e4m3_lightx2v_4step_comfyui.safetensors", "t2v"),
             ModelInst(t, ModelType.Unet, hf2, "lightx2v/Wan2.2-Distill-Models", "wan2.2_i2v_A14b_high_noise_scaled_fp8_e4m3_lightx2v_4step_comfyui.safetensors", "i2v"),
             ModelInst(t, ModelType.Unet, hf2, "lightx2v/Wan2.2-Distill-Models", "wan2.2_i2v_A14b_low_noise_scaled_fp8_e4m3_lightx2v_4step_comfyui.safetensors", "i2v"),
