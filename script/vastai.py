@@ -542,12 +542,20 @@ class ModelInstComfyUi:
             # ModelInst(t, ModelType.DiffusionModel, hf2, "", "", ""),
             ModelInst(
                 t,
-                ModelType.DiffusionModel,
+                ModelType.Checkpoint,
                 hf2,
-                "Comfy-Org/Qwen-Image-Edit_ComfyUI",
-                "split_files/diffusion_models/qwen_image_edit_2509_fp8_e4m3fn.safetensors",
+                "Phr00t/Qwen-Image-Edit-Rapid-AIO",
+                "v7/Qwen-Rapid-AIO-NSFW-v7.1.safetensors",
                 "",
             ),
+            # ModelInst(
+            #    t,
+            #    ModelType.DiffusionModel,
+            #    hf2,
+            #    "Comfy-Org/Qwen-Image-Edit_ComfyUI",
+            #    "split_files/diffusion_models/qwen_image_edit_2509_fp8_e4m3fn.safetensors",
+            #    "",
+            # ),
             # VAE
             # ModelInst(t, ModelType.VAE, hf2, "", "", ""),
             ModelInst(

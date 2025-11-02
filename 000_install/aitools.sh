@@ -118,6 +118,6 @@ ___kohyass_sdxl () {
 
 ___clean_gen ()
 {
-    rm -rf /workspace/ComfyUI/output/video
-    rm -rf /workspace/ComfyUI/temp/
+    rm -rf $ENV_WORKSPACE/ComfyUI/output/video
+    rm -rf $ENV_WORKSPACE/ComfyUI/temp/*
 }
