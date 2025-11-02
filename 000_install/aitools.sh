@@ -16,7 +16,7 @@ ___install() {
   pip install -r $ENV_HOME/requirements_remote.txt
 }
 ___update() {
-  git pull $ENV_REPOS
+  git -C $ENV_HOME pull
 }
 ___hook () {
   if [ -x $ENV_POST_HOOK ]; then
