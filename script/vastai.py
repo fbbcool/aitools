@@ -268,7 +268,6 @@ class ModelInst:
                     file_hf = snapshot_download(
                         repo_id=self.repo,
                         local_dir=self.path_model,
-                        local_dir_use_symlinks=True,
                     )
                 else:
                     # use hf download
@@ -276,7 +275,6 @@ class ModelInst:
                         repo_id=self.repo,
                         filename=self.path_local,
                         local_dir=self.path_model,
-                        local_dir_use_symlinks=True,
                     )
 
             if self.method_dl == DownloadMethod.Hugging:
