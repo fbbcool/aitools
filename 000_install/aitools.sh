@@ -16,6 +16,7 @@ ___install() {
   pip install -r $ENV_HOME/requirements_remote.txt
 }
 ___update() {
+  echo "update aitools ..."
   git -C $ENV_HOME pull
 }
 ___hook () {
