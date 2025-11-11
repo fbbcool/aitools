@@ -1,0 +1,3 @@
+#!/bin/sh
+
+export PYTHONPATH=$AITOOLS_DIR/src:$PYTHONPATH

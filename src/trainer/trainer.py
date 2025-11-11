@@ -1,29 +1,29 @@
-import json
 import os
+import json
 from pathlib import Path
 import shutil
-import sys
-import time
 from typing import Final, Literal
 import threading
 
 from huggingface_hub import hf_hub_download, snapshot_download
-import urllib
 
 from more_itertools import chunked_even
 
 from aidb.hfdataset import HFDatasetImg
 
-class Trainer:
-    #WORKSPACE: Final = Path("/Volumes/data/Project/AI/REPOS")
-    #AITOOLS: Final = WORKSPACE / "src" / "aitools"
-    #ROOT: Final = WORKSPACE / "build" / "train"
 
-    WORKSPACE: Final = Path("/workspace")
-    AITOOLS: Final = WORKSPACE / "___aitools"
+class Trainer:
+    WORKSPACE: Final = Path(os.environ.get("ENV_WORKSPACE", "/workspace"))
+    AITOOLS: Final = Path(os.environ.get("AITOOLS_DIR", str(WORKSPACE / "___aitools")))
     ROOT: Final = WORKSPACE / "train"
 
-    MODEL_TYPES: list[Literal["base", "ckpt", "text_encoder", "vae", "clipl"]] = ["base", "ckpt", "text_encoder", "vae", "clipl"]
+    MODEL_TYPES: list[Literal["base", "ckpt", "text_encoder", "vae", "clipl"]] = [
+        "base",
+        "ckpt",
+        "text_encoder",
+        "vae",
+        "clipl",
+    ]
 
     FILENAME_CONFIG_BASE: Final = "config_base.json"
     FILENAME_CONFIG_TRAIN: Final = "config_trainer.json"
@@ -37,14 +37,20 @@ class Trainer:
     FILE_CONFIG_DATASET: Final = ROOT / "dataset.toml"
     FILE_TRAIN_SCRIPT: Final = ROOT / "train.sh"
 
-    def __init__(self, repo_ids_hfd: str | list[str], type_model: str | None = None, load_models: bool = True, multithread: bool = False) -> None:
+    def __init__(
+        self,
+        repo_ids_hfd: str | list[str],
+        type_model: str | None = None,
+        load_models: bool = True,
+        multithread: bool = False,
+    ) -> None:
         if isinstance(repo_ids_hfd, str):
             repo_ids_hfd = [repo_ids_hfd]
         self._repo_ids_hfd: list[str] = repo_ids_hfd
 
         self._config_base: dict = {}
         self._config_train: dict = {}
-        
+
         self._type_model = None
         self._trigger = ""
         self._name = ""
@@ -55,14 +61,20 @@ class Trainer:
 
         # make root folder
         self.ROOT.mkdir(exist_ok=True)
-        
+
         #
         # set train config
         #
-        hf_hub_download(repo_id=self._repo_ids_hfd[0], filename=self.FILENAME_CONFIG_TRAIN, repo_type="dataset", force_download=True, local_dir=self.ROOT)
+        hf_hub_download(
+            repo_id=self._repo_ids_hfd[0],
+            filename=self.FILENAME_CONFIG_TRAIN,
+            repo_type="dataset",
+            force_download=True,
+            local_dir=self.ROOT,
+        )
         # read train config file with pathlib and store the dict
         try:
-            with self.FILE_CONFIG_TRAIN.open('r', encoding='utf-8') as f:
+            with self.FILE_CONFIG_TRAIN.open("r", encoding="utf-8") as f:
                 self._config_train = json.load(f)
         except Exception as e:
             print(f"{e}\nError: config json not loadable!")
@@ -83,18 +95,20 @@ class Trainer:
         # set base config
         #
         try:
-            with self.FILE_CONFIG_BASE.open('r', encoding='utf-8') as f:
+            with self.FILE_CONFIG_BASE.open("r", encoding="utf-8") as f:
                 self._config_base = json.load(f)
         except Exception as e:
             print(f"{e}\nError: config json not loadable!")
             return
         _base_models_all: dict = self._config_base.get("models", {})
-        self._models: dict[str, dict] | None = _base_models_all.get(self._type_model, None)
+        self._models: dict[str, dict] | None = _base_models_all.get(
+            self._type_model, None
+        )
         self._model_links: dict[str, str] = {}
 
         #
         # folders
-        #         
+        #
         # make datatset folder
         if self.FOLDER_DATASET.exists():
             # remove it
@@ -113,9 +127,9 @@ class Trainer:
         #
         if load_models:
             self._download_models()
-        
+
         self._make_dataset(multithread=multithread)
-        #self._make_file_sample_prompts()
+        # self._make_file_sample_prompts()
         self._make_file_dataset_config()
         self._make_file_diffpipe_config()
         self._make_file_train_script()
@@ -126,7 +140,7 @@ class Trainer:
             return None
         else:
             print(f"downloading models for type {self._type_model}:")
-        
+
         for _type in self.MODEL_TYPES:
             print(f"\ttrying model {_type} ...")
             if _type in self._models:
@@ -135,17 +149,30 @@ class Trainer:
                 _repo_id = _model.get("repo_id", None)
                 _ignore_patterns = _model.get("ignore_patterns", None)
                 _file = _model.get("file", None)
-                _link = self._download_model(_repo_id, file = _file, ignore_patterns = _ignore_patterns)
+                _link = self._download_model(
+                    _repo_id, file=_file, ignore_patterns=_ignore_patterns
+                )
                 self._model_links[_type] = _link
             else:
                 self._model_links[_type] = ""
                 print(f"\tno config found for {_type}")
-        
-    def _download_model(self, repo_id: str, file: str | None = None, ignore_patterns: list[str] | None = None) -> str | None:
+
+    def _download_model(
+        self,
+        repo_id: str,
+        file: str | None = None,
+        ignore_patterns: list[str] | None = None,
+    ) -> str | None:
         if file is not None:
-            link = hf_hub_download(repo_id=repo_id, filename=file, cache_dir=self.FOLDER_MODELS)
+            link = hf_hub_download(
+                repo_id=repo_id, filename=file, cache_dir=self.FOLDER_MODELS
+            )
         elif ignore_patterns is not None:
-            link = snapshot_download(repo_id=repo_id, ignore_patterns=ignore_patterns, cache_dir=self.FOLDER_MODELS)
+            link = snapshot_download(
+                repo_id=repo_id,
+                ignore_patterns=ignore_patterns,
+                cache_dir=self.FOLDER_MODELS,
+            )
         else:
             return None
         return link
@@ -166,21 +193,27 @@ class Trainer:
             n = 8
             m = len(ids_img)
             ids = []
-            for batch in chunked_even(ids_img,(m//n)+1):
+            for batch in chunked_even(ids_img, (m // n) + 1):
                 ids.append(batch)
-            if (len(ids) != n):
+            if len(ids) != n:
                 raise ValueError("dataset multithreading failed!")
 
             threads = []
             for i in range(n):
-                thread = threading.Thread(target=self._process_imgs, args=[ids[i],hfd,])
+                thread = threading.Thread(
+                    target=self._process_imgs,
+                    args=[
+                        ids[i],
+                        hfd,
+                    ],
+                )
                 print(f" dataset thread[{i}]: {len(ids[i])} imgs")
                 threads.append(thread)
                 thread.start()
             for i in range(n):
                 threads[i].join()
                 print(f" dataset thread[{i}]: joined.")
-    
+
     def _process_imgs(self, ids: list[str], hfd: HFDatasetImg) -> None:
         if not ids:
             return
@@ -193,7 +226,7 @@ class Trainer:
             idx = hfd.id2idx(id)
             if not idx:
                 continue
-            
+
             # caption or prompt fetch
             prompt = hfd.prompts[idx]
             caption = hfd.captions[idx]
@@ -204,7 +237,7 @@ class Trainer:
 
             if not caption:
                 lost += 1
-                print(f"caption missing for {id}!") 
+                print(f"caption missing for {id}!")
                 continue
 
             # TODO more generic, and take care that the dataset isnt polluted with trigger words
@@ -212,7 +245,7 @@ class Trainer:
             caption = caption.replace("1woman,", "")
 
             caption = f"{self._trigger}," + caption
-            
+
             # img file
             try:
                 img_file_dl = hfd.img_download(idx)
@@ -220,7 +253,7 @@ class Trainer:
                 lost += 1
                 print(f"{e}\n{id} not downloadable!")
                 continue
-            
+
             # copy file to dataset folder
             img_file = self.FOLDER_DATASET / img_file_dl.name
             shutil.copy(str(img_file_dl), str(img_file))
@@ -229,11 +262,10 @@ class Trainer:
             cap_file = img_file.with_suffix(".txt")
             with cap_file.open("w", encoding="utf-8") as f:
                 f.write(caption)
-            
+
             # ok
             success += 1
         print(f"dataset thread finished: {success} successes, {lost} losses")
-
 
     def _make_file_sample_prompts(self) -> None:
         str_prompt = []
@@ -241,14 +273,13 @@ class Trainer:
             # every prompt items is put in its own line
             str_prompt.append(prompt)
             str_prompt.append(f"{self._trigger}," + prompt)
-        
+
         # delete file if exists
         if self.FILE_SAMPLE_PROMPTS.exists():
             self.FILE_SAMPLE_PROMPTS.unlink()
-        
+
         with self.FILE_SAMPLE_PROMPTS.open("w", encoding="utf-8") as f:
             f.write("\n\n".join(str_prompt))
-            
 
     def _make_file_dataset_config(self) -> None:
         str_file = f"""
@@ -337,7 +368,7 @@ num_repeats = {self._num_repeats}
             self._make_file_diffpipe_config_qwen_image()
         else:
             raise ValueError(f"unknown training type: {self._type_model}")
-    
+
     #
     # wan22_high diffpipe config
     #
@@ -495,7 +526,7 @@ eps = 1e-8
 """
         with self.FILE_CONFIG_DIFFPIPE.open("w", encoding="utf-8") as f:
             f.write(str_file)
-    
+
     #
     # wan22_low diffpipe config
     #
@@ -654,7 +685,7 @@ eps = 1e-8
 """
         with self.FILE_CONFIG_DIFFPIPE.open("w", encoding="utf-8") as f:
             f.write(str_file)
-    
+
     #
     # wan21 diffpipe config
     #
@@ -810,7 +841,7 @@ eps = 1e-8
 """
         with self.FILE_CONFIG_DIFFPIPE.open("w", encoding="utf-8") as f:
             f.write(str_file)
-    
+
     #
     # qwen-image diffpipe config
     #
@@ -973,9 +1004,8 @@ eps = 1e-8
     def _make_file_train_script(self) -> None:
         str_file = f"""
 NCCL_P2P_DISABLE="1" NCCL_IB_DISABLE="1" deepspeed --num_gpus=1 train.py --deepspeed --config {self.FILE_CONFIG_DIFFPIPE}
-""" 
+"""
         # save train string to train script and chmod 777 it.
         with self.FILE_TRAIN_SCRIPT.open("w", encoding="utf-8") as f:
             f.write(str_file)
         self.FILE_TRAIN_SCRIPT.chmod(0o777)
-    
