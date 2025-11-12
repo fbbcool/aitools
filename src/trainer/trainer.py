@@ -366,6 +366,8 @@ num_repeats = {self._num_repeats}
             self._make_file_diffpipe_config_wan22_low()
         elif self._type_model == "qwen_image":
             self._make_file_diffpipe_config_qwen_image()
+        elif self._type_model == "qwen_jib":
+            self._make_file_diffpipe_config_qwen_image()
         else:
             raise ValueError(f"unknown training type: {self._type_model}")
 
