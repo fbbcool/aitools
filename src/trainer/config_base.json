@@ -1,77 +1,89 @@
 {
-    "models": {
-        "wan21": {
-            "base": {
-                "repo_id": "Wan-AI/Wan2.1-T2V-14B",
-                "ignore_patterns": [
-                    "diffusion_pytorch_model*",
-                    "models_t5*"
-                ]
-            },
-            "ckpt": {
-                "repo_id": "NSFW-API/NSFW_Wan_14b",
-                "file": "nsfw_wan_14b_e15_fp8.safetensors"
-            },
-            "text_encoder": {
-                "repo_id": "Kijai/WanVideo_comfy",
-                "file": "umt5-xxl-enc-fp8_e4m3fn.safetensors"
-            }
-        },
-        "wan22_high": {
-            "base": {
-                "repo_id": "Wan-AI/Wan2.2-T2V-A14B",
-                "ignore_patterns": [
-                    "high_noise_model/diffusion_pytorch_model*",
-                    "low_noise_model/diffusion_pytorch_model*",
-                    "models_t5*"
-                ]
-            },
-            "ckpt": {
-                "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
-                "file": "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors"
-            },
-            "text_encoder": {
-                "repo_id": "Kijai/WanVideo_comfy",
-                "file": "umt5-xxl-enc-fp8_e4m3fn.safetensors"
-            }
-        },
-        "wan22_low": {
-            "base": {
-                "repo_id": "Wan-AI/Wan2.2-T2V-A14B",
-                "ignore_patterns": [
-                    "high_noise_model/diffusion_pytorch_model*",
-                    "low_noise_model/diffusion_pytorch_model*",
-                    "models_t5*"
-                ]
-            },
-            "ckpt": {
-                "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
-                "file": "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors"
-            },
-            "text_encoder": {
-                "repo_id": "Kijai/WanVideo_comfy",
-                "file": "umt5-xxl-enc-fp8_e4m3fn.safetensors"
-            }
-        },
-        "qwen_image": {
-            "base": {
-                "repo_id": "Qwen/Qwen-Image",
-                "ignore_patterns": [
-                    "transformer/diffusion_pytorch_model*"
-                ]
-            },
-            "ckpt": {
-                "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-                "file": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors"
-            },
-            "ckpt_nsfw": {
-                "repo_id": "GuangyuanSD/Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn",
-                "file": "Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn.safetensors"
-            },
-            "ckpt_sfw": {
-                "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-                "file": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors"
-            }
-        }
+  "models": {
+    "wan21": {
+      "base": {
+        "repo_id": "Wan-AI/Wan2.1-T2V-14B",
+        "ignore_patterns": [
+          "diffusion_pytorch_model*",
+          "models_t5*"
+        ]
+      },
+      "ckpt": {
+        "repo_id": "NSFW-API/NSFW_Wan_14b",
+        "file": "nsfw_wan_14b_e15_fp8.safetensors"
+      },
+      "text_encoder": {
+        "repo_id": "Kijai/WanVideo_comfy",
+        "file": "umt5-xxl-enc-fp8_e4m3fn.safetensors"
+      }
+    },
+    "wan22_high": {
+      "base": {
+        "repo_id": "Wan-AI/Wan2.2-T2V-A14B",
+        "ignore_patterns": [
+          "high_noise_model/diffusion_pytorch_model*",
+          "low_noise_model/diffusion_pytorch_model*",
+          "models_t5*"
+        ]
+      },
+      "ckpt": {
+        "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+        "file": "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors"
+      },
+      "text_encoder": {
+        "repo_id": "Kijai/WanVideo_comfy",
+        "file": "umt5-xxl-enc-fp8_e4m3fn.safetensors"
+      }
+    },
+    "wan22_low": {
+      "base": {
+        "repo_id": "Wan-AI/Wan2.2-T2V-A14B",
+        "ignore_patterns": [
+          "high_noise_model/diffusion_pytorch_model*",
+          "low_noise_model/diffusion_pytorch_model*",
+          "models_t5*"
+        ]
+      },
+      "ckpt": {
+        "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+        "file": "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors"
+      },
+      "text_encoder": {
+        "repo_id": "Kijai/WanVideo_comfy",
+        "file": "umt5-xxl-enc-fp8_e4m3fn.safetensors"
+      }
+    },
+    "qwen_image": {
+      "base": {
+        "repo_id": "Qwen/Qwen-Image",
+        "ignore_patterns": [
+          "transformer/diffusion_pytorch_model*"
+        ]
+      },
+      "ckpt": {
+        "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+        "file": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors"
+      },
+      "ckpt_nsfw": {
+        "repo_id": "GuangyuanSD/Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn",
+        "file": "Qwen-image-NSFW_RED-Q-Queen_of_Diamonds_fp8_e4m3fn.safetensors"
+      },
+      "ckpt_sfw": {
+        "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+        "file": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors"
+      }
+    },
+    "qwen_jib": {
+      "base": {
+        "repo_id": "Qwen/Qwen-Image",
+        "ignore_patterns": [
+          "transformer/diffusion_pytorch_model*"
+        ]
+      },
+      "ckpt": {
+        "repo_id": "fbbcool/qwen-jib-gts",
+        "file": "qwen_jib_dream_gts_001_00001_.safetensors"
+      }
     }
+  }
 }
