@@ -73,7 +73,7 @@
         "file": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors"
       }
     },
-    "qwen_jib": {
+    "qwen_image-gts": {
       "base": {
         "repo_id": "Qwen/Qwen-Image",
         "ignore_patterns": [
@@ -81,8 +81,8 @@
         ]
       },
       "ckpt": {
-        "repo_id": "fbbcool/qwen-jib-gts",
-        "file": "qwen_jib_dream_gts_001_00001_.safetensors"
+        "repo_id": "fbbcool/qwen-gts",
+        "file": "qwen-gts_001.safetensors"
       }
     }
   }
