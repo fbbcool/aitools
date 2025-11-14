@@ -1,4 +1,6 @@
-git clone https://github.com/tdrussell/diffusion-pipe /workspace/diffusion-pipe
+rm -rf /workspace/diffusion-pipe
+#git clone https://github.com/tdrussell/diffusion-pipe /workspace/diffusion-pipe
+git clone https://github.com/fbbcool/diffusion-pipe /workspace/diffusion-pipe
 cd /workspace/diffusion-pipe
 git submodule update --init --recursive
 cp /workspace/train/train.sh /workspace/diffusion-pipe
