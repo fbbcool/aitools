@@ -525,7 +525,6 @@ class ModelInstComfyUi:
                 "",
             ),
             # lora lightning
-            # ModelInst(t, ModelType.Lora, hf, "lightx2v/Qwen-Image-Lightning", "Qwen-Image-Lightning-4steps-V1.0.safetensors", ""),
             ModelInst(
                 t,
                 ModelType.Lora,
@@ -946,7 +945,7 @@ class ModelInstComfyUi:
 
 class PostInstHook:
     def __init__(self) -> None:
-        URL_HOOK: Final = os.environ.get("ENV_POST_HOOK")
+        URL_HOOK: Final = "/tmp"
         self.lines: list[str] = []
         self.path: Path = Path(URL_HOOK)
 
