@@ -755,6 +755,23 @@ class ModelInstComfyUi:
                 "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
                 "t2v",
             ),
+            # https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/NSFW/Wan2.2_Remix_NSFW_t2v_14b_high_lighting_v2.0.safetensors
+            ModelInst(
+                t,
+                ModelType.Unet,
+                hf2,
+                "FX-FeiHou/wan2.2-Remix",
+                "NSFW/Wan2.2_Remix_NSFW_t2v_14b_high_lighting_v2.0.safetensors",
+                "t2v",
+            ),
+            ModelInst(
+                t,
+                ModelType.Unet,
+                hf2,
+                "FX-FeiHou/wan2.2-Remix",
+                "NSFW/Wan2.2_Remix_NSFW_t2v_14b_low_lighting_v2.0.safetensors",
+                "t2v",
+            ),
             # https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/NSFW/Wan2.2_Remix_NSFW_i2v_14b_high_lighting_v2.0.safetensors
             ModelInst(
                 t,
