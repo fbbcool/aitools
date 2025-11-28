@@ -312,10 +312,11 @@ class ModelInst:
         }
 
         if self.target == TargetType.Comfy:
-            path_models = path_models / "ComfyUI/models"
+            path_models = path_models / "models"
             dir_model = map_dir_models.get(self.model, None)
 
         if self.target == TargetType.Kohyass:
+            # TODO: does not fit with former ComfyUI folder!
             path_models = path_models / "kohya_ss/models"
             dir_model = map_dir_models.get(self.model, None)
 
@@ -931,16 +932,16 @@ class ModelInstComfyUi:
         downloads = models_common + model_db[group]
         for download in downloads:
             install = True
+
             if not download.method_gen:
                 download.method_gen = None
-
             if download.method_gen is not None:
                 if method_gen is not None:
                     if download.method_gen != method_gen:
                         install = False
 
-        if install:
-            download.install
+            if install:
+                download.install
 
 
 class PostInstHook:
