@@ -928,19 +928,19 @@ class ModelInstComfyUi:
         if not method_gen:
             method_gen = None
 
-            downloads = models_common + model_db[group]
-            for download in downloads:
-                install = True
-                if not download.method_gen:
-                    download.method_gen = None
+        downloads = models_common + model_db[group]
+        for download in downloads:
+            install = True
+            if not download.method_gen:
+                download.method_gen = None
 
             if download.method_gen is not None:
                 if method_gen is not None:
                     if download.method_gen != method_gen:
                         install = False
 
-            if install:
-                download.install
+        if install:
+            download.install
 
 
 class PostInstHook:
