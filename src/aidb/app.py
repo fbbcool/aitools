@@ -1,3 +1,4 @@
+import os
 import gradio as gr
 from aidb.dbmanager import DBManager
 from aidb.query import Query
@@ -7,12 +8,13 @@ from aidb.set import SetImg
 from aidb.tagger import TAGS_CUSTOM
 from aidb.app.cell_image import AppImageCell
 from aidb.app.tab_search_and_rate import AppTabSearchAndRate
-from typing import Final, Optional, List, Dict, Any, Tuple
+from typing import Final, Optional, List, Tuple
 import html
-import json # Import json for robust string escaping
+import json  # Import json for robust string escaping
 
 # Define images per page constant
 IMAGES_PER_PAGE: Final = 500
+
 
 class AIDBGradioApp:
     """
@@ -30,11 +32,13 @@ class AIDBGradioApp:
         """
         if not isinstance(db_manager, DBManager):
             raise TypeError("db_manager must be an instance of DBManager.")
-        
+
         self._db_manager = db_manager
         self._query_handler = Query(db_manager)
         self._statistics_handler = Statistics(db_manager)
-        print("AIDBGradioApp initialized with DBManager, Query, and Statistics references.")
+        print(
+            "AIDBGradioApp initialized with DBManager, Query, and Statistics references."
+        )
 
         # hidden update triggers
         self._get_full_image_data_trigger_elem_id = "get_full_image_data_trigger_btn"
@@ -56,7 +60,7 @@ class AIDBGradioApp:
         all_wd_tags = self._get_sorted_wd_tags_for_dropdown()
 
         # Add an empty string option to allow "None" selection
-        dropdown_choices = [""] + all_wd_tags # Empty string for "None"
+        dropdown_choices = [""] + all_wd_tags  # Empty string for "None"
 
         with gr.Blocks() as demo:
             gr.Markdown("# AIDB Image Metadata Manager")
@@ -68,99 +72,231 @@ class AIDBGradioApp:
 
             # --- Hidden Components for Robust Event Handling ---
             # Trigger buttons (no data, just event triggers)
-            get_full_image_data_trigger = gr.Button("Get Full Image Data Trigger", visible=False, elem_id=self._get_full_image_data_trigger_elem_id)
-            rating_update_trigger = gr.Button("Hidden Rating Update Trigger", visible=False, elem_id=self._rating_update_trigger_elem_id)
-            scene_update_trigger = gr.Button("Hidden Scene Update Trigger", visible=False, elem_id=self._scene_update_trigger_elem_id)
+            get_full_image_data_trigger = gr.Button(
+                "Get Full Image Data Trigger",
+                visible=False,
+                elem_id=self._get_full_image_data_trigger_elem_id,
+            )
+            rating_update_trigger = gr.Button(
+                "Hidden Rating Update Trigger",
+                visible=False,
+                elem_id=self._rating_update_trigger_elem_id,
+            )
+            scene_update_trigger = gr.Button(
+                "Hidden Scene Update Trigger",
+                visible=False,
+                elem_id=self._scene_update_trigger_elem_id,
+            )
 
             # Data bus textboxes (hold data passed from JS to Python)
             image_id_bus = gr.Textbox(visible=False, elem_id=self._image_id_bus_elem_id)
-            rating_data_bus = gr.Textbox(visible=False, elem_id=self._rating_data_bus_elem_id)
-            scene_data_bus = gr.Textbox(visible=False, elem_id=self._scene_data_bus_elem_id)
-            
+            rating_data_bus = gr.Textbox(
+                visible=False, elem_id=self._rating_data_bus_elem_id
+            )
+            scene_data_bus = gr.Textbox(
+                visible=False, elem_id=self._scene_data_bus_elem_id
+            )
+
             # Data bus textboxes for the image modal
-            modal_img_data_bus = gr.Textbox(visible=False, elem_id="modal_img_data_bus_elem")
-            modal_details_data_bus = gr.Textbox(visible=False, elem_id="modal_details_data_bus_elem")
+            modal_img_data_bus = gr.Textbox(
+                visible=False, elem_id="modal_img_data_bus_elem"
+            )
+            modal_details_data_bus = gr.Textbox(
+                visible=False, elem_id="modal_details_data_bus_elem"
+            )
             # --- End Hidden Components ---
 
             AppImageCell.html_image_modal()
 
-            AppTabSearchAndRate._create_interface()            
-            with gr.Tab("Image Search"): # Renamed tab for clarity
+            AppTabSearchAndRate._create_interface()
+            with gr.Tab("Image Search"):  # Renamed tab for clarity
                 gr.Markdown("## Advanced Image Search with Mandatory and Optional Tags")
-                gr.Markdown("Select up to 3 mandatory tags (all must be present) and up to 3 optional tags (contribute to score).")
+                gr.Markdown(
+                    "Select up to 3 mandatory tags (all must be present) and up to 3 optional tags (contribute to score)."
+                )
 
                 with gr.Row():
-                    mandatory_tag_1 = gr.Dropdown(label="Mandatory Tag 1", choices=dropdown_choices, value="", allow_custom_value=False, interactive=True)
-                    mandatory_tag_2 = gr.Dropdown(label="Mandatory Tag 2", choices=dropdown_choices, value="", allow_custom_value=False, interactive=True)
-                    mandatory_tag_3 = gr.Dropdown(label="Mandatory Tag 3", choices=dropdown_choices, value="", allow_custom_value=False, interactive=True)
-                
+                    mandatory_tag_1 = gr.Dropdown(
+                        label="Mandatory Tag 1",
+                        choices=dropdown_choices,
+                        value="",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    mandatory_tag_2 = gr.Dropdown(
+                        label="Mandatory Tag 2",
+                        choices=dropdown_choices,
+                        value="",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    mandatory_tag_3 = gr.Dropdown(
+                        label="Mandatory Tag 3",
+                        choices=dropdown_choices,
+                        value="",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+
                 with gr.Row():
-                    optional_tag_1 = gr.Dropdown(label="Optional Tag 1", choices=dropdown_choices, value="", allow_custom_value=False, interactive=True)
-                    optional_tag_2 = gr.Dropdown(label="Optional Tag 2", choices=dropdown_choices, value="", allow_custom_value=False, interactive=True)
-                    optional_tag_3 = gr.Dropdown(label="Optional Tag 3", choices=dropdown_choices, value="", allow_custom_value=False, interactive=True)
-                
+                    optional_tag_1 = gr.Dropdown(
+                        label="Optional Tag 1",
+                        choices=dropdown_choices,
+                        value="",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    optional_tag_2 = gr.Dropdown(
+                        label="Optional Tag 2",
+                        choices=dropdown_choices,
+                        value="",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    optional_tag_3 = gr.Dropdown(
+                        label="Optional Tag 3",
+                        choices=dropdown_choices,
+                        value="",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+
                 with gr.Row():
-                    rating_min = gr.Dropdown(label="Rating Min", choices=[str(x) for x in list(range(-2, 6))], value="3", allow_custom_value=False, interactive=True)
-                    rating_max = gr.Dropdown(label="Rating Max", choices=[str(x) for x in list(range(-2, 6))], value="5", allow_custom_value=False, interactive=True)
+                    rating_min = gr.Dropdown(
+                        label="Rating Min",
+                        choices=[str(x) for x in list(range(-2, 6))],
+                        value="3",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    rating_max = gr.Dropdown(
+                        label="Rating Max",
+                        choices=[str(x) for x in list(range(-2, 6))],
+                        value="5",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
                 with gr.Row():
-                    operation = gr.Dropdown(label="Operation", choices=["None", "Rate", "Scene"], value="Rate", allow_custom_value=False, interactive=True)
-                    bodypart = gr.Dropdown(label="Bodypart", choices=["Ignore", "Empty"] + TAGS_CUSTOM["bodypart"], value="Ignore", allow_custom_value=False, interactive=True)
-                
+                    operation = gr.Dropdown(
+                        label="Operation",
+                        choices=["None", "Rate", "Scene"],
+                        value="Rate",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    bodypart = gr.Dropdown(
+                        label="Bodypart",
+                        choices=["Ignore", "Empty"] + TAGS_CUSTOM["bodypart"],
+                        value="Ignore",
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+
                 search_button = gr.Button("Search Images")
-                
+
                 with gr.Column(visible=True) as advanced_search_list_view:
                     # in the title, the number of selected images should be shown
                     curr_label = "Matching Images (Highest Score First)"
                     advanced_search_html_display = gr.HTML(label=curr_label)
                     with gr.Row():
                         advanced_search_prev_btn = gr.Button("Previous Page")
-                        advanced_search_page_info = gr.Textbox(label="Page", interactive=False, scale=0)
+                        advanced_search_page_info = gr.Textbox(
+                            label="Page", interactive=False, scale=0
+                        )
                         advanced_search_next_btn = gr.Button("Next Page")
-                        advanced_search_go_to_page_num = gr.Number(label="Go to Page", value=1, precision=0, scale=0)
+                        advanced_search_go_to_page_num = gr.Number(
+                            label="Go to Page", value=1, precision=0, scale=0
+                        )
                         advanced_search_go_to_page_btn = gr.Button("Go")
-                        refresh_button = gr.Button("Refresh Current Page") # NEW Refresh button
+                        refresh_button = gr.Button(
+                            "Refresh Current Page"
+                        )  # NEW Refresh button
 
                 search_button.click(
                     self._imgs_search_and_op,
                     inputs=[
-                        mandatory_tag_1, mandatory_tag_2, mandatory_tag_3,
-                        optional_tag_1, optional_tag_2, optional_tag_3, rating_min, rating_max,operation,bodypart
+                        mandatory_tag_1,
+                        mandatory_tag_2,
+                        mandatory_tag_3,
+                        optional_tag_1,
+                        optional_tag_2,
+                        optional_tag_3,
+                        rating_min,
+                        rating_max,
+                        operation,
+                        bodypart,
                     ],
-                    outputs=[advanced_search_html_display, advanced_search_image_cache, advanced_search_current_page, advanced_search_page_info]
+                    outputs=[
+                        advanced_search_html_display,
+                        advanced_search_image_cache,
+                        advanced_search_current_page,
+                        advanced_search_page_info,
+                    ],
                 )
 
                 advanced_search_prev_btn.click(
                     self._paginate_images,
-                    inputs=[advanced_search_image_cache, advanced_search_current_page, gr.State(-1)],
-                    outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info]
+                    inputs=[
+                        advanced_search_image_cache,
+                        advanced_search_current_page,
+                        gr.State(-1),
+                    ],
+                    outputs=[
+                        advanced_search_html_display,
+                        advanced_search_current_page,
+                        advanced_search_page_info,
+                    ],
                 )
                 advanced_search_next_btn.click(
                     self._paginate_images,
-                    inputs=[advanced_search_image_cache, advanced_search_current_page, gr.State(1)],
-                    outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info]
+                    inputs=[
+                        advanced_search_image_cache,
+                        advanced_search_current_page,
+                        gr.State(1),
+                    ],
+                    outputs=[
+                        advanced_search_html_display,
+                        advanced_search_current_page,
+                        advanced_search_page_info,
+                    ],
                 )
                 advanced_search_go_to_page_btn.click(
                     self._go_to_specific_page,
-                    inputs=[advanced_search_image_cache, advanced_search_current_page, advanced_search_go_to_page_num],
-                    outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info]
+                    inputs=[
+                        advanced_search_image_cache,
+                        advanced_search_current_page,
+                        advanced_search_go_to_page_num,
+                    ],
+                    outputs=[
+                        advanced_search_html_display,
+                        advanced_search_current_page,
+                        advanced_search_page_info,
+                    ],
                 )
 
                 # NEW: Refresh button click event
                 refresh_button.click(
                     self._refresh_image_grid,
                     inputs=[advanced_search_image_cache, advanced_search_current_page],
-                    outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info]
+                    outputs=[
+                        advanced_search_html_display,
+                        advanced_search_current_page,
+                        advanced_search_page_info,
+                    ],
                 )
-            
+
             # Link hidden triggers to functions
             get_full_image_data_trigger.click(
                 self._get_full_image_data_for_modal,
                 inputs=[image_id_bus],
-                outputs=[modal_img_data_bus, modal_details_data_bus]
-            ).then( # Chaining .then() to update the modal after data is received
-                None, # No Python function needed here, just JS
-                [modal_img_data_bus, modal_details_data_bus], # Inputs are the data buses
-                None, # No outputs to Gradio components for this JS part
+                outputs=[modal_img_data_bus, modal_details_data_bus],
+            ).then(  # Chaining .then() to update the modal after data is received
+                None,  # No Python function needed here, just JS
+                [
+                    modal_img_data_bus,
+                    modal_details_data_bus,
+                ],  # Inputs are the data buses
+                None,  # No outputs to Gradio components for this JS part
                 js="""
                 (img_base64, details_json_string) => {
                     console.log('JS: Received data for modal. Updating modal content.');
@@ -193,49 +329,60 @@ class AIDBGradioApp:
                     }
                     document.getElementById('fullPageImageOverlay').style.display = 'flex'; // Use flex to center
                 }
-                """
-
+                """,
             )
 
             rating_update_trigger.click(
-                self._update_image_rating, # Call the update function first
-                inputs=[rating_data_bus], # Input is the data bus textbox
-                outputs=[] # This function doesn't update UI directly
-            ).then( # Chain .then() to refresh the grid
+                self._update_image_rating,  # Call the update function first
+                inputs=[rating_data_bus],  # Input is the data bus textbox
+                outputs=[],  # This function doesn't update UI directly
+            ).then(  # Chain .then() to refresh the grid
                 self._refresh_image_grid,
                 inputs=[advanced_search_image_cache, advanced_search_current_page],
-                outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info] # Update the grid
+                outputs=[
+                    advanced_search_html_display,
+                    advanced_search_current_page,
+                    advanced_search_page_info,
+                ],  # Update the grid
             )
-            
+
             scene_update_trigger.click(
-                self._update_image_scene, # Call the update function first
-                inputs=[scene_data_bus], # Input is the data bus textbox
-                outputs=[] # This function doesn't update UI directly
-            ).then( # Chain .then() to refresh the grid
+                self._update_image_scene,  # Call the update function first
+                inputs=[scene_data_bus],  # Input is the data bus textbox
+                outputs=[],  # This function doesn't update UI directly
+            ).then(  # Chain .then() to refresh the grid
                 self._refresh_image_grid,
                 inputs=[advanced_search_image_cache, advanced_search_current_page],
-                outputs=[advanced_search_html_display, advanced_search_current_page, advanced_search_page_info] # Update the grid
+                outputs=[
+                    advanced_search_html_display,
+                    advanced_search_current_page,
+                    advanced_search_page_info,
+                ],  # Update the grid
             )
-            
+
             with gr.Tab("Image Set View"):
                 # drop down menu for image sets stored in the db
                 image_set_dropdown = gr.Dropdown(
                     label="Select Image Set",
                     choices=self._db_manager.sets_img_names,
-                    interactive=True
+                    interactive=True,
                 )
                 load_image_set_button = gr.Button("Load Image Set")
-                
+
                 with gr.Column(visible=True) as image_set_list_view:
                     image_set_html_display = gr.HTML(label="Images in Set")
                     with gr.Row():
                         image_set_prev_btn = gr.Button("Previous Page")
-                        image_set_page_info = gr.Textbox(label="Page", interactive=False, scale=0)
+                        image_set_page_info = gr.Textbox(
+                            label="Page", interactive=False, scale=0
+                        )
                         image_set_next_btn = gr.Button("Next Page")
-                        image_set_go_to_page_num = gr.Number(label="Go to Page", value=1, precision=0, scale=0)
+                        image_set_go_to_page_num = gr.Number(
+                            label="Go to Page", value=1, precision=0, scale=0
+                        )
                         image_set_go_to_page_btn = gr.Button("Go")
                         image_set_refresh_button = gr.Button("Refresh Current Page")
-                
+
                 # State variables for image set pagination
                 image_set_cache = gr.State(value=[])
                 image_set_current_page = gr.State(value=1)
@@ -243,28 +390,53 @@ class AIDBGradioApp:
                 load_image_set_button.click(
                     self._load_image_set,
                     inputs=[image_set_dropdown],
-                    outputs=[image_set_html_display, image_set_cache, image_set_current_page, image_set_page_info]
+                    outputs=[
+                        image_set_html_display,
+                        image_set_cache,
+                        image_set_current_page,
+                        image_set_page_info,
+                    ],
                 )
 
                 image_set_prev_btn.click(
                     self._paginate_images,
                     inputs=[image_set_cache, image_set_current_page, gr.State(-1)],
-                    outputs=[image_set_html_display, image_set_current_page, image_set_page_info]
+                    outputs=[
+                        image_set_html_display,
+                        image_set_current_page,
+                        image_set_page_info,
+                    ],
                 )
                 image_set_next_btn.click(
                     self._paginate_images,
                     inputs=[image_set_cache, image_set_current_page, gr.State(1)],
-                    outputs=[image_set_html_display, image_set_current_page, image_set_page_info]
+                    outputs=[
+                        image_set_html_display,
+                        image_set_current_page,
+                        image_set_page_info,
+                    ],
                 )
                 image_set_go_to_page_btn.click(
                     self._go_to_specific_page,
-                    inputs=[image_set_cache, image_set_current_page, image_set_go_to_page_num],
-                    outputs=[image_set_html_display, image_set_current_page, image_set_page_info]
+                    inputs=[
+                        image_set_cache,
+                        image_set_current_page,
+                        image_set_go_to_page_num,
+                    ],
+                    outputs=[
+                        image_set_html_display,
+                        image_set_current_page,
+                        image_set_page_info,
+                    ],
                 )
                 image_set_refresh_button.click(
                     self._refresh_image_grid,
                     inputs=[image_set_cache, image_set_current_page],
-                    outputs=[image_set_html_display, image_set_current_page, image_set_page_info]
+                    outputs=[
+                        image_set_html_display,
+                        image_set_current_page,
+                        image_set_page_info,
+                    ],
                 )
 
             with gr.Tab("Set Collection"):
@@ -274,25 +446,23 @@ class AIDBGradioApp:
                         label="Select Collection",
                         value=self._db_manager._collection,
                         choices=self._db_manager.collections_images,
-                        interactive=True
+                        interactive=True,
                     )
                 # selected collection is set foe db manager
                 collection_dropdown.change(
                     lambda x: self._db_manager.set_collection(x),
                     inputs=[collection_dropdown],
-                    outputs=[]
+                    outputs=[],
                 )
-                
-                
-            
-        return demo 
-    
+
+        return demo
+
     def _load_image_set(self, img_set: str):
         set = SetImg(self._db_manager, name=img_set, autoload=True)
         imgs = [img for img in set.imgs]
         # add chosen operation to images
         for img in imgs:
-            img.operation = 'nop'
+            img.operation = "nop"
 
         print(f"Found {len(imgs)} images matching advanced search criteria.")
 
@@ -303,7 +473,7 @@ class AIDBGradioApp:
 
         start_idx = (current_page - 1) * IMAGES_PER_PAGE
         end_idx = start_idx + IMAGES_PER_PAGE
-        
+
         images_on_page = imgs[start_idx:end_idx]
         html_output = self._generate_image_html(images_on_page)
         page_info_text = f"Page {current_page}/{total_pages} ({total_images} imgs)"
@@ -317,10 +487,10 @@ class AIDBGradioApp:
         """
         print("Fetching sorted WD tags for dropdown...")
         tag_counts = self._statistics_handler.get_absolute_tag_occurrence()
-        
+
         # Sort tags by count in descending order
         sorted_tags = sorted(tag_counts.items(), key=lambda item: item[1], reverse=True)
-        
+
         # Return only the tag names
         tag_names = [tag for tag, count in sorted_tags]
         print(f"Found {len(tag_names)} unique WD tags.")
@@ -336,7 +506,7 @@ class AIDBGradioApp:
         get_full_image_data_trigger_id = self._get_full_image_data_trigger_elem_id
         rating_update_trigger_id = self._rating_update_trigger_elem_id
         scene_update_trigger_id = self._scene_update_trigger_elem_id
-        
+
         img_width = 250
         html_content = f"""
         <style>
@@ -499,15 +669,13 @@ class AIDBGradioApp:
                 rating_update_trigger_id=rating_update_trigger_id,
                 scene_update_trigger_id=scene_update_trigger_id,
             )
-        
+
         html_content += "</div>"
         return html_content
 
-    def _paginate_images(self, 
-                         image_cache: List[Image],
-                         current_page: int, 
-                         direction: int
-                         ) -> Tuple[str, int, str]:
+    def _paginate_images(
+        self, image_cache: List[Image], current_page: int, direction: int
+    ) -> Tuple[str, int, str]:
         """
         Handles pagination for image displays.
         `direction` is -1 for previous, 1 for next.
@@ -517,9 +685,9 @@ class AIDBGradioApp:
 
         total_images = len(image_cache)
         total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
-        
+
         new_page = current_page + direction
-        new_page = max(1, min(new_page, total_pages)) # Clamp page number
+        new_page = max(1, min(new_page, total_pages))  # Clamp page number
 
         start_idx = (new_page - 1) * IMAGES_PER_PAGE
         end_idx = start_idx + IMAGES_PER_PAGE
@@ -527,14 +695,15 @@ class AIDBGradioApp:
         images_on_page = image_cache[start_idx:end_idx]
         html_output = self._generate_image_html(images_on_page)
         page_info_text = f"Page {new_page}/{total_pages}"
-        
+
         return html_output, new_page, page_info_text
 
-    def _go_to_specific_page(self,
-                             image_cache: List[Image],
-                             current_page: int, # This is the current page before the jump
-                             target_page_number: float # Gradio's Number component returns float
-                            ) -> Tuple[str, int, str]:
+    def _go_to_specific_page(
+        self,
+        image_cache: List[Image],
+        current_page: int,  # This is the current page before the jump
+        target_page_number: float,  # Gradio's Number component returns float
+    ) -> Tuple[str, int, str]:
         """
         Jumps to a specific page in the image display.
         """
@@ -551,14 +720,19 @@ class AIDBGradioApp:
         # Call paginate_images with the calculated target page and no relative direction
         return self._paginate_images(image_cache, target_page, 0)
 
-
-    def _imgs_search_and_op(self, 
-                                     mand_tag1: Optional[str], mand_tag2: Optional[str], mand_tag3: Optional[str],
-                                     opt_tag1: Optional[str], opt_tag2: Optional[str], opt_tag3: Optional[str],
-                                     rating_min: Optional[str], rating_max: Optional[str],
-                                     operation: Optional[str],
-                                     bodypart: Optional[str],
-                                     ) -> Tuple[str, List[Image], int, str]:
+    def _imgs_search_and_op(
+        self,
+        mand_tag1: Optional[str],
+        mand_tag2: Optional[str],
+        mand_tag3: Optional[str],
+        opt_tag1: Optional[str],
+        opt_tag2: Optional[str],
+        opt_tag3: Optional[str],
+        rating_min: Optional[str],
+        rating_max: Optional[str],
+        operation: Optional[str],
+        bodypart: Optional[str],
+    ) -> Tuple[str, List[Image], int, str]:
         """
         Performs an advanced search and initializes pagination.
         Returns (html_content, image_cache, current_page, page_info_text).
@@ -567,11 +741,13 @@ class AIDBGradioApp:
         optional_tags = [tag for tag in [opt_tag1, opt_tag2, opt_tag3] if tag]
 
         # get scored image list
-        imgs = self._query_handler.query_by_tags(mandatory_tags, optional_tags, int(rating_min), int(rating_max),bodypart)
+        imgs = self._query_handler.query_by_tags(
+            mandatory_tags, optional_tags, int(rating_min), int(rating_max), bodypart
+        )
 
         # add chosen operation to images
         for img in imgs:
-            img.operation = operation.lower() if operation else 'nop'
+            img.operation = operation.lower() if operation else "nop"
 
         print(f"Found {len(imgs)} images matching advanced search criteria.")
 
@@ -582,7 +758,7 @@ class AIDBGradioApp:
 
         start_idx = (current_page - 1) * IMAGES_PER_PAGE
         end_idx = start_idx + IMAGES_PER_PAGE
-        
+
         images_on_page = imgs[start_idx:end_idx]
         html_output = self._generate_image_html(images_on_page)
         page_info_text = f"Page {current_page}/{total_pages} ({total_images} imgs)"
@@ -606,18 +782,26 @@ class AIDBGradioApp:
         except ValueError as e:
             print(f"ERROR: Invalid ObjectId for image ID '{image_id}': {e}")
             return "", json.dumps({"error": f"Invalid image ID format: {image_id}"})
-            
+
         image_data = img_obj.data
         if image_data is None:
-            print(f"ERROR: Image with ID '{image_id}' not found in the database or data could not be retrieved.")
-            return "", json.dumps({"error": f"Image with ID '{image_id}' not found in the database."})
+            print(
+                f"ERROR: Image with ID '{
+                    image_id
+                }' not found in the database or data could not be retrieved."
+            )
+            return "", json.dumps(
+                {"error": f"Image with ID '{image_id}' not found in the database."}
+            )
 
         pil_img = img_obj.pil
         if pil_img is None:
             print(f"ERROR: Could not load PIL image file for image ID: {image_id}.")
-            return "", json.dumps({"error": f"Could not load image file for ID: {image_id}."})
-        
-        #img_caption = img_obj.meta_prompt
+            return "", json.dumps(
+                {"error": f"Could not load image file for ID: {image_id}."}
+            )
+
+        # img_caption = img_obj.meta_prompt
         img_caption = img_obj.caption
         if img_caption is None:
             img_caption = img_obj.caption
@@ -628,71 +812,91 @@ class AIDBGradioApp:
 
         full_img_base64 = AppImageCell._pil_to_base64(pil_img)
 
-        tags_wd = image_data.get('tags', {}).get('tags_wd', {})
+        tags_wd = image_data.get("tags", {}).get("tags_wd", {})
         sorted_tags_wd = sorted(tags_wd.items(), key=lambda item: item[1], reverse=True)
         # Escape tag names to prevent potential HTML injection issues
-        modal_formatted_tags = "".join([f"{html.escape(tag)}: {prob:.2f}<br>" for tag, prob in sorted_tags_wd])
-        
+        modal_formatted_tags = "".join(
+            [f"{html.escape(tag)}: {prob:.2f}<br>" for tag, prob in sorted_tags_wd]
+        )
+
         image_details = {
             "id": str(img_obj.id),
-            "full_path": str(img_obj.get_full_path()) if img_obj.get_full_path() else "N/A",
-            "rating": img_obj.data.get('rating', 'N/A'),
-            "category": img_obj.data.get('category', 'N/A'),
-            "dimensions_width": image_data.get('dimensions', {}).get('width', 'N/A'),
-            "dimensions_height": image_data.get('dimensions', {}).get('height', 'N/A'),
-            "dimensions_unit": image_data.get('dimensions', {}).get('unit', ''),
-            "creation_date": image_data.get('creation_date', 'N/A'),
-            "last_modified_date": image_data.get('last_modified_date', 'N/A'),
-            "tags_html": modal_formatted_tags if modal_formatted_tags else 'No WD tags available.',
+            "full_path": str(img_obj.get_full_path())
+            if img_obj.get_full_path()
+            else "N/A",
+            "rating": img_obj.data.get("rating", "N/A"),
+            "category": img_obj.data.get("category", "N/A"),
+            "dimensions_width": image_data.get("dimensions", {}).get("width", "N/A"),
+            "dimensions_height": image_data.get("dimensions", {}).get("height", "N/A"),
+            "dimensions_unit": image_data.get("dimensions", {}).get("unit", ""),
+            "creation_date": image_data.get("creation_date", "N/A"),
+            "last_modified_date": image_data.get("last_modified_date", "N/A"),
+            "tags_html": modal_formatted_tags
+            if modal_formatted_tags
+            else "No WD tags available.",
             "caption": img_caption,
         }
-        
+
         return full_img_base64, json.dumps(image_details)
 
-    def _update_image_rating(self, 
-                             rating_data_str: str,
-                            ) -> None: # No outputs from this function
+    def _update_image_rating(
+        self,
+        rating_data_str: str,
+    ) -> None:  # No outputs from this function
         """
         Updates an image's rating in the database.
         This function is triggered by a hidden button and receives its data from a hidden 'data bus' textbox.
         The UI refresh is handled by a subsequent .then() call in the event chain.
         """
-        print(f"DEBUG: _update_image_rating called with data from bus: '{rating_data_str}'")
+        print(
+            f"DEBUG: _update_image_rating called with data from bus: '{rating_data_str}'"
+        )
 
         if not rating_data_str or not isinstance(rating_data_str, str):
-            print(f"ERROR: Invalid or empty data received for rating update: {rating_data_str}")
+            print(
+                f"ERROR: Invalid or empty data received for rating update: {rating_data_str}"
+            )
             gr.Warning("Could not update rating: Invalid data received from frontend.")
             return None
 
         # We expect a string like "image_id_val,new_rating_val"
-        parts = rating_data_str.split(',')
+        parts = rating_data_str.split(",")
         if len(parts) != 2:
-            print(f"ERROR: Invalid data format for _update_image_rating: {rating_data_str}")
+            print(
+                f"ERROR: Invalid data format for _update_image_rating: {rating_data_str}"
+            )
             gr.Warning(f"Could not update rating: Malformed data '{rating_data_str}'.")
             return None
-        
+
         image_id = parts[0].strip()
         try:
             new_rating = int(parts[1].strip())
         except ValueError:
             print(f"ERROR: Invalid rating value received in data: {rating_data_str}")
-            gr.Warning(f"Could not update rating: Invalid rating value in '{rating_data_str}'.")
+            gr.Warning(
+                f"Could not update rating: Invalid rating value in '{rating_data_str}'."
+            )
             return None
-        print(f"DEBUG: _update_image_rating called for image {image_id} with rating {new_rating}")
+        print(
+            f"DEBUG: _update_image_rating called for image {image_id} with rating {new_rating}"
+        )
         # Update the database
         ret = self._db_manager.update_image(image_id, rating=new_rating)
         # This function now explicitly returns None, as it's not directly updating Gradio outputs.
         # give gradio info based on ret
         if ret and ret > 0:
-            gr.Info(f"Rating for image {image_id} updated to {new_rating}.",duration=1.0)
+            gr.Info(
+                f"Rating for image {image_id} updated to {new_rating}.", duration=1.0
+            )
         else:
             gr.Warning(f"Failed to update rating for image {image_id}.", duration=2.0)
-            
-        return None 
 
-    def _update_image_scene(self, 
-                             data_str: str,
-                            ) -> None: # No outputs from this function
+        return None
+
+    def _update_image_scene(
+        self,
+        data_str: str,
+    ) -> None:  # No outputs from this function
         """
         Updates an image's scene tag in the database.
         This function is triggered by a hidden button and receives its data from a hidden 'data bus' textbox.
@@ -706,12 +910,12 @@ class AIDBGradioApp:
             return None
 
         # We expect a string like "image_id,new_val"
-        parts = data_str.split(',')
+        parts = data_str.split(",")
         if len(parts) != 2:
             print(f"ERROR: Invalid data format for _update_image_scene: {data_str}")
             gr.Warning(f"Could not update scene: Malformed data '{data_str}'.")
             return None
-        
+
         image_id = parts[0].strip()
         try:
             new_data = parts[1].strip()
@@ -719,7 +923,9 @@ class AIDBGradioApp:
             print(f"ERROR: Invalid scene value received in data: {data_str}")
             gr.Warning(f"Could not update: Invalid scene value in '{data_str}'.")
             return None
-        print(f"DEBUG: _update_image_scene called for image {image_id} with scene {new_data}")
+        print(
+            f"DEBUG: _update_image_scene called for image {image_id} with scene {new_data}"
+        )
         # Update the database
         img = Image(self._db_manager, image_id)
         bodyparts = img.get_tags_custom("bodypart")
@@ -728,7 +934,7 @@ class AIDBGradioApp:
         else:
             # remove new_data from bodyparts
             bodyparts.remove(new_data)
-            
+
         ret = img.set_tags_custom("bodypart", bodyparts)
         # This function now explicitly returns None, as it's not directly updating Gradio outputs.
         # give gradio info based on ret
@@ -736,35 +942,46 @@ class AIDBGradioApp:
             gr.Info(f"Scene tag for image {image_id} updated to {new_data}.")
         else:
             gr.Warning(f"Failed to update scene tag for image {image_id}.")
-            
-        return None 
 
+        return None
 
-    def _refresh_image_grid(self, 
-                            advanced_search_image_cache: List[Image],
-                            advanced_search_current_page: int
-                           ) -> Tuple[str, int, str]:
+    def _refresh_image_grid(
+        self,
+        advanced_search_image_cache: List[Image],
+        advanced_search_current_page: int,
+    ) -> Tuple[str, int, str]:
         """
         Refreshes the image grid display based on the current cache and page.
         """
-        print(f"DEBUG: _refresh_image_grid called for page {advanced_search_current_page}")
-        advanced_search_html, advanced_search_page, advanced_search_page_info_text = self._paginate_images(
-            advanced_search_image_cache, advanced_search_current_page, 0
+        print(
+            f"DEBUG: _refresh_image_grid called for page {advanced_search_current_page}"
         )
-        return (advanced_search_html, advanced_search_page, advanced_search_page_info_text)
-
+        advanced_search_html, advanced_search_page, advanced_search_page_info_text = (
+            self._paginate_images(
+                advanced_search_image_cache, advanced_search_current_page, 0
+            )
+        )
+        return (
+            advanced_search_html,
+            advanced_search_page,
+            advanced_search_page_info_text,
+        )
 
     def launch(self, **kwargs):
         print("Launching Gradio application...")
         self.interface.launch(**kwargs)
 
+
 # Example Usage (for testing purposes, typically in a separate script or main application file)
 if __name__ == "__main__":
     # Initialize DBManager (assuming MongoDB is running)
-    db_manager_instance = DBManager(config_file='/home/misw/venv/aitools/aitools/src/aidb/dbmanager.yaml')
+    config_file = f"{os.environ['CONF_AIT']}/aidb/dbmanager.yaml"
+    db_manager_instance = DBManager(config_file=config_file)
 
     # Create and launch the Gradio app
-    if db_manager_instance.db is not None: # Only proceed if DBManager connected successfully
+    if (
+        db_manager_instance.db is not None
+    ):  # Only proceed if DBManager connected successfully
         app = AIDBGradioApp(db_manager_instance)
         app.launch()
     else:
