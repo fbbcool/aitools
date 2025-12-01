@@ -1,0 +1,56 @@
+{
+  "wan22": {
+    "common": {
+      "vae": [
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/vae/wan_2.1_vae.safetensors"
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        },
+        {
+          "repo_id": "NSFW-API/NSFW-Wan-UMT5-XXL",
+          "file": "nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
+        }
+      ],
+      "custom_node": [
+        {
+          "repo_id": "yolain/ComfyUI-Easy-Use",
+          "method_download": "github"
+        }
+      ]
+    },
+    "t2v": {
+      "transformer": [
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+          "type": [
+            "unet",
+            "high"
+          ],
+          "method_download": "huggingface",
+          "skip": 0
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+          "type": "auto",
+          "skip": 0
+        },
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
+          "type": "auto",
+          "skip": 0
+        }
+      ]
+    }
+  }
+}

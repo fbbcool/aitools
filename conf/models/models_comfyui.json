@@ -1,0 +1,62 @@
+{
+  "comfyui": {
+    "common": {
+      "upscale": [
+        {
+          "repo_id": "ai-forever/Real-ESRGAN",
+          "file": "RealESRGAN_x2.pth",
+          "method_download": "huggingface"
+        },
+        {
+          "repo_id": "ai-forever/Real-ESRGAN",
+          "file": "RealESRGAN_x4.pth"
+        }
+      ],
+      "custom_node": [
+        {
+          "repo_id": "yolain/ComfyUI-Easy-Use",
+          "method_download": "github"
+        },
+        {
+          "repo_id": "cubiq/ComfyUI_essentials"
+        },
+        {
+          "repo_id": "ltdrdata/ComfyUI-Inspire-Pack"
+        },
+        {
+          "repo_id": "Derfuu/Derfuu_ComfyUI_ModdedNodes"
+        },
+        {
+          "repo_id": "stduhpf/ComfyUI-WanMoeKSampler"
+        },
+        {
+          "repo_id": "Zehong-Ma/ComfyUI-MagCache"
+        },
+        {
+          "repo_id": "Fannovel16/ComfyUI-Frame-Interpolation"
+        },
+        {
+          "repo_id": "rgthree/rgthree-comfy"
+        },
+        {
+          "repo_id": "kijai/ComfyUI-KJNodes"
+        },
+        {
+          "repo_id": "Comfy-Org/ComfyUI-Manager"
+        },
+        {
+          "repo_id": "ltdrdata/ComfyUI-Impact-Pack"
+        },
+        {
+          "repo_id": "Kosinkadink/comfyui-videohelpersuite"
+        },
+        {
+          "repo_id": "ClownsharkBatwing/RES4LYF"
+        },
+        {
+          "repo_id": "ssitu/ComfyUI_UltimateSDUpscale"
+        }
+      ]
+    }
+  }
+}
