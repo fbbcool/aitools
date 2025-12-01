@@ -64,22 +64,33 @@ class AInstallerDB:
 class AInstaller:
     def __init__(
         self,
-        group: str,
-        install_type: Literal["comfyui", "diffpipe"] = "comfyui",
+        base_dir: str,
+        group: str = "",
+        method: Literal["comfyui", "diffpipe"] = "comfyui",
     ):
         self.db = AInstallerDB().db
+        self.base_dir = Path(base_dir)
         split = group.split(":")
         self.group = split[0]
-        self.type = install_type
         self.variants = []
         if len(split) > 1:
             self.variants.append("common")
             self.variants.append(split[1])
+        self.type = method
+        self.requirements = []
+
         self.install()
 
     def install(self):
         for item in self._items:
             self._install_item(item)
+
+        # create python requirements.txt
+        self.requirements = list(set(self.requirements))
+
+        requirements_txt = self.base_dir / "requirements_ainstall.txt"
+        with requirements_txt.open("w") as f:
+            f.write("\n".join(self.requirements))
 
     @property
     def _items(self) -> Generator:
@@ -205,6 +216,12 @@ class AInstaller:
         if not target_dir:
             item["invalid"] = True
             return item
+        target = item.get("target")
+        if target == "custom_node":
+            repo_id = item["config"].get("repo_id")
+            split = repo_id.split("/")
+            # add name of repo id to target directory
+            target_dir = f"{target_dir}/{split[1]}"
 
         group = item.get("group", "comfyui")
         target_dir = Path(target_dir)
@@ -232,7 +249,7 @@ class AInstaller:
             if subdir != "auto":
                 target_dir = target_dir / subdir
 
-        target_dir = Path("/tmp/comfy") / target_dir
+        target_dir = self.base_dir / target_dir
         item["target_dir"] = str(target_dir)
 
     def _setup_item_diffpipe(self, item: dict) -> dict:
@@ -276,8 +293,10 @@ class AInstaller:
         if not file:
             # use snaphot download
             link = Path(snapshot_download(repo_id=repo_id))
-            for sft in Path(link).rglob("*.safetensors"):
-                print(Path(sft).relative_to(link))
+            for src in Path(link).rglob("*.safetensors"):
+                target = target_dir / Path(src).relative_to(link)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                self._symlink(src, target)
 
         else:
             # use hf download
@@ -291,14 +310,24 @@ class AInstaller:
 
             self._symlink(src, target)
 
-    def _symlink(self, src: str | Path, target: str | Path, directory=False):
-        src = str(src)
-        target = str(target)
+    def _install_item_git(self, item: dict) -> None:
+        repo_id = item["config"].get("repo_id")
+        target_dir = Path(item["target_dir"])
+
+        url = f"https://github.com/{repo_id}.git"
+        Path(target_dir).mkdir(parents=True, exist_ok=True)
         try:
-            os.symlink(src, target, target_is_directory=directory)
-        except OSError:
-            os.remove(target)
-            os.symlink(src, target, target_is_directory=directory)
+            Repo.clone_from(url, target_dir, recursive=True)
+        except Exception as e:
+            print(f"Url git clone went wrong: {url} -> {target_dir}")
+            print(e)
+        # collect python requirements
+        requirements_txt = target_dir / "requirements.txt"
+        if requirements_txt.exists():
+            with requirements_txt.open() as f:
+                while line := f.readline():
+                    split = line.split(">=")
+                    self.requirements.append(split[0].rstrip())
 
     def download_wget(self, url: str, fname: str):
         resp = requests.get(url, stream=True)
@@ -325,15 +354,11 @@ class AInstaller:
             print(f"Url download went wrong: {url}")
             print(e)
 
-    def _install_item_git(self, item: dict) -> None:
-        return
-        repo_id = item["config"].get("repo_id")
-        target_dir = Path(item["target_dir"])
-
-        url = f"https://github.com/{repo_id}.git"
-        Path(target_dir).mkdir(parents=True, exist_ok=True)
+    def _symlink(self, src: str | Path, target: str | Path, directory=False):
+        src = str(src)
+        target = str(target)
         try:
-            Repo.clone_from(url, target_dir, recursive=True)
-        except Exception as e:
-            print(f"Url git clone went wrong: {url} -> {target_dir}")
-            print(e)
+            os.symlink(src, target, target_is_directory=directory)
+        except OSError:
+            os.remove(target)
+            os.symlink(src, target, target_is_directory=directory)
