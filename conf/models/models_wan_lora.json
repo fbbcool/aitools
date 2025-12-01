@@ -1,18 +1,25 @@
 {
   "wan22": {
+    "common": {
+      "lora": [
+        {
+          "repo_id": "fbbcool/wan22_lora"
+        }
+      ]
+    },
     "t2v": {
       "lora": [
         {
           "link": "https://civitai.com/api/download/models/2303105?type=Model&format=SafeTensor",
           "method_download": "civitai",
-          "type": "high",
+          "subdir": "high",
           "name_target": "dreamplay-v2",
           "skip": 0
         },
         {
           "link": "https://civitai.com/api/download/models/2303113?type=Model&format=SafeTensor",
           "method_download": "civitai",
-          "type": "low",
+          "subdir": "low",
           "name_target": "dreamplay-v2",
           "skip": 0
         }
@@ -23,14 +30,14 @@
         {
           "link": "https://civitai.com/api/download/models/2176505?type=Model&format=SafeTensor",
           "method_download": "civitai",
-          "type": "high",
+          "subdir": "high",
           "name_target": "dreamplay-v1",
           "skip": 0
         },
         {
           "link": "https://civitai.com/api/download/models/2303113?type=Model&format=SafeTensor",
           "method_download": "civitai",
-          "type": "low",
+          "subdir": "low",
           "name_target": "dreamplay-v1",
           "skip": 0
         }

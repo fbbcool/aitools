@@ -29,11 +29,9 @@
         {
           "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
           "file": "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
-          "type": [
-            "unet",
-            "high"
-          ],
+          "subdir": "auto",
           "method_download": "huggingface",
+          "rename": "fp8_scaled",
           "skip": 0
         }
       ],
@@ -41,13 +39,15 @@
         {
           "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
           "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
-          "type": "auto",
+          "subdir": "auto",
+          "rename": "4steps",
           "skip": 0
         },
         {
           "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
           "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
-          "type": "auto",
+          "subdir": "auto",
+          "rename": "4steps",
           "skip": 0
         }
       ]
