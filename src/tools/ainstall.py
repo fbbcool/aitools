@@ -70,6 +70,7 @@ class AInstaller:
         base_dir: str,
         group: str = "",
         method: Literal["comfyui", "diffpipe"] = "comfyui",
+        verbose: bool = False,
     ):
         self.db = AInstallerDB().db
         self._cache = Path(AIT_PATH_CACHE)
@@ -86,6 +87,8 @@ class AInstaller:
         self.requirements = []
 
         self.token_cai = os.environ.get("CAI_TOKEN", "")
+
+        self.verbose = verbose
 
         self.install()
 
@@ -119,6 +122,8 @@ class AInstaller:
             for target, target_data in variant_data.items():
                 for config in target_data:
                     if config.get("skip", False):
+                        continue
+                    if config.get("action", "None") == "skip":
                         continue
                     yield self._make_item(self.group, variant, target, config)
 
@@ -161,8 +166,8 @@ class AInstaller:
         self._install_item_generic(item)
 
     def _install_item_generic(self, item: dict) -> None:
-        print("*** trying ***")
-        pprint(item)
+        if self.verbose:
+            pprint(item)
         if item.get("invalid", False):
             print("warning: item is invalid!")
             return
@@ -173,22 +178,20 @@ class AInstaller:
 
         config = item.get("config")
         method = config.get("method_download", "")
+
+        descriptor = self._descriptor_item(item)
+        print(f"[{method}] retrieving {descriptor} ...")
+
         if not method:
             print("warning: item has no download method!")
             return
         elif method == "huggingface":
-            print("try download hf:")
             self._install_item_hf(item)
         elif method == "github":
-            print("try clone github:")
             self._install_item_git(item)
         elif method == "civitai":
-            print("try download civitai:")
-            # TODO: civitai
             self._install_item_civitai(item)
-            # self._install_item_wget(item)
         elif method == "wget":
-            print("try download wget:")
             self._install_item_wget(item)
 
     def _setup_item_comfyui(self, item: dict) -> dict:
@@ -465,9 +468,11 @@ class AInstaller:
                             f"\rDownloading: {filename_cai} [{progress * 100:.2f}%] - {
                                 speed:.2f} MB/s"
                         )
-            print(f"Download completed. File saved as: {filename_cai}")
+            if self.verbose:
+                print(f"Download completed. File saved as: {filename_cai}")
         else:
-            print("cache ok.")
+            if self.verbose:
+                print("cache ok.")
 
         target_file = target_dir / filename_cai
         rename = item["config"].get("rename", "")
@@ -475,3 +480,21 @@ class AInstaller:
             target_file = (target_dir / rename).with_suffix(".safetensors")
 
         self._symlink(cache_file, target_file)
+
+    def _descriptor_item(self, item: dict) -> str:
+        descriptor = ""
+        repo_id = item["config"].get("repo_id", "")
+        file = item["config"].get("file", "")
+        link = item["config"].get("link", "")
+        rename = item["config"].get("rename", "")
+
+        if repo_id:
+            descriptor += repo_id + "/"
+        if file:
+            descriptor += file
+        if link:
+            descriptor = link
+        if rename:
+            descriptor += " -> " + rename
+
+        return descriptor
