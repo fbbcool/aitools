@@ -1,34 +1,29 @@
 {
-  "wan22": {
+  "my_group": {
     "common": {
       "vae": [
         {
-          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
-          "file": "split_files/vae/wan_2.1_vae.safetensors"
+          "repo_id": "repo/id",
+          "file": "group_vae.safetensors",
+          "rename": "vae"
         }
       ],
       "text_encoder": [
         {
-          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
-          "file": "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-        },
-        {
-          "repo_id": "NSFW-API/NSFW-Wan-UMT5-XXL",
-          "file": "nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
+          "repo_id": "repo/id",
+          "file": "group-umt5.safetensors",
+          "rename": "text_encoder"
         }
       ],
       "clip": [
         {
-          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
-          "file": "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-        },
-        {
-          "repo_id": "NSFW-API/NSFW-Wan-UMT5-XXL",
-          "file": "nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
+          "repo_id": "repo/id",
+          "file": "group-umt5.safetensors",
+          "rename": "clip"
         }
       ]
     },
-    "t2v": {
+    "foo": {
       "transformer": [
         {
           "link": "https://civitai.com/api/download/models/2323420?type=Model&format=SafeTensor&size=pruned&fp=fp8",
@@ -42,20 +37,6 @@
           "subdir": "low",
           "method_download": "civitai",
           "rename": "SmoothMix_v2",
-          "skip": false
-        },
-        {
-          "repo_id": "FX-FeiHou/wan2.2-Remix",
-          "file": "NSFW/Wan2.2_Remix_NSFW_t2v_14b_high_lighting_v2.0.safetensors",
-          "subdir": "auto",
-          "rename": "Remix_NSFW",
-          "skip": false
-        },
-        {
-          "repo_id": "FX-FeiHou/wan2.2-Remix",
-          "file": "NSFW/Wan2.2_Remix_NSFW_t2v_14b_low_lighting_v2.0.safetensors",
-          "subdir": "auto",
-          "rename": "Remix_NSFW",
           "skip": false
         },
         {
@@ -92,7 +73,7 @@
         }
       ]
     },
-    "i2v": {
+    "bar": {
       "transformer": [
         {
           "link": "https://civitai.com/api/download/models/2260110?type=Model&format=SafeTensor&size=pruned&fp=fp8",
@@ -106,20 +87,6 @@
           "subdir": "low",
           "method_download": "civitai",
           "rename": "SmoothMix_v1",
-          "skip": false
-        },
-        {
-          "repo_id": "FX-FeiHou/wan2.2-Remix",
-          "file": "NSFW/Wan2.2_Remix_NSFW_i2v_14b_high_lighting_v2.0.safetensors",
-          "subdir": "auto",
-          "rename": "Remix_NSFW",
-          "skip": false
-        },
-        {
-          "repo_id": "FX-FeiHou/wan2.2-Remix",
-          "file": "NSFW/Wan2.2_Remix_NSFW_i2v_14b_low_lighting_v2.0.safetensors",
-          "subdir": "auto",
-          "rename": "Remix_NSFW",
           "skip": false
         },
         {
