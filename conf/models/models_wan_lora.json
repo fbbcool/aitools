@@ -13,14 +13,14 @@
           "link": "https://civitai.com/api/download/models/2303105?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
-          "name_target": "dreamplay-v2",
+          "rename": "dreamplay-v2",
           "skip": 0
         },
         {
           "link": "https://civitai.com/api/download/models/2303113?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
-          "name_target": "dreamplay-v2",
+          "rename": "dreamplay-v2",
           "skip": 0
         }
       ]
@@ -31,14 +31,14 @@
           "link": "https://civitai.com/api/download/models/2176505?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
-          "name_target": "dreamplay-v1",
+          "rename": "dreamplay-v1",
           "skip": 0
         },
         {
           "link": "https://civitai.com/api/download/models/2303113?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
-          "name_target": "dreamplay-v1",
+          "rename": "dreamplay-v1",
           "skip": 0
         }
       ]

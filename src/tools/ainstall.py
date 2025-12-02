@@ -14,6 +14,7 @@ from urllib.parse import urlparse, parse_qs, unquote
 from pprint import pprint
 
 AIT_PATH_CONF: Final = f"{os.environ['CONF_AIT']}/models"
+AIT_PATH_CACHE: Final = f"{os.environ['HOME']}/.cache/ainstall"
 
 
 class AInstallerDB:
@@ -62,6 +63,9 @@ class AInstallerDB:
 
 
 class AInstaller:
+    CHUNK_SIZE: Final = 1638400
+    USER_AGENT: Final = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"  # noqa
+
     def __init__(
         self,
         base_dir: str,
@@ -69,6 +73,9 @@ class AInstaller:
         method: Literal["comfyui", "diffpipe"] = "comfyui",
     ):
         self.db = AInstallerDB().db
+        self._cache = Path(AIT_PATH_CACHE)
+        self._cache.mkdir(parents=True, exist_ok=True)
+
         self.base_dir = Path(base_dir)
         split = group.split(":")
         self.group = split[0]
@@ -78,6 +85,8 @@ class AInstaller:
             self.variants.append(split[1])
         self.type = method
         self.requirements = []
+
+        self.token_cai = os.environ.get("CAI_TOKEN", "")
 
         self.install()
 
@@ -193,6 +202,14 @@ class AInstaller:
         elif method == "github":
             print("try clone github:")
             self._install_item_git(item)
+        elif method == "civitai":
+            print("try download civitai:")
+            # TODO: civitai
+            self._install_item_civitai(item)
+            # self._install_item_wget(item)
+        elif method == "wget":
+            print("try download wget:")
+            self._install_item_wget(item)
 
     def _setup_item_comfyui(self, item: dict) -> dict:
         # build target url
@@ -234,17 +251,13 @@ class AInstaller:
 
         # apply subdir
         subdir = item["config"].get("subdir", "")
-        file = item["config"].get("file", "")
+        file: str = item["config"].get("file", "")
         if subdir:
             if subdir == "auto":
                 # check for high/low
-                if "high" in file:
+                if "high" in file.lower():
                     subdir = "high"
-                if "HIGH" in file:
-                    subdir = "high"
-                if "low" in file:
-                    subdir = "low"
-                if "LOW" in file:
+                if "low" in file.lower():
                     subdir = "low"
             if subdir != "auto":
                 target_dir = target_dir / subdir
@@ -329,30 +342,47 @@ class AInstaller:
                     split = line.split(">=")
                     self.requirements.append(split[0].rstrip())
 
-    def download_wget(self, url: str, fname: str):
-        resp = requests.get(url, stream=True)
-        total = int(resp.headers.get("content-length", 0))
+    def _install_item_wget(self, item: dict) -> None:
+        url = item["config"].get("link", "")
+        if not url:
+            print("Warning: wget, no link given")
+            return
+        urlp = urlparse(url)
+        urlpath = Path(urlp.path)
+        urlname = urlpath.name
 
-        fopath, _ = os.path.split(fname)
-        if not os.path.exists(fopath):
-            os.makedirs(fopath)
-        try:
-            with (
-                open(fname, "wb") as file,
-                tqdm(
-                    desc=fname,
-                    total=total,
-                    unit="iB",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                ) as bar,
-            ):
-                for data in resp.iter_content(chunk_size=1024):
-                    size = file.write(data)
-                    bar.update(size)
-        except Exception as e:
-            print(f"Url download went wrong: {url}")
-            print(e)
+        rename = item["config"].get("rename", "")
+        if not url:
+            print("Warning: wget, no rename given")
+            return
+        target_dir = Path(item["target_dir"])
+        target_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = (self._cache / urlname).with_suffix(".safetensors")
+        target_file = (target_dir / rename).with_suffix(".safetensors")
+
+        if not cache_file.exists():
+            resp = requests.get(url, stream=True)
+            total = int(resp.headers.get("content-length", 0))
+
+            try:
+                with (
+                    cache_file.open("wb") as file,
+                    tqdm(
+                        desc=cache_file.name,
+                        total=total,
+                        unit="iB",
+                        unit_scale=True,
+                        unit_divisor=1024,
+                    ) as bar,
+                ):
+                    for data in resp.iter_content(chunk_size=1024):
+                        size = file.write(data)
+                        bar.update(size)
+            except Exception as e:
+                print(f"Url download went wrong: {url}")
+                print(e)
+
+        self._symlink(cache_file, target_file)
 
     def _symlink(self, src: str | Path, target: str | Path, directory=False):
         src = str(src)
@@ -362,3 +392,112 @@ class AInstaller:
         except OSError:
             os.remove(target)
             os.symlink(src, target, target_is_directory=directory)
+
+    def _install_item_civitai(self, item: dict):
+        url = item["config"].get("link", "")
+        if not url:
+            print("Warning: wget, no link given")
+            return
+        # urlp = urlparse(url)
+        # urlpath = Path(urlp.path)
+        # urlname = urlpath.name
+
+        target_dir = Path(item["target_dir"])
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        filename_cai = ""
+
+        headers = {
+            "Authorization": f"Bearer {self.token_cai}",
+            "User-Agent": self.USER_AGENT,
+        }
+
+        # Disable automatic redirect handling
+        class NoRedirection(urllib.request.HTTPErrorProcessor):
+            def http_response(self, request, response):
+                return response
+
+            https_response = http_response
+
+        request = urllib.request.Request(url, headers=headers)
+        opener = urllib.request.build_opener(NoRedirection)
+        response = opener.open(request)
+
+        if response.status in [301, 302, 303, 307, 308]:
+            redirect_url = response.getheader("Location")
+
+            # Extract filename from the redirect URL
+            parsed_url = urlparse(redirect_url)
+            query_params = parse_qs(parsed_url.query)
+            content_disposition = query_params.get(
+                "response-content-disposition", [None]
+            )[0]
+
+            if content_disposition:
+                filename_cai = unquote(
+                    content_disposition.split("filename=")[1].strip('"')
+                )
+            else:
+                raise Exception("Unable to determine filename")
+
+            response = urllib.request.urlopen(redirect_url)
+        elif response.status == 404:
+            raise Exception("File not found")
+        else:
+            raise Exception("No redirect found, something went wrong")
+
+        total_size = response.getheader("Content-Length")
+
+        if total_size is not None:
+            total_size = int(total_size)
+
+        cache_file = self._cache / filename_cai
+        with cache_file.open("wb") as f:
+            downloaded = 0
+            start_time = time.time()
+
+            while True:
+                chunk_start_time = time.time()
+                buffer = response.read(self.CHUNK_SIZE)
+                chunk_end_time = time.time()
+
+                if not buffer:
+                    break
+
+                downloaded += len(buffer)
+                f.write(buffer)
+                chunk_time = chunk_end_time - chunk_start_time
+
+                if chunk_time > 0:
+                    speed = len(buffer) / chunk_time / (1024**2)  # Speed in MB/s
+
+                if total_size is not None:
+                    progress = downloaded / total_size
+                    sys.stdout.write(
+                        f"\rDownloading: {filename_cai} [{progress * 100:.2f}%] - {
+                            speed:.2f} MB/s"
+                    )
+                    sys.stdout.flush()
+
+        end_time = time.time()
+        time_taken = end_time - start_time
+        hours, remainder = divmod(time_taken, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        if hours > 0:
+            time_str = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+        elif minutes > 0:
+            time_str = f"{int(minutes)}m {int(seconds)}s"
+        else:
+            time_str = f"{int(seconds)}s"
+
+        sys.stdout.write("\n")
+        print(f"Download completed. File saved as: {filename_cai}")
+        print(f"Downloaded in {time_str}")
+
+        target_file = target_dir / filename_cai
+        rename = item["config"].get("rename", "")
+        if not rename:
+            target_file = (target_dir / rename).with_suffix(".safetensors")
+
+        self._symlink(cache_file, target_file)
