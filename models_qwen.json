@@ -1,0 +1,125 @@
+{
+  "qwen": {
+    "common": {
+      "vae": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/vae/qwen_image_vae.safetensors",
+          "rename": "vae"
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "rename": "2-5_fp8"
+        }
+      ],
+      "clip": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "rename": "2-5_fp8"
+        }
+      ]
+    },
+    "image": {
+      "transformer": [
+        {
+          "link": "https://civitai.com/api/download/models/2398473?type=Model&format=SafeTensor&size=pruned&fp=fp8",
+          "method_download": "civitai",
+          "rename": "Hyphoria_fp8",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2398473?type=Model&format=SafeTensor&size=full&fp=bf16",
+          "method_download": "civitai",
+          "rename": "Hyphoria_fp16",
+          "skip": true
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2409636?type=Model&format=SafeTensor&size=pruned&fp=fp8",
+          "method_download": "civitai",
+          "rename": "JibMix_fp8",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2409636?type=Model&format=SafeTensor&size=full&fp=fp16",
+          "method_download": "civitai",
+          "rename": "JibMix_fp16",
+          "skip": true
+        },
+        {
+          "repo_id": "fbbcool/qwen-gts",
+          "file": "qwen-gts_001.safetensors",
+          "rename": "1gts_v1",
+          "skip": false
+        },
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors",
+          "rename": "fp8",
+          "skip": false
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "lightx2v/Qwen-Image-Lightning",
+          "file": "Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors",
+          "rename": "8steps-v2",
+          "skip": false
+        },
+        {
+          "repo_id": "lightx2v/Qwen-Image-Lightning",
+          "file": "Qwen-Image-Lightning-4steps-V2.0.safetensors",
+          "rename": "4steps-v2",
+          "skip": false
+        },
+        {
+          "repo_id": "fbbcool/qwen-image_lora",
+          "skip": false
+        }
+      ]
+    },
+    "edit": {
+      "transformer": [
+        {
+          "link": "",
+          "method_download": "civitai",
+          "rename": "",
+          "skip": true
+        },
+        {
+          "repo_id": "Phr00t/Qwen-Image-Edit-Rapid-AIO",
+          "file": "v7/Qwen-Rapid-AIO-NSFW-v7.1.safetensors",
+          "rename": "Rapid-AIO-v7_1",
+          "skip": false
+        },
+        {
+          "repo_id": "Comfy-Org/Qwen-Image-Edit_ComfyUI",
+          "file": "split_files/diffusion_models/qwen_image_edit_2509_fp8_e4m3fn.safetensors",
+          "rename": "fp8",
+          "skip": false
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "lightx2v/Qwen-Image-Lightning",
+          "file": "Qwen-Image-Edit-2509/Qwen-Image-Edit-2509-Lightning-8steps-V1.0-bf16.safetensors",
+          "rename": "8steps-v1",
+          "skip": false
+        },
+        {
+          "repo_id": "lightx2v/Qwen-Image-Lightning",
+          "file": "Qwen-Image-Edit-2509/Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors",
+          "rename": "4steps-v1",
+          "skip": false
+        },
+        {
+          "repo_id": "fbbcool/qwen-image-edit_lora",
+          "skip": false
+        }
+      ]
+    }
+  }
+}

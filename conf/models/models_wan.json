@@ -16,6 +16,16 @@
           "repo_id": "NSFW-API/NSFW-Wan-UMT5-XXL",
           "file": "nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
         }
+      ],
+      "clip": [
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        },
+        {
+          "repo_id": "NSFW-API/NSFW-Wan-UMT5-XXL",
+          "file": "nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
+        }
       ]
     },
     "t2v": {
@@ -25,28 +35,28 @@
           "subdir": "high",
           "method_download": "civitai",
           "rename": "SmoothMix_v2",
-          "skip": 0
+          "skip": false
         },
         {
           "link": "https://civitai.com/api/download/models/2324440?type=Model&format=SafeTensor&size=pruned&fp=fp8",
           "subdir": "low",
           "method_download": "civitai",
           "rename": "SmoothMix_v2",
-          "skip": 0
+          "skip": false
         },
         {
           "repo_id": "FX-FeiHou/wan2.2-Remix",
           "file": "NSFW/Wan2.2_Remix_NSFW_t2v_14b_high_lighting_v2.0.safetensors",
           "subdir": "auto",
           "rename": "Remix_NSFW",
-          "skip": 0
+          "skip": false
         },
         {
           "repo_id": "FX-FeiHou/wan2.2-Remix",
           "file": "NSFW/Wan2.2_Remix_NSFW_t2v_14b_low_lighting_v2.0.safetensors",
           "subdir": "auto",
           "rename": "Remix_NSFW",
-          "skip": 0
+          "skip": false
         },
         {
           "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
@@ -54,7 +64,7 @@
           "subdir": "auto",
           "method_download": "huggingface",
           "rename": "fp8_scaled",
-          "skip": 0
+          "skip": false
         },
         {
           "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
@@ -62,7 +72,7 @@
           "subdir": "auto",
           "method_download": "huggingface",
           "rename": "fp8_scaled",
-          "skip": 0
+          "skip": false
         }
       ],
       "lora": [
@@ -71,14 +81,14 @@
           "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
           "subdir": "auto",
           "rename": "4steps",
-          "skip": 0
+          "skip": false
         },
         {
           "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
           "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
           "subdir": "auto",
           "rename": "4steps",
-          "skip": 0
+          "skip": false
         }
       ]
     }

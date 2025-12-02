@@ -103,23 +103,6 @@ class AInstaller:
 
     @property
     def _items(self) -> Generator:
-        # common group
-        print("items for common group:")
-        group = self.db.get(self.type, {})
-        for variant, data in group.items():
-            # no variants given => install all
-            # variants given => iinstall explicit
-            if self.variants:
-                if variant not in self.variants:
-                    continue
-
-            variant_data: dict = group.get(variant, {})
-            if not variant_data:
-                continue
-
-            for target, target_data in variant_data.items():
-                for config in target_data:
-                    yield self._make_item(self.type, variant, target, config)
         # selected group
         print(f"items for selected group {self.group}:")
         group = self.db.get(self.group, {})
@@ -136,6 +119,8 @@ class AInstaller:
 
             for target, target_data in variant_data.items():
                 for config in target_data:
+                    if config.get("skip", False):
+                        continue
                     yield self._make_item(self.group, variant, target, config)
 
     def _make_item(self, group: str, variant: str, target: str, config: dict):
@@ -185,10 +170,6 @@ class AInstaller:
         target_dir = item.get("target_dir", "")
         if not target_dir:
             print("warning: item has no target directory!")
-            return
-
-        if item.get("skip", False):
-            print("warning: item is skipped!")
             return
 
         config = item.get("config")
@@ -451,53 +432,47 @@ class AInstaller:
         if total_size is not None:
             total_size = int(total_size)
 
+        download = False
         cache_file = self._cache / filename_cai
-        with cache_file.open("wb") as f:
-            downloaded = 0
-            start_time = time.time()
+        if not cache_file.exists():
+            download = True
+        elif total_size > cache_file.stat().st_size:
+            download = True
+        if item["config"].get("force", False):
+            download = True
 
-            while True:
-                chunk_start_time = time.time()
-                buffer = response.read(self.CHUNK_SIZE)
-                chunk_end_time = time.time()
+        if download:
+            with cache_file.open("wb") as f:
+                downloaded = 0
 
-                if not buffer:
-                    break
+                while True:
+                    chunk_start_time = time.time()
+                    buffer = response.read(self.CHUNK_SIZE)
+                    chunk_end_time = time.time()
 
-                downloaded += len(buffer)
-                f.write(buffer)
-                chunk_time = chunk_end_time - chunk_start_time
+                    if not buffer:
+                        break
 
-                if chunk_time > 0:
-                    speed = len(buffer) / chunk_time / (1024**2)  # Speed in MB/s
+                    downloaded += len(buffer)
+                    f.write(buffer)
+                    chunk_time = chunk_end_time - chunk_start_time
 
-                if total_size is not None:
-                    progress = downloaded / total_size
-                    sys.stdout.write(
-                        f"\rDownloading: {filename_cai} [{progress * 100:.2f}%] - {
-                            speed:.2f} MB/s"
-                    )
-                    sys.stdout.flush()
+                    if chunk_time > 0:
+                        speed = len(buffer) / chunk_time / (1024**2)  # Speed in MB/s
 
-        end_time = time.time()
-        time_taken = end_time - start_time
-        hours, remainder = divmod(time_taken, 3600)
-        minutes, seconds = divmod(remainder, 60)
-
-        if hours > 0:
-            time_str = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
-        elif minutes > 0:
-            time_str = f"{int(minutes)}m {int(seconds)}s"
+                    if total_size is not None:
+                        progress = downloaded / total_size
+                        sys.stdout.write(
+                            f"\rDownloading: {filename_cai} [{progress * 100:.2f}%] - {
+                                speed:.2f} MB/s"
+                        )
+            print(f"Download completed. File saved as: {filename_cai}")
         else:
-            time_str = f"{int(seconds)}s"
-
-        sys.stdout.write("\n")
-        print(f"Download completed. File saved as: {filename_cai}")
-        print(f"Downloaded in {time_str}")
+            print("cache ok.")
 
         target_file = target_dir / filename_cai
         rename = item["config"].get("rename", "")
-        if not rename:
+        if rename:
             target_file = (target_dir / rename).with_suffix(".safetensors")
 
         self._symlink(cache_file, target_file)
