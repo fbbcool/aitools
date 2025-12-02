@@ -1,4 +1,3 @@
-from enum import Enum, auto
 import os
 import sys
 from typing import Final, Generator, Literal
