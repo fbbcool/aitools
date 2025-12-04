@@ -10,6 +10,8 @@ from aidb.dbmanager import DBManager  # Updated import
 from aidb.hfdataset import HFDatasetImg
 from aidb.tagger import tagger_wd as tagger  # Updated import
 
+from ait.image import get_prompt_comfy
+
 
 class Image:
     """
@@ -254,58 +256,7 @@ class Image:
             pil = self.pil
             if pil is None:
                 return None
-            pil.load()  # necessary after .open() for metadata!
-            data = json.loads(pil.info['prompt'])
-            ksampler = {}
-            for id in data:
-                class_type = data[id]['class_type']
-                if class_type in ['KSampler', 'WanVideoSampler', 'WanMoeKSampler']:
-                    ksampler = data[id]
-                    break
-            inputs = ksampler.get('inputs', None)
-            if inputs is None:
-                return None
-
-            prompt = None
-            value = None
-            for key in ['positive', 'text_embeds']:
-                value = inputs.get(key, None)
-                if value is not None:
-                    id_pos = value[0]
-                    prompt = data[id_pos]
-                    break  # of for
-
-            max_loop = 10
-            while not isinstance(prompt, str):
-                if prompt is None:
-                    return None
-
-                max_loop -= 1
-                if max_loop < 0:
-                    prompt = None
-                    return None
-
-                inputs = None
-                if isinstance(prompt, list):
-                    id_pos = prompt[0]
-                    node_pos = data[id_pos]
-                    if isinstance(node_pos, dict):
-                        inputs = node_pos.get('inputs', None)
-                elif isinstance(prompt, dict):
-                    inputs = prompt.get('inputs', None)
-                else:
-                    return None
-
-                if inputs is None:
-                    return None
-
-                prompt = inputs.get('text', None)
-                for key in ['Text', 'string_b', 'positive_prompt']:
-                    value = inputs.get(key, None)
-                    if value is not None:
-                        prompt = value
-                        break  # for
-
+            prompt = get_prompt_comfy(pil=pil)
         except Exception:
             return None
 

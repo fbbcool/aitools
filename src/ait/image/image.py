@@ -3,14 +3,17 @@ from PIL import Image as PILImage
 import json
 
 
-def get_prompt_comfy(img_path: Path | str) -> str | None:
-    img_path = Path(img_path)
-    if not img_path.exists():
-        return None
-    if not img_path.is_file():
-        return None
+def get_prompt_comfy(img_path: Path | str = '', pil: PILImage.Image | None = None) -> str | None:
+    if pil is None:
+        img_path = Path(img_path)
+        if not img_path.exists():
+            return None
+        if not img_path.is_file():
+            return None
+        img_pil = PILImage.open(img_path)
+    else:
+        img_pil = pil
 
-    img_pil = PILImage.open(img_path)
     img_pil.load()
     data = json.loads(img_pil.info['prompt'])
 
