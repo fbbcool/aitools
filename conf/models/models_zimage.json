@@ -1,0 +1,153 @@
+{
+  "zimage": {
+    "common": {
+      "vae": [
+        {
+          "repo_id": "Comfy-Org/z_image_turbo",
+          "file": "split_files/vae/ae.safetensors",
+          "rename": "vae"
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/z_image_turbo",
+          "file": "split_files/text_encoders/qwen_3_4b.safetensors",
+          "rename": "text_encoder"
+        }
+      ],
+      "clip": [
+        {
+          "repo_id": "Comfy-Org/z_image_turbo",
+          "file": "split_files/text_encoders/qwen_3_4b.safetensors",
+          "rename": "clip"
+        }
+      ]
+    },
+    "turbo": {
+      "transformer": [
+        {
+          "repo_id": "Comfy-Org/z_image_turbo",
+          "file": "split_files/diffusion_models/z_image_turbo_bf16.safetensors",
+          "rename": "turbo",
+          "skip": false
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+          "subdir": "auto",
+          "rename": "4steps",
+          "skip": true
+        },
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
+          "subdir": "auto",
+          "rename": "4steps",
+          "skip": true
+        }
+      ]
+    },
+    "base": {
+      "transformer": [
+        {
+          "link": "https://civitai.com/api/download/models/2260110?type=Model&format=SafeTensor&size=pruned&fp=fp8",
+          "subdir": "high",
+          "method_download": "civitai",
+          "rename": "SmoothMix_v1",
+          "skip": true
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2259006?type=Model&format=SafeTensor&size=pruned&fp=fp8",
+          "subdir": "low",
+          "method_download": "civitai",
+          "rename": "SmoothMix_v1",
+          "skip": true
+        },
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+          "subdir": "auto",
+          "method_download": "huggingface",
+          "rename": "fp8_scaled",
+          "skip": true
+        },
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+          "subdir": "auto",
+          "method_download": "huggingface",
+          "rename": "fp8_scaled",
+          "skip": true
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+          "subdir": "auto",
+          "rename": "4steps",
+          "skip": true
+        },
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
+          "subdir": "auto",
+          "rename": "4steps",
+          "skip": true
+        }
+      ]
+    },
+    "edit": {
+      "transformer": [
+        {
+          "link": "https://civitai.com/api/download/models/2260110?type=Model&format=SafeTensor&size=pruned&fp=fp8",
+          "subdir": "high",
+          "method_download": "civitai",
+          "rename": "SmoothMix_v1",
+          "skip": true
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2259006?type=Model&format=SafeTensor&size=pruned&fp=fp8",
+          "subdir": "low",
+          "method_download": "civitai",
+          "rename": "SmoothMix_v1",
+          "skip": true
+        },
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+          "subdir": "auto",
+          "method_download": "huggingface",
+          "rename": "fp8_scaled",
+          "skip": true
+        },
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+          "subdir": "auto",
+          "method_download": "huggingface",
+          "rename": "fp8_scaled",
+          "skip": true
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+          "subdir": "auto",
+          "rename": "4steps",
+          "skip": true
+        },
+        {
+          "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
+          "subdir": "auto",
+          "rename": "4steps",
+          "skip": true
+        }
+      ]
+    }
+  }
+}

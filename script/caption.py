@@ -2,7 +2,9 @@ from aidb.caption_joy import CapJoy
 from aidb.hfdataset import HFDatasetImg
 
 caper = CapJoy(trigger="1fem")
-#hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
+force = True
+
+# hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
 hfd = HFDatasetImg(repo_id="fbbcool/1fem", force_meta_dl=True)
 hfd.cache()
 
@@ -13,7 +15,8 @@ for idx in range(n):
     try:
         if hfd.captions_joy[idx]:
             print("already captionized.")
-            continue
+            if not force:
+                continue
         img = hfd.pil(idx)
         caption = caper.img_caption(img)
         print(f"{caption}\n")
@@ -26,3 +29,4 @@ for idx in range(n):
 
 print(f"\n\tDONE with {error} errors.")
 hfd.save_to_jsonl(force=True)
+

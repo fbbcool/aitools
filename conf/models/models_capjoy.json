@@ -1,0 +1,12 @@
+{
+  "capjoy": {
+    "common": {
+      "model": [
+        {
+          "repo_id": "fancyfeast/llama-joycaption-beta-one-hf-llava",
+          "action": "no_install"
+        }
+      ]
+    }
+  }
+}

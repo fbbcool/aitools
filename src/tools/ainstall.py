@@ -60,6 +60,24 @@ class AInstallerDB:
     def db(self) -> dict:
         return self._db
 
+    def repo_ids(self, group: str, variant: str, target: str) -> list[str]:
+        group = self.db.get(group, "")
+        if not group:
+            return []
+        variant = group.get(variant, "")
+        if not variant:
+            return []
+        targets = variant.get(target, [])
+
+        repo_ids = []
+        for target in targets:
+            repo_id = target.get("repo_id", "")
+            if repo_id:
+                repo_ids.append(repo_id)
+        
+        return repo_ids
+
+
 
 class AInstaller:
     CHUNK_SIZE: Final = 1638400
