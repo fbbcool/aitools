@@ -31,23 +31,21 @@ class AIDBGradioApp:
             db_manager (DBManager): An instance of the DBManager class.
         """
         if not isinstance(db_manager, DBManager):
-            raise TypeError("db_manager must be an instance of DBManager.")
+            raise TypeError('db_manager must be an instance of DBManager.')
 
         self._db_manager = db_manager
         self._query_handler = Query(db_manager)
         self._statistics_handler = Statistics(db_manager)
-        print(
-            "AIDBGradioApp initialized with DBManager, Query, and Statistics references."
-        )
+        print('AIDBGradioApp initialized with DBManager, Query, and Statistics references.')
 
         # hidden update triggers
-        self._get_full_image_data_trigger_elem_id = "get_full_image_data_trigger_btn"
-        self._rating_update_trigger_elem_id = "rating_update_trigger_btn"
-        self._scene_update_trigger_elem_id = "scene_update_trigger_btn"
+        self._get_full_image_data_trigger_elem_id = 'get_full_image_data_trigger_btn'
+        self._rating_update_trigger_elem_id = 'rating_update_trigger_btn'
+        self._scene_update_trigger_elem_id = 'scene_update_trigger_btn'
         # hidden data busses
-        self._image_id_bus_elem_id = "image_id_bus_elem"
-        self._rating_data_bus_elem_id = "rating_data_bus_elem"
-        self._scene_data_bus_elem_id = "scene_data_bus_elem"
+        self._image_id_bus_elem_id = 'image_id_bus_elem'
+        self._rating_data_bus_elem_id = 'rating_data_bus_elem'
+        self._scene_data_bus_elem_id = 'scene_data_bus_elem'
 
         self.interface = self._create_interface()
 
@@ -60,11 +58,11 @@ class AIDBGradioApp:
         all_wd_tags = self._get_sorted_wd_tags_for_dropdown()
 
         # Add an empty string option to allow "None" selection
-        dropdown_choices = [""] + all_wd_tags  # Empty string for "None"
+        dropdown_choices = [''] + all_wd_tags  # Empty string for "None"
 
         with gr.Blocks() as demo:
-            gr.Markdown("# AIDB Image Metadata Manager")
-            gr.Markdown("Welcome to the AIDB frontend. Use the search options below.")
+            gr.Markdown('# AIDB Image Metadata Manager')
+            gr.Markdown('Welcome to the AIDB frontend. Use the search options below.')
 
             # State variables for pagination (only advanced search cache is needed)
             advanced_search_image_cache = gr.State(value=[])
@@ -73,144 +71,136 @@ class AIDBGradioApp:
             # --- Hidden Components for Robust Event Handling ---
             # Trigger buttons (no data, just event triggers)
             get_full_image_data_trigger = gr.Button(
-                "Get Full Image Data Trigger",
+                'Get Full Image Data Trigger',
                 visible=False,
                 elem_id=self._get_full_image_data_trigger_elem_id,
             )
             rating_update_trigger = gr.Button(
-                "Hidden Rating Update Trigger",
+                'Hidden Rating Update Trigger',
                 visible=False,
                 elem_id=self._rating_update_trigger_elem_id,
             )
             scene_update_trigger = gr.Button(
-                "Hidden Scene Update Trigger",
+                'Hidden Scene Update Trigger',
                 visible=False,
                 elem_id=self._scene_update_trigger_elem_id,
             )
 
             # Data bus textboxes (hold data passed from JS to Python)
             image_id_bus = gr.Textbox(visible=False, elem_id=self._image_id_bus_elem_id)
-            rating_data_bus = gr.Textbox(
-                visible=False, elem_id=self._rating_data_bus_elem_id
-            )
-            scene_data_bus = gr.Textbox(
-                visible=False, elem_id=self._scene_data_bus_elem_id
-            )
+            rating_data_bus = gr.Textbox(visible=False, elem_id=self._rating_data_bus_elem_id)
+            scene_data_bus = gr.Textbox(visible=False, elem_id=self._scene_data_bus_elem_id)
 
             # Data bus textboxes for the image modal
-            modal_img_data_bus = gr.Textbox(
-                visible=False, elem_id="modal_img_data_bus_elem"
-            )
+            modal_img_data_bus = gr.Textbox(visible=False, elem_id='modal_img_data_bus_elem')
             modal_details_data_bus = gr.Textbox(
-                visible=False, elem_id="modal_details_data_bus_elem"
+                visible=False, elem_id='modal_details_data_bus_elem'
             )
             # --- End Hidden Components ---
 
             AppImageCell.html_image_modal()
 
             AppTabSearchAndRate._create_interface()
-            with gr.Tab("Image Search"):  # Renamed tab for clarity
-                gr.Markdown("## Advanced Image Search with Mandatory and Optional Tags")
+            with gr.Tab('Image Search'):  # Renamed tab for clarity
+                gr.Markdown('## Advanced Image Search with Mandatory and Optional Tags')
                 gr.Markdown(
-                    "Select up to 3 mandatory tags (all must be present) and up to 3 optional tags (contribute to score)."
+                    'Select up to 3 mandatory tags (all must be present) and up to 3 optional tags (contribute to score).'
                 )
 
                 with gr.Row():
                     mandatory_tag_1 = gr.Dropdown(
-                        label="Mandatory Tag 1",
+                        label='Mandatory Tag 1',
                         choices=dropdown_choices,
-                        value="",
+                        value='',
                         allow_custom_value=False,
                         interactive=True,
                     )
                     mandatory_tag_2 = gr.Dropdown(
-                        label="Mandatory Tag 2",
+                        label='Mandatory Tag 2',
                         choices=dropdown_choices,
-                        value="",
+                        value='',
                         allow_custom_value=False,
                         interactive=True,
                     )
                     mandatory_tag_3 = gr.Dropdown(
-                        label="Mandatory Tag 3",
+                        label='Mandatory Tag 3',
                         choices=dropdown_choices,
-                        value="",
+                        value='',
                         allow_custom_value=False,
                         interactive=True,
                     )
 
                 with gr.Row():
                     optional_tag_1 = gr.Dropdown(
-                        label="Optional Tag 1",
+                        label='Optional Tag 1',
                         choices=dropdown_choices,
-                        value="",
+                        value='',
                         allow_custom_value=False,
                         interactive=True,
                     )
                     optional_tag_2 = gr.Dropdown(
-                        label="Optional Tag 2",
+                        label='Optional Tag 2',
                         choices=dropdown_choices,
-                        value="",
+                        value='',
                         allow_custom_value=False,
                         interactive=True,
                     )
                     optional_tag_3 = gr.Dropdown(
-                        label="Optional Tag 3",
+                        label='Optional Tag 3',
                         choices=dropdown_choices,
-                        value="",
+                        value='',
                         allow_custom_value=False,
                         interactive=True,
                     )
 
                 with gr.Row():
                     rating_min = gr.Dropdown(
-                        label="Rating Min",
+                        label='Rating Min',
                         choices=[str(x) for x in list(range(-2, 6))],
-                        value="3",
+                        value='3',
                         allow_custom_value=False,
                         interactive=True,
                     )
                     rating_max = gr.Dropdown(
-                        label="Rating Max",
+                        label='Rating Max',
                         choices=[str(x) for x in list(range(-2, 6))],
-                        value="5",
+                        value='5',
                         allow_custom_value=False,
                         interactive=True,
                     )
                 with gr.Row():
                     operation = gr.Dropdown(
-                        label="Operation",
-                        choices=["None", "Rate", "Scene"],
-                        value="Rate",
+                        label='Operation',
+                        choices=['None', 'Rate', 'Scene'],
+                        value='Rate',
                         allow_custom_value=False,
                         interactive=True,
                     )
                     bodypart = gr.Dropdown(
-                        label="Bodypart",
-                        choices=["Ignore", "Empty"] + TAGS_CUSTOM["bodypart"],
-                        value="Ignore",
+                        label='Bodypart',
+                        choices=['Ignore', 'Empty'] + TAGS_CUSTOM['bodypart'],
+                        value='Ignore',
                         allow_custom_value=False,
                         interactive=True,
                     )
 
-                search_button = gr.Button("Search Images")
+                search_button = gr.Button('Search Images')
 
-                with gr.Column(visible=True) as advanced_search_list_view:
+                with gr.Column(visible=True):
                     # in the title, the number of selected images should be shown
-                    curr_label = "Matching Images (Highest Score First)"
+                    curr_label = 'Matching Images (Highest Score First)'
                     advanced_search_html_display = gr.HTML(label=curr_label)
                     with gr.Row():
-                        advanced_search_prev_btn = gr.Button("Previous Page")
+                        advanced_search_prev_btn = gr.Button('Previous Page')
                         advanced_search_page_info = gr.Textbox(
-                            label="Page", interactive=False, scale=0
+                            label='Page', interactive=False, scale=0
                         )
-                        advanced_search_next_btn = gr.Button("Next Page")
+                        advanced_search_next_btn = gr.Button('Next Page')
                         advanced_search_go_to_page_num = gr.Number(
-                            label="Go to Page", value=1, precision=0, scale=0
+                            label='Go to Page', value=1, precision=0, scale=0
                         )
-                        advanced_search_go_to_page_btn = gr.Button("Go")
-                        refresh_button = gr.Button(
-                            "Refresh Current Page"
-                        )  # NEW Refresh button
+                        advanced_search_go_to_page_btn = gr.Button('Go')
+                        refresh_button = gr.Button('Refresh Current Page')  # NEW Refresh button
 
                 search_button.click(
                     self._imgs_search_and_op,
@@ -360,28 +350,26 @@ class AIDBGradioApp:
                 ],  # Update the grid
             )
 
-            with gr.Tab("Image Set View"):
+            with gr.Tab('Image Set View'):
                 # drop down menu for image sets stored in the db
                 image_set_dropdown = gr.Dropdown(
-                    label="Select Image Set",
+                    label='Select Image Set',
                     choices=self._db_manager.sets_img_names,
                     interactive=True,
                 )
-                load_image_set_button = gr.Button("Load Image Set")
+                load_image_set_button = gr.Button('Load Image Set')
 
-                with gr.Column(visible=True) as image_set_list_view:
-                    image_set_html_display = gr.HTML(label="Images in Set")
+                with gr.Column(visible=True):
+                    image_set_html_display = gr.HTML(label='Images in Set')
                     with gr.Row():
-                        image_set_prev_btn = gr.Button("Previous Page")
-                        image_set_page_info = gr.Textbox(
-                            label="Page", interactive=False, scale=0
-                        )
-                        image_set_next_btn = gr.Button("Next Page")
+                        image_set_prev_btn = gr.Button('Previous Page')
+                        image_set_page_info = gr.Textbox(label='Page', interactive=False, scale=0)
+                        image_set_next_btn = gr.Button('Next Page')
                         image_set_go_to_page_num = gr.Number(
-                            label="Go to Page", value=1, precision=0, scale=0
+                            label='Go to Page', value=1, precision=0, scale=0
                         )
-                        image_set_go_to_page_btn = gr.Button("Go")
-                        image_set_refresh_button = gr.Button("Refresh Current Page")
+                        image_set_go_to_page_btn = gr.Button('Go')
+                        image_set_refresh_button = gr.Button('Refresh Current Page')
 
                 # State variables for image set pagination
                 image_set_cache = gr.State(value=[])
@@ -439,11 +427,11 @@ class AIDBGradioApp:
                     ],
                 )
 
-            with gr.Tab("Set Collection"):
-                gr.Markdown("## Set Collection")
+            with gr.Tab('Set Collection'):
+                gr.Markdown('## Set Collection')
                 with gr.Row():
                     collection_dropdown = gr.Dropdown(
-                        label="Select Collection",
+                        label='Select Collection',
                         value=self._db_manager._collection,
                         choices=self._db_manager.collections_images,
                         interactive=True,
@@ -462,9 +450,9 @@ class AIDBGradioApp:
         imgs = [img for img in set.imgs]
         # add chosen operation to images
         for img in imgs:
-            img.operation = "nop"
+            img.operation = 'nop'
 
-        print(f"Found {len(imgs)} images matching advanced search criteria.")
+        print(f'Found {len(imgs)} images matching advanced search criteria.')
 
         # Initialize pagination to the first page
         total_images = len(imgs)
@@ -476,7 +464,7 @@ class AIDBGradioApp:
 
         images_on_page = imgs[start_idx:end_idx]
         html_output = self._generate_image_html(images_on_page)
-        page_info_text = f"Page {current_page}/{total_pages} ({total_images} imgs)"
+        page_info_text = f'Page {current_page}/{total_pages} ({total_images} imgs)'
 
         return html_output, imgs, current_page, page_info_text
 
@@ -485,7 +473,7 @@ class AIDBGradioApp:
         Retrieves all unique WD tags, sorted by their absolute occurrence
         in descending order, for populating the Gradio dropdown.
         """
-        print("Fetching sorted WD tags for dropdown...")
+        print('Fetching sorted WD tags for dropdown...')
         tag_counts = self._statistics_handler.get_absolute_tag_occurrence()
 
         # Sort tags by count in descending order
@@ -493,7 +481,7 @@ class AIDBGradioApp:
 
         # Return only the tag names
         tag_names = [tag for tag, count in sorted_tags]
-        print(f"Found {len(tag_names)} unique WD tags.")
+        print(f'Found {len(tag_names)} unique WD tags.')
         return tag_names
 
     def _generate_image_html(self, images_on_page_data: list[Image]) -> str:
@@ -670,7 +658,7 @@ class AIDBGradioApp:
                 scene_update_trigger_id=scene_update_trigger_id,
             )
 
-        html_content += "</div>"
+        html_content += '</div>'
         return html_content
 
     def _paginate_images(
@@ -681,7 +669,7 @@ class AIDBGradioApp:
         `direction` is -1 for previous, 1 for next.
         """
         if not image_cache:
-            return "", 1, "Page 0/0"
+            return '', 1, 'Page 0/0'
 
         total_images = len(image_cache)
         total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
@@ -694,7 +682,7 @@ class AIDBGradioApp:
 
         images_on_page = image_cache[start_idx:end_idx]
         html_output = self._generate_image_html(images_on_page)
-        page_info_text = f"Page {new_page}/{total_pages}"
+        page_info_text = f'Page {new_page}/{total_pages}'
 
         return html_output, new_page, page_info_text
 
@@ -708,7 +696,7 @@ class AIDBGradioApp:
         Jumps to a specific page in the image display.
         """
         if not image_cache:
-            return "", 1, "Page 0/0"
+            return '', 1, 'Page 0/0'
 
         total_images = len(image_cache)
         total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
@@ -742,14 +730,18 @@ class AIDBGradioApp:
 
         # get scored image list
         imgs = self._query_handler.query_by_tags(
-            mandatory_tags, optional_tags, int(rating_min), int(rating_max), bodypart
+            mandatory_tags,
+            optional_tags,
+            int(rating_min),  # pyright: ignore
+            int(rating_max),  # pyright: ignore
+            bodypart,  # pyright: ignore
         )
 
         # add chosen operation to images
         for img in imgs:
-            img.operation = operation.lower() if operation else "nop"
+            img.operation = operation.lower() if operation else 'nop'
 
-        print(f"Found {len(imgs)} images matching advanced search criteria.")
+        print(f'Found {len(imgs)} images matching advanced search criteria.')
 
         # Initialize pagination to the first page
         total_images = len(imgs)
@@ -761,7 +753,7 @@ class AIDBGradioApp:
 
         images_on_page = imgs[start_idx:end_idx]
         html_output = self._generate_image_html(images_on_page)
-        page_info_text = f"Page {current_page}/{total_pages} ({total_images} imgs)"
+        page_info_text = f'Page {current_page}/{total_pages} ({total_images} imgs)'
 
         return html_output, imgs, current_page, page_info_text
 
@@ -771,17 +763,17 @@ class AIDBGradioApp:
         Returns a raw base64 string and a JSON-serialized string of the image details.
         These strings are intended to be placed in hidden Textbox components (data buses).
         """
-        print(f"DEBUG: _get_full_image_data_for_modal called for image ID: {image_id}")
+        print(f'DEBUG: _get_full_image_data_for_modal called for image ID: {image_id}')
 
         if not image_id:
-            print("ERROR: Received empty or invalid image ID for modal data.")
-            return "", json.dumps({"error": "Invalid image ID provided."})
+            print('ERROR: Received empty or invalid image ID for modal data.')
+            return '', json.dumps({'error': 'Invalid image ID provided.'})  # pyright: ignore
 
         try:
             img_obj = Image(self._db_manager, image_id)
         except ValueError as e:
             print(f"ERROR: Invalid ObjectId for image ID '{image_id}': {e}")
-            return "", json.dumps({"error": f"Invalid image ID format: {image_id}"})
+            return '', json.dumps({'error': f'Invalid image ID format: {image_id}'})  # pyright: ignore
 
         image_data = img_obj.data
         if image_data is None:
@@ -790,16 +782,14 @@ class AIDBGradioApp:
                     image_id
                 }' not found in the database or data could not be retrieved."
             )
-            return "", json.dumps(
-                {"error": f"Image with ID '{image_id}' not found in the database."}
+            return '', json.dumps(  # pyright: ignore
+                {'error': f"Image with ID '{image_id}' not found in the database."}
             )
 
         pil_img = img_obj.pil
         if pil_img is None:
-            print(f"ERROR: Could not load PIL image file for image ID: {image_id}.")
-            return "", json.dumps(
-                {"error": f"Could not load image file for ID: {image_id}."}
-            )
+            print(f'ERROR: Could not load PIL image file for image ID: {image_id}.')
+            return '', json.dumps({'error': f'Could not load image file for ID: {image_id}.'})  # pyright: ignore
 
         # img_caption = img_obj.meta_prompt
         img_caption = img_obj.caption
@@ -808,36 +798,32 @@ class AIDBGradioApp:
         if img_caption is None:
             img_caption = img_obj.prompt
         if img_caption is None:
-            img_caption = ""
+            img_caption = ''
 
         full_img_base64 = AppImageCell._pil_to_base64(pil_img)
 
-        tags_wd = image_data.get("tags", {}).get("tags_wd", {})
+        tags_wd = image_data.get('tags', {}).get('tags_wd', {})
         sorted_tags_wd = sorted(tags_wd.items(), key=lambda item: item[1], reverse=True)
         # Escape tag names to prevent potential HTML injection issues
-        modal_formatted_tags = "".join(
-            [f"{html.escape(tag)}: {prob:.2f}<br>" for tag, prob in sorted_tags_wd]
+        modal_formatted_tags = ''.join(
+            [f'{html.escape(tag)}: {prob:.2f}<br>' for tag, prob in sorted_tags_wd]
         )
 
         image_details = {
-            "id": str(img_obj.id),
-            "full_path": str(img_obj.get_full_path())
-            if img_obj.get_full_path()
-            else "N/A",
-            "rating": img_obj.data.get("rating", "N/A"),
-            "category": img_obj.data.get("category", "N/A"),
-            "dimensions_width": image_data.get("dimensions", {}).get("width", "N/A"),
-            "dimensions_height": image_data.get("dimensions", {}).get("height", "N/A"),
-            "dimensions_unit": image_data.get("dimensions", {}).get("unit", ""),
-            "creation_date": image_data.get("creation_date", "N/A"),
-            "last_modified_date": image_data.get("last_modified_date", "N/A"),
-            "tags_html": modal_formatted_tags
-            if modal_formatted_tags
-            else "No WD tags available.",
-            "caption": img_caption,
+            'id': str(img_obj.id),
+            'full_path': str(img_obj.get_full_path()) if img_obj.get_full_path() else 'N/A',
+            'rating': img_obj.data.get('rating', 'N/A'),
+            'category': img_obj.data.get('category', 'N/A'),
+            'dimensions_width': image_data.get('dimensions', {}).get('width', 'N/A'),
+            'dimensions_height': image_data.get('dimensions', {}).get('height', 'N/A'),
+            'dimensions_unit': image_data.get('dimensions', {}).get('unit', ''),
+            'creation_date': image_data.get('creation_date', 'N/A'),
+            'last_modified_date': image_data.get('last_modified_date', 'N/A'),
+            'tags_html': modal_formatted_tags if modal_formatted_tags else 'No WD tags available.',
+            'caption': img_caption,
         }
 
-        return full_img_base64, json.dumps(image_details)
+        return full_img_base64, json.dumps(image_details)  # pyright: ignore
 
     def _update_image_rating(
         self,
@@ -848,23 +834,17 @@ class AIDBGradioApp:
         This function is triggered by a hidden button and receives its data from a hidden 'data bus' textbox.
         The UI refresh is handled by a subsequent .then() call in the event chain.
         """
-        print(
-            f"DEBUG: _update_image_rating called with data from bus: '{rating_data_str}'"
-        )
+        print(f"DEBUG: _update_image_rating called with data from bus: '{rating_data_str}'")
 
         if not rating_data_str or not isinstance(rating_data_str, str):
-            print(
-                f"ERROR: Invalid or empty data received for rating update: {rating_data_str}"
-            )
-            gr.Warning("Could not update rating: Invalid data received from frontend.")
+            print(f'ERROR: Invalid or empty data received for rating update: {rating_data_str}')
+            gr.Warning('Could not update rating: Invalid data received from frontend.')
             return None
 
         # We expect a string like "image_id_val,new_rating_val"
-        parts = rating_data_str.split(",")
+        parts = rating_data_str.split(',')
         if len(parts) != 2:
-            print(
-                f"ERROR: Invalid data format for _update_image_rating: {rating_data_str}"
-            )
+            print(f'ERROR: Invalid data format for _update_image_rating: {rating_data_str}')
             gr.Warning(f"Could not update rating: Malformed data '{rating_data_str}'.")
             return None
 
@@ -872,24 +852,18 @@ class AIDBGradioApp:
         try:
             new_rating = int(parts[1].strip())
         except ValueError:
-            print(f"ERROR: Invalid rating value received in data: {rating_data_str}")
-            gr.Warning(
-                f"Could not update rating: Invalid rating value in '{rating_data_str}'."
-            )
+            print(f'ERROR: Invalid rating value received in data: {rating_data_str}')
+            gr.Warning(f"Could not update rating: Invalid rating value in '{rating_data_str}'.")
             return None
-        print(
-            f"DEBUG: _update_image_rating called for image {image_id} with rating {new_rating}"
-        )
+        print(f'DEBUG: _update_image_rating called for image {image_id} with rating {new_rating}')
         # Update the database
         ret = self._db_manager.update_image(image_id, rating=new_rating)
         # This function now explicitly returns None, as it's not directly updating Gradio outputs.
         # give gradio info based on ret
         if ret and ret > 0:
-            gr.Info(
-                f"Rating for image {image_id} updated to {new_rating}.", duration=1.0
-            )
+            gr.Info(f'Rating for image {image_id} updated to {new_rating}.', duration=1.0)
         else:
-            gr.Warning(f"Failed to update rating for image {image_id}.", duration=2.0)
+            gr.Warning(f'Failed to update rating for image {image_id}.', duration=2.0)
 
         return None
 
@@ -905,14 +879,14 @@ class AIDBGradioApp:
         print(f"DEBUG: _update_scene_rating called with data from bus: '{data_str}'")
 
         if not data_str or not isinstance(data_str, str):
-            print(f"ERROR: Invalid or empty data received for scene update: {data_str}")
-            gr.Warning("Could not update scene: Invalid data received from frontend.")
+            print(f'ERROR: Invalid or empty data received for scene update: {data_str}')
+            gr.Warning('Could not update scene: Invalid data received from frontend.')
             return None
 
         # We expect a string like "image_id,new_val"
-        parts = data_str.split(",")
+        parts = data_str.split(',')
         if len(parts) != 2:
-            print(f"ERROR: Invalid data format for _update_image_scene: {data_str}")
+            print(f'ERROR: Invalid data format for _update_image_scene: {data_str}')
             gr.Warning(f"Could not update scene: Malformed data '{data_str}'.")
             return None
 
@@ -920,28 +894,26 @@ class AIDBGradioApp:
         try:
             new_data = parts[1].strip()
         except ValueError:
-            print(f"ERROR: Invalid scene value received in data: {data_str}")
+            print(f'ERROR: Invalid scene value received in data: {data_str}')
             gr.Warning(f"Could not update: Invalid scene value in '{data_str}'.")
             return None
-        print(
-            f"DEBUG: _update_image_scene called for image {image_id} with scene {new_data}"
-        )
+        print(f'DEBUG: _update_image_scene called for image {image_id} with scene {new_data}')
         # Update the database
         img = Image(self._db_manager, image_id)
-        bodyparts = img.get_tags_custom("bodypart")
+        bodyparts = img.get_tags_custom('bodypart')
         if new_data not in bodyparts:
             bodyparts.append(new_data)
         else:
             # remove new_data from bodyparts
             bodyparts.remove(new_data)
 
-        ret = img.set_tags_custom("bodypart", bodyparts)
+        ret = img.set_tags_custom('bodypart', bodyparts)
         # This function now explicitly returns None, as it's not directly updating Gradio outputs.
         # give gradio info based on ret
         if ret and ret > 0:
-            gr.Info(f"Scene tag for image {image_id} updated to {new_data}.")
+            gr.Info(f'Scene tag for image {image_id} updated to {new_data}.')
         else:
-            gr.Warning(f"Failed to update scene tag for image {image_id}.")
+            gr.Warning(f'Failed to update scene tag for image {image_id}.')
 
         return None
 
@@ -953,13 +925,9 @@ class AIDBGradioApp:
         """
         Refreshes the image grid display based on the current cache and page.
         """
-        print(
-            f"DEBUG: _refresh_image_grid called for page {advanced_search_current_page}"
-        )
+        print(f'DEBUG: _refresh_image_grid called for page {advanced_search_current_page}')
         advanced_search_html, advanced_search_page, advanced_search_page_info_text = (
-            self._paginate_images(
-                advanced_search_image_cache, advanced_search_current_page, 0
-            )
+            self._paginate_images(advanced_search_image_cache, advanced_search_current_page, 0)
         )
         return (
             advanced_search_html,
@@ -968,21 +936,19 @@ class AIDBGradioApp:
         )
 
     def launch(self, **kwargs):
-        print("Launching Gradio application...")
+        print('Launching Gradio application...')
         self.interface.launch(**kwargs)
 
 
 # Example Usage (for testing purposes, typically in a separate script or main application file)
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Initialize DBManager (assuming MongoDB is running)
-    config_file = f"{os.environ['CONF_AIT']}/aidb/dbmanager.yaml"
+    config_file = f'{os.environ["CONF_AIT"]}/aidb/dbmanager.yaml'
     db_manager_instance = DBManager(config_file=config_file)
 
     # Create and launch the Gradio app
-    if (
-        db_manager_instance.db is not None
-    ):  # Only proceed if DBManager connected successfully
+    if db_manager_instance.db is not None:  # Only proceed if DBManager connected successfully
         app = AIDBGradioApp(db_manager_instance)
         app.launch()
     else:
-        print("Could not initialize DBManager. Gradio app will not launch.")
+        print('Could not initialize DBManager. Gradio app will not launch.')

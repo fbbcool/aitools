@@ -6,8 +6,6 @@ import pymongo.database
 from pymongo.errors import ConnectionFailure, OperationFailure
 from pathlib import Path
 import datetime
-import uuid
-import mimetypes
 from typing import Final, Generator, List, Dict, Optional, Union, Any, Tuple
 import yaml  # Import the yaml library
 
@@ -361,9 +359,7 @@ class DBManager:
             print('Database not connected. Cannot retrieve image IDs.')
             return
 
-        image_docs = self.find_documents(
-            self._collection, query={}, projection={'_id': 1}
-        )  # Only fetch _id
+        image_docs = self.find_documents(self._collection, query={})  # Only fetch _id
         for doc in image_docs:
             yield str(doc['_id'])
 
@@ -738,7 +734,6 @@ class DBManager:
                 'file_type': image_extensions[file_extension],
                 'container_db_id': parent_container_db_id,  # MongoDB reference to the parent container
                 'statistics': {},
-                'train_image_url': '',
             }
             return self.insert_document(self._collection, image_metadata)
         else:
@@ -786,7 +781,7 @@ class DBManager:
             try:
                 update_fields['image_ids'] = [ObjectId(img_id) for img_id in image_ids]
             except Exception:
-                print(f'Invalid image_ids format: one or more IDs are not valid ObjectId strings.')
+                print('Invalid image_ids format: one or more IDs are not valid ObjectId strings.')
                 return None
 
         if not update_fields:
@@ -870,7 +865,7 @@ class DBManager:
                 update_fields['container_db_id'] = ObjectId(container_db_id)
             except Exception:
                 print(f'Invalid container_db_id format: {container_db_id}')
-                return None
+                return 0
 
         if not update_fields:
             print('No fields provided for image update.')
@@ -880,9 +875,9 @@ class DBManager:
             object_id = ObjectId(image_id)
         except Exception:
             print(f'Invalid image_id format: {image_id}')
-            return None
+            return 0
 
-        return self.update_document(self._collection, {'_id': object_id}, {'$set': update_fields})
+        return self.update_document(self._collection, {'_id': object_id}, {'$set': update_fields})  # pyright: ignore
 
     def img_add_field(self, img_id: str, fieldname: str, value: Any = {}, force=False):
         """Adds a new data field to the image document. If the field already exists, the force option is taken into account."""
