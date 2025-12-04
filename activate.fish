@@ -3,34 +3,44 @@ function ait_update
     git -C $HOME_AIT pull
 end
 
+function ait_setup_comfyui
+    ait_update
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY comfyui
+end
+
 function ait_setup_qwen
     ait_update
-    python3 $HOME_AIT/script/vastai.py qwen
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY qwen:image
 end
 
 function ait_setup_qwen_edit
     ait_update
-    python3 $HOME_AIT/script/vastai.py qwen_edit
-end
-
-function ait_setup_wan21
-    ait_update
-    python3 $HOME_AIT/script/vastai.py wan21
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY qwen:edit
 end
 
 function ait_setup_wan22
     ait_update
-    python3 $HOME_AIT/script/vastai.py wan22
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY wan22:t2v
 end
 
 function ait_setup_wan22_i2v
     ait_update
-    python3 $HOME_AIT/script/vastai.py wan22_i2v
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY wan22:i2v
 end
 
-function ait_current
+function ait_setup_zimage_turbo
     ait_update
-    python3 $HOME_AIT/script/vastai.py current
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY zimage:turbo
+end
+
+function ait_setup_zimage_base
+    ait_update
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY zimage:base
+end
+
+function ait_setup_zimage_edit
+    ait_update
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY zimage:edit
 end
 
 #function ait_wan21 () {
