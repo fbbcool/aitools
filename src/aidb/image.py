@@ -7,6 +7,7 @@ import numpy as np  # Import Image from Pillow and alias it to avoid conflict wi
 
 from aidb.dbdefines import TAGS_TRIGGER
 from aidb.dbmanager import DBManager  # Updated import
+from aidb.hfdataset import HFDatasetImg
 from aidb.tagger import tagger_wd as tagger  # Updated import
 
 
@@ -35,16 +36,14 @@ class Image:
             collection: DB collection which hosts the image data. it can be pulled from the current db manager collection or set directly. the user has to take care of correctness!
         """
         if not isinstance(db_manager, DBManager):
-            raise TypeError("db_manager must be an instance of DBManager.")
+            raise TypeError('db_manager must be an instance of DBManager.')
 
         # Validate if image_id is a valid ObjectId string
         try:
             ObjectId(image_id)
         except Exception:
             raise ValueError(
-                f"Invalid image_id format: '{
-                    image_id
-                }'. Must be a valid MongoDB ObjectId string."
+                f"Invalid image_id format: '{image_id}'. Must be a valid MongoDB ObjectId string."
             )
 
         self._db_manager = db_manager
@@ -52,7 +51,7 @@ class Image:
         self._data = doc  # Store the pre-fetched document
         self.score = 0.0
         self.contributing_tags = []
-        self.operation: Literal["nop", "rate", "scene"] = "nop"
+        self.operation: Literal['nop', 'rate', 'scene'] = 'nop'
         self._caption: str | None = None
         self._prompt: str | None = None
         if collection is None:
@@ -81,16 +80,14 @@ class Image:
         found_collections = []
         for collection_name in collections:
             # Check if the image ID exists in this collection
-            if self._db_manager.find_documents(
-                collection_name, {"_id": ObjectId(self._image_id)}
-            ):
+            if self._db_manager.find_documents(collection_name, {'_id': ObjectId(self._image_id)}):
                 found_collections.append(collection_name)
         return found_collections
 
     @property
     def container(self) -> str | None:
         """Returns the container of this image."""
-        container_id = self.data.get("container_id", None)
+        container_id = self.data.get('container_id', None)
         if container_id is None:
             return None
         return self._db_manager.name_container(container_id)
@@ -101,23 +98,21 @@ class Image:
         Returns the relative path of the image container relative to the pool directory in the
         container local path without the poll directory itself.
         """
-        pool_dir = "pool"
-        container_local_path_str = self.data.get("container_local_path")
+        pool_dir = 'pool'
+        container_local_path_str = self.data.get('container_local_path')
         if container_local_path_str is None:
-            return ""
+            return ''
 
         # Find the position of "pool" in the path
         try:
             pool_index = container_local_path_str.find(pool_dir)
             if pool_index != -1:
                 # Extract the part of the path after "pool/"
-                relative_path_start_index = (
-                    pool_index + len(pool_dir) + 1
-                )  # +1 for the slash
+                relative_path_start_index = pool_index + len(pool_dir) + 1  # +1 for the slash
                 return container_local_path_str[relative_path_start_index:]
         except Exception as e:
-            print(f"Error parsing container_local_path: {e}")
-        return ""
+            print(f'Error parsing container_local_path: {e}')
+        return ''
 
     @property
     def data(self) -> dict:
@@ -129,7 +124,7 @@ class Image:
 
         # Fetch the image document from the database
         image_doc = self._db_manager.find_documents(
-            self._collection, {"_id": ObjectId(self._image_id)}
+            self._collection, {'_id': ObjectId(self._image_id)}
         )
 
         if not image_doc:
@@ -140,7 +135,7 @@ class Image:
                 return self._data
             self._collection = collections[0]
             image_doc = self._db_manager.find_documents(
-                self._collection, {"_id": ObjectId(self._image_id)}
+                self._collection, {'_id': ObjectId(self._image_id)}
             )
 
         # Assuming find_documents returns a list, take the first one
@@ -153,9 +148,9 @@ class Image:
         if self.data is None:
             return {}
         # Use .get to safely access, return empty dict if 'tags' is missing
-        return self.data.get("tags", {})
+        return self.data.get('tags', {})
 
-    def tags_prompt(self, trigger: str = "") -> list[str]:
+    def tags_prompt(self, trigger: str = '') -> list[str]:
         return tagger.tags_prompt(self.tags, trigger=trigger)
 
     @property
@@ -163,19 +158,17 @@ class Image:
         """Returns the rating of the image."""
         if self.data is None:
             return None
-        return self.data.get("rating")
+        return self.data.get('rating')
 
     @property
     def hfd_repo_id(self) -> str | None:
         if self._hfd_repo_id is None:
             # _get tries it once! if it fails, it return an emtpy string to avoid second tries!
-            self._hfd_repo_id = self.data.get("hfd_repo_id", "")
+            self._hfd_repo_id = self.data.get('hfd_repo_id', '')
             if not self._hfd_repo_id:
-                self._hfd_repo_id = self._db_manager.get_collection_hfd(
-                    self._collection
-                )
+                self._hfd_repo_id = self._db_manager.get_collection_hfd(self._collection)
             if self._hfd_repo_id is None:
-                self._hfd_repo_id = ""
+                self._hfd_repo_id = ''
             # now determinig really failed and set it to empty to avoid subsequent tries!
 
         elif not self._hfd_repo_id:
@@ -184,7 +177,7 @@ class Image:
         return self._hfd_repo_id
 
     @property
-    def hfd(self):
+    def hfd(self) -> HFDatasetImg | None:
         repo_id = self.hfd_repo_id
         if repo_id is None:
             return None
@@ -195,7 +188,7 @@ class Image:
         if self._caption is None:
             caption_new = self._hfd_caption_search
             if caption_new is None:
-                self._caption = ""
+                self._caption = ''
             else:
                 self._caption = caption_new
 
@@ -212,7 +205,7 @@ class Image:
 
         idx = _hfd.id2idx(self.id)
         if idx is not None:
-            return _hfd.captions_joy[_hfd.id2idx(self.id)]
+            return _hfd.captions_joy[idx]
         return None
 
     @property
@@ -223,7 +216,7 @@ class Image:
 
         idx = _hfd.id2idx(self.id)
         if idx is not None:
-            return _hfd.captions[_hfd.id2idx(self.id)]
+            return _hfd.captions[idx]
         return None
 
     @property
@@ -234,10 +227,10 @@ class Image:
         caption = self._hfd_caption
         if caption is None:
             for _hfd in self._db_manager.hfds:
-                idx = _hfd.id2idx(self.id)
+                idx = _hfd.id2idx(self.id)  # pyright: ignore
                 if idx is None:
                     continue
-                caption = _hfd.captions[idx]
+                caption = _hfd.captions[idx]  # pyright: ignore
                 if caption:
                     break
         return caption
@@ -247,7 +240,7 @@ class Image:
         if self._prompt is None:
             prompt = self._prompt_meta
             if prompt is None:
-                self._prompt = ""
+                self._prompt = ''
             else:
                 self._prompt = prompt
         if not self._prompt:
@@ -259,21 +252,23 @@ class Image:
         prompt = None
         try:
             pil = self.pil
+            if pil is None:
+                return None
             pil.load()  # necessary after .open() for metadata!
-            data = json.loads(pil.info["prompt"])
+            data = json.loads(pil.info['prompt'])
             ksampler = {}
             for id in data:
-                class_type = data[id]["class_type"]
-                if class_type in ["KSampler", "WanVideoSampler", "WanMoeKSampler"]:
+                class_type = data[id]['class_type']
+                if class_type in ['KSampler', 'WanVideoSampler', 'WanMoeKSampler']:
                     ksampler = data[id]
                     break
-            inputs = ksampler.get("inputs", None)
+            inputs = ksampler.get('inputs', None)
             if inputs is None:
                 return None
 
             prompt = None
             value = None
-            for key in ["positive", "text_embeds"]:
+            for key in ['positive', 'text_embeds']:
                 value = inputs.get(key, None)
                 if value is not None:
                     id_pos = value[0]
@@ -295,23 +290,23 @@ class Image:
                     id_pos = prompt[0]
                     node_pos = data[id_pos]
                     if isinstance(node_pos, dict):
-                        inputs = node_pos.get("inputs", None)
+                        inputs = node_pos.get('inputs', None)
                 elif isinstance(prompt, dict):
-                    inputs = prompt.get("inputs", None)
+                    inputs = prompt.get('inputs', None)
                 else:
                     return None
 
                 if inputs is None:
                     return None
 
-                prompt = inputs.get("text", None)
-                for key in ["Text", "string_b", "positive_prompt"]:
+                prompt = inputs.get('text', None)
+                for key in ['Text', 'string_b', 'positive_prompt']:
                     value = inputs.get(key, None)
                     if value is not None:
                         prompt = value
                         break  # for
 
-        except Exception as e:
+        except Exception:
             return None
 
         # always return None, regardless of None or empty.
@@ -319,25 +314,23 @@ class Image:
             return None
         if isinstance(prompt, str):
             for trigger in TAGS_TRIGGER:
-                prompt = prompt.replace(f"{trigger},", "")
+                prompt = prompt.replace(f'{trigger},', '')
         else:
             return None
         return prompt
 
     def set_rating(self, rating: int) -> int:
         """Sets the rating of the image."""
-        if not isinstance(rating, int):
-            raise TypeError("Rating must be an integer.")
         if not (-2 <= rating <= 5):
-            raise ValueError("Rating must be between -2 and 5.")
-        print(f"Setting rating for image {self._image_id} to {rating}")
+            raise ValueError('Rating must be between -2 and 5.')
+        print(f'Setting rating for image {self._image_id} to {rating}')
         return self._db_manager.update_image(self._image_id, rating=rating)
 
     def get_tags_custom(self, category: str) -> list[str]:
         """Returns tags of a custom category."""
         tags = self.tags
-        if "custom" in tags:
-            custom_tags = tags["custom"]
+        if 'custom' in tags:
+            custom_tags = tags['custom']
         else:
             return []
         if category in custom_tags:
@@ -348,9 +341,9 @@ class Image:
     def set_tags_custom(self, category: str, tags_category: list[str]) -> int:
         """Sets custom category tags"""
         tags = self.tags
-        tags_custom = tags["custom"] if "custom" in tags else {}
+        tags_custom = tags['custom'] if 'custom' in tags else {}
         tags_custom[category] = tags_category
-        return self.update_tags({"custom": tags_custom})
+        return self.update_tags({'custom': tags_custom})
 
     def generate_tags(self) -> dict:
         """
@@ -361,9 +354,9 @@ class Image:
             return tagger.tags(self.pil)
         else:
             print(
-                f"Warning: Cannot generate tags for image {
+                f'Warning: Cannot generate tags for image {
                     self._image_id
-                } as PIL image could not be loaded."
+                } as PIL image could not be loaded.'
             )
             return {}
 
@@ -380,16 +373,14 @@ class Image:
                                     or path components are not found.
         """
         if self.data is None:
-            print(
-                f"Cannot get full path: Image data not available for ID '{self._image_id}'."
-            )
+            print(f"Cannot get full path: Image data not available for ID '{self._image_id}'.")
             return None
 
         try:
             full_path = (
                 Path(self._db_manager._root)
                 / self.container_url_relative
-                / self.data.get("relative_url")
+                / self.data.get('relative_url')
             )
             return full_path
         except Exception as e:
@@ -397,7 +388,7 @@ class Image:
             return None
 
     @property
-    def pil(self) -> Optional[PILImage.Image]:
+    def pil(self) -> PILImage.Image | None:
         """
         Retrieves the image as a PIL (Pillow) Image object.
 
@@ -410,23 +401,17 @@ class Image:
         """
         full_path = self.get_full_path()
         if full_path is None:
-            print(
-                f"Cannot get PIL image: Full path not available for image ID '{self._image_id}'."
-            )
+            print(f"Cannot get PIL image: Full path not available for image ID '{self._image_id}'.")
             return None
 
         if not full_path.exists():
             print(
-                f"Warning: Image file not found at '{full_path}' for image ID '{
-                    self._image_id
-                }'."
+                f"Warning: Image file not found at '{full_path}' for image ID '{self._image_id}'."
             )
             for res in [1024, 768]:
                 new_path = self.path_train_image_from_dbm_and_res(res)
                 if new_path.exists():
-                    print(
-                        f"Ok, using train image {res} instead for image ID '{self._image_id}'."
-                    )
+                    print(f"Ok, using train image {res} instead for image ID '{self._image_id}'.")
                     full_path = new_path
                     break
 
@@ -441,14 +426,12 @@ class Image:
             print(f"Error opening image file '{full_path}': {e}")
             return None
         except Exception as e:
-            print(
-                f"An unexpected error occurred while getting PIL image for '{full_path}': {e}"
-            )
+            print(f"An unexpected error occurred while getting PIL image for '{full_path}': {e}")
             return None
 
     @property
     def thumbnail_path(self) -> Path:
-        thumbnail_filename = f"{self._image_id}_thumb.png"
+        thumbnail_filename = f'{self._image_id}_thumb.png'
         thumbnail_path = (
             Path(self._db_manager._root)
             / self._db_manager._default_thumbnail_dir
@@ -472,9 +455,9 @@ class Image:
                 return thumb_pil_image
             except Exception as e:
                 print(
-                    f"Warning: Could not load existing thumbnail '{
-                        thumbnail_path
-                    }' for ID '{self._image_id}': {e}. Attempting to regenerate."
+                    f"Warning: Could not load existing thumbnail '{thumbnail_path}' for ID '{
+                        self._image_id
+                    }': {e}. Attempting to regenerate."
                 )
 
         # 2. If not found or failed to load, generate and save a new one
@@ -487,9 +470,9 @@ class Image:
                 return thumb_pil_image
             except Exception as e:
                 print(
-                    f"Warning: Could not load existing thumbnail '{
-                        thumbnail_path
-                    }' for ID '{self._image_id}': {e}. Regeneration failed!"
+                    f"Warning: Could not load existing thumbnail '{thumbnail_path}' for ID '{
+                        self._image_id
+                    }': {e}. Regeneration failed!"
                 )
                 return None
 
@@ -502,9 +485,7 @@ class Image:
         and then loads and returns the newly created training image.
         """
         if self.data is None:
-            print(
-                f"Cannot get training image: Image data not available for ID '{self._image_id}'."
-            )
+            print(f"Cannot get training image: Image data not available for ID '{self._image_id}'.")
             return None
 
         train_image_url_str = self.url_train_image
@@ -540,9 +521,7 @@ class Image:
                 # Load the newly created training image
                 new_train_pil_image = PILImage.open(created_train_image_path)
                 print(
-                    f"Successfully loaded newly generated training image for ID '{
-                        self._image_id
-                    }'."
+                    f"Successfully loaded newly generated training image for ID '{self._image_id}'."
                 )
                 return new_train_pil_image
             except Exception as e:
@@ -553,9 +532,7 @@ class Image:
                 )
                 return None
         else:
-            print(
-                f"Failed to create or save training image for image ID '{self._image_id}'."
-            )
+            print(f"Failed to create or save training image for image ID '{self._image_id}'.")
             return None
 
     @property
@@ -572,8 +549,8 @@ class Image:
 
     def path_train_image_from_dbm_and_res(self, res: int) -> Path:
         path_train_imgs = Path(self._db_manager.default_train_image_dir)
-        name_train_img = f"{self._image_id}_{res}"
-        path_train_img = (path_train_imgs / name_train_img).with_suffix(".png")
+        name_train_img = f'{self._image_id}_{res}'
+        path_train_img = (path_train_imgs / name_train_img).with_suffix('.png')
         return path_train_img
 
     @property
@@ -583,7 +560,7 @@ class Image:
         """
         if self.data is None:
             return None
-        return self.data.get("train_image_url")
+        return self.data.get('train_image_url')
 
     @property
     def statistics(self) -> dict:
@@ -594,7 +571,7 @@ class Image:
         """
         if self.data is None:
             return {}
-        return self.data.get("statistics", {})
+        return self.data.get('statistics', {})
 
     @property
     def focus_vector(self) -> np.ndarray | None:
@@ -606,7 +583,7 @@ class Image:
         if self.statistics is None:
             return None
 
-        focus_vector_list = self.statistics.get("focus_vector")
+        focus_vector_list = self.statistics.get('focus_vector')
         if focus_vector_list is None:
             return None
 
@@ -621,7 +598,7 @@ class Image:
         """
         if self.statistics is None:
             return {}
-        return self.statistics.get("neighbors", {})
+        return self.statistics.get('neighbors', {})
 
     @property
     def neighbor0(self) -> tuple[str, float] | None:
@@ -666,11 +643,9 @@ class Image:
             return None
 
         output_dir_path = Path(output_path)
-        output_dir_path.mkdir(
-            parents=True, exist_ok=True
-        )  # Ensure output directory exists
+        output_dir_path.mkdir(parents=True, exist_ok=True)  # Ensure output directory exists
 
-        output_filename = f"{self._image_id}.png"
+        output_filename = f'{self._image_id}.png'
         full_output_path = output_dir_path / output_filename
 
         try:
@@ -690,9 +665,7 @@ class Image:
 
                 # Create a copy to resize, keeping original PIL image intact if needed elsewhere
                 resized_pil_image = pil_image.copy()
-                resized_pil_image.resize(
-                    (size[0], size[1]), PILImage.Resampling.LANCZOS
-                )
+                resized_pil_image.resize((size[0], size[1]), PILImage.Resampling.LANCZOS)
                 pil_image_to_save = resized_pil_image
                 print(f"Image '{self._image_id}' resized to {size[0]}x{size[1]}.")
             else:
@@ -700,7 +673,7 @@ class Image:
 
             # Save the image with specified compression
             pil_image_to_save.save(
-                full_output_path, "PNG", optimize=True, compress_level=compression
+                full_output_path, 'PNG', optimize=True, compress_level=compression
             )
             print(
                 f"Image '{self._image_id}' saved successfully to '{
@@ -709,9 +682,7 @@ class Image:
             )
             return full_output_path
         except Exception as e:
-            print(
-                f"Error saving PNG image '{self._image_id}' to '{full_output_path}': {e}"
-            )
+            print(f"Error saving PNG image '{self._image_id}' to '{full_output_path}': {e}")
             return None
 
     def thumbnail_create(self, to_path: Path) -> None:
@@ -720,9 +691,7 @@ class Image:
         """
         pil_image = self.pil
         if pil_image is None:
-            print(
-                f"Failed to get PIL image for thumbnail generation for ID '{self._image_id}'."
-            )
+            print(f"Failed to get PIL image for thumbnail generation for ID '{self._image_id}'.")
             return None
 
         try:
@@ -732,13 +701,11 @@ class Image:
                 self._db_manager._default_thumbnail_size, PILImage.Resampling.LANCZOS
             )  # Preserves aspect ratio
 
-            thumb_pil_image.save(to_path, "PNG", optimize=True, compress_level=6)
+            thumb_pil_image.save(to_path, 'PNG', optimize=True, compress_level=6)
             print(f"Thumbnail for image '{self._image_id}' saved to '{to_path}'.")
 
         except Exception as e:
-            print(
-                f"Error generating or saving thumbnail for image '{self._image_id}': {e}"
-            )
+            print(f"Error generating or saving thumbnail for image '{self._image_id}': {e}")
             return None
 
     def save_train_image_and_update_db(
@@ -752,17 +719,13 @@ class Image:
         """
         pil_image = self.pil
         if pil_image is None:
-            print(
-                f"Failed to get PIL image for thumbnail generation for ID '{self._image_id}'."
-            )
+            print(f"Failed to get PIL image for thumbnail generation for ID '{self._image_id}'.")
             return None
 
         output_dir_path = Path(output_directory)
-        output_dir_path.mkdir(
-            parents=True, exist_ok=True
-        )  # Ensure output directory exists
+        output_dir_path.mkdir(parents=True, exist_ok=True)  # Ensure output directory exists
 
-        train_img_filename = f"{self._image_id}_{train_image_size[0]}.png"
+        train_img_filename = f'{self._image_id}_{train_image_size[0]}.png'
         full_train_img_path = output_dir_path / train_img_filename
 
         if full_train_img_path.exists():
@@ -797,12 +760,8 @@ class Image:
                     (new_width, new_height), PILImage.Resampling.LANCZOS
                 )
 
-            train_pil_image.save(
-                full_train_img_path, "PNG", optimize=True, compress_level=6
-            )
-            print(
-                f"Train image for image '{self._image_id}' saved to '{full_train_img_path}'."
-            )
+            train_pil_image.save(full_train_img_path, 'PNG', optimize=True, compress_level=6)
+            print(f"Train image for image '{self._image_id}' saved to '{full_train_img_path}'.")
 
             # Update the database with the new thumbnail URL
             # For simplicity, we'll store the local file path as the URL.
@@ -817,39 +776,31 @@ class Image:
                 self._data = None
                 return str(full_train_img_path)
             else:
-                print(
-                    f"Failed to update thumbnail URL in DB for image '{self._image_id}'."
-                )
+                print(f"Failed to update thumbnail URL in DB for image '{self._image_id}'.")
                 return None
 
         except Exception as e:
-            print(
-                f"Error generating or saving thumbnail for image '{self._image_id}': {e}"
-            )
+            print(f"Error generating or saving thumbnail for image '{self._image_id}': {e}")
             return None
 
     def update_description(self, description: List[Dict[str, str]]) -> Optional[int]:
         """Updates the description field of the image."""
-        print(f"Updating description for image {self._image_id}")
+        print(f'Updating description for image {self._image_id}')
         return self._db_manager.update_image(self._image_id, description=description)
 
     def update_creation_date(self, creation_date: str) -> Optional[int]:
         """Updates the creation_date field of the image."""
-        print(f"Updating creation_date for image {self._image_id}")
-        return self._db_manager.update_image(
-            self._image_id, creation_date=creation_date
-        )
+        print(f'Updating creation_date for image {self._image_id}')
+        return self._db_manager.update_image(self._image_id, creation_date=creation_date)
 
     def update_last_modified_date(self, last_modified_date: str) -> Optional[int]:
         """Updates the last_modified_date field of the image."""
-        print(f"Updating last_modified_date for image {self._image_id}")
-        return self._db_manager.update_image(
-            self._image_id, last_modified_date=last_modified_date
-        )
+        print(f'Updating last_modified_date for image {self._image_id}')
+        return self._db_manager.update_image(self._image_id, last_modified_date=last_modified_date)
 
     def update_tags(self, tags: List[Dict[str, Any]]) -> Optional[int]:
         """Updates the tags field of the image."""
-        print(f"Updating tags for image {self._image_id}")
+        print(f'Updating tags for image {self._image_id}')
         new_tags = self.tags
         new_tags |= tags
         return self._db_manager.update_image(self._image_id, tags=new_tags)
@@ -858,45 +809,37 @@ class Image:
         """Initializes the tags field of the image."""
         ret = 0
         if not self.tags or force:
-            ret = self._db_manager.update_image(
-                self._image_id, tags=self.generate_tags()
-            )
+            ret = self._db_manager.update_image(self._image_id, tags=self.generate_tags())
         return ret
 
-    def update_dimensions(
-        self, dimensions: Dict[str, Union[int, str]]
-    ) -> Optional[int]:
+    def update_dimensions(self, dimensions: Dict[str, Union[int, str]]) -> Optional[int]:
         """Updates the dimensions field of the image."""
-        print(f"Updating dimensions for image {self._image_id}")
+        print(f'Updating dimensions for image {self._image_id}')
         return self._db_manager.update_image(self._image_id, dimensions=dimensions)
 
     def update_thumbnail_url(self, thumbnail_url: str) -> Optional[int]:
         """Updates the thumbnail_url field of the image."""
-        print(f"Updating thumbnail_url for image {self._image_id}")
-        return self._db_manager.update_image(
-            self._image_id, thumbnail_url=thumbnail_url
-        )
+        print(f'Updating thumbnail_url for image {self._image_id}')
+        return self._db_manager.update_image(self._image_id, thumbnail_url=thumbnail_url)
 
     def update_rating(self, rating: int) -> Optional[int]:
         """Updates the rating field of the image."""
-        print(f"Updating rating for image {self._image_id}")
+        print(f'Updating rating for image {self._image_id}')
         return self._db_manager.update_image(self._image_id, rating=rating)
 
     def update_category(self, category: str) -> Optional[int]:
         """Updates the category field of the image."""
-        print(f"Updating category for image {self._image_id}")
+        print(f'Updating category for image {self._image_id}')
         return self._db_manager.update_image(self._image_id, category=category)
 
     def update_container_db_id(self, container_db_id: str) -> Optional[int]:
         """Updates the container_db_id field of the image."""
-        print(f"Updating container_db_id for image {self._image_id}")
-        return self._db_manager.update_image(
-            self._image_id, container_db_id=container_db_id
-        )
+        print(f'Updating container_db_id for image {self._image_id}')
+        return self._db_manager.update_image(self._image_id, container_db_id=container_db_id)
 
     def update_collection(self, collection: str) -> Optional[int]:
         """Updates the collection field of the image."""
-        print(f"Updating collection for image {self._image_id}")
+        print(f'Updating collection for image {self._image_id}')
         return self._db_manager.update_image(self._image_id, collection=collection)
 
     def update_all(
@@ -915,7 +858,7 @@ class Image:
         Updates multiple fields of the image document.
         Any parameter left as None will not be updated.
         """
-        print(f"Updating multiple fields for image {self._image_id}")
+        print(f'Updating multiple fields for image {self._image_id}')
         return self._db_manager.update_image(
             self._image_id,
             description=description,
@@ -943,13 +886,9 @@ class Image:
         Returns the probability of a specific tag from the 'tags_wd' dictionary.
         Returns 0.0 if the tag is not found.
         """
-        if (
-            self.data is None
-            or "tags" not in self.data
-            or "tags_wd" not in self.data["tags"]
-        ):
+        if self.data is None or 'tags' not in self.data or 'tags_wd' not in self.data['tags']:
             return 0.0
-        tags_dict: dict = self.data["tags"]["tags_wd"]
+        tags_dict: dict = self.data['tags']['tags_wd']
         return tags_dict.get(tag, 0.0)
 
     def calc_score_based_on_tags(self, tags: list[str]) -> None:
@@ -959,8 +898,8 @@ class Image:
         """
         current_score = 0.0
         contributing_tags: List[Tuple[str, float]] = []
-        if self.data and "tags" in self.data and "tags_wd" in self.data["tags"]:
-            wd_tags = self.data["tags"]["tags_wd"]
+        if self.data and 'tags' in self.data and 'tags_wd' in self.data['tags']:
+            wd_tags = self.data['tags']['tags_wd']
             for o_tag in tags:
                 if o_tag in wd_tags:
                     current_score += wd_tags[o_tag]
@@ -969,19 +908,17 @@ class Image:
         self.contributing_tags = contributing_tags
 
     def run_operation(self, value: Any) -> int:
-        if self.operation == "nop":
+        if self.operation == 'nop':
             return True
-        elif self.operation == "rate":
+        elif self.operation == 'rate':
             return self.update_rating(value)
-        elif self.operation == "scene":
-            tags = {"scene": value}
+        elif self.operation == 'scene':
+            tags = {'scene': value}
             return self.update_tags(tags)
         else:
             return False
 
-    def export_train(
-        self, to_folder: str, trigger: str = "", export_cap_files=False
-    ) -> None:
+    def export_train(self, to_folder: str, trigger: str = '', export_cap_files=False) -> None:
         """
         Exports all necessary training files to the export folder:
         1. copy the training image from the url to_folder/image_id.png
@@ -989,37 +926,37 @@ class Image:
         """
         export_path = Path(to_folder)
         export_path.mkdir(parents=True, exist_ok=True)
-        train_path = export_path / "train"
+        train_path = export_path / 'train'
         train_path.mkdir(parents=True, exist_ok=True)
-        images_path = train_path / "images"
+        images_path = train_path / 'images'
         images_path.mkdir(parents=True, exist_ok=True)
         if export_cap_files:
-            text_path = train_path / "text"
+            text_path = train_path / 'text'
             text_path.mkdir(parents=True, exist_ok=True)
 
         # 1. Copy the training image by just trying its url. if url doesnt exist, abort.
         train_image_path_str = self.url_train_image
         if not train_image_path_str:
-            print(f"No training image URL found for image {self.id}. Aborting export.")
+            print(f'No training image URL found for image {self.id}. Aborting export.')
             return
 
         train_image_source_path = Path(train_image_path_str)
         if not train_image_source_path.exists():
             print(
-                f"Training image file not found at {train_image_source_path} for image {
+                f'Training image file not found at {train_image_source_path} for image {
                     self.id
-                }. Aborting export."
+                }. Aborting export.'
             )
             return
 
-        train_image_destination_path = images_path / f"{self.id}.png"
+        train_image_destination_path = images_path / f'{self.id}.png'
         try:
             import shutil
 
             shutil.copy(train_image_source_path, train_image_destination_path)
-            print(f"Copied training image to {train_image_destination_path}")
+            print(f'Copied training image to {train_image_destination_path}')
         except Exception as e:
-            print(f"Error copying training image for {self.id}: {e}")
+            print(f'Error copying training image for {self.id}: {e}')
             return
 
         # 3. or expand metadata.jsonl
@@ -1028,18 +965,18 @@ class Image:
         caption = self._hfd_caption_search
         capjoy = self._hfd_caption_joy
         line_json = {
-            "file_name": "images/" + train_image_destination_path.name,
-            "tags": json.dumps(self.tags),
-            "prompt": prompt,
-            "caption": caption,
-            "caption_joy": capjoy,
+            'file_name': 'images/' + train_image_destination_path.name,
+            'tags': json.dumps(self.tags),
+            'prompt': prompt,
+            'caption': caption,
+            'caption_joy': capjoy,
         }
         # add line to extisting "metadata.jsonl" or create file if not exist
-        metadata_file_path = train_path / "metadata.jsonl"
+        metadata_file_path = train_path / 'metadata.jsonl'
         try:
-            with open(metadata_file_path, "a", encoding="utf-8") as f:
+            with open(metadata_file_path, 'a', encoding='utf-8') as f:
                 json.dump(line_json, f)
-                f.write("\n")
-            print(f"Added metadata to {metadata_file_path}")
+                f.write('\n')
+            print(f'Added metadata to {metadata_file_path}')
         except Exception as e:
-            print(f"Error writing to metadata.jsonl for {self.id}: {e}")
+            print(f'Error writing to metadata.jsonl for {self.id}: {e}')
