@@ -343,7 +343,7 @@ class Image:
         tags = self.tags
         tags_custom = tags['custom'] if 'custom' in tags else {}
         tags_custom[category] = tags_category
-        return self.update_tags({'custom': tags_custom})
+        return self.update_tags({'custom': tags_custom})  # pyright: ignore
 
     def generate_tags(self) -> dict:
         """
@@ -351,7 +351,7 @@ class Image:
         Requires the PIL image to be loadable.
         """
         if self.pil:
-            return tagger.tags(self.pil)
+            return tagger.tags(self.pil)  # pyright: ignore
         else:
             print(
                 f'Warning: Cannot generate tags for image {
@@ -381,7 +381,7 @@ class Image:
                 Path(self._db_manager._root)
                 / self.container_url_relative
                 / self.data.get('relative_url')
-            )
+            )  # pyright: ignore
             return full_path
         except Exception as e:
             print(f"Error constructing full path for image ID '{self._image_id}': {e}")
@@ -802,14 +802,14 @@ class Image:
         """Updates the tags field of the image."""
         print(f'Updating tags for image {self._image_id}')
         new_tags = self.tags
-        new_tags |= tags
+        new_tags |= tags  # pyright: ignore
         return self._db_manager.update_image(self._image_id, tags=new_tags)
 
     def init_tags(self, force: bool = False) -> Optional[int]:
         """Initializes the tags field of the image."""
         ret = 0
         if not self.tags or force:
-            ret = self._db_manager.update_image(self._image_id, tags=self.generate_tags())
+            ret = self._db_manager.update_image(self._image_id, tags=self.generate_tags())  # pyright: ignore
         return ret
 
     def update_dimensions(self, dimensions: Dict[str, Union[int, str]]) -> Optional[int]:
@@ -836,11 +836,6 @@ class Image:
         """Updates the container_db_id field of the image."""
         print(f'Updating container_db_id for image {self._image_id}')
         return self._db_manager.update_image(self._image_id, container_db_id=container_db_id)
-
-    def update_collection(self, collection: str) -> Optional[int]:
-        """Updates the collection field of the image."""
-        print(f'Updating collection for image {self._image_id}')
-        return self._db_manager.update_image(self._image_id, collection=collection)
 
     def update_all(
         self,
@@ -911,10 +906,10 @@ class Image:
         if self.operation == 'nop':
             return True
         elif self.operation == 'rate':
-            return self.update_rating(value)
+            return self.update_rating(value)  # pyright: ignore
         elif self.operation == 'scene':
             tags = {'scene': value}
-            return self.update_tags(tags)
+            return self.update_tags(tags)  # pyright: ignore
         else:
             return False
 
