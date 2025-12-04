@@ -1,7 +1,0 @@
-accelerate
-torch
-sentencepiece
-torchvision
-timm
-transformers==4.51.0
-liger-kernel==0.5.9

@@ -1,7 +1,7 @@
-from aidb.caption_joy import CapJoy
+from ait.caption import Joy
 from aidb.hfdataset import HFDatasetImg
 
-caper = CapJoy(trigger="1fem")
+caper = Joy(trigger="1fem")
 force = True
 
 # hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
@@ -29,4 +29,3 @@ for idx in range(n):
 
 print(f"\n\tDONE with {error} errors.")
 hfd.save_to_jsonl(force=True)
-
