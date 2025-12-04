@@ -3,7 +3,7 @@ from PIL import Image
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 
 
-from typing import Final, Generator
+from typing import Final
 
 from tools.ainstall import AInstallerDB
 
@@ -106,7 +106,7 @@ class Joy:
             do_sample=True if self._temperature > 0 else False,
             suppress_tokens=None,
             use_cache=True,
-            temperature=0.6,
+            temperature=self._temperature,
             top_k=None,
             top_p=self._top_p if self._temperature > 0 else None,
         )[0]
