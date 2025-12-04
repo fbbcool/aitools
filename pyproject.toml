@@ -22,6 +22,6 @@ unfixable = ["B"]
 quote-style = "single"
 
 [tool.pycodestyle]
-count = False
-ignore = E226,E302,E71
+count = false
+#ignore = E226,E302,E71
 max-line-length = 100
