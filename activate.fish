@@ -55,11 +55,13 @@ function ait_clean_gen
 end
 
 function ait_img_prompt_clipspace
+    echo (wl-paste)
     python3 $HOME_AIT/script/img_prompt.py (wl-paste) | wl-copy
     echo (wl-paste)
 end
 
 function ait_img_caption_clipspace
+    echo (wl-paste)
     #python3 $HOME_AIT/script/img_caption.py (wl-paste) | sed 's/\(<prompt>\|<\/prompt>\)//g' | wl-copy
     set output (python3 $HOME_AIT/script/img_caption.py (wl-paste))
     set out2 (echo $output | grep -o '<prompt>.*</prompt>' | sed 's/\(<prompt>\|<\/prompt>\)//g')

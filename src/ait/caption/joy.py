@@ -22,7 +22,7 @@ CONTENT_SYSTEM: Final = {
 }
 DEFAULT_PROMPT: Final = 'Write a very long detailed description for this image.'
 CONTENT_PROMPT: Final = {
-    '1gts': 'The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess and a man with a massive size difference. the giantess woman is always much taller. avoid child or figurine captions as this is always an interaction between a giantess woman and a man. the aspect of size difference and the man itself is always described as xsmall man.',
+    '1gts': 'The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess and a man with a massive size difference. the giantess woman is always much taller. avoid child,figurine,small,tiny captions as this is always an interaction between a giantess woman and a xsmall man. the aspect of size difference and the xsmall man itself is always described as xsmall man.',
     '1woman': 'The users are interested in women with big breasts and hairy women and how they present their bodies.',
     '1fem': "The users are interested in body and face characteristics of this female character. always call the female character 'giantess woman'",
     '1fbb': 'The users are interested in body poses and muscularity characteristics of this female muscular character.',
