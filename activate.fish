@@ -53,3 +53,8 @@ function ait_clean_gen
     rm -rf $HOME_COMFY/output/video
     rm -rf $HOME_COMFY/temp/*
 end
+
+function ait_prompt_clipspace
+    python3 $HOME_AIT/script/img_prompt.py (wl-paste) | wl-copy
+    echo (wl-paste)
+end
