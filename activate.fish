@@ -59,7 +59,10 @@ function ait_img_prompt_clipspace
     echo (wl-paste)
 end
 
-function ait_img_image_clipspace
-    python3 $HOME_AIT/script/img_caption.py (wl-paste) | wl-copy
-    echo (wl-paste)
+function ait_img_caption_clipspace
+    #python3 $HOME_AIT/script/img_caption.py (wl-paste) | sed 's/\(<prompt>\|<\/prompt>\)//g' | wl-copy
+    set output (python3 $HOME_AIT/script/img_caption.py (wl-paste))
+    set out2 (echo $output | grep -o '<prompt>.*</prompt>' | sed 's/\(<prompt>\|<\/prompt>\)//g')
+    echo $out2 | wl-copy
+    echo -n (wl-paste)
 end

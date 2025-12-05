@@ -22,7 +22,7 @@ CONTENT_SYSTEM: Final = {
 }
 DEFAULT_PROMPT: Final = 'Write a very long detailed description for this image.'
 CONTENT_PROMPT: Final = {
-    '1gts': 'The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.',
+    '1gts': 'The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess and a man with a massive size difference. the giantess woman is always much taller. avoid child or figurine captions as this is always an interaction between a giantess woman and a man. the aspect of size difference and the man itself is always described as xsmall man.',
     '1woman': 'The users are interested in women with big breasts and hairy women and how they present their bodies.',
     '1fem': "The users are interested in body and face characteristics of this female character. always call the female character 'giantess woman'",
     '1fbb': 'The users are interested in body poses and muscularity characteristics of this female muscular character.',
@@ -62,7 +62,6 @@ class Joy:
         except IndexError:
             raise IndexError('AInstallerDB: no model configured!')
         self.repo_id = model_repo_id
-        print(f'CapJoy: using {self.repo_id}')
 
         self.model = LlavaForConditionalGeneration.from_pretrained(
             self.repo_id, torch_dtype='bfloat16', device_map=0
@@ -73,7 +72,6 @@ class Joy:
     # the public interface
     def img_caption(self, img: Image.Image) -> str:
         prompt = DEFAULT_PROMPT + CONTENT_PROMPT.get(self._trigger, '')
-        print(f'caper using prompt:\n\t{prompt}')
         return self._process(img, prompt)
 
     def imgurl_caption(self, url: str) -> str:
