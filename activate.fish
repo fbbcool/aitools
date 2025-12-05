@@ -54,7 +54,12 @@ function ait_clean_gen
     rm -rf $HOME_COMFY/temp/*
 end
 
-function ait_prompt_clipspace
+function ait_img_prompt_clipspace
     python3 $HOME_AIT/script/img_prompt.py (wl-paste) | wl-copy
+    echo (wl-paste)
+end
+
+function ait_img_image_clipspace
+    python3 $HOME_AIT/script/img_caption.py (wl-paste) | wl-copy
     echo (wl-paste)
 end
