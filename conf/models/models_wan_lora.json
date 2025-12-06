@@ -28,6 +28,20 @@
     "i2v": {
       "lora": [
         {
+          "link": "https://civitai.com/api/download/models/2439503?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "muscle_growth",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2439474?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "muscle_growth",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2470961?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
