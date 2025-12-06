@@ -28,6 +28,34 @@
     "i2v": {
       "lora": [
         {
+          "link": "https://civitai.com/api/download/models/2470961?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "abscrunch-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2470824?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "abscrunch-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2152516?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "deepthroat-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2152583?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "deepthroat-v1",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2176505?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
