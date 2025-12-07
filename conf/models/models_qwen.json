@@ -122,6 +122,12 @@
           "skip": false
         },
         {
+          "link": "https://civitai.com/api/download/models/2297143?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "rename": "ainme2real",
+          "skip": false
+        },
+        {
           "repo_id": "fbbcool/qwen-image-edit_lora",
           "skip": false
         }
