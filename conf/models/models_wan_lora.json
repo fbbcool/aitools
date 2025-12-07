@@ -10,6 +10,20 @@
     "t2v": {
       "lora": [
         {
+          "link": "https://civitai.com/api/download/models/2096603?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "macromastia-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2096600?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "macromastia-v1",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2303105?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
@@ -27,6 +41,48 @@
     },
     "i2v": {
       "lora": [
+        {
+          "link": "https://civitai.com/api/download/models/2310796?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "body-growth-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2310872?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "body-growth-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2261902?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "bouncy-walk-v2",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2261896?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "bouncy-walk-v2",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2265575?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "macromastia-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2266727?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "macromastia-v1",
+          "skip": false
+        },
         {
           "link": "https://civitai.com/api/download/models/2439503?type=Model&format=SafeTensor",
           "method_download": "civitai",

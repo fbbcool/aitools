@@ -68,3 +68,13 @@ function ait_img_caption_clipspace
     echo $out2 | wl-copy
     echo -n (wl-paste)
 end
+
+function ait_save_latest_vid_prores
+    set dir $HOME_COMFY/output/video/prores
+    lslast 2 $dir | xargs -t -i cp $dir/{} $HOME/Downloads
+end
+
+function ait_save_latest_vid_upscale
+    set dir $HOME_COMFY/output/video/upscale
+    lslast 2 $dir | xargs -t -i cp $dir/{} $HOME/Downloads
+end

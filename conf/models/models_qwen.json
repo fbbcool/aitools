@@ -116,6 +116,12 @@
           "skip": false
         },
         {
+          "repo_id": "lovis93/next-scene-qwen-image-lora-2509",
+          "file": "next-scene_lora-v2-3000.safetensors",
+          "rename": "next-scene-v2",
+          "skip": false
+        },
+        {
           "repo_id": "fbbcool/qwen-image-edit_lora",
           "skip": false
         }
