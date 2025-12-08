@@ -1,3 +1,5 @@
+set -xg AIT_TMP $HOME/Downloads/000_tmp/
+
 function ait_update
     echo "update aitools ..."
     git -C $HOME_AIT pull
@@ -67,6 +69,16 @@ function ait_img_caption_clipspace
     set out2 (echo $output | grep -o '<prompt>.*</prompt>' | sed 's/\(<prompt>\|<\/prompt>\)//g')
     echo $out2 | wl-copy
     echo -n (wl-paste)
+end
+
+function ait_tmp_clipspace
+    set input (wl-paste)
+    echo $input
+    cp $input $AIT_TMP
+end
+
+function ait_tmp_clean
+    rm $AIT_TMP/*.png
 end
 
 function ait_save_latest_vid_prores

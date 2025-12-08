@@ -12,14 +12,13 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 from pprint import pprint
 
-AIT_PATH_CONF: Final = f"{os.environ['CONF_AIT']}/models"
-AIT_PATH_CACHE: Final = f"{os.environ['HOME']}/.cache/ainstall"
+AIT_PATH_CONF: Final = f'{os.environ["CONF_AIT"]}/models'
+AIT_PATH_CACHE: Final = f'{os.environ["HOME"]}/.cache/ainstall'
+AIT_MODEL_PREFIXES: Final = ['models_', 'ainst_']
 
 
 class AInstallerDB:
-    def __init__(
-        self, srcdir: str = AIT_PATH_CONF, prefixes: list[str] = ["models_", "ainst_"]
-    ):
+    def __init__(self, srcdir: str = AIT_PATH_CONF, prefixes: list[str] = AIT_MODEL_PREFIXES):
         self._db: dict = {}
         self._srcdir: Path = Path(srcdir)
         self._prefixes: list[str] = prefixes
@@ -32,11 +31,11 @@ class AInstallerDB:
         """
         files = []
         for prefix in self._prefixes:
-            for file in self._srcdir.glob(f"{prefix}*.json"):
+            for file in self._srcdir.glob(f'{prefix}*.json'):
                 files.append(file)
 
         for file in files:
-            print(f"read {file.name}")
+            print(f'read {file.name}')
             with file.open() as json_data:
                 groups = json.load(json_data)
             for group, update_data in groups.items():
@@ -49,7 +48,7 @@ class AInstallerDB:
             group_data[variant] = self._update_variant(variant_data, update_data)
         self._db[group] = group_data
 
-    def _update_variant(self, variant: dict, data: dict) -> None:
+    def _update_variant(self, variant: dict, data: dict) -> dict:
         for target, update_data in data.items():
             target_data = variant.get(target, [])
             target_data += update_data
@@ -61,33 +60,32 @@ class AInstallerDB:
         return self._db
 
     def repo_ids(self, group: str, variant: str, target: str) -> list[str]:
-        group = self.db.get(group, "")
-        if not group:
+        _group: dict = self.db.get(group, {})
+        if not _group:
             return []
-        variant = group.get(variant, "")
-        if not variant:
+        _variant = _group.get(variant, {})
+        if not _variant:
             return []
-        targets = variant.get(target, [])
+        targets = _variant.get(target, [])
 
         repo_ids = []
-        for target in targets:
-            repo_id = target.get("repo_id", "")
+        for _target in targets:
+            repo_id = _target.get('repo_id', '')
             if repo_id:
                 repo_ids.append(repo_id)
-        
-        return repo_ids
 
+        return repo_ids
 
 
 class AInstaller:
     CHUNK_SIZE: Final = 1638400
-    USER_AGENT: Final = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"  # noqa
+    USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'  # noqa
 
     def __init__(
         self,
         base_dir: str,
-        group: str = "",
-        method: Literal["comfyui", "diffpipe"] = "comfyui",
+        group: str = '',
+        method: Literal['comfyui', 'diffpipe'] = 'comfyui',
         verbose: bool = False,
     ):
         self.db = AInstallerDB().db
@@ -95,16 +93,16 @@ class AInstaller:
         self._cache.mkdir(parents=True, exist_ok=True)
 
         self.base_dir = Path(base_dir)
-        split = group.split(":")
+        split = group.split(':')
         self.group = split[0]
         self.variants = []
         if len(split) > 1:
-            self.variants.append("common")
+            self.variants.append('common')
             self.variants.append(split[1])
         self.type = method
         self.requirements = []
 
-        self.token_cai = os.environ.get("CAI_TOKEN", "")
+        self.token_cai = os.environ.get('CAI_TOKEN', '')
 
         self.verbose = verbose
 
@@ -117,16 +115,16 @@ class AInstaller:
         # create python requirements.txt
         self.requirements = list(set(self.requirements))
 
-        requirements_txt = self.base_dir / "requirements_ainstall.txt"
-        with requirements_txt.open("w") as f:
-            f.write("\n".join(self.requirements))
+        requirements_txt = self.base_dir / 'requirements_ainstall.txt'
+        with requirements_txt.open('w') as f:
+            f.write('\n'.join(self.requirements))
 
     @property
     def _items(self) -> Generator:
         # selected group
-        print(f"items for selected group {self.group}:")
+        print(f'items for selected group {self.group}:')
         group = self.db.get(self.group, {})
-        for variant, data in group.items():
+        for variant, _ in group.items():
             # no variants given => install all
             # variants given => iinstall explicit
             if self.variants:
@@ -139,175 +137,178 @@ class AInstaller:
 
             for target, target_data in variant_data.items():
                 for config in target_data:
-                    if config.get("skip", False):
+                    if config.get('skip', False):
                         continue
-                    if config.get("action", "None") == "skip":
+                    if config.get('action', 'None') == 'skip':
                         continue
                     yield self._make_item(self.group, variant, target, config)
 
     def _make_item(self, group: str, variant: str, target: str, config: dict):
         item: dict = {
-            "group": group,
-            "variant": variant,
-            "target": target,
-            "config": config,
-            "type": self.type,
+            'group': group,
+            'variant': variant,
+            'target': target,
+            'config': config,
+            'type': self.type,
         }
 
         # resolve download method
-        method_download = item["config"].get("method_download", "auto")
+        method_download = item['config'].get('method_download', 'auto')
 
-        if method_download == "auto":
-            if item["target"] == "custom_node":
-                method_download = "github"
-        if method_download == "auto":
-            if item["config"].get("link", None) is not None:
-                method_download = "civitai"
-            elif item["config"].get("repo_id", None) is not None:
-                method_download = "huggingface"
+        if method_download == 'auto':
+            if item['target'] == 'custom_node':
+                method_download = 'github'
+        if method_download == 'auto':
+            if item['config'].get('link', None) is not None:
+                method_download = 'civitai'
+            elif item['config'].get('repo_id', None) is not None:
+                method_download = 'huggingface'
 
-        if method_download == "auto":
+        if method_download == 'auto':
             # auto couldn't be resolved
             print("Warning: auto download method couldn't be resolved.")
 
-        item["config"] |= {"method_download": method_download}
+        item['config'] |= {'method_download': method_download}
 
         return item
 
     def _install_item(self, item: dict) -> None:
-        str_setup = f"_setup_item_{item['type']}"
+        str_setup = f'_setup_item_{item["type"]}'
         setup = getattr(self, str_setup, None)
         if callable(setup):
             setup(item)
         else:
-            print(f"warning: no item setup for type[{item['type']}]")
+            print(f'warning: no item setup for type[{item["type"]}]')
         self._install_item_generic(item)
 
     def _install_item_generic(self, item: dict) -> None:
         if self.verbose:
             pprint(item)
-        if item.get("invalid", False):
-            print("warning: item is invalid!")
+        if item.get('invalid', False):
+            print('warning: item is invalid!')
             return
-        target_dir = item.get("target_dir", "")
+        target_dir = item.get('target_dir', '')
         if not target_dir:
-            print("warning: item has no target directory!")
+            print('warning: item has no target directory!')
             return
 
-        config = item.get("config")
-        method = config.get("method_download", "")
+        config = item.get('config', {})
+        method = config.get('method_download', '')
 
         descriptor = self._descriptor_item(item)
-        print(f"[{method}] retrieving {descriptor} ...")
+        print(f'[{method}] retrieving {descriptor} ...')
 
         if not method:
-            print("warning: item has no download method!")
+            print('warning: item has no download method!')
             return
-        elif method == "huggingface":
+        elif method == 'huggingface':
             self._install_item_hf(item)
-        elif method == "github":
+        elif method == 'github':
             self._install_item_git(item)
-        elif method == "civitai":
+        elif method == 'civitai':
             self._install_item_civitai(item)
-        elif method == "wget":
+        elif method == 'wget':
             self._install_item_wget(item)
 
     def _setup_item_comfyui(self, item: dict) -> dict:
         # build target url
         map_target_dirs = {
-            "ckpt": "models/ckpt",
-            "vae": "models/vae",
-            "controlnet": "models/controlnet",
-            "custom_node": "custom_nodes",
-            "lora": "models/loras",
-            "embedding": "models/embeddings",
-            "clip": "models/clip",
-            "clip_vision": "models/clip_vision",
-            "ipadapter": "models/ipadapter",
-            "unet": "models/unet",
-            "upscale": "models/upscale_models",
-            "diffusor": "models/diffusion_models",
-            "transformer": "models/diffusion_models",
-            "text_encoder": "models/text_encoders",
+            'ckpt': 'models/ckpt',
+            'vae': 'models/vae',
+            'controlnet': 'models/controlnet',
+            'custom_node': 'custom_nodes',
+            'lora': 'models/loras',
+            'embedding': 'models/embeddings',
+            'clip': 'models/clip',
+            'clip_vision': 'models/clip_vision',
+            'ipadapter': 'models/ipadapter',
+            'unet': 'models/unet',
+            'upscale': 'models/upscale_models',
+            'diffusor': 'models/diffusion_models',
+            'transformer': 'models/diffusion_models',
+            'text_encoder': 'models/text_encoders',
         }
-        target_dir = map_target_dirs.get(item.get("target", "unknown"), "")
+        target_dir = map_target_dirs.get(item.get('target', 'unknown'), '')
         if not target_dir:
-            item["invalid"] = True
+            item['invalid'] = True
             return item
-        target = item.get("target")
-        if target == "custom_node":
-            repo_id = item["config"].get("repo_id")
-            split = repo_id.split("/")
+        target = item.get('target')
+        if target == 'custom_node':
+            repo_id = item['config'].get('repo_id')
+            split = repo_id.split('/')
             # add name of repo id to target directory
-            target_dir = f"{target_dir}/{split[1]}"
+            target_dir = f'{target_dir}/{split[1]}'
 
-        group = item.get("group", "comfyui")
+        group = item.get('group', 'comfyui')
         target_dir = Path(target_dir)
         if group != self.type:
             target_dir = target_dir / group
 
-        variant = item.get("variant", "common")
-        if variant != "common":
+        variant = item.get('variant', 'common')
+        if variant != 'common':
             target_dir = target_dir / variant
 
         # apply subdir
-        subdir = item["config"].get("subdir", "")
-        file: str = item["config"].get("file", "")
+        subdir = item['config'].get('subdir', '')
+        file: str = item['config'].get('file', '')
         if subdir:
-            if subdir == "auto":
+            if subdir == 'auto':
                 # check for high/low
-                if "high" in file.lower():
-                    subdir = "high"
-                if "low" in file.lower():
-                    subdir = "low"
-            if subdir != "auto":
+                if 'high' in file.lower():
+                    subdir = 'high'
+                if 'low' in file.lower():
+                    subdir = 'low'
+            if subdir != 'auto':
                 target_dir = target_dir / subdir
 
         target_dir = self.base_dir / target_dir
-        item["target_dir"] = str(target_dir)
+        item['target_dir'] = str(target_dir)
+
+        return item
 
     def _setup_item_diffpipe(self, item: dict) -> dict:
         # build target url
         map_target_dirs = {
-            "ckpt": "models/ckpt",
-            "vae": "models/vae",
-            "controlnet": "models/controlnet",
-            "custom_node": "custom_nodes",
-            "lora": "models/loras",
-            "embedding": "models/embeddings",
-            "clip": "models/clip",
-            "clip_vision": "models/clip_vision",
-            "ipadapter": "models/ipadapter",
-            "unet": "models/unet",
-            "upscale": "models/upscale_models",
-            "diffusor": "models/diffusion_models",
-            "transformer": "models/diffusion_models",
-            "text_encoder": "models/text_encoders",
+            'ckpt': 'models/ckpt',
+            'vae': 'models/vae',
+            'controlnet': 'models/controlnet',
+            'custom_node': 'custom_nodes',
+            'lora': 'models/loras',
+            'embedding': 'models/embeddings',
+            'clip': 'models/clip',
+            'clip_vision': 'models/clip_vision',
+            'ipadapter': 'models/ipadapter',
+            'unet': 'models/unet',
+            'upscale': 'models/upscale_models',
+            'diffusor': 'models/diffusion_models',
+            'transformer': 'models/diffusion_models',
+            'text_encoder': 'models/text_encoders',
         }
-        target_dir = map_target_dirs.get(item.get("target", "unknown"), "")
+        target_dir = map_target_dirs.get(item.get('target', 'unknown'), '')
         if not target_dir:
-            item["invalid"] = 1
+            item['invalid'] = 1
             return item
-        target_dir = Path(target_dir) / item.get("group")
-        variant = item.get("variant", "common")
-        if variant != "common":
+        target_dir = Path(target_dir)
+        target_dir = target_dir / item.get('group')  # pyright: ignore
+        variant = item.get('variant', 'common')
+        if variant != 'common':
             target_dir = target_dir / variant
-        item["target_dir"] = str(target_dir)
+        item['target_dir'] = str(target_dir)
 
         return item
 
     def _install_item_hf(self, item: dict) -> None:
-        repo_id = item["config"].get("repo_id")
-        file = item["config"].get("file", "")
-        rename = item["config"].get("rename", "")
+        repo_id = item['config'].get('repo_id')
+        file = item['config'].get('file', '')
+        rename = item['config'].get('rename', '')
 
-        target_dir = Path(item["target_dir"])
+        target_dir = Path(item['target_dir'])
         target_dir.mkdir(parents=True, exist_ok=True)
 
         if not file:
             # use snaphot download
             link = Path(snapshot_download(repo_id=repo_id))
-            for src in Path(link).rglob("*.safetensors"):
+            for src in Path(link).rglob('*.safetensors'):
                 target = target_dir / Path(src).relative_to(link)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 self._symlink(src, target)
@@ -325,53 +326,53 @@ class AInstaller:
             self._symlink(src, target)
 
     def _install_item_git(self, item: dict) -> None:
-        repo_id = item["config"].get("repo_id")
-        target_dir = Path(item["target_dir"])
+        repo_id = item['config'].get('repo_id')
+        target_dir = Path(item['target_dir'])
 
-        url = f"https://github.com/{repo_id}.git"
+        url = f'https://github.com/{repo_id}.git'
         Path(target_dir).mkdir(parents=True, exist_ok=True)
         try:
             Repo.clone_from(url, target_dir, recursive=True)
         except Exception as e:
-            print(f"Url git clone went wrong: {url} -> {target_dir}")
+            print(f'Url git clone went wrong: {url} -> {target_dir}')
             print(e)
         # collect python requirements
-        requirements_txt = target_dir / "requirements.txt"
+        requirements_txt = target_dir / 'requirements.txt'
         if requirements_txt.exists():
             with requirements_txt.open() as f:
                 while line := f.readline():
-                    split = line.split(">=")
+                    split = line.split('>=')
                     self.requirements.append(split[0].rstrip())
 
     def _install_item_wget(self, item: dict) -> None:
-        url = item["config"].get("link", "")
+        url = item['config'].get('link', '')
         if not url:
-            print("Warning: wget, no link given")
+            print('Warning: wget, no link given')
             return
         urlp = urlparse(url)
         urlpath = Path(urlp.path)
         urlname = urlpath.name
 
-        rename = item["config"].get("rename", "")
+        rename = item['config'].get('rename', '')
         if not url:
-            print("Warning: wget, no rename given")
+            print('Warning: wget, no rename given')
             return
-        target_dir = Path(item["target_dir"])
+        target_dir = Path(item['target_dir'])
         target_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = (self._cache / urlname).with_suffix(".safetensors")
-        target_file = (target_dir / rename).with_suffix(".safetensors")
+        cache_file = (self._cache / urlname).with_suffix('.safetensors')
+        target_file = (target_dir / rename).with_suffix('.safetensors')
 
         if not cache_file.exists():
             resp = requests.get(url, stream=True)
-            total = int(resp.headers.get("content-length", 0))
+            total = int(resp.headers.get('content-length', 0))
 
             try:
                 with (
-                    cache_file.open("wb") as file,
+                    cache_file.open('wb') as file,
                     tqdm(
                         desc=cache_file.name,
                         total=total,
-                        unit="iB",
+                        unit='iB',
                         unit_scale=True,
                         unit_divisor=1024,
                     ) as bar,
@@ -380,7 +381,7 @@ class AInstaller:
                         size = file.write(data)
                         bar.update(size)
             except Exception as e:
-                print(f"Url download went wrong: {url}")
+                print(f'Url download went wrong: {url}')
                 print(e)
 
         self._symlink(cache_file, target_file)
@@ -395,22 +396,22 @@ class AInstaller:
             os.symlink(src, target, target_is_directory=directory)
 
     def _install_item_civitai(self, item: dict):
-        url = item["config"].get("link", "")
+        url = item['config'].get('link', '')
         if not url:
-            print("Warning: wget, no link given")
+            print('Warning: wget, no link given')
             return
         # urlp = urlparse(url)
         # urlpath = Path(urlp.path)
         # urlname = urlpath.name
 
-        target_dir = Path(item["target_dir"])
+        target_dir = Path(item['target_dir'])
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        filename_cai = ""
+        filename_cai = ''
 
         headers = {
-            "Authorization": f"Bearer {self.token_cai}",
-            "User-Agent": self.USER_AGENT,
+            'Authorization': f'Bearer {self.token_cai}',
+            'User-Agent': self.USER_AGENT,
         }
 
         # Disable automatic redirect handling
@@ -425,29 +426,25 @@ class AInstaller:
         response = opener.open(request)
 
         if response.status in [301, 302, 303, 307, 308]:
-            redirect_url = response.getheader("Location")
+            redirect_url = response.getheader('Location')
 
             # Extract filename from the redirect URL
             parsed_url = urlparse(redirect_url)
             query_params = parse_qs(parsed_url.query)
-            content_disposition = query_params.get(
-                "response-content-disposition", [None]
-            )[0]
+            content_disposition = query_params.get('response-content-disposition', [None])[0]
 
             if content_disposition:
-                filename_cai = unquote(
-                    content_disposition.split("filename=")[1].strip('"')
-                )
+                filename_cai = unquote(content_disposition.split('filename=')[1].strip('"'))
             else:
-                raise Exception("Unable to determine filename")
+                raise Exception('Unable to determine filename')
 
             response = urllib.request.urlopen(redirect_url)
         elif response.status == 404:
-            raise Exception("File not found")
+            raise Exception('File not found')
         else:
-            raise Exception("No redirect found, something went wrong")
+            raise Exception('No redirect found, something went wrong')
 
-        total_size = response.getheader("Content-Length")
+        total_size = response.getheader('Content-Length')
 
         if total_size is not None:
             total_size = int(total_size)
@@ -458,17 +455,18 @@ class AInstaller:
             download = True
         elif total_size > cache_file.stat().st_size:
             download = True
-        if item["config"].get("force", False):
+        if item['config'].get('force', False):
             download = True
 
         if download:
-            with cache_file.open("wb") as f:
+            with cache_file.open('wb') as f:
                 downloaded = 0
 
                 while True:
                     chunk_start_time = time.time()
                     buffer = response.read(self.CHUNK_SIZE)
                     chunk_end_time = time.time()
+                    speed = 0
 
                     if not buffer:
                         break
@@ -483,36 +481,36 @@ class AInstaller:
                     if total_size is not None:
                         progress = downloaded / total_size
                         sys.stdout.write(
-                            f"\rDownloading: {filename_cai} [{progress * 100:.2f}%] - {
-                                speed:.2f} MB/s"
+                            f'\rDownloading: {filename_cai} [{progress * 100:.2f}%] - {
+                                speed:.2f} MB/s'
                         )
             if self.verbose:
-                print(f"Download completed. File saved as: {filename_cai}")
+                print(f'Download completed. File saved as: {filename_cai}')
         else:
             if self.verbose:
-                print("cache ok.")
+                print('cache ok.')
 
         target_file = target_dir / filename_cai
-        rename = item["config"].get("rename", "")
+        rename = item['config'].get('rename', '')
         if rename:
-            target_file = (target_dir / rename).with_suffix(".safetensors")
+            target_file = (target_dir / rename).with_suffix('.safetensors')
 
         self._symlink(cache_file, target_file)
 
     def _descriptor_item(self, item: dict) -> str:
-        descriptor = ""
-        repo_id = item["config"].get("repo_id", "")
-        file = item["config"].get("file", "")
-        link = item["config"].get("link", "")
-        rename = item["config"].get("rename", "")
+        descriptor = ''
+        repo_id = item['config'].get('repo_id', '')
+        file = item['config'].get('file', '')
+        link = item['config'].get('link', '')
+        rename = item['config'].get('rename', '')
 
         if repo_id:
-            descriptor += repo_id + "/"
+            descriptor += repo_id + '/'
         if file:
             descriptor += file
         if link:
             descriptor = link
         if rename:
-            descriptor += " -> " + rename
+            descriptor += ' -> ' + rename
 
         return descriptor
