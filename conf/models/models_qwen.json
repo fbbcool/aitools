@@ -76,6 +76,18 @@
           "skip": false
         },
         {
+          "link": "https://civitai.com/api/download/models/2369080?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "rename": "skinfix-v2",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2363467?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "rename": "amateur-photo-v1",
+          "skip": false
+        },
+        {
           "repo_id": "fbbcool/qwen-image_lora",
           "skip": false
         }
@@ -125,6 +137,12 @@
           "link": "https://civitai.com/api/download/models/2297143?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "ainme2real",
+          "skip": false
+        },
+        {
+          "repo_id": "dx8152/Qwen-Image-Edit-2509-Fusion",
+          "file": "%E6%BA%B6%E5%9B%BE.safetensors",
+          "rename": "fusion",
           "skip": false
         },
         {
