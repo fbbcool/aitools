@@ -57,6 +57,20 @@
           "repo_id": "ChangeTheConstants/SeedVarianceEnhancer"
         },
         {
+          "repo_id": "lquesada/ComfyUI-Inpaint-CropAndStitch"
+        },
+        {
+          "repo_id": "M1kep/ComfyLiterals",
+          "action": "skip"
+        },
+        {
+          "repo_id": "kijai/ComfyUI-WanVideoWrapper",
+          "action": "skip"
+        },
+        {
+          "repo_id": "XT-404/XT-404_SKYNET"
+        },
+        {
           "repo_id": "ssitu/ComfyUI_UltimateSDUpscale"
         }
       ]
