@@ -13,5 +13,5 @@ if __name__ == '__main__':
     if url_img.suffix.lower() not in ['.jpg', '.jpeg', '.png', '.webp']:
         exit(1)
 
-    prompt = get_prompt_comfy(str(url_img))
+    prompt = get_prompt_comfy(str(url_img), verbose=False)
     print(prompt)

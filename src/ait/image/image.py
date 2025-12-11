@@ -3,7 +3,9 @@ from PIL import Image as PILImage
 import json
 
 
-def get_prompt_comfy(img_path: Path | str = '', pil: PILImage.Image | None = None) -> str | None:
+def get_prompt_comfy(
+    img_path: Path | str = '', pil: PILImage.Image | None = None, verbose: bool = False
+) -> str | None:
     if pil is None:
         img_path = Path(img_path)
         if not img_path.exists():
@@ -22,7 +24,9 @@ def get_prompt_comfy(img_path: Path | str = '', pil: PILImage.Image | None = Non
         ksampler = {}
         for id in data:
             class_type = data[id]['class_type']
-            if class_type in ['KSampler', 'WanVideoSampler', 'WanMoeKSampler']:
+            if verbose:
+                print(class_type)
+            if class_type in ['KSampler', 'WanVideoSampler', 'WanMoeKSampler', 'XT404_Skynet_1']:
                 ksampler = data[id]
                 break
         inputs = ksampler.get('inputs', None)

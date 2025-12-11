@@ -126,6 +126,20 @@
           "skip": false
         },
         {
+          "link": "https://civitai.com/api/download/models/2365856?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "cumshot-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2368269?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "cumshot-v1",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2176505?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",

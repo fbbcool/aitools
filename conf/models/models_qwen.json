@@ -134,19 +134,51 @@
           "skip": false
         },
         {
+          "repo_id": "valiantcat/Qwen-Image-Edit-2509-photous",
+          "file": "QwenEdit2509_photous_000010000.safetensors",
+          "rename": "photo-us",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2297143?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "ainme2real",
           "skip": false
         },
         {
-          "repo_id": "dx8152/Qwen-Image-Edit-2509-Fusion",
-          "file": "%E6%BA%B6%E5%9B%BE.safetensors",
-          "rename": "fusion",
-          "skip": false
+          "repo_id": "dx8152/Qwen-Edit-2509-Multiple-angles",
+          "file": "%E9%95%9C%E5%A4%B4%E8%BD%AC%E6%8D%A2.safetensors",
+          "rename": "multi_angle",
+          "skip": true
         },
         {
           "repo_id": "fbbcool/qwen-image-edit_lora",
+          "file": "multi_angle.safetensors",
+          "rename": "multi_angle",
+          "skip": false
+        },
+        {
+          "repo_id": "dx8152/Qwen-Image-Edit-2509-Light_restoration",
+          "file": "%E7%A7%BB%E9%99%A4%E5%85%89%E5%BD%B1V2.safetensors",
+          "rename": "light-restore-v2",
+          "skip": true
+        },
+        {
+          "repo_id": "fbbcool/qwen-image-edit_lora",
+          "file": "light-restore-v2.safetensors",
+          "rename": "light-restore-v2",
+          "skip": false
+        },
+        {
+          "repo_id": "dx8152/Qwen-Image-Edit-2509-Fusion",
+          "file": "%E6%BA%B6%E5%9B%BE.safetensors",
+          "rename": "fusion",
+          "skip": true
+        },
+        {
+          "repo_id": "fbbcool/qwen-image-edit_lora",
+          "file": "fusion.safetensors",
+          "rename": "fusion",
           "skip": false
         }
       ]
