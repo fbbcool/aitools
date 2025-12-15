@@ -71,6 +71,9 @@
           "repo_id": "XT-404/XT-404_SKYNET"
         },
         {
+          "repo_id": "numz/ComfyUI-SeedVR2_VideoUpscaler"
+        },
+        {
           "repo_id": "ssitu/ComfyUI_UltimateSDUpscale"
         }
       ]
