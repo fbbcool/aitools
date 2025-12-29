@@ -147,6 +147,10 @@ class AInstaller:
                 f.write('\n'.join(self.requirements))
 
     @property
+    def vars_bound(self) -> dict:
+        return self._vars_bound
+
+    @property
     def _items(self) -> Generator:
         # selected group
         print(f'items for selected group {self.group}:')
