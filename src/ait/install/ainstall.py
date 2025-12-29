@@ -22,7 +22,6 @@ class AInstallerDB:
         self._db: dict = {}
         self._srcdir: Path = Path(srcdir)
         self._prefixes: list[str] = prefixes
-        self._vars_bound: dict[str, Any] = {}
 
         self._make()
 
@@ -92,6 +91,7 @@ class AInstaller:
         self.db = AInstallerDB().db
         self._cache = Path(AIT_PATH_CACHE)
         self._cache.mkdir(parents=True, exist_ok=True)
+        self._vars_bound: dict[str, Any] = {}
 
         self.base_dir = Path(base_dir)
         split = group.split(':')
@@ -112,9 +112,31 @@ class AInstaller:
     def install(self):
         for item in self._items:
             try:
-                self._install_item(item)
+                item = self._install_item(item)
             except Exception as e:
                 print(f"warning: couldn't install {item}: {e}")
+                continue
+
+            target_var = item.get('target_var', None)
+            if target_var is not None:
+                var_value = item.get('link', None)
+                if var_value is None:
+                    continue
+                split = target_var.split(':')
+                var_bound = split[0]
+                var_type = 'str'
+                if len(split) > 1:
+                    var_type = split[1]
+
+                if var_type == 'str':
+                    var_value = str(var_value)
+                elif var_type == 'int':
+                    var_value = int(var_value)
+                elif var_type == 'list_int':
+                    var_value = [int(var_value)]
+                elif var_type == 'list_str':
+                    var_value = [str(var_value)]
+                self._vars_bound |= {var_bound: var_value}
 
         # create python requirements.txt
         self.requirements = list(set(self.requirements))
