@@ -1,0 +1,19 @@
+{
+  "train_zimage": {
+    "common": {
+      "model": [
+        {
+          "repo_id": "Tongyi-MAI/Z-Image-Turbo"
+        }
+      ]
+    },
+    "turbo": {
+      "lora": [
+        {
+          "repo_id": "ostris/zimage_turbo_training_adapter",
+          "file": "zimage_turbo_training_adapter_v2.safetensors"
+        }
+      ]
+    }
+  }
+}

@@ -110,7 +110,10 @@ class AInstaller:
 
     def install(self):
         for item in self._items:
-            self._install_item(item)
+            try:
+                self._install_item(item)
+            except Exception as e:
+                print(f"warning: couldn't install {item}: {e}")
 
         # create python requirements.txt
         self.requirements = list(set(self.requirements))

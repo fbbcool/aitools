@@ -1,4 +1,5 @@
 set -xg AIT_TMP $HOME/Downloads/000_tmp/
+set -xg WORKSPACE $HOME/Workspace
 
 function ait_update
     echo "update aitools ..."
@@ -45,6 +46,11 @@ function ait_setup_zimage_edit
     python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY zimage:edit
 end
 
+function ait_setup_train_zimage_turbo
+    ait_update
+    python3 $HOME_AIT/script/ainstall_diffpipe.py $WORKSPACE train_zimage:edit
+end
+
 #function ait_wan21 () {
 #  ___install
 #  ___setup_wan21
@@ -81,7 +87,7 @@ function ait_tmp_clean
     rm $AIT_TMP/*.png
 end
 
-function ait_save_latest_vid_prores
+function comfy_save_latest_vid_prores
     set dir $HOME_COMFY/output/video/prores
     lslast 2 $dir | xargs -t -i cp $dir/{} $HOME/Downloads
 end
@@ -89,4 +95,8 @@ end
 function ait_save_latest_vid_upscale
     set dir $HOME_COMFY/output/video/upscale
     lslast 2 $dir | xargs -t -i cp $dir/{} $HOME/Downloads
+end
+
+function comfy_pip_install
+    uv pip install -r $HOME_COMFY/requirements_ainstall.txt --no-build-isolation
 end

@@ -39,6 +39,11 @@
           "skip": true
         },
         {
+          "link": "https://civitai.com/api/download/models/2507266?type=Model&format=SafeTensor",
+          "rename": "giantess-v1",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2466172?type=Model&format=SafeTensor",
           "rename": "penis-lora-v2",
           "skip": false

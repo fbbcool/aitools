@@ -10,6 +10,20 @@
     "t2v": {
       "lora": [
         {
+          "link": "https://civitai.com/api/download/models/2195559?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "deepthroat-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2195625?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "deepthroat-v1",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2096603?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
@@ -41,6 +55,20 @@
     },
     "i2v": {
       "lora": [
+        {
+          "link": "https://civitai.com/api/download/models/2509620?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "slap-v2",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2509701?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "slap-v2",
+          "skip": false
+        },
         {
           "link": "https://civitai.com/api/download/models/2310796?type=Model&format=SafeTensor",
           "method_download": "civitai",

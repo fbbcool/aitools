@@ -74,6 +74,9 @@
           "repo_id": "numz/ComfyUI-SeedVR2_VideoUpscaler"
         },
         {
+          "repo_id": "1038lab/ComfyUI-QwenVL"
+        },
+        {
           "repo_id": "ssitu/ComfyUI_UltimateSDUpscale"
         }
       ]
