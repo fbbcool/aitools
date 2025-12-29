@@ -10,40 +10,46 @@ from huggingface_hub import hf_hub_download, snapshot_download
 from more_itertools import chunked_even
 
 from aidb.hfdataset import HFDatasetImg
+from ait.install import AInstaller
+from templater import Templater
 
 
 class Trainer:
-    WORKSPACE: Final = Path(os.environ.get("ENV_WORKSPACE", "/workspace"))
-    AITOOLS: Final = Path(os.environ.get("AITOOLS_DIR", str(WORKSPACE / "___aitools")))
-    ROOT: Final = WORKSPACE / "train"
+    WORKSPACE: Final = Path(os.environ.get('WORKSPACE', '/workspace'))
+    AITOOLS: Final = Path(os.environ.get('AITOOLS_DIR', str(WORKSPACE / '___aitools')))
+    ROOT: Final = WORKSPACE / 'train'
 
-    MODEL_TYPES: list[Literal["base", "ckpt", "text_encoder", "vae", "clipl"]] = [
-        "base",
-        "ckpt",
-        "text_encoder",
-        "vae",
-        "clipl",
+    MODEL_TYPES: list[Literal['base', 'ckpt', 'text_encoder', 'vae', 'clipl']] = [
+        'base',
+        'ckpt',
+        'text_encoder',
+        'vae',
+        'clipl',
     ]
 
-    FILENAME_CONFIG_BASE: Final = "config_base.json"
-    FILENAME_CONFIG_TRAIN: Final = "config_trainer.json"
-    FILE_CONFIG_BASE: Final = AITOOLS / "src/trainer" / FILENAME_CONFIG_BASE
+    FILENAME_CONFIG_BASE: Final = 'config_base.json'
+    FILENAME_CONFIG_TRAIN: Final = 'config_trainer.json'
+    FILE_CONFIG_BASE: Final = AITOOLS / 'src/trainer' / FILENAME_CONFIG_BASE
     FILE_CONFIG_TRAIN: Final = ROOT / FILENAME_CONFIG_TRAIN
-    FOLDER_DATASET: Final = ROOT / "dataset"
-    FOLDER_OUTPUT: Final = ROOT / "output"
-    FOLDER_MODELS: Final = ROOT / "../models"
-    FILE_SAMPLE_PROMPTS: Final = ROOT / "sample_prompts.txt"
-    FILE_CONFIG_DIFFPIPE: Final = ROOT / "diffpipe.toml"
-    FILE_CONFIG_DATASET: Final = ROOT / "dataset.toml"
-    FILE_TRAIN_SCRIPT: Final = ROOT / "train.sh"
+    FOLDER_DATASET: Final = ROOT / 'dataset'
+    FOLDER_OUTPUT: Final = ROOT / 'output'
+    FOLDER_MODELS: Final = ROOT / '../models'
+    FILE_SAMPLE_PROMPTS: Final = ROOT / 'sample_prompts.txt'
+    FILE_CONFIG_DIFFPIPE: Final = ROOT / 'diffpipe.toml'
+    FILE_CONFIG_DATASET: Final = ROOT / 'dataset.toml'
+    FILE_TRAIN_SCRIPT: Final = ROOT / 'train.sh'
 
     def __init__(
         self,
+        group: str,
         repo_ids_hfd: str | list[str],
-        type_model: str | None = None,
         load_models: bool = True,
         multithread: bool = False,
     ) -> None:
+        self._installer = AInstaller(self.ROOT, group=group, method='diffpipe')
+
+        return
+
         if isinstance(repo_ids_hfd, str):
             repo_ids_hfd = [repo_ids_hfd]
         self._repo_ids_hfd: list[str] = repo_ids_hfd
@@ -51,9 +57,9 @@ class Trainer:
         self._config_base: dict = {}
         self._config_train: dict = {}
 
-        self._type_model = None
-        self._trigger = ""
-        self._name = ""
+        self._model = None
+        self._trigger = ''
+        self._name = ''
         self._netdim = 4
         self._batch_size = 1
         self._num_repeats = 1
@@ -68,42 +74,40 @@ class Trainer:
         hf_hub_download(
             repo_id=self._repo_ids_hfd[0],
             filename=self.FILENAME_CONFIG_TRAIN,
-            repo_type="dataset",
+            repo_type='dataset',
             force_download=True,
             local_dir=self.ROOT,
         )
         # read train config file with pathlib and store the dict
         try:
-            with self.FILE_CONFIG_TRAIN.open("r", encoding="utf-8") as f:
+            with self.FILE_CONFIG_TRAIN.open('r', encoding='utf-8') as f:
                 self._config_train = json.load(f)
         except Exception as e:
-            print(f"{e}\nError: config json not loadable!")
+            print(f'{e}\nError: config json not loadable!')
             return
         # set train config members
-        if type_model is not None:
-            self._type_model = type_model
+        if group is not None:
+            self._model = group
         else:
-            self._type_model = self._config_train.get("type", None)
-        self._name = self._config_train.get("name", "")
-        self._trigger = self._config_train.get("trigger", "")
-        self._netdim = int(self._config_train.get("netdim", 4))
-        self._batch_size = int(self._config_train.get("batch_size", 1))
-        self._num_repeats = int(self._config_train.get("num_repeats", 1))
-        self._lr = float(self._config_train.get("lr", 2e-5))
+            self._model = self._config_train.get('type', None)
+        self._name = self._config_train.get('name', '')
+        self._trigger = self._config_train.get('trigger', '')
+        self._netdim = int(self._config_train.get('netdim', 4))
+        self._batch_size = int(self._config_train.get('batch_size', 1))
+        self._num_repeats = int(self._config_train.get('num_repeats', 1))
+        self._lr = float(self._config_train.get('lr', 2e-5))
 
         #
         # set base config
         #
         try:
-            with self.FILE_CONFIG_BASE.open("r", encoding="utf-8") as f:
+            with self.FILE_CONFIG_BASE.open('r', encoding='utf-8') as f:
                 self._config_base = json.load(f)
         except Exception as e:
-            print(f"{e}\nError: config json not loadable!")
+            print(f'{e}\nError: config json not loadable!')
             return
-        _base_models_all: dict = self._config_base.get("models", {})
-        self._models: dict[str, dict] | None = _base_models_all.get(
-            self._type_model, None
-        )
+        _base_models_all: dict = self._config_base.get('models', {})
+        self._models: dict[str, dict] | None = _base_models_all.get(self._model, None)
         self._model_links: dict[str, str] = {}
 
         #
@@ -136,26 +140,24 @@ class Trainer:
 
     def _download_models(self) -> None:
         if self._models is None:
-            print(f"Error: no models found for type {self._type_model}")
+            print(f'Error: no models found for type {self._model}')
             return None
         else:
-            print(f"downloading models for type {self._type_model}:")
+            print(f'downloading models for type {self._model}:')
 
         for _type in self.MODEL_TYPES:
-            print(f"\ttrying model {_type} ...")
+            print(f'\ttrying model {_type} ...')
             if _type in self._models:
-                print(f"\tdownloading model {_type} ...")
+                print(f'\tdownloading model {_type} ...')
                 _model = self._models.get(_type, {})
-                _repo_id = _model.get("repo_id", None)
-                _ignore_patterns = _model.get("ignore_patterns", None)
-                _file = _model.get("file", None)
-                _link = self._download_model(
-                    _repo_id, file=_file, ignore_patterns=_ignore_patterns
-                )
+                _repo_id = _model.get('repo_id', None)
+                _ignore_patterns = _model.get('ignore_patterns', None)
+                _file = _model.get('file', None)
+                _link = self._download_model(_repo_id, file=_file, ignore_patterns=_ignore_patterns)
                 self._model_links[_type] = _link
             else:
-                self._model_links[_type] = ""
-                print(f"\tno config found for {_type}")
+                self._model_links[_type] = ''
+                print(f'\tno config found for {_type}')
 
     def _download_model(
         self,
@@ -164,9 +166,7 @@ class Trainer:
         ignore_patterns: list[str] | None = None,
     ) -> str | None:
         if file is not None:
-            link = hf_hub_download(
-                repo_id=repo_id, filename=file, cache_dir=self.FOLDER_MODELS
-            )
+            link = hf_hub_download(repo_id=repo_id, filename=file, cache_dir=self.FOLDER_MODELS)
         elif ignore_patterns is not None:
             link = snapshot_download(
                 repo_id=repo_id,
@@ -196,7 +196,7 @@ class Trainer:
             for batch in chunked_even(ids_img, (m // n) + 1):
                 ids.append(batch)
             if len(ids) != n:
-                raise ValueError("dataset multithreading failed!")
+                raise ValueError('dataset multithreading failed!')
 
             threads = []
             for i in range(n):
@@ -207,12 +207,12 @@ class Trainer:
                         hfd,
                     ],
                 )
-                print(f" dataset thread[{i}]: {len(ids[i])} imgs")
+                print(f' dataset thread[{i}]: {len(ids[i])} imgs')
                 threads.append(thread)
                 thread.start()
             for i in range(n):
                 threads[i].join()
-                print(f" dataset thread[{i}]: joined.")
+                print(f' dataset thread[{i}]: joined.')
 
     def _process_imgs(self, ids: list[str], hfd: HFDatasetImg) -> None:
         if not ids:
@@ -237,21 +237,21 @@ class Trainer:
 
             if not caption:
                 lost += 1
-                print(f"caption missing for {id}!")
+                print(f'caption missing for {id}!')
                 continue
 
             # TODO more generic, and take care that the dataset isnt polluted with trigger words
-            caption = caption.replace("1gts,", "")
-            caption = caption.replace("1woman,", "")
+            caption = caption.replace('1gts,', '')
+            caption = caption.replace('1woman,', '')
 
-            caption = f"{self._trigger}," + caption
+            caption = f'{self._trigger},' + caption
 
             # img file
             try:
                 img_file_dl = hfd.img_download(idx)
             except Exception as e:
                 lost += 1
-                print(f"{e}\n{id} not downloadable!")
+                print(f'{e}\n{id} not downloadable!')
                 continue
 
             # copy file to dataset folder
@@ -259,27 +259,27 @@ class Trainer:
             shutil.copy(str(img_file_dl), str(img_file))
 
             # write caption to file
-            cap_file = img_file.with_suffix(".txt")
-            with cap_file.open("w", encoding="utf-8") as f:
+            cap_file = img_file.with_suffix('.txt')
+            with cap_file.open('w', encoding='utf-8') as f:
                 f.write(caption)
 
             # ok
             success += 1
-        print(f"dataset thread finished: {success} successes, {lost} losses")
+        print(f'dataset thread finished: {success} successes, {lost} losses')
 
     def _make_file_sample_prompts(self) -> None:
         str_prompt = []
-        for prompt in self._config_train["prompts"]:
+        for prompt in self._config_train['prompts']:
             # every prompt items is put in its own line
             str_prompt.append(prompt)
-            str_prompt.append(f"{self._trigger}," + prompt)
+            str_prompt.append(f'{self._trigger},' + prompt)
 
         # delete file if exists
         if self.FILE_SAMPLE_PROMPTS.exists():
             self.FILE_SAMPLE_PROMPTS.unlink()
 
-        with self.FILE_SAMPLE_PROMPTS.open("w", encoding="utf-8") as f:
-            f.write("\n\n".join(str_prompt))
+        with self.FILE_SAMPLE_PROMPTS.open('w', encoding='utf-8') as f:
+            f.write('\n\n'.join(str_prompt))
 
     def _make_file_dataset_config(self) -> None:
         str_file = f"""
@@ -351,23 +351,23 @@ num_repeats = {self._num_repeats}
 # resolutions = [[448, 576]]
 # frame_buckets = [1]
 """
-        with self.FILE_CONFIG_DATASET.open("w", encoding="utf-8") as f:
+        with self.FILE_CONFIG_DATASET.open('w', encoding='utf-8') as f:
             f.write(str_file)
 
     #
     # diffpipe configs
     #
     def _make_file_diffpipe_config(self) -> None:
-        if self._type_model == "wan21":
+        if self._model == 'wan21':
             self._make_file_diffpipe_config_wan21()
-        elif self._type_model == "wan22_high":
+        elif self._model == 'wan22_high':
             self._make_file_diffpipe_config_wan22_high()
-        elif self._type_model == "wan22_low":
+        elif self._model == 'wan22_low':
             self._make_file_diffpipe_config_wan22_low()
-        elif self._type_model.startswith("qwen_image"):
+        elif self._model.startswith('qwen_image'):
             self._make_file_diffpipe_config_qwen_image()
         else:
-            raise ValueError(f"unknown training type: {self._type_model}")
+            raise ValueError(f'unknown training type: {self._model}')
 
     #
     # wan22_high diffpipe config
@@ -472,11 +472,11 @@ video_clip_mode = 'single_beginning'
 [model]
 type = 'wan'
 # this is the config checkout for the checkpoint but w/o the specific model
-ckpt_path = '{self._model_links["base"]}'
+ckpt_path = '{self._model_links['base']}'
 # this is the used checkpoint model (compatible with the base checkpoint config!)
-transformer_path = '{self._model_links["ckpt"]}'
+transformer_path = '{self._model_links['ckpt']}'
 # this is the used text encoder model (compatible with the base checkpoint config!)
-llm_path = '{self._model_links["text_encoder"]}'
+llm_path = '{self._model_links['text_encoder']}'
 dtype = 'bfloat16'
 transformer_dtype = 'float8'
 timestep_sample_method = 'logit_normal'
@@ -486,7 +486,7 @@ max_t = 1
 # For models that support full fine tuning, simply delete or comment out the [adapter] table to FFT.
 [adapter]
 type = 'lora'
-rank = {int(self._config_train["netdim"])}
+rank = {int(self._config_train['netdim'])}
 # Dtype for the LoRA weights you are training.
 dtype = 'bfloat16'
 # You can initialize the lora weights from a previously trained lora.
@@ -524,7 +524,7 @@ eps = 1e-8
 # betas = [0.9, 0.99]
 # weight_decay = 0.01
 """
-        with self.FILE_CONFIG_DIFFPIPE.open("w", encoding="utf-8") as f:
+        with self.FILE_CONFIG_DIFFPIPE.open('w', encoding='utf-8') as f:
             f.write(str_file)
 
     #
@@ -630,11 +630,11 @@ video_clip_mode = 'single_beginning'
 [model]
 type = 'wan'
 # this is the config checkout for the checkpoint but w/o the specific model
-ckpt_path = '{self._model_links["base"]}'
+ckpt_path = '{self._model_links['base']}'
 # this is the used checkpoint model (compatible with the base checkpoint config!)
-transformer_path = '{self._model_links["ckpt"]}'
+transformer_path = '{self._model_links['ckpt']}'
 # this is the used text encoder model (compatible with the base checkpoint config!)
-llm_path = '{self._model_links["text_encoder"]}'
+llm_path = '{self._model_links['text_encoder']}'
 dtype = 'bfloat16'
 transformer_dtype = 'float8'
 timestep_sample_method = 'logit_normal'
@@ -644,7 +644,7 @@ max_t = 0.875
 # For models that support full fine tuning, simply delete or comment out the [adapter] table to FFT.
 [adapter]
 type = 'lora'
-rank = {int(self._config_train["netdim"])}
+rank = {int(self._config_train['netdim'])}
 # Dtype for the LoRA weights you are training.
 dtype = 'bfloat16'
 # You can initialize the lora weights from a previously trained lora.
@@ -683,7 +683,7 @@ eps = 1e-8
 # betas = [0.9, 0.99]
 # weight_decay = 0.01
 """
-        with self.FILE_CONFIG_DIFFPIPE.open("w", encoding="utf-8") as f:
+        with self.FILE_CONFIG_DIFFPIPE.open('w', encoding='utf-8') as f:
             f.write(str_file)
 
     #
@@ -789,11 +789,11 @@ video_clip_mode = 'single_beginning'
 [model]
 type = 'wan'
 # this is the config checkout for the checkpoint but w/o the specific model
-ckpt_path = '{self._model_links["base"]}'
+ckpt_path = '{self._model_links['base']}'
 # this is the used checkpoint model (compatible with the base checkpoint config!)
-transformer_path = '{self._model_links["ckpt"]}'
+transformer_path = '{self._model_links['ckpt']}'
 # this is the used text encoder model (compatible with the base checkpoint config!)
-llm_path = '{self._model_links["text_encoder"]}'
+llm_path = '{self._model_links['text_encoder']}'
 dtype = 'bfloat16'
 transformer_dtype = 'float8'
 timestep_sample_method = 'logit_normal'
@@ -801,7 +801,7 @@ timestep_sample_method = 'logit_normal'
 # For models that support full fine tuning, simply delete or comment out the [adapter] table to FFT.
 [adapter]
 type = 'lora'
-rank = {int(self._config_train["netdim"])}
+rank = {int(self._config_train['netdim'])}
 # Dtype for the LoRA weights you are training.
 dtype = 'bfloat16'
 # You can initialize the lora weights from a previously trained lora.
@@ -839,7 +839,7 @@ eps = 1e-8
 # betas = [0.9, 0.99]
 # weight_decay = 0.01
 """
-        with self.FILE_CONFIG_DIFFPIPE.open("w", encoding="utf-8") as f:
+        with self.FILE_CONFIG_DIFFPIPE.open('w', encoding='utf-8') as f:
             f.write(str_file)
 
     #
@@ -945,11 +945,11 @@ steps_per_print = 10
 [model]
 type = 'qwen_image'
 # this is the config checkout for the checkpoint but w/o the specific model
-diffusers_path = '{self._model_links["base"]}'
+diffusers_path = '{self._model_links['base']}'
 # this is the used checkpoint model (compatible with the base checkpoint config!)
-transformer_path = '{self._model_links["ckpt"]}'
+transformer_path = '{self._model_links['ckpt']}'
 # this is the used text encoder model (compatible with the base checkpoint config!)
-#text_encoder_path = '{self._model_links["text_encoder"]}'
+#text_encoder_path = '{self._model_links['text_encoder']}'
 dtype = 'bfloat16'
 transformer_dtype = 'float8'
 timestep_sample_method = 'logit_normal'
@@ -957,7 +957,7 @@ timestep_sample_method = 'logit_normal'
 # For models that support full fine tuning, simply delete or comment out the [adapter] table to FFT.
 [adapter]
 type = 'lora'
-rank = {int(self._config_train["netdim"])}
+rank = {int(self._config_train['netdim'])}
 # Dtype for the LoRA weights you are training.
 dtype = 'bfloat16'
 # You can initialize the lora weights from a previously trained lora.
@@ -995,7 +995,7 @@ eps = 1e-8
 # betas = [0.9, 0.99]
 # weight_decay = 0.01
 """
-        with self.FILE_CONFIG_DIFFPIPE.open("w", encoding="utf-8") as f:
+        with self.FILE_CONFIG_DIFFPIPE.open('w', encoding='utf-8') as f:
             f.write(str_file)
 
     #
@@ -1006,6 +1006,6 @@ eps = 1e-8
 NCCL_P2P_DISABLE="1" NCCL_IB_DISABLE="1" deepspeed --num_gpus=1 train.py --deepspeed --config {self.FILE_CONFIG_DIFFPIPE}
 """
         # save train string to train script and chmod 777 it.
-        with self.FILE_TRAIN_SCRIPT.open("w", encoding="utf-8") as f:
+        with self.FILE_TRAIN_SCRIPT.open('w', encoding='utf-8') as f:
             f.write(str_file)
         self.FILE_TRAIN_SCRIPT.chmod(0o777)

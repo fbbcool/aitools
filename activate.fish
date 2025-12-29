@@ -48,7 +48,7 @@ end
 
 function ait_setup_train_zimage_turbo
     ait_update
-    python3 $HOME_AIT/script/ainstall_diffpipe.py $WORKSPACE train_zimage:edit
+    python3 $HOME_AIT/script/ainstall_diffpipe.py $WORKSPACE train_zimage:turbo
 end
 
 #function ait_wan21 () {

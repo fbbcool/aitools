@@ -13,6 +13,13 @@
           "repo_id": "ostris/zimage_turbo_training_adapter",
           "file": "zimage_turbo_training_adapter_v2.safetensors"
         }
+      ],
+      "dataset": [
+        {
+          "action": "link",
+          "repo_type": "dataset",
+          "repo_id": "fbbcool/1legsemp"
+        }
       ]
     }
   }

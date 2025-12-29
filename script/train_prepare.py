@@ -1,5 +1,4 @@
 from trainer import Trainer
 
-repo_ids = ["fbbcool/1man"]
-Trainer(repo_ids, type_model="qwen_image", multithread=True)
-
+dataset_repo_ids = ['fbbcool/1man']
+Trainer('train_zimage:turbo', dataset_repo_ids, multithread=True)

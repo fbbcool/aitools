@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Final, Generator, Literal
+from typing import Final, Generator, Literal, Any
 import json
 from huggingface_hub import hf_hub_download, snapshot_download
 import requests
@@ -22,6 +22,7 @@ class AInstallerDB:
         self._db: dict = {}
         self._srcdir: Path = Path(srcdir)
         self._prefixes: list[str] = prefixes
+        self._vars_bound: dict[str, Any] = {}
 
         self._make()
 
@@ -83,7 +84,7 @@ class AInstaller:
 
     def __init__(
         self,
-        base_dir: str,
+        base_dir: str | Path,
         group: str = '',
         method: Literal['comfyui', 'diffpipe'] = 'comfyui',
         verbose: bool = False,
@@ -118,9 +119,10 @@ class AInstaller:
         # create python requirements.txt
         self.requirements = list(set(self.requirements))
 
-        requirements_txt = self.base_dir / 'requirements_ainstall.txt'
-        with requirements_txt.open('w') as f:
-            f.write('\n'.join(self.requirements))
+        if self.requirements:
+            requirements_txt = self.base_dir / 'requirements_ainstall.txt'
+            with requirements_txt.open('w') as f:
+                f.write('\n'.join(self.requirements))
 
     @property
     def _items(self) -> Generator:
@@ -175,25 +177,25 @@ class AInstaller:
 
         return item
 
-    def _install_item(self, item: dict) -> None:
+    def _install_item(self, item: dict) -> dict:
         str_setup = f'_setup_item_{item["type"]}'
         setup = getattr(self, str_setup, None)
         if callable(setup):
-            setup(item)
+            item = setup(item)
         else:
             print(f'warning: no item setup for type[{item["type"]}]')
-        self._install_item_generic(item)
+        return self._install_item_generic(item)
 
-    def _install_item_generic(self, item: dict) -> None:
+    def _install_item_generic(self, item: dict) -> dict:
         if self.verbose:
             pprint(item)
         if item.get('invalid', False):
             print('warning: item is invalid!')
-            return
+            return {}
         target_dir = item.get('target_dir', '')
         if not target_dir:
             print('warning: item has no target directory!')
-            return
+            return {}
 
         config = item.get('config', {})
         method = config.get('method_download', '')
@@ -203,15 +205,17 @@ class AInstaller:
 
         if not method:
             print('warning: item has no download method!')
-            return
+            return {}
         elif method == 'huggingface':
-            self._install_item_hf(item)
+            item = self._install_item_hf(item)
         elif method == 'github':
-            self._install_item_git(item)
+            item = self._install_item_git(item)
         elif method == 'civitai':
-            self._install_item_civitai(item)
+            item = self._install_item_civitai(item)
         elif method == 'wget':
-            self._install_item_wget(item)
+            item = self._install_item_wget(item)
+
+        return item
 
     def _setup_item_comfyui(self, item: dict) -> dict:
         # build target url
@@ -270,65 +274,110 @@ class AInstaller:
         return item
 
     def _setup_item_diffpipe(self, item: dict) -> dict:
+        # build target vars for templater
+        map_target_vars = {
+            'ckpt': 'ckpt_path:str',
+            'vae': 'vae_path:str',
+            'lora': 'merge_adapters:list_str',
+            'clip': 'clip_path:str',
+            'transformer': 'transformer_path:str',
+            'text_encoder': 'llm_path:str',
+        }
         # build target url
         map_target_dirs = {
-            'ckpt': 'models/ckpt',
-            'vae': 'models/vae',
-            'controlnet': 'models/controlnet',
-            'custom_node': 'custom_nodes',
-            'lora': 'models/loras',
-            'embedding': 'models/embeddings',
-            'clip': 'models/clip',
-            'clip_vision': 'models/clip_vision',
-            'ipadapter': 'models/ipadapter',
-            'unet': 'models/unet',
-            'upscale': 'models/upscale_models',
-            'diffusor': 'models/diffusion_models',
-            'transformer': 'models/diffusion_models',
-            'text_encoder': 'models/text_encoders',
+            'ckpt': 'data/ckpt',
+            'dataset': 'data/datasets',
+            'vae': 'data/vae',
+            'controlnet': 'data/controlnet',
+            'lora': 'data/loras',
+            'embedding': 'data/embeddings',
+            'clip': 'data/clip',
+            'clip_vision': 'data/clip_vision',
+            'ipadapter': 'data/ipadapter',
+            'unet': 'data/unet',
+            'upscale': 'data/upscale_models',
+            'diffusor': 'data/diffusion_models',
+            'transformer': 'data/diffusion_models',
+            'text_encoder': 'data/text_encoders',
         }
         target_dir = map_target_dirs.get(item.get('target', 'unknown'), '')
+        target_var = map_target_vars.get(item.get('target', 'unknown'), '')
         if not target_dir:
-            item['invalid'] = 1
+            item['invalid'] = True
             return item
+        target = item.get('target')
+        if target == 'custom_node':
+            repo_id = item['config'].get('repo_id')
+            split = repo_id.split('/')
+            # add name of repo id to target directory
+            target_dir = f'{target_dir}/{split[1]}'
+
+        group = item.get('group', 'comfyui')
         target_dir = Path(target_dir)
-        target_dir = target_dir / item.get('group')  # pyright: ignore
+        if group != self.type:
+            target_dir = target_dir / group
+
         variant = item.get('variant', 'common')
         if variant != 'common':
             target_dir = target_dir / variant
+
+        # apply subdir
+        subdir = item['config'].get('subdir', '')
+        file: str = item['config'].get('file', '')
+        if subdir:
+            if subdir == 'auto':
+                # check for high/low
+                if 'high' in file.lower():
+                    subdir = 'high'
+                if 'low' in file.lower():
+                    subdir = 'low'
+            if subdir != 'auto':
+                target_dir = target_dir / subdir
+
+        target_dir = self.base_dir / target_dir
         item['target_dir'] = str(target_dir)
+        if target_var:
+            item['target_var'] = target_var
 
         return item
 
-    def _install_item_hf(self, item: dict) -> None:
+    def _install_item_hf(self, item: dict) -> dict:
         repo_id = item['config'].get('repo_id')
+        repo_type = item['config'].get('repo_type', None)
         file = item['config'].get('file', '')
         rename = item['config'].get('rename', '')
+        action = item['config'].get('action', '')
 
         target_dir = Path(item['target_dir'])
-        target_dir.mkdir(parents=True, exist_ok=True)
 
         if not file:
             # use snaphot download
-            link = Path(snapshot_download(repo_id=repo_id))
-            for src in Path(link).rglob('*.safetensors'):
-                target = target_dir / Path(src).relative_to(link)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                self._symlink(src, target)
+            link = Path(snapshot_download(repo_id=repo_id, repo_type=repo_type))
+            if action == 'link_safetensors':
+                for src in Path(link).rglob('*.safetensors'):
+                    target = target_dir / Path(src).relative_to(link)
+                    self._symlink(src, target)
+            elif action != 'no_link':
+                target = target_dir / Path(repo_id)
+                self._symlink(link, target, directory=True)
+                item['link'] = str(target)
 
         else:
             # use hf download
             link = hf_hub_download(repo_id=repo_id, filename=file)
             src = Path(link)
 
-            target_file = src.name
-            if rename:
-                target_file = Path(rename).with_suffix(src.suffix)
-            target = target_dir / target_file
+            if action != 'no_link':
+                target_file = src.name
+                if rename:
+                    target_file = Path(rename).with_suffix(src.suffix)
+                target = target_dir / target_file
+                self._symlink(src, target)
+                item['link'] = str(target)
 
-            self._symlink(src, target)
+        return item
 
-    def _install_item_git(self, item: dict) -> None:
+    def _install_item_git(self, item: dict) -> dict:
         repo_id = item['config'].get('repo_id')
         target_dir = Path(item['target_dir'])
 
@@ -339,6 +388,8 @@ class AInstaller:
         except Exception as e:
             print(f'Url git clone went wrong: {url} -> {target_dir}')
             print(e)
+        finally:
+            item['link'] = str(target_dir)
         # collect python requirements
         requirements_txt = target_dir / 'requirements.txt'
         if requirements_txt.exists():
@@ -346,12 +397,13 @@ class AInstaller:
                 while line := f.readline():
                     split = line.split('>=')
                     self.requirements.append(split[0].rstrip())
+        return item
 
-    def _install_item_wget(self, item: dict) -> None:
+    def _install_item_wget(self, item: dict) -> dict:
         url = item['config'].get('link', '')
         if not url:
             print('Warning: wget, no link given')
-            return
+            return {}
         urlp = urlparse(url)
         urlpath = Path(urlp.path)
         urlname = urlpath.name
@@ -359,7 +411,7 @@ class AInstaller:
         rename = item['config'].get('rename', '')
         if not url:
             print('Warning: wget, no rename given')
-            return
+            return {}
         target_dir = Path(item['target_dir'])
         target_dir.mkdir(parents=True, exist_ok=True)
         cache_file = (self._cache / urlname).with_suffix('.safetensors')
@@ -389,20 +441,22 @@ class AInstaller:
 
         self._symlink(cache_file, target_file)
 
-    def _symlink(self, src: str | Path, target: str | Path, directory=False):
-        src = str(src)
-        target = str(target)
-        try:
-            os.symlink(src, target, target_is_directory=directory)
-        except OSError:
-            os.remove(target)
-            os.symlink(src, target, target_is_directory=directory)
+        item['link'] = str(target_file)
+        return item
 
-    def _install_item_civitai(self, item: dict):
+    def _symlink(self, src: str | Path, target: str | Path, directory=False) -> None:
+        src = Path(src)
+        target = Path(target)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            os.unlink(str(target))
+        os.symlink(str(src), str(target), target_is_directory=directory)
+
+    def _install_item_civitai(self, item: dict) -> dict:
         url = item['config'].get('link', '')
         if not url:
             print('Warning: wget, no link given')
-            return
+            return {}
         # urlp = urlparse(url)
         # urlpath = Path(urlp.path)
         # urlname = urlpath.name
@@ -499,6 +553,9 @@ class AInstaller:
             target_file = (target_dir / rename).with_suffix('.safetensors')
 
         self._symlink(cache_file, target_file)
+
+        item['link'] = str(target_file)
+        return item
 
     def _descriptor_item(self, item: dict) -> str:
         descriptor = ''
