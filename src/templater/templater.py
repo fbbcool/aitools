@@ -1,7 +1,7 @@
 import json
 from string import Template
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 
 class TemplaterVariable:
@@ -48,6 +48,8 @@ class TemplaterVariable:
 
 
 class Templater:
+    SUFFIX_CONFIG_FILES: Final = '.toml'
+
     def __init__(
         self,
         name: str,
@@ -58,7 +60,9 @@ class Templater:
         self.name = name
 
         url_templates = Path(url_templates)
-        file_template = url_templates / f'{self.name}_template.yaml'
+        file_template = (url_templates / f'{self.name}_template').with_suffix(
+            self.SUFFIX_CONFIG_FILES
+        )
 
         str_template: str = ''
         with file_template.open('rt') as f:
@@ -103,6 +107,6 @@ class Templater:
     def save(self, todir: str | Path) -> None:
         todir = Path(todir)
         todir.mkdir(parents=True, exist_ok=True)
-        tofile = (todir / self.name).with_suffix('.yaml')
+        tofile = (todir / self.name).with_suffix(self.SUFFIX_CONFIG_FILES)
         with tofile.open('wt') as f:
             f.write(self.get_string)

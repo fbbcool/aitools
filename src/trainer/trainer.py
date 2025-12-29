@@ -47,7 +47,9 @@ class Trainer:
         multithread: bool = False,
     ) -> None:
         self._installer = AInstaller(self.ROOT, group=group, method='diffpipe')
-        self._templater_dataset = Templater()
+        self._templater_dataset = Templater(
+            group, self.DIR_TEMPLATES, vars_dict=self._installer.vars_bound
+        )
 
         return
 
