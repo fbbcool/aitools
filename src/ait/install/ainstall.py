@@ -132,10 +132,14 @@ class AInstaller:
                     var_value = str(var_value)
                 elif var_type == 'int':
                     var_value = int(var_value)
-                elif var_type == 'list_int':
-                    var_value = [int(var_value)]
+                elif var_type == 'float':
+                    var_value = float(var_value)
                 elif var_type == 'list_str':
                     var_value = [str(var_value)]
+                elif var_type == 'list_int':
+                    var_value = [int(var_value)]
+                elif var_type == 'list_float':
+                    var_value = [float(var_value)]
                 self._vars_bound |= {var_bound: var_value}
 
         # create python requirements.txt
@@ -149,6 +153,26 @@ class AInstaller:
     @property
     def vars_bound(self) -> dict:
         return self._vars_bound
+
+    @property
+    def name(self) -> str:
+        return self.group
+
+    @property
+    def variant(self) -> str | None:
+        variant = None
+        common = 'common'  # skip this one, no explicit variant!
+        if len(self.variants) == 1:
+            variant = self.variants[0]
+            if variant == common:
+                variant = None
+        elif len(self.variants) == 2:
+            variant = self.variants[0]
+            if variant == common:
+                variant = variant[1]
+        else:
+            variant = None  # no explicit variant
+        return variant
 
     @property
     def _items(self) -> Generator:

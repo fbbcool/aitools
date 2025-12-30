@@ -16,7 +16,7 @@ from templater import Templater
 
 class Trainer:
     WORKSPACE: Final = Path(os.environ.get('WORKSPACE', '/workspace'))
-    AITOOLS: Final = Path(os.environ.get('AITOOLS_DIR', str(WORKSPACE / '___aitools')))
+    HOME_AIT: Final = Path(os.environ.get('HOME_AIT', str(WORKSPACE / '___aitools')))
     ROOT: Final = WORKSPACE / 'train'
 
     MODEL_TYPES: list[Literal['base', 'ckpt', 'text_encoder', 'vae', 'clipl']] = [
@@ -29,15 +29,9 @@ class Trainer:
 
     FILENAME_CONFIG_BASE: Final = 'config_base.json'
     FILENAME_CONFIG_TRAIN: Final = 'config_trainer.json'
-    FILE_CONFIG_BASE: Final = AITOOLS / 'src/trainer' / FILENAME_CONFIG_BASE
-    FILE_CONFIG_TRAIN: Final = ROOT / FILENAME_CONFIG_TRAIN
-    FOLDER_DATASET: Final = ROOT / 'dataset'
-    FOLDER_OUTPUT: Final = ROOT / 'output'
-    FOLDER_MODELS: Final = ROOT / '../models'
-    FILE_SAMPLE_PROMPTS: Final = ROOT / 'sample_prompts.txt'
-    FILE_CONFIG_DIFFPIPE: Final = ROOT / 'diffpipe.toml'
-    FILE_CONFIG_DATASET: Final = ROOT / 'dataset.toml'
-    FILE_TRAIN_SCRIPT: Final = ROOT / 'train.sh'
+    FILE_CONFIG_BASE: Final = HOME_AIT / 'src/trainer' / FILENAME_CONFIG_BASE
+    DIR_TEMPLATES: Final = HOME_AIT / 'conf/diffpipe'
+    FILE_TRAIN_SCRIPT: Final = 'train.sh'
 
     def __init__(
         self,
@@ -45,10 +39,22 @@ class Trainer:
         repo_ids_hfd: str | list[str],
         load_models: bool = True,
         multithread: bool = False,
+        root: str | None = None,
     ) -> None:
-        self._installer = AInstaller(self.ROOT, group=group, method='diffpipe')
+        if root is None:
+            self.root = self.ROOT
+        else:
+            self.root = root
+
+        self._installer = AInstaller(self.root, group=group, method='diffpipe')
+        self.name = self._installer.name
+        self.variant = self._installer.variant
         self._templater_dataset = Templater(
-            group, self.DIR_TEMPLATES, vars_dict=self._installer.vars_bound
+            self.name,
+            'dataset',
+            self.DIR_TEMPLATES,
+            variant=self.variant,
+            vars_dict=self._installer.vars_bound,
         )
 
         return
@@ -117,17 +123,17 @@ class Trainer:
         # folders
         #
         # make datatset folder
-        if self.FOLDER_DATASET.exists():
+        if self.DIR_DATASET.exists():
             # remove it
-            shutil.rmtree(self.FOLDER_DATASET)
-        self.FOLDER_DATASET.mkdir()
+            shutil.rmtree(self.DIR_DATASET)
+        self.DIR_DATASET.mkdir()
         # make output folder
-        if self.FOLDER_OUTPUT.exists():
+        if self.DIR_OUTPUT.exists():
             # remove it
-            shutil.rmtree(self.FOLDER_OUTPUT)
-        self.FOLDER_OUTPUT.mkdir()
+            shutil.rmtree(self.DIR_OUTPUT)
+        self.DIR_OUTPUT.mkdir()
 
-        self.FOLDER_MODELS.mkdir(exist_ok=True)
+        self.DIR_MODELS.mkdir(exist_ok=True)
 
         #
         # prepare training toolchain
@@ -169,12 +175,12 @@ class Trainer:
         ignore_patterns: list[str] | None = None,
     ) -> str | None:
         if file is not None:
-            link = hf_hub_download(repo_id=repo_id, filename=file, cache_dir=self.FOLDER_MODELS)
+            link = hf_hub_download(repo_id=repo_id, filename=file, cache_dir=self.DIR_MODELS)
         elif ignore_patterns is not None:
             link = snapshot_download(
                 repo_id=repo_id,
                 ignore_patterns=ignore_patterns,
-                cache_dir=self.FOLDER_MODELS,
+                cache_dir=self.DIR_MODELS,
             )
         else:
             return None
@@ -258,7 +264,7 @@ class Trainer:
                 continue
 
             # copy file to dataset folder
-            img_file = self.FOLDER_DATASET / img_file_dl.name
+            img_file = self.DIR_DATASET / img_file_dl.name
             shutil.copy(str(img_file_dl), str(img_file))
 
             # write caption to file
@@ -335,7 +341,7 @@ frame_buckets = [1]
 [[directory]]
 # Path to directory of images/videos, and corresponding caption files. The caption files should match the media file name, but with a .txt extension.
 # A missing caption file will log a warning, but then just train using an empty caption.
-path = '{self.FOLDER_DATASET}'
+path = '{self.DIR_DATASET}'
 
 # You can do masked training, where the mask indicates which parts of the image to train on. The masking is done in the loss function. The mask directory should have mask
 # images with the same names (ignoring the extension) as the training images. E.g. training image 1.jpg could have mask image 1.jpg, 1.png, etc. If a training image doesn't
@@ -378,7 +384,7 @@ num_repeats = {self._num_repeats}
     def _make_file_diffpipe_config_wan22_high(self) -> None:
         str_file = f"""
 # Output path for training runs. Each training run makes a new directory in here.
-output_dir = '{self.FOLDER_OUTPUT}'
+output_dir = '{self.DIR_OUTPUT}'
 dataset = '{self.FILE_CONFIG_DATASET}'
 
 # training settings
@@ -536,7 +542,7 @@ eps = 1e-8
     def _make_file_diffpipe_config_wan22_low(self) -> None:
         str_file = f"""
 # Output path for training runs. Each training run makes a new directory in here.
-output_dir = '{self.FOLDER_OUTPUT}'
+output_dir = '{self.DIR_OUTPUT}'
 dataset = '{self.FILE_CONFIG_DATASET}'
 
 # training settings
@@ -695,7 +701,7 @@ eps = 1e-8
     def _make_file_diffpipe_config_wan21(self) -> None:
         str_file = f"""
 # Output path for training runs. Each training run makes a new directory in here.
-output_dir = '{self.FOLDER_OUTPUT}'
+output_dir = '{self.DIR_OUTPUT}'
 dataset = '{self.FILE_CONFIG_DATASET}'
 
 # training settings
@@ -851,7 +857,7 @@ eps = 1e-8
     def _make_file_diffpipe_config_qwen_image(self) -> None:
         str_file = f"""
 # Output path for training runs. Each training run makes a new directory in here.
-output_dir = '{self.FOLDER_OUTPUT}'
+output_dir = '{self.DIR_OUTPUT}'
 dataset = '{self.FILE_CONFIG_DATASET}'
 
 # training settings
