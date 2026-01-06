@@ -34,6 +34,7 @@ ${warmup_steps}
 # Block swapping only works for LoRA training, and requires pipeline_stages=1.
 
 #blocks_to_swap = 20
+${blocks_to_swap}
 
 # eval settings
 
@@ -60,6 +61,7 @@ ${save_every_n_epochs}
 #checkpoint_every_n_minutes = 120
 # Always set to true unless you have a huge amount of VRAM.
 # This can also be 'unsloth' to reduce VRAM even more, with a slight performance hit.
+#activation_checkpointing = 'unsloth'
 activation_checkpointing = true
 # Use reentrant activation checkpointing method (set this in addition to `activation_checkpointing`). Might be required for some models
 # when using pipeline parallelism (pipeline_stages>1). Otherwise recommended to not use it.
