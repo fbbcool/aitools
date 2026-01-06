@@ -1,8 +1,9 @@
 #!/bin/sh
-export AIT_REPOS='https://github.com/fbbcool/aitools.git'
+export REPOS_AIT='https://github.com/fbbcool/aitools.git'
 export WORKSPACE='/workspace'
-export AIT_HOME=$WORKSPACE/aitools
-export PYTHONPATH=$AIT_HOME/src
+export HOME_AIT=$WORKSPACE/aitools
+export CONF_AIT=$HOME_AIT/conf
+export PYTHONPATH=$HOME_AIT/src
 
 ___install() {
   git clone $AIT_REPOS $AIT_HOME
