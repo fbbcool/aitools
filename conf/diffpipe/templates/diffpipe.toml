@@ -107,7 +107,8 @@ video_clip_mode = 'single_beginning'
 ${model___type}
 # this is the config checkout for the checkpoint but w/o the specific model
 #ckpt_path = '{self._model_links['base']}'
-${model___ckpt_path}
+#${model___ckpt_path}
+${model___diffusers_path}
 # this is the used checkpoint model (compatible with the base checkpoint config!)
 #transformer_path = '{self._model_links['ckpt']}'
 ${model___transformer_path}

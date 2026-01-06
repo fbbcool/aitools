@@ -30,8 +30,8 @@
       ],
       "transformer": [
         {
-          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-          "file": "split_files/diffusion_models/qwen_image_2512_fp8_e4m3fn.safetensors",
+          "repo_id": "unsloth/Qwen-Image-2512-FP8",
+          "file": "qwen-image-2512-fp8.safetensors",
           "rename": "2512_fp8",
           "skip": false
         }
