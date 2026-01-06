@@ -1,11 +1,8 @@
 import os
-import json
 from pathlib import Path
 import shutil
 from typing import Final, Literal
 import threading
-
-from huggingface_hub import hf_hub_download, snapshot_download
 
 from more_itertools import chunked_even
 
@@ -20,17 +17,6 @@ class Trainer:
     HOME_AIT: Final = Path(os.environ.get('HOME_AIT', str(WORKSPACE / '___aitools')))
     ROOT: Final = WORKSPACE / PREFIX
 
-    MODEL_TYPES: list[Literal['base', 'ckpt', 'text_encoder', 'vae', 'clipl']] = [
-        'base',
-        'ckpt',
-        'text_encoder',
-        'vae',
-        'clipl',
-    ]
-
-    FILENAME_CONFIG_BASE: Final = 'config_base.json'
-    FILENAME_CONFIG_TRAIN: Final = 'config_trainer.json'
-    FILE_CONFIG_BASE: Final = HOME_AIT / 'src/trainer' / FILENAME_CONFIG_BASE
     FILE_TRAIN_SCRIPT: Final = f'{PREFIX}.sh'
     PREFIX_INSTALLER_GROUP: Final = f'{PREFIX}_'
     DIR_DATASET: Final = 'dataset'
@@ -63,20 +49,25 @@ class Trainer:
             self._config_dataset = config_dataset
 
         self._installer = AInstaller(self.root, group=self._group_installer, method='diffpipe')
+        # print(f'installer vars dataset: {self._installer.vars_bound}')
+        self._config_trainer |= self._installer.vars_bound
+
+        self._config_dataset |= {'path': self.dir_dataset}
         self._templater_dataset = Templater(
             'dataset',
             self.model,
             variant=self.variant,
             vars_dict=self.config_dataset,
         )
+        self._templater_dataset.save(self.root)
+
+        self._config_trainer |= {'dataset': self._templater_dataset.file_saved}
         self._templater_diffpipe = Templater(
             'diffpipe',
             self.model,
             variant=self.variant,
             vars_dict=self.config_trainer,
         )
-
-        self._templater_dataset.save(self.root)
         self._templater_diffpipe.save(self.root)
 
         self._repo_ids_hfd: list[str] = repo_ids_hfd
@@ -199,66 +190,6 @@ class Trainer:
             success += 1
         print(f'dataset thread finished: {success} successes, {lost} losses')
 
-    #
-    # wan22_high diffpipe config
-    #
-    def _make_file_diffpipe_config_wan22_high(self) -> None:
-        str_file = f"""
-[model]
-type = 'wan'
-# this is the config checkout for the checkpoint but w/o the specific model
-ckpt_path = 'self._model_links['base']'
-# this is the used checkpoint model (compatible with the base checkpoint config!)
-transformer_path = 'self._model_links['ckpt']'
-# this is the used text encoder model (compatible with the base checkpoint config!)
-llm_path = 'self._model_links['text_encoder']'
-dtype = 'bfloat16'
-transformer_dtype = 'float8'
-timestep_sample_method = 'logit_normal'
-min_t = 0.875
-max_t = 1
-"""
-
-    #
-    # wan22_low diffpipe config
-    #
-    def _make_file_diffpipe_config_wan22_low(self) -> None:
-        str_file = f"""
-[model]
-type = 'wan'
-# this is the config checkout for the checkpoint but w/o the specific model
-ckpt_path = 'self._model_links['base']'
-# this is the used checkpoint model (compatible with the base checkpoint config!)
-transformer_path = 'self._model_links['ckpt']'
-# this is the used text encoder model (compatible with the base checkpoint config!)
-llm_path = 'self._model_links['text_encoder']'
-min_t = 0.0
-max_t = 0.875
-[optimizer]
-lr = 2.0 * self._lr
-betas = [0.9, 0.99]
-weight_decay = 0.01
-eps = 1e-8
-"""
-
-    #
-    # qwen-image diffpipe config
-    #
-    def _make_file_diffpipe_config_qwen_image(self) -> None:
-        str_file = f"""
-[model]
-type = 'qwen_image'
-# this is the config checkout for the checkpoint but w/o the specific model
-diffusers_path = 'self._model_links['base']'
-# this is the used checkpoint model (compatible with the base checkpoint config!)
-transformer_path = 'self._model_links['ckpt']'
-# this is the used text encoder model (compatible with the base checkpoint config!)
-#text_encoder_path = 'self._model_links['text_encoder']'
-"""
-
-    #
-    # train script
-    #
     def _make_file_train_script(self) -> None:
         str_file = f"""
 NCCL_P2P_DISABLE="1" NCCL_IB_DISABLE="1" deepspeed --num_gpus=1 train.py --deepspeed --config {self._templater_diffpipe.file_saved}
@@ -268,3 +199,61 @@ NCCL_P2P_DISABLE="1" NCCL_IB_DISABLE="1" deepspeed --num_gpus=1 train.py --deeps
         with file_train.open('w', encoding='utf-8') as f:
             f.write(str_file)
         file_train.chmod(0o777)
+
+
+#    #
+#    # wan22_high diffpipe config
+#    #
+#    def _make_file_diffpipe_config_wan22_high(self) -> None:
+#        str_file = f"""
+# [model]
+# type = 'wan'
+## this is the config checkout for the checkpoint but w/o the specific model
+# ckpt_path = 'self._model_links['base']'
+## this is the used checkpoint model (compatible with the base checkpoint config!)
+# transformer_path = 'self._model_links['ckpt']'
+## this is the used text encoder model (compatible with the base checkpoint config!)
+# llm_path = 'self._model_links['text_encoder']'
+# dtype = 'bfloat16'
+# transformer_dtype = 'float8'
+# timestep_sample_method = 'logit_normal'
+# min_t = 0.875
+# max_t = 1
+# """
+#
+#    #
+#    # wan22_low diffpipe config
+#    #
+#    def _make_file_diffpipe_config_wan22_low(self) -> None:
+#        str_file = f"""
+# [model]
+# type = 'wan'
+## this is the config checkout for the checkpoint but w/o the specific model
+# ckpt_path = 'self._model_links['base']'
+## this is the used checkpoint model (compatible with the base checkpoint config!)
+# transformer_path = 'self._model_links['ckpt']'
+## this is the used text encoder model (compatible with the base checkpoint config!)
+# llm_path = 'self._model_links['text_encoder']'
+# min_t = 0.0
+# max_t = 0.875
+# [optimizer]
+# lr = 2.0 * self._lr
+# betas = [0.9, 0.99]
+# weight_decay = 0.01
+# eps = 1e-8
+# """
+#
+#    #
+#    # qwen-image diffpipe config
+#    #
+#    def _make_file_diffpipe_config_qwen_image(self) -> None:
+#        str_file = f"""
+# [model]
+# type = 'qwen_image'
+## this is the config checkout for the checkpoint but w/o the specific model
+# diffusers_path = 'self._model_links['base']'
+## this is the used checkpoint model (compatible with the base checkpoint config!)
+# transformer_path = 'self._model_links['ckpt']'
+## this is the used text encoder model (compatible with the base checkpoint config!)
+##text_encoder_path = 'self._model_links['text_encoder']'
+# """
