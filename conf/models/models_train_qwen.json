@@ -5,6 +5,7 @@
         {
           "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
           "file": "split_files/vae/qwen_image_vae.safetensors",
+          "skip": true,
           "rename": "vae"
         }
       ],
@@ -12,18 +13,21 @@
         {
           "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
           "file": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
-          "rename": "2-5_fp8"
-        }
-      ],
-      "clip": [
-        {
-          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-          "file": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "skip": true,
           "rename": "2-5_fp8"
         }
       ]
     },
     "2512": {
+      "ckpt": [
+        {
+          "repo_id": "Qwen/Qwen-Image-2512",
+          "ignore_patterns": [
+            "transformer/diffusion_pytorch_model-0*"
+          ],
+          "action": "none"
+        }
+      ],
       "transformer": [
         {
           "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",

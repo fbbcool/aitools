@@ -115,6 +115,8 @@ ${model___transformer_path}
 #llm_path = '{self._model_links['text_encoder']}'
 ${model___llm_path}
 ${model___vae_path}
+#merge_adapters
+${model___merge_adapters}
 #dtype = 'bfloat16'
 ${model___dtype}
 #transformer_dtype = 'float8'

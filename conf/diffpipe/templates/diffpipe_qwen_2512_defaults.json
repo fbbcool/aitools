@@ -1,7 +1,7 @@
 {
   "output_dir": "/workspace/train/output",
   "dataset": "/workspace/train/dataset.toml",
-  "epochs": 20,
+  "epochs": 40,
   "micro_batch_size_per_gpu": 1,
   "warmup_steps": 20,
   "save_every_n_epochs": 1,
@@ -19,7 +19,7 @@
   "model___max_t": "",
   "adapter___rank": "16",
   "adapter___dtype": "bfloat16",
-  "optimizer___lr": "",
+  "optimizer___lr": 2e-5,
   "optimizer___weight_decay": 0.01,
   "optimizer___type": "adamw_optimi"
 }

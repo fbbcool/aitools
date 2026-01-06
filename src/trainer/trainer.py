@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import shutil
-from typing import Final, Literal
+from typing import Final
 import threading
 
 from more_itertools import chunked_even
@@ -50,9 +50,8 @@ class Trainer:
 
         self._installer = AInstaller(self.root, group=self._group_installer, method='diffpipe')
         # print(f'installer vars dataset: {self._installer.vars_bound}')
-        self._config_trainer |= self._installer.vars_bound
 
-        self._config_dataset |= {'path': self.dir_dataset}
+        self._config_dataset |= {'path': str(self.dir_dataset)}
         self._templater_dataset = Templater(
             'dataset',
             self.model,
@@ -61,7 +60,9 @@ class Trainer:
         )
         self._templater_dataset.save(self.root)
 
-        self._config_trainer |= {'dataset': self._templater_dataset.file_saved}
+        self._config_trainer |= {'dataset': str(self._templater_dataset.file_saved)}
+        self._config_trainer |= self._installer.vars_bound
+        print(self.config_trainer)
         self._templater_diffpipe = Templater(
             'diffpipe',
             self.model,

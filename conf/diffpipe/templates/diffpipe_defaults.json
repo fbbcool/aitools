@@ -13,6 +13,7 @@
   "model___transformer_path": "",
   "model___llm_path": "",
   "model___vae_path": "",
+  "model___merge_adapters": "",
   "model___transformer_dtype": "float8",
   "model___dtype": "bfloat16",
   "model___min_t": "",

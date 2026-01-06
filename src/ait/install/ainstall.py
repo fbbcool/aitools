@@ -322,12 +322,12 @@ class AInstaller:
     def _setup_item_diffpipe(self, item: dict) -> dict:
         # build target vars for templater
         map_target_vars = {
-            'ckpt': 'ckpt_path:str',
-            'vae': 'vae_path:str',
-            'lora': 'merge_adapters:list_str',
-            'clip': 'clip_path:str',
-            'transformer': 'transformer_path:str',
-            'text_encoder': 'llm_path:str',
+            'ckpt': 'model___ckpt_path:str',
+            'vae': 'model___vae_path:str',
+            'lora': 'model___merge_adapters:list_str',
+            'clip': 'model___clip_path:str',
+            'transformer': 'model___transformer_path:str',
+            'text_encoder': 'model___llm_path:str',
         }
         # build target url
         map_target_dirs = {
@@ -393,12 +393,18 @@ class AInstaller:
         file = item['config'].get('file', '')
         rename = item['config'].get('rename', '')
         action = item['config'].get('action', '')
+        ignore_patterns = item['config'].get('ignore_patterns', [])
 
         target_dir = Path(item['target_dir'])
 
         if not file:
             # use snaphot download
-            link = Path(snapshot_download(repo_id=repo_id, repo_type=repo_type))
+            print(f'ignore_patterns: {ignore_patterns}')
+            link = Path(
+                snapshot_download(
+                    repo_id=repo_id, repo_type=repo_type, ignore_patterns=ignore_patterns
+                )
+            )
             if action == 'link_safetensors':
                 for src in Path(link).rglob('*.safetensors'):
                     target = target_dir / Path(src).relative_to(link)
