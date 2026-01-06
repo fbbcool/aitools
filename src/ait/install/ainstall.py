@@ -169,7 +169,7 @@ class AInstaller:
         elif len(self.variants) == 2:
             variant = self.variants[0]
             if variant == common:
-                variant = variant[1]
+                variant = self.variants[1]
         else:
             variant = None  # no explicit variant
         return variant

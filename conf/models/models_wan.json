@@ -3,6 +3,20 @@
     "common": {
       "transformer": [
         {
+          "link": "https://civitai.com/api/download/models/2527234?type=Model&format=SafeTensor&size=full&fp=fp16",
+          "subdir": "high",
+          "method_download": "civitai",
+          "rename": "Exitium-Vitrix-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2527274?type=Model&format=SafeTensor&size=full&fp=fp16",
+          "subdir": "low",
+          "method_download": "civitai",
+          "rename": "Exitium-Vitrix-v1",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2483014?type=Model&format=SafeTensor&size=full&fp=fp16",
           "subdir": "high",
           "method_download": "civitai",

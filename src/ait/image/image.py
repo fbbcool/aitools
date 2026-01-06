@@ -28,9 +28,13 @@ def get_prompt_comfy(
                 print(class_type)
             if class_type in ['KSampler', 'WanVideoSampler', 'WanMoeKSampler', 'XT404_Skynet_1']:
                 ksampler = data[id]
+                if verbose:
+                    print(f'{class_type} found!')
                 break
         inputs = ksampler.get('inputs', None)
         if inputs is None:
+            if verbose:
+                print('no inputs found!')
             return None
 
         prompt = None
@@ -40,6 +44,8 @@ def get_prompt_comfy(
             if value is not None:
                 id_pos = value[0]
                 prompt = data[id_pos]
+                if verbose:
+                    print(f'{key} with value[{value}] found!')
                 break  # of for
 
         max_loop = 10
@@ -58,8 +64,12 @@ def get_prompt_comfy(
                 node_pos = data[id_pos]
                 if isinstance(node_pos, dict):
                     inputs = node_pos.get('inputs', None)
+                    if verbose:
+                        print(f'value[{value}] found!')
             elif isinstance(prompt, dict):
                 inputs = prompt.get('inputs', None)
+                if verbose:
+                    print(f'inputs[{inputs}] found!')
             else:
                 return None
 
@@ -67,11 +77,19 @@ def get_prompt_comfy(
                 return None
 
             prompt = inputs.get('text', None)
-            for key in ['Text', 'string_b', 'positive_prompt']:
+            keys = ['Text', 'string_b', 'positive_prompt']
+            for key in keys:
                 value = inputs.get(key, None)
                 if value is not None:
                     prompt = value
                     break  # for
+            if prompt is None:
+                # search anys
+                for i in range(10):
+                    key = f'any_0{i}'
+                    value = inputs.get(key, None)
+                    if value is not None:
+                        prompt = value
 
     except Exception:
         return None

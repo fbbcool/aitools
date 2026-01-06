@@ -69,61 +69,37 @@ class Templater:
 
     def __init__(
         self,
-        name: str,
         _type: str,  # "dataset" or "diffpipe"
+        name: str,
         url_templates: str | Path = Path(URL_TEMPLATES),
         variant: str | None = None,
-        variants: list[str]
-        | None = None,  # if no template is found, maybe a variant exists. first match!
         vars_dict: dict | None = None,
         vars_list: list[TemplaterVariable] | None = None,
         suffix: str = SUFFIX_CONFIG_FILES,
         todir: str | Path = URL_TODIR,
-        use_generics: bool = False,
+        verbose: bool = False,
     ) -> None:
+        self._type = _type
+        self.name = name
+        self.variant = variant
+        self.path_templates = Path(url_templates)
         self.suffix = suffix
         self._todir = todir
         self.file_saved: Path | None = None
+        self.verbose = verbose
 
         # select template
-        self.path_templates = Path(url_templates)
-        self.name = name
-        self.variant = ''
-        self._type = _type
-        self._use_generics = False
-        if variants is None:
-            variants = []
-        if variant is None:
-            variant = ''
-        if variant:
-            variants.append(variant)
-        if not self.filepath_template.exists():
-            for variant in variants:
-                self.variant = variant
-                if self.filepath_template.exists():
-                    break
-        # use use_generics
-        if not self.filepath_template.exists():
-            self._use_generics = use_generics
-        # template selection not successful
-        if not self.filepath_template.exists():
-            raise FileNotFoundError(f'No template found: {str(self.filepath_template)}')
-
-        # template selection successful
-        print(f'success: using template {self.filepath_template}')
         str_template: str = ''
-        with self.filepath_template.open('rt') as f:
+        file_template = self.filepath_template
+        if file_template is None:
+            raise FileNotFoundError('no template found!')
+        with file_template.open('rt') as f:
             str_template = f.read()
             # print(str_template)
         self._template = Template(str_template)
+        print(f'using template: {file_template}')
 
-        defaults = {}
-        if self.filepath_defaults.exists():
-            print(f'info: using defaults {self.filepath_defaults}')
-            with self.filepath_defaults.open('rt') as f:
-                defaults = json.load(f)
-        else:
-            print(f'info: no defaults found for: {self.filepath_defaults}')
+        defaults = self._make_cascading_defaults()
 
         self._substitutes = self._make_substitutes_from_dict(defaults)
 
@@ -132,37 +108,61 @@ class Templater:
         if vars_list:
             self._substitutes |= self._make_substitutes_from_list(vars_list)
 
-        print('using substitutes:')
-        pprint(self._substitutes)
+        if self.verbose:
+            print('using substitutes:')
+            pprint(self._substitutes)
+
+    def _load_json(self, filepath: Path) -> dict:
+        if not filepath.exists():
+            return {}
+        if not filepath.is_file():
+            return {}
+        with filepath.open('rt') as f:
+            return json.load(f)
+
+    def _make_cascading_defaults(self) -> dict:
+        defaults = {}
+
+        files = [
+            self.path_templates / f'{self._type}_{self.POSTFIX_DEFAULT_FILES}',
+            self.path_templates / f'{self._type}_{self.name}_{self.POSTFIX_DEFAULT_FILES}',
+            self.path_templates
+            / f'{self._type}_{self.name}_{self.variant}_{self.POSTFIX_DEFAULT_FILES}',
+        ]
+        for file in files:
+            data = self._load_json(file)
+            if data:
+                defaults |= data
+                print(f'using defaults: {file}')
+
+        return defaults
 
     @property
-    def filepath_template(self) -> Path:
-        if self._use_generics:
-            return (self.path_templates / f'{self._type}').with_suffix(self.suffix)
-        if self.variant:
-            return (self.path_templates / f'{self.name}_{self.variant}_{self._type}').with_suffix(
+    def filepath_template(self) -> Path | None:
+        files = [
+            (self.path_templates / f'{self._type}_{self.name}_{self.variant}').with_suffix(
                 self.suffix
-            )
-        return (self.path_templates / f'{self.name}_{self._type}').with_suffix(self.suffix)
+            ),
+            (self.path_templates / f'{self._type}_{self.name}').with_suffix(self.suffix),
+            (self.path_templates / f'{self._type}').with_suffix(self.suffix),
+        ]
+        for file in files:
+            print(f'looking for: {file}')
+            if file.exists():
+                return file
+        return None
 
     @property
     def filename(self) -> str:
-        return self.filepath_template.name
-
-    @property
-    def filepath_defaults(self) -> Path:
-        if self._use_generics:
-            return self.path_templates / f'{self._type}_{self.POSTFIX_DEFAULT_FILES}'
-        if self.variant:
-            return (
-                self.path_templates
-                / f'{self.name}_{self.variant}_{self._type}_{self.POSTFIX_DEFAULT_FILES}'
-            )
-        return self.path_templates / f'{self.name}_{self._type}_{self.POSTFIX_DEFAULT_FILES}'
+        file = self.filepath_template
+        if file is not None:
+            return file.name
+        else:
+            return ''
 
     @property
     def todir(self) -> Path:
-        return self._todir
+        return Path(self._todir)
 
     def _make_substitutes_from_dict(self, vars: dict) -> dict[str, Any]:
         ret = {}

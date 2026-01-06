@@ -3,6 +3,11 @@
     "common": {
       "vae": [
         {
+          "repo_id": "REPA-E/e2e-qwenimage-vae",
+          "file": "diffusion_pytorch_model.safetensors",
+          "rename": "vae-e2e"
+        },
+        {
           "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
           "file": "split_files/vae/qwen_image_vae.safetensors",
           "rename": "vae"
@@ -57,12 +62,18 @@
         },
         {
           "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-          "file": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors",
-          "rename": "fp8",
+          "file": "split_files/diffusion_models/qwen_image_2512_fp8_e4m3fn.safetensors",
+          "rename": "2512_fp8",
           "skip": false
         }
       ],
       "lora": [
+        {
+          "repo_id": "lightx2v/Qwen-Image-2512-Lightning",
+          "file": "Qwen-Image-2512-Lightning-4steps-V1.0-bf16.safetensors",
+          "rename": "4steps-2512-v2",
+          "skip": false
+        },
         {
           "repo_id": "lightx2v/Qwen-Image-Lightning",
           "file": "Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors",
@@ -76,6 +87,12 @@
           "skip": false
         },
         {
+          "link": "https://civitai.com/api/download/models/2510724?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "rename": "penis-lora-v2",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2369080?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "skinfix-v2",
@@ -85,6 +102,12 @@
           "link": "https://civitai.com/api/download/models/2363467?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "amateur-photo-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2474488?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "rename": "nsfw-snofs-v13",
           "skip": false
         },
         {
@@ -103,8 +126,8 @@
         },
         {
           "repo_id": "Phr00t/Qwen-Image-Edit-Rapid-AIO",
-          "file": "v17/Qwen-Rapid-AIO-NSFW-v17.safetensors",
-          "rename": "Rapid-AIO-v17",
+          "file": "v18/Qwen-Rapid-AIO-NSFW-v18.1.safetensors",
+          "rename": "Rapid-AIO-v18-1",
           "skip": false
         },
         {

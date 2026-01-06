@@ -57,11 +57,6 @@ end
 #  ___hook
 #}
 
-function ait_clean_gen
-    rm -rf $HOME_COMFY/output/video
-    rm -rf $HOME_COMFY/temp/*
-end
-
 function ait_img_prompt_clipspace
     echo (wl-paste)
     python3 $HOME_AIT/script/img_prompt.py (wl-paste) | wl-copy
@@ -77,6 +72,11 @@ function ait_img_caption_clipspace
     echo -n (wl-paste)
 end
 
+function ait_caption
+    ait_tmp_clipspace
+    ait_img_caption_clipspace
+end
+
 function ait_tmp_clipspace
     set input (wl-paste)
     echo $input
@@ -87,12 +87,18 @@ function ait_tmp_clean
     rm $AIT_TMP/*.png
 end
 
+function comfy_clean_gen
+    rm -rf $HOME_COMFY/output/video
+    rm -f $HOME_COMFY/output *.mp4 *.png
+    rm -rf $HOME_COMFY/temp/*
+end
+
 function comfy_save_latest_vid_prores
     set dir $HOME_COMFY/output/video/prores
     lslast 2 $dir | xargs -t -i cp $dir/{} $HOME/Downloads
 end
 
-function ait_save_latest_vid_upscale
+function comfy_save_latest_vid_upscale
     set dir $HOME_COMFY/output/video/upscale
     lslast 2 $dir | xargs -t -i cp $dir/{} $HOME/Downloads
 end

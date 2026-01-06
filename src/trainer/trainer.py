@@ -30,7 +30,6 @@ class Trainer:
     FILENAME_CONFIG_BASE: Final = 'config_base.json'
     FILENAME_CONFIG_TRAIN: Final = 'config_trainer.json'
     FILE_CONFIG_BASE: Final = HOME_AIT / 'src/trainer' / FILENAME_CONFIG_BASE
-    DIR_TEMPLATES: Final = HOME_AIT / 'conf/diffpipe'
     FILE_TRAIN_SCRIPT: Final = 'train.sh'
 
     def __init__(
@@ -50,9 +49,8 @@ class Trainer:
         self.name = self._installer.name
         self.variant = self._installer.variant
         self._templater_dataset = Templater(
-            self.name,
             'dataset',
-            self.DIR_TEMPLATES,
+            self.name,
             variant=self.variant,
             vars_dict=self._installer.vars_bound,
         )

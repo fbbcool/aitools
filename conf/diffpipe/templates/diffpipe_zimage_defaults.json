@@ -1,0 +1,11 @@
+{
+  "output_dir": "/workspace/train/output",
+  "dataset": "/workspace/train/dataset.toml",
+  "epochs": 20,
+  "micro_batch_size_per_gpu": 4,
+  "warmup_steps": 20,
+  "caching_batch_size": 4,
+  "model___type": "z_image",
+  "adapter___rank": 32,
+  "optimizer___lr": 2e-5
+}

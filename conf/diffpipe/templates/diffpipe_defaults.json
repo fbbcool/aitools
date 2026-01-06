@@ -3,7 +3,7 @@
   "dataset": "/workspace/train/dataset.toml",
   "epochs": 20,
   "micro_batch_size_per_gpu": 1,
-  "warm_up_steps": 100,
+  "warmup_steps": 100,
   "save_every_n_epochs": 1,
   "save_dtype": "bfloat16",
   "caching_batch_size": 1,

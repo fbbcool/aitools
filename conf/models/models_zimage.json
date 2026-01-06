@@ -3,6 +3,11 @@
     "common": {
       "vae": [
         {
+          "repo_id": "Owen777/UltraFlux-v1",
+          "file": "vae/diffusion_pytorch_model.safetensors",
+          "rename": "vae-ultraflux-v1"
+        },
+        {
           "repo_id": "Comfy-Org/z_image_turbo",
           "file": "split_files/vae/ae.safetensors",
           "rename": "vae"
@@ -26,6 +31,11 @@
     "turbo": {
       "transformer": [
         {
+          "link": "https://civitai.com/api/download/models/2511897?type=Model&format=SafeTensor&size=full&fp=fp16",
+          "rename": "JibMix",
+          "skip": false
+        },
+        {
           "repo_id": "Comfy-Org/z_image_turbo",
           "file": "split_files/diffusion_models/z_image_turbo_bf16.safetensors",
           "rename": "turbo",
@@ -34,9 +44,54 @@
       ],
       "lora": [
         {
-          "link": "",
-          "rename": "",
-          "skip": true
+          "link": "https://civitai.com/api/download/models/2511098?type=Model&format=SafeTensor",
+          "rename": "giant",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2453498?type=Model&format=SafeTensor",
+          "rename": "macromastia",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2493529?type=Model&format=SafeTensor",
+          "rename": "real-breast-nipples-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2545423?type=Model&format=SafeTensor",
+          "rename": "big-nipples",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2502823?type=Model&format=SafeTensor",
+          "rename": "slider-ass",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2550619?type=Model&format=SafeTensor",
+          "rename": "slider-breasts-v21",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2523263?type=Model&format=SafeTensor",
+          "rename": "slider-details-v1",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2470291?type=Model&format=SafeTensor",
+          "rename": "after-dark-v2",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2464421?type=Model&format=SafeTensor",
+          "rename": "bushy-pelvic-area",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2471161?type=Model&format=SafeTensor",
+          "rename": "jibmix-realistic-v1",
+          "skip": false
         },
         {
           "link": "https://civitai.com/api/download/models/2507266?type=Model&format=SafeTensor",
