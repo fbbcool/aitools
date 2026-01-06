@@ -19,7 +19,7 @@ from trainer import Trainer
 #    'model___dtype': 'bfloat16',
 #    'model___min_t': '',
 #    'model___max_t': '',
-#    'adapter___rank': '16',
+#    'adapter___rank': 16,
 #    'adapter___dtype': 'bfloat16',
 #    'optimizer___lr': 2e-5,
 #    'optimizer___weight_decay': 0.01,
@@ -34,7 +34,7 @@ config_trainer = {
     'caching_batch_size': 1,
     'steps_per_print': 10,
     'model___type': 'qwen_image',
-    'adapter___rank': '16',
+    'adapter___rank': 16,
     'optimizer___lr': 2e-5,
 }
 config_dataset = {'num_repeats': 1, 'resolutions': [1024]}
