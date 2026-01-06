@@ -8,6 +8,7 @@
   "save_dtype": "bfloat16",
   "caching_batch_size": 1,
   "steps_per_print": 10,
+  "blocks_to_swap": 8,
   "model___type": "qwen_image",
   "model___ckpt_path": "",
   "model___transformer_path": "",
