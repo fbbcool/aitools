@@ -322,7 +322,8 @@ class AInstaller:
     def _setup_item_diffpipe(self, item: dict) -> dict:
         # build target vars for templater
         map_target_vars = {
-            'ckpt': 'model___diffusers_path:str',
+            'ckpt': 'model___ckpt_path:str',
+            'diffuser': 'model___diffusers_path:str',
             'vae': 'model___vae_path:str',
             'lora': 'model___merge_adapters:list_str',
             'clip': 'model___clip_path:str',
@@ -342,7 +343,7 @@ class AInstaller:
             'ipadapter': 'data/ipadapter',
             'unet': 'data/unet',
             'upscale': 'data/upscale_models',
-            'diffusor': 'data/diffusion_models',
+            'diffuser': 'data/diffusion_models',
             'transformer': 'data/diffusion_models',
             'text_encoder': 'data/text_encoders',
         }
