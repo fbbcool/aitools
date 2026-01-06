@@ -1,0 +1,63 @@
+{
+  "train_qwen": {
+    "common": {
+      "vae": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/vae/qwen_image_vae.safetensors",
+          "rename": "vae"
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "rename": "2-5_fp8"
+        }
+      ],
+      "clip": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "rename": "2-5_fp8"
+        }
+      ]
+    },
+    "2512": {
+      "transformer": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/diffusion_models/qwen_image_2512_fp8_e4m3fn.safetensors",
+          "rename": "2512_fp8",
+          "skip": false
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "lightx2v/Qwen-Image-2512-Lightning",
+          "file": "Qwen-Image-2512-Lightning-4steps-V1.0-bf16.safetensors",
+          "rename": "4steps-2512-v2",
+          "skip": true
+        }
+      ]
+    },
+    "2511": {
+      "transformer": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image-Edit_ComfyUI",
+          "file": "split_files/diffusion_models/qwen_image_edit_2511_fp8mixed.safetensors",
+          "rename": "fp8_2511",
+          "skip": false
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "lightx2v/Qwen-Image-Edit-2511-Lightning",
+          "file": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+          "rename": "4steps-2511-v1",
+          "skip": true
+        }
+      ]
+    }
+  }
+}

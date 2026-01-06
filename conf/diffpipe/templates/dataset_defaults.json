@@ -1,4 +1,7 @@
 {
   "num_repeats": 1,
-  "resolutions": 1024
+  "resolutions": [
+    1024
+  ],
+  "path": "/workspace/train/dataset"
 }

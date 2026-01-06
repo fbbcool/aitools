@@ -155,10 +155,6 @@ class AInstaller:
         return self._vars_bound
 
     @property
-    def name(self) -> str:
-        return self.group
-
-    @property
     def variant(self) -> str | None:
         variant = None
         common = 'common'  # skip this one, no explicit variant!

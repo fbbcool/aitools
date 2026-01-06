@@ -70,7 +70,7 @@ class Templater:
     def __init__(
         self,
         _type: str,  # "dataset" or "diffpipe"
-        name: str,
+        name: str,  # may contain prefix "train_"
         url_templates: str | Path = Path(URL_TEMPLATES),
         variant: str | None = None,
         vars_dict: dict | None = None,
@@ -80,7 +80,7 @@ class Templater:
         verbose: bool = False,
     ) -> None:
         self._type = _type
-        self.name = name
+        self._name = name
         self.variant = variant
         self.path_templates = Path(url_templates)
         self.suffix = suffix
@@ -134,8 +134,14 @@ class Templater:
             if data:
                 defaults |= data
                 print(f'using defaults: {file}')
+            else:
+                print(f'no defaults: {file}')
 
         return defaults
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def filepath_template(self) -> Path | None:
@@ -147,7 +153,6 @@ class Templater:
             (self.path_templates / f'{self._type}').with_suffix(self.suffix),
         ]
         for file in files:
-            print(f'looking for: {file}')
             if file.exists():
                 return file
         return None
