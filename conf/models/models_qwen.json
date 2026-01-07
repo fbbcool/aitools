@@ -31,6 +31,12 @@
     "image": {
       "transformer": [
         {
+          "link": "https://civitai.com/api/download/models/2567280?type=Model&format=SafeTensor&size=full&fp=fp8",
+          "method_download": "civitai",
+          "rename": "AGQI_2512_NSFW",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2398473?type=Model&format=SafeTensor&size=pruned&fp=fp8",
           "method_download": "civitai",
           "rename": "Hyphoria_fp8",

@@ -61,10 +61,7 @@
       "diffuser": [
         {
           "repo_id": "Qwen/Qwen-Image-2512",
-          "ignore_patterns_disable": [
-            "transformer/diffusion_pytorch_model-0*"
-          ],
-          "action": "none"
+          "skip": false
         }
       ],
       "transformer": [
@@ -85,6 +82,32 @@
           "file": "qwen-image-2512-fp8.safetensors",
           "rename": "2512_fp8_unsloth",
           "skip": true
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "lightx2v/Qwen-Image-2512-Lightning",
+          "file": "Qwen-Image-2512-Lightning-4steps-V1.0-bf16.safetensors",
+          "rename": "4steps-2512-v2",
+          "skip": true
+        }
+      ]
+    },
+    "2512_AGQI": {
+      "diffuser": [
+        {
+          "repo_id": "Qwen/Qwen-Image-2512",
+          "ignore_patterns": [
+            "transformer/diffusion_pytorch_model-0*"
+          ],
+          "action": "none"
+        }
+      ],
+      "transformer": [
+        {
+          "link": "https://civitai.com/api/download/models/2567280?type=Model&format=SafeTensor&size=full&fp=bf16",
+          "rename": "AGQI_2512_NSFW_full",
+          "skip": false
         }
       ],
       "lora": [

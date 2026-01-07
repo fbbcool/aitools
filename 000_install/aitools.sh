@@ -6,10 +6,10 @@ export CONF_AIT=$HOME_AIT/conf
 export PYTHONPATH=$HOME_AIT/src
 
 ___install() {
-  git clone $AIT_REPOS $AIT_HOME
-  pip install -r $AIT_HOME/requirements_remote.txt
+  git clone $REPOS_AIT $HOME_AIT
+  pip install -r $HOME_AIT/requirements_remote.txt
 }
 ___update() {
   echo "update aitools ..."
-  git -C $AIT_HOME pull
+  git -C $HOME_AIT pull
 }
