@@ -37,7 +37,7 @@ config_trainer = {
     'blocks_to_swap': '',
     'model___type': 'qwen_image',
     'adapter___rank': 16,
-    'optimizer___lr': 2e-5,
+    'optimizer___lr': 5e-5,
 }
 config_dataset = {'num_repeats': 1, 'resolutions': [1024]}
 
