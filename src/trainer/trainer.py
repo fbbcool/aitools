@@ -3,6 +3,7 @@ from pathlib import Path
 import shutil
 from typing import Final
 import threading
+import random
 
 from more_itertools import chunked_even
 
@@ -138,12 +139,21 @@ class Trainer:
                 print(f' dataset thread[{i}]: joined.')
 
     def _process_imgs(self, ids: list[str], hfd: HFDatasetImg) -> None:
+        max_imgs_to_pick = 50
         if not ids:
             return
+        pick_chance = float(max_imgs_to_pick) / float(hfd.size)
 
         lost = 0
         success = 0
+        not_picked = 0
         for id in ids:
+            pick = False
+            if random.random() < pick_chance:
+                pick = True
+            if not pick:
+                not_picked += 1
+                continue
             if not id:
                 continue
             idx = hfd.id2idx(id)
@@ -189,7 +199,9 @@ class Trainer:
 
             # ok
             success += 1
-        print(f'dataset thread finished: {success} successes, {lost} losses')
+        print(
+            f'dataset thread finished: {success} successes, {lost} losses, {not_picked} not picked'
+        )
 
     def _make_file_train_script(self) -> None:
         str_file = f"""
