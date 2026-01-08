@@ -28,18 +28,18 @@ from trainer import Trainer
 # }
 config_trainer = {
     'epochs': 40,
-    'micro_batch_size_per_gpu': 1,
+    'micro_batch_size_per_gpu': 2,
     'warmup_steps': 20,
     'save_every_n_epochs': 1,
     'save_dtype': 'bfloat16',
-    'caching_batch_size': 1,
+    'caching_batch_size': 4,
     'steps_per_print': 10,
     'blocks_to_swap': '',
     'model___type': 'qwen_image',
     'adapter___rank': 16,
     'optimizer___lr': 5e-5,
 }
-config_dataset = {'num_repeats': 1, 'resolutions': [1024]}
+config_dataset = {'num_repeats': 2, 'resolutions': [1024]}
 
 
 dataset_repo_ids = [('fbbcool/1fbb_02', 150)]
