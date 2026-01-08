@@ -42,7 +42,7 @@ config_trainer = {
 config_dataset = {'num_repeats': 1, 'resolutions': [1024]}
 
 
-dataset_repo_ids = ['fbbcool/1legsemp']
+dataset_repo_ids = [('fbbcool/1fbb_02', 150)]
 Trainer(
     'qwen',
     dataset_repo_ids,

@@ -25,7 +25,7 @@ class Trainer:
     def __init__(
         self,
         model: str,
-        repo_ids_hfd: list[str],
+        repo_ids_hfd: list[str] | list[tuple[str, int]],
         variant: str | None = None,
         config_trainer: dict | None = None,
         config_dataset: dict | None = None,
@@ -72,7 +72,7 @@ class Trainer:
         )
         self._templater_diffpipe.save(self.root)
 
-        self._repo_ids_hfd: list[str] = repo_ids_hfd
+        self._repo_ids_hfd: list[str] | list[tuple[str, int]] = repo_ids_hfd
 
         self._trigger = trigger
 
@@ -102,16 +102,25 @@ class Trainer:
 
     def _make_dataset(self, multithread: bool = False) -> None:
         self.dir_dataset.mkdir(parents=True, exist_ok=True)
-        for repo_id in self._repo_ids_hfd:
+        for item in self._repo_ids_hfd:
+            repo_id = ''
+            max_imgs = 0
+            if isinstance(item, str):
+                repo_id = item
+            elif isinstance(item, tuple):
+                repo_id = item[0]
+                max_imgs = item[1]
             hfd = HFDatasetImg(repo_id, force_meta_dl=True)
             hfd.cache()
-            self._make_dataset_hfd(hfd, multithread=multithread)
+            self._make_dataset_hfd(hfd, multithread=multithread, max_imgs=max_imgs)
 
-    def _make_dataset_hfd(self, hfd: HFDatasetImg, multithread: bool = False) -> None:
+    def _make_dataset_hfd(
+        self, hfd: HFDatasetImg, multithread: bool = False, max_imgs: int = 0
+    ) -> None:
         # non multi-threaded
         ids_img = hfd.ids
         if not multithread:
-            self._process_imgs(ids_img, hfd)
+            self._process_imgs(ids_img, hfd, max_imgs=max_imgs)
         else:
             # multi-threaded
             n = 8
@@ -129,6 +138,7 @@ class Trainer:
                     args=[
                         ids[i],
                         hfd,
+                        max_imgs,
                     ],
                 )
                 print(f' dataset thread[{i}]: {len(ids[i])} imgs')
@@ -138,11 +148,12 @@ class Trainer:
                 threads[i].join()
                 print(f' dataset thread[{i}]: joined.')
 
-    def _process_imgs(self, ids: list[str], hfd: HFDatasetImg) -> None:
-        max_imgs_to_pick = 50
+    def _process_imgs(self, ids: list[str], hfd: HFDatasetImg, max_imgs: int = 0) -> None:
         if not ids:
             return
-        pick_chance = float(max_imgs_to_pick) / float(hfd.size)
+        pick_chance = 1.10
+        if max_imgs > 0:
+            pick_chance = float(max_imgs) / float(hfd.size)
 
         lost = 0
         success = 0
