@@ -76,7 +76,6 @@
         {
           "repo_id": "fbbcool/qwen_2512_lora",
           "file": "1gts_xlasm_01-26.safetensors",
-          "rename": "1gts",
           "skip": false
         }
       ]
