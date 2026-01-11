@@ -142,8 +142,8 @@
         },
         {
           "repo_id": "Phr00t/Qwen-Image-Edit-Rapid-AIO",
-          "file": "v18/Qwen-Rapid-AIO-NSFW-v18.1.safetensors",
-          "rename": "Rapid-AIO-v18-1",
+          "file": "v19/Qwen-Rapid-AIO-NSFW-v19.safetensors",
+          "rename": "Rapid-AIO-v19",
           "skip": false
         },
         {

@@ -1,11 +1,11 @@
 from ait.caption import Joy
 from aidb.hfdataset import HFDatasetImg
 
-caper = Joy('1xlasm')
+caper = Joy('1calves')
 force = True
 
 # hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
-hfd = HFDatasetImg(repo_id='fbbcool/1gts_xlasm_01', force_meta_dl=True)
+hfd = HFDatasetImg(repo_id='fbbcool/1legsemp', force_meta_dl=True)
 hfd.cache()
 
 n = len(hfd)

@@ -11,7 +11,7 @@ import yaml  # Import the yaml library
 
 from aidb.hfdataset import HFDatasetImg
 
-DBM_COLLECTION_IMG_PREFIX: Final = 'imgs_'
+DBM_COLLECTION_IMG_PREFIX: Final = ['imgs_', '1gts_']
 
 
 # Define the DBManager class for handling metadata operations
@@ -165,11 +165,11 @@ class DBManager:
 
         # List all collection names in the current database
         collections = self.db.list_collection_names()
-        collections_filtered = [
-            collection
-            for collection in collections
-            if collection.startswith(DBM_COLLECTION_IMG_PREFIX)
-        ]
+        collections_filtered = []
+        for prefix in DBM_COLLECTION_IMG_PREFIX:
+            collections_filtered += [
+                collection for collection in collections if collection.startswith(prefix)
+            ]
         return collections_filtered
 
     def collection_rename(self, name_to: str, name_from: str):
@@ -1044,4 +1044,3 @@ class DBManager:
         # Update the current DBManager's connection to the newly imported database
         self.db = new_db
         self._db_name = db_name
-

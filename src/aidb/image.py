@@ -218,7 +218,10 @@ class Image:
 
         idx = _hfd.id2idx(self.id)
         if idx is not None:
-            return _hfd.captions[idx]
+            caption = _hfd.captions_joy[idx]
+            if not caption:
+                caption = _hfd.captions[idx]
+            return caption
         return None
 
     @property

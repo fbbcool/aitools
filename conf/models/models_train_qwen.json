@@ -57,7 +57,7 @@
         }
       ]
     },
-    "2512": {
+    "2512-1gts": {
       "diffuser": [
         {
           "repo_id": "Qwen/Qwen-Image-2512",
@@ -65,18 +65,6 @@
         }
       ],
       "transformer": [
-        {
-          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-          "file": "split_files/diffusion_models/qwen_image_fp8_hq.safetensors",
-          "rename": "2512_fp8",
-          "skip": true
-        },
-        {
-          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-          "file": "split_files/diffusion_models/qwen_image_2512_fp8_e4m3fn.safetensors",
-          "rename": "2512_fp8_scaled",
-          "skip": true
-        },
         {
           "repo_id": "unsloth/Qwen-Image-2512-FP8",
           "file": "qwen-image-2512-fp8.safetensors",
@@ -86,10 +74,10 @@
       ],
       "lora": [
         {
-          "repo_id": "lightx2v/Qwen-Image-2512-Lightning",
-          "file": "Qwen-Image-2512-Lightning-4steps-V1.0-bf16.safetensors",
-          "rename": "4steps-2512-v2",
-          "skip": true
+          "repo_id": "fbbcool/qwen_2512_lora",
+          "file": "1gts_xlasm_01-26.safetensors",
+          "rename": "1gts",
+          "skip": false
         }
       ]
     },
