@@ -27,7 +27,7 @@ from trainer import Trainer
 #    'optimizer___type': 'adamw_optimi',
 # }
 config_trainer = {
-    'epochs': 40,
+    'epochs': 100,
     'micro_batch_size_per_gpu': 2,
     'warmup_steps': 20,
     'save_every_n_epochs': 1,
@@ -43,7 +43,7 @@ config_dataset = {'num_repeats': 2, 'resolutions': [1024]}
 
 
 # dataset_repo_ids = [('fbbcool/1fbb_02', 150)]
-dataset_repo_ids = ['fbbcool/1legsemp']
+dataset_repo_ids = ['fbbcool/1busty']
 Trainer(
     'qwen',
     dataset_repo_ids,

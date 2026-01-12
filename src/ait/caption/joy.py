@@ -16,13 +16,13 @@ CONTENT_SYSTEM: Final = {
     '1woman': 'The users are interested in women with big breasts and hairy women and how they present their bodies.',
     '1fem': "The users are interested in body and face characteristics of this female character. always call the female character 'giantess woman'",
     '1fbb': 'The users are interested in body poses and muscularity characteristics of this female muscular character.',
-    '1busty': 'The users are interested in women with big breasts and big asses and how they present their bodies.',
     '1hairy': 'The users are interested in woman with very hairy pussies and very hairy asses how they present their bodies.',
     '1pussy_insert': "a giantess woman is inserting a small adult man into her vagina. if you want to use 'the small man is positioned between her legs', use 'inserted in her vagina' instead and describe wether the lower or upper bodypart of the small man is inserted and not visible.",
     '1man': "The image is about a small man with an erect penis on a grey background. describe the man as a 'small man'. if the small man takes most of the image, call it a closeup, if not, call it a photograph.",
     '1legsemp': "The image is tall giantess woman with muscular legs. describe the woman as a 'giantess woman'. they all have muscular legs and calves",
     '1calves': 'The image is about a woman showing off her muscular calves. do not describe anything about her muscularity since this is already known. instead, describe how she is showing off her calves and the overall scene.',
     '1leggy': 'The image is about a woman showing off her muscular calves. do not describe anything about her muscularity and her calves since this is already known. instead, describe how she she poses and the overall scene and always call her "leggy woman".',
+    '1busty': 'The image is about a woman showing off their large breasts and asses. do not describe anything about her breasts size (especially when they are large), cleavage or body shape since this is already known! instead, describe how she she poses and the overall scene. always call her "busty woman".',
 }
 DEFAULT_PROMPT: Final = 'Write a very long detailed description for this image.'
 CONTENT_PROMPT: Final = {
@@ -32,13 +32,13 @@ CONTENT_PROMPT: Final = {
     '1woman': 'The users are interested in women with big breasts and hairy women and how they present their bodies.',
     '1fem': "The users are interested in body and face characteristics of this female character. always call the female character 'giantess woman'",
     '1fbb': 'The users are interested in body poses and muscularity characteristics of this female muscular character.',
-    '1busty': 'The users are interested in women with big breasts and big asses and how they present their bodies.',
     '1hairy': 'The users are interested in woman with very hairy pussies and very hairy asses how they present their bodies.',
     '1pussy_insert': "a giantess woman is inserting a small adult man into her vagina. if you want to use 'the small man is positioned between her legs', use 'inserted in her vagina' instead and describe wether the lower or upper bodypart of the small man is inserted and not visible.",
     '1man': "The image is about a small man with an erect penis on a grey background. describe the man as a 'small man'. if the small man takes most of the image, call it a closeup, if not, call it a photograph.",
     '1legsemp': "The image is tall giantess woman with muscular legs. describe the woman as a 'giantess woman'. they all have muscular legs and calves",
     '1calves': 'The image is about a woman showing off her muscular calves. do not describe anything about her muscularity since this is already known. instead, describe how she is showing off her calves and the overall scene.',
     '1leggy': 'The image is about a woman showing off her muscular calves. do not describe anything about her muscularity and her calves since this is already known. instead, describe how she she poses and the overall scene and always call her "leggy woman".',
+    '1busty': 'The image is about a woman showing off their large breasts and asses. do not describe anything about her breasts size (especially when they are large), cleavage or body shape since this is already known! instead, describe how she she poses and the overall scene. always call her "busty woman".',
 }
 
 POST_PROMPT: Final = (
