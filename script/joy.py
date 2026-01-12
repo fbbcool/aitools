@@ -1,7 +1,7 @@
 from ait.caption import Joy
 from aidb.hfdataset import HFDatasetImg
 
-caper = Joy('1calves')
+caper = Joy('1leggy')
 force = True
 
 # hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
