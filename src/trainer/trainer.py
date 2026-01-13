@@ -112,6 +112,9 @@ class Trainer:
                 max_imgs = item[1]
             hfd = HFDatasetImg(repo_id, force_meta_dl=True)
             hfd.cache()
+            if hfd.size < 60:
+                multithread = False
+
             self._make_dataset_hfd(hfd, multithread=multithread, max_imgs=max_imgs)
 
     def _make_dataset_hfd(

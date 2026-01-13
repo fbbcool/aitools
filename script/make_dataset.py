@@ -8,22 +8,28 @@ from aidb.query import Query
 config_file = Path(os.environ['HOME_AIT']) / 'conf/aidb/dbmanager.yaml'
 path_pool = Path('/home/misw/Data/AI/pool')
 name_collection = '1gts_xlasm_01'
-path_train = path_pool / f'___train_{name_collection}'
+# name_tset = name_collection
+name_tset = '1busty_gts'
+path_train = path_pool / f'___train_{name_tset}'
 path_collection = path_pool / name_collection
 
 dbm = DBManager(config_file=str(config_file))
 
-dbm.add_container(path_collection, collection=name_collection)
-sta = Statistics(dbm)
+#### for new img data ###
+# dbm.add_container(path_collection, collection=name_collection)
+# sta = Statistics(dbm)
+# dbm.set_collection(name_collection)
+#
+# for img in dbm.images:
+#    img.init_tags()
+#    img.thumbnail
+#    sta.img_statistics_init(img, force=True)
+####
+
 dbm.set_collection(name_collection)
-
-for img in dbm.images:
-    img.init_tags()
-    img.thumbnail
-    sta.img_statistics_init(img, force=True)
-
 q = Query(dbm)
 imgs = q.query_by_rating(-2, 5)
+imgs = q.query_by_bodyparts(['breast'], -2, 5)
 print(f'found {len(imgs)} imgs.')
 
 for img in imgs:
