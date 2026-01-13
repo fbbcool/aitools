@@ -20,7 +20,7 @@
   "model___max_t": "",
   "adapter___rank": 16,
   "adapter___dtype": "bfloat16",
-  "optimizer___lr": 2e-5,
+  "optimizer___lr": 5e-5,
   "optimizer___weight_decay": 0.01,
   "optimizer___type": "adamw_optimi"
 }
