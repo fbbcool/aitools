@@ -1,4 +1,5 @@
 import os
+import shutil
 from pathlib import Path
 from typing import Final
 
@@ -28,6 +29,15 @@ def is_vid(url: str | Path) -> bool:
     elif url.is_dir():
         return False
     elif url.suffix in POSTFIX_VID:
+        return True
+    return False
+
+
+def is_dir(url: str | Path) -> bool:
+    url = Path(url)
+    if not url.exists():
+        return False
+    elif url.is_dir():
         return True
     return False
 
@@ -66,3 +76,24 @@ def subdir_inc(url: str | Path) -> Path:
     else:
         new = max[0] + 1
     return url / f'{new:04d}'
+
+
+def urls_to_dir(_urls: list[str] | list[Path] | str | Path, to_dir: str | Path) -> None:
+    if not isinstance(_urls, list):
+        urls = [_urls]
+    else:
+        urls = _urls
+    to_dir = Path(to_dir)
+    to_dir.mkdir(parents=True, exist_ok=True)
+
+    for from_url in urls:
+        from_url = Path(from_url)
+        if not from_url.exists():
+            continue
+        to_url = to_dir / from_url.name
+        shutil.move(str(from_url), str(to_url))
+
+
+def imgs_from_url(url: str | Path) -> list[Path]:
+    img_urls = [Path(f.path) for f in os.scandir(url) if is_img_or_vid(f.path)]
+    return img_urls
