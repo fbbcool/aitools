@@ -175,12 +175,12 @@ class Trainer:
                 continue
 
             # caption or prompt fetch
-            prompt = hfd.prompts[idx]
-            caption = hfd.captions[idx]
-            if not caption:
-                caption = prompt
-            if not prompt:
-                prompt = caption
+            # prompt = hfd.prompts[idx]
+            caption = hfd.captions_joy[idx]
+            # if not caption:
+            #    caption = prompt
+            # if not prompt:
+            #    prompt = caption
 
             if not caption:
                 lost += 1

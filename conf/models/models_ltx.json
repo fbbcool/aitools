@@ -1,0 +1,68 @@
+{
+  "ltx": {
+    "common": {
+      "vae": [
+        {
+          "repo_id": "Lightricks/LTX-2",
+          "file": "audio_vae/diffusion_pytorch_model.safetensors",
+          "rename": "audio-vae"
+        },
+        {
+          "file": "vae/diffusion_pytorch_model.safetensors",
+          "rename": "vae"
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Lightricks/LTX-2",
+          "file": "",
+          "rename": ""
+        }
+      ],
+      "vocoder": [
+        {
+          "repo_id": "Lightricks/LTX-2",
+          "file": "vocoder/diffusion_pytorch_model.safetensors",
+          "rename": "vocoder"
+        }
+      ],
+      "latent_upsampler": [
+        {
+          "repo_id": "Lightricks/LTX-2",
+          "file": "latent_upsampler/diffusion_pytorch_model.safetensors",
+          "rename": "latent_upsampler"
+        }
+      ]
+    },
+    "2": {
+      "transformer": [
+        {
+          "repo_id": "Lightricks/LTX-2",
+          "file": "ltx-2-19b-distilled-fp8.safetensors",
+          "rename": "destilled-fp8",
+          "skip": false
+        },
+        {
+          "repo_id": "Lightricks/LTX-2",
+          "file": "ltx-2-19b-dev-fp8.safetensors",
+          "rename": "dev-fp8",
+          "skip": false
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "Lightricks/LTX-2",
+          "file": "ltx-2-temporal-upscaler-x2-1.0.safetensors",
+          "rename": "upscaler-temporalx2-v1",
+          "skip": false
+        },
+        {
+          "repo_id": "Lightricks/LTX-2",
+          "file": "ltx-2-spatial-upscaler-x2-1.0.safetensors",
+          "rename": "upscaler-spatialx2-v1",
+          "skip": false
+        }
+      ]
+    }
+  }
+}
