@@ -12,7 +12,9 @@ if __name__ == '__main__':
     print(f'-> {url_img.name}')
 
     # joy = Joy('gts_prompter')
-    joy = Joy('1xlasm')
+    # joy = Joy('1xlasm')
+    # joy = Joy('1hairy')
+    joy = Joy('1fbb')
     caption = joy.imgurl_caption(str(url_img))
 
     print(f'<prompt>\n{caption}\n </prompt>')
