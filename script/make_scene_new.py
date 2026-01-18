@@ -3,12 +3,13 @@ from pathlib import Path
 
 # from pprint import pprint
 from ait.image import get_prompt_comfy
-from ait.tools.files import is_img_or_vid
+from ait.tools.files import is_dir, is_img_or_vid
 from aidb.scene_manager import SceneManager
 
 if __name__ == '__main__':
     urls = sys.argv[1:]
     urls_img = [url for url in urls if is_img_or_vid(url)]
+    urls_dir = [url for url in urls if is_dir(url)]
 
     # url_img = Path(sys.argv[1])
     # if not url_img.exists():
@@ -23,7 +24,8 @@ if __name__ == '__main__':
 
     if not urls_img:
         print('no imgs found!')
-        exit()
 
     scm = SceneManager()
+
     scm.scene_new(urls_img)
+    scm.scene_new(urls_dir)

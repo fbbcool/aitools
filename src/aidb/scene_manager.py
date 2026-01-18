@@ -4,7 +4,7 @@ from typing import Final, Generator
 import json
 
 from aidb.dbmanager import DBManager
-from ait.tools.files import is_img_or_vid, subdirs, subdir_inc, urls_to_dir, is_dir, imgs_from_url
+from ait.tools.files import is_img_or_vid, subdir_inc, urls_to_dir, is_dir, imgs_from_url
 
 
 class SceneManager:
