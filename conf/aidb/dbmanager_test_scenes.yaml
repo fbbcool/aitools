@@ -5,7 +5,7 @@ mongodb_settings:
   #host: "mongodb://mongo:mongo@n100"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
   host: "mongodb://mongo:mongo@192.168.0.120"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
   port: 27017        # Or your MongoDB port
-  db_name: "test_scenes" # Or your database name, e.g., "prod_ai"
+  db_name: "test_scenes_new" # Or your database name, e.g., "prod_ai"
   #collection: "scene"   # Or your collection name, e.g., "images"
 
 # Directory settings
@@ -32,10 +32,3 @@ train_image_settings:
   # The aspect ratio of the original image will be preserved.
   default_train_image_size: [1024, 1024]
 
-# Huggingface settings
-#hf_settings:
-#  preload:
-#    - "fbbcool/gts01_r35"
-#
-#  collection2hfd:
-#   - imgs_1busty: "fbbcool/1busty"

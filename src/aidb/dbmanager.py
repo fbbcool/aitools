@@ -1,5 +1,6 @@
 import json
 from bson import ObjectId
+from bson.errors import InvalidId
 import pymongo
 import pymongo.collection
 import pymongo.database
@@ -455,8 +456,16 @@ class DBManager:
                 )
         return None
 
-    def to_dbid(self, id: str) -> ObjectId:
-        return ObjectId(id)
+    def to_oid(self, id: Any) -> ObjectId | None:
+        if isinstance(id, ObjectId):
+            return id
+        if not isinstance(id, str):
+            return None
+        try:
+            oid = ObjectId(id)
+        except InvalidId:
+            return None
+        return oid
 
     def find_documents(
         self, collection_name: str, query: Optional[Dict[str, Any]] = None
@@ -486,8 +495,8 @@ class DBManager:
                 )
         return []
 
-    def get_by_id(self, collection_name: str, id: str):
-        return self.find_documents(collection_name, query={'_id': ObjectId(id)})
+    def documents_from_oid(self, collection_name: str, oid: ObjectId) -> List[Dict[str, Any]]:
+        return self.find_documents(collection_name, query={'_id': oid})
 
     def update_document(
         self, collection_name: str, query: Dict[str, Any], new_values: Dict[str, Any]

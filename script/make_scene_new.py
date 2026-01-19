@@ -27,5 +27,5 @@ if __name__ == '__main__':
 
     scm = SceneManager()
 
-    scm.scene_new(urls_img)
-    scm.scene_new(urls_dir)
+    scm.new_scene_from_urls(urls_img)
+    scm.new_scene_from_urls(urls_dir)
