@@ -17,9 +17,9 @@ class SceneManager:
     def __init__(self, dbm: DBManager | None = None) -> None:
         config_file = Path(os.environ['CONF_AIT']) / 'aidb' / f'dbmanager_{self.SCENE_DB}.yaml'
         if dbm is None:
-            self.dbm = DBManager(config_file=str(config_file))
+            self._dbm = DBManager(config_file=str(config_file))
         else:
-            self.dbm = dbm
+            self._dbm = dbm
 
         # this is not necessary since mongo handles collection creation automatically
         # dbm.create_collection(self.SCENE_COLLECTION)
@@ -38,32 +38,51 @@ class SceneManager:
         return data
 
     @classmethod
-    def dbid_dotfile(cls, url: str | Path) -> None | str:
+    def id_dotfile(cls, url: str | Path) -> None | str:
         data = cls._url_dotfile_load(url)
         if data is None:
             return None
         dbid = data.get(cls.FIELD_DBID, None)
         return dbid
 
-    def dbid_db(self, url: str | Path) -> None | str:
-        docs = self.dbm.find_documents(self.SCENE_COLLECTION, query={self.FIELD_URL: str(url)})
-        size = len(docs)
-        if size < 1:
+    def url_id(self, url: str | Path) -> None | str:
+        data = self.url_data(url)
+        if data is None:
             return None
-        elif size == 1:
-            dbid = docs[0]['_id']
-        else:
-            self._log(f'multiple db entries for {url}!', level='error')
-            dbid = docs[0]['_id']
-        return str(dbid)
+        return str(data.get('_id', ''))
 
     @property
-    def dbids(self) -> Generator:
+    def ids(self) -> Generator:
         """Returns a generator of scene dbid's for all scenes in the db"""
 
-        docs = self.dbm.find_documents(self.SCENE_COLLECTION, query={})
+        docs = self._dbm.find_documents(self.SCENE_COLLECTION, query={})
         for doc in docs:
             yield str(doc['_id'])
+
+    def id_data(self, id: str) -> dict | None:
+        docs = self._dbm.get_by_id(self.SCENE_COLLECTION, id)
+        if len(docs) == 0:
+            return None
+        elif len(docs) == 1:
+            return docs[0]
+
+        self._log(f'DATABASE INCONSISTENCY: id {id} is multiple', level='error')
+        return None
+
+    def url_data(self, url: str | Path) -> dict | None:
+        docs = self._dbm.find_documents(self.SCENE_COLLECTION, query={self.FIELD_URL: str(url)})
+        if len(docs) == 0:
+            return None
+        elif len(docs) == 1:
+            return docs[0]
+
+        self._log(f'DATABASE INCONSISTENCY: id {id} is multiple', level='error')
+        return None
+
+    def is_id(self, id: str) -> bool:
+        if self.id_data(id) is not None:
+            return True
+        return False
 
     def url_update(self, url: str | Path) -> str | None:
         url = Path(url)
@@ -74,10 +93,10 @@ class SceneManager:
             self._log(f'url is not a dir: {url}')
             return
 
-        dbid_dotfile = self.dbid_dotfile(url)
+        dbid_dotfile = self.id_dotfile(url)
         self._log(f'{url} got dotfile dbid {dbid_dotfile}', level='debug')
 
-        dbid = self.dbid_db(url)
+        dbid = self.url_id(url)
         self._log(f'{url} got dbid {dbid}', level='debug')
 
         if dbid_dotfile is None:
@@ -143,9 +162,9 @@ class SceneManager:
             return None
 
         # does scene url already exist?
-        dbid = self.dbid_db(url)
+        dbid = self.url_id(url)
         if dbid is None:
-            dbid = self.dbm.insert_document(self.SCENE_COLLECTION, meta)
+            dbid = self._dbm.insert_document(self.SCENE_COLLECTION, meta)
             self._log('scene added: {url}.', level='message')
         else:
             self._log(f'scene not added, already exists: {url} dbid={dbid}.', level='debug')
@@ -187,7 +206,7 @@ class SceneManager:
             return None
 
         # physical files movement
-        dir_scene = subdir_inc(self.dbm._root)
+        dir_scene = subdir_inc(self._dbm._root)
         urls_to_dir(url_imgs, dir_scene)
 
         # db entry
@@ -197,6 +216,19 @@ class SceneManager:
 
     def _scene_new_dir(self, dir: str | Path) -> None | str:
         return self._scene_new_imgs(imgs_from_url(dir))
+
+    @property
+    def _dbc_scenes(self):
+        return self._dbm._get_collection(self.SCENE_COLLECTION)
+
+    def _dbc_to_id(self, id: str):
+        self._dbm.to_dbid(id)
+
+    def _db_update_scene(self, id: str, data: dict):
+        filter = {'_id': self._dbc_to_id(id)}
+        update = {'$set': data}
+        self._dbc_scenes.update_one(filter, update)
+        return
 
     @staticmethod
     def _json_read(url: Path) -> dict:

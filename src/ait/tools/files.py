@@ -3,8 +3,24 @@ import shutil
 from pathlib import Path
 from typing import Final
 
-POSTFIX_IMG: Final = ['.png', '.PNG']
-POSTFIX_VID: Final = ['.mov', '.mp4']
+SUFFIX_IMG: Final = ['png', 'webp', 'jpg', 'jpeg']
+SUFFIX_VID: Final = ['mov', 'mp4']
+
+
+def suffix_img() -> list[str]:
+    postfixes = SUFFIX_IMG
+    ret = postfixes.copy()
+    ret += [pf.capitalize() for pf in postfixes]
+    ret += [pf.upper() for pf in postfixes]
+    return [f'.{pf}' for pf in ret]
+
+
+def suffix_vid() -> list[str]:
+    postfixes = SUFFIX_VID
+    ret = postfixes.copy()
+    ret += [pf.capitalize() for pf in postfixes]
+    ret += [pf.upper() for pf in postfixes]
+    return [f'.{pf}' for pf in ret]
 
 
 def is_img_or_vid(url: str | Path) -> bool:
@@ -17,7 +33,7 @@ def is_img(url: str | Path) -> bool:
         return False
     elif url.is_dir():
         return False
-    elif url.suffix in POSTFIX_IMG:
+    elif url.suffix in suffix_img():
         return True
     return False
 
@@ -28,7 +44,7 @@ def is_vid(url: str | Path) -> bool:
         return False
     elif url.is_dir():
         return False
-    elif url.suffix in POSTFIX_VID:
+    elif url.suffix in suffix_vid():
         return True
     return False
 

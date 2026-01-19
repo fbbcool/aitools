@@ -455,6 +455,9 @@ class DBManager:
                 )
         return None
 
+    def to_dbid(self, id: str) -> ObjectId:
+        return ObjectId(id)
+
     def find_documents(
         self, collection_name: str, query: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
@@ -482,6 +485,9 @@ class DBManager:
                     f"An unexpected error occurred during finding documents in '{collection_name}': {e}"
                 )
         return []
+
+    def get_by_id(self, collection_name: str, id: str):
+        return self.find_documents(collection_name, query={'_id': ObjectId(id)})
 
     def update_document(
         self, collection_name: str, query: Dict[str, Any], new_values: Dict[str, Any]
