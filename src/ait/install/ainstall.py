@@ -137,7 +137,11 @@ class AInstaller:
                 elif var_type == 'list_float':
                     var_value = [float(var_value)]
                 self._vars_bound |= {
-                    var_bound: {'value': var_value, 'format': data.get('format', '')}
+                    var_bound: {
+                        'value': var_value,
+                        'format': data.get('format', ''),
+                        'parameter': data.get('parameter', ''),
+                    }
                 }
 
         # create python requirements.txt
@@ -333,6 +337,7 @@ class AInstaller:
                 'model___llm_path': {'type': 'str'},
                 'model___text_encoders_zimage': {
                     'type': 'str',
+                    'parameter': 'text_encoders',
                     'format': '${parameter} = [{path = ${value}, type = "lumina2"]',
                 },
             },

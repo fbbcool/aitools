@@ -14,6 +14,7 @@ class TemplaterVariable:
         name: str,
         value: str | int | float | list[str] | list[int] | list[float],
         disable: bool = False,
+        parameter: str | None = None,
         format: str | None = None,
     ) -> None:
         self._typelist = [str, int, float]
@@ -30,6 +31,10 @@ class TemplaterVariable:
             vcheck = value
         if type(vcheck) not in self._typelist:
             raise ValueError(f'type is not in {self._typelist}!')
+        if parameter is not None:
+            self.parameter = parameter
+        else:
+            self.parameter = self.name.split(self.PARAMETER_SPITTER)[-1]
         self.value = value
         self._disable = disable
         # empty str also disables
@@ -47,15 +52,13 @@ class TemplaterVariable:
 
     @property
     def format_substitution(self) -> str:
-        # setup parameter, always use last split
-        parameter = self.name.split(self.PARAMETER_SPITTER)[-1]
         # setup value
         if isinstance(self.value, str):
             value = f"'{self.value}'"
         else:
             value = str(self.value)
 
-        sub = {'parameter': parameter}
+        sub = {'parameter': self.parameter}
         sub |= {'value': value}
         ret = Template(self._format).safe_substitute(sub)
         if self._disable:
@@ -181,13 +184,17 @@ class Templater:
         for key, data in vars.items():
             if isinstance(data, dict):
                 val = data.get('value', '')
+                parameter = data.get('parameter', '')
+                if not parameter:
+                    parameter = None
                 format = data.get('format', '')
                 if not format:
                     format = None
             else:
                 val = data
                 format = None
-            v = TemplaterVariable(key, val, format=format)
+                parameter = None
+            v = TemplaterVariable(key, val, format=format, parameter=parameter)
             ret |= v.substitute
         return ret
 
