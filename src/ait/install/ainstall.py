@@ -338,7 +338,7 @@ class AInstaller:
                 'model___text_encoders_zimage': {
                     'type': 'str',
                     'parameter': 'text_encoders',
-                    'format': '${parameter} = [{path = ${value}, type = "lumina2"]',
+                    'format': '${parameter} = [{path = ${value}, type = "lumina2"}]',
                 },
             },
         }
