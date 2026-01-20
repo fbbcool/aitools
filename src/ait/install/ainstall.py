@@ -117,8 +117,8 @@ class AInstaller:
                 print(f"warning: couldn't install {item}: {e}")
                 continue
 
-            target_var = item.get('target_var', None)
-            if target_var is not None:
+            target_var_list = item.get('target_var', [])
+            for target_var in target_var_list:
                 var_value = item.get('link', None)
                 if var_value is None:
                     continue
