@@ -324,7 +324,7 @@ class AInstaller:
         map_target_vars = {
             'ckpt': ['model___ckpt_path:str'],
             'diffuser': ['model___diffusers_path:str'],
-            'vae': ['model___vae_path:str'],
+            'vae': ['model___vae_path:str', 'model___vae:str'],
             'lora': ['model___merge_adapters:list_str'],
             'clip': ['model___clip_path:str'],
             'transformer': ['model___transformer_path:str'],
