@@ -23,7 +23,7 @@
       ]
     },
     "turbo": {
-      "diffusion_model": [
+      "ckpt": [
         {
           "repo_id": "Comfy-Org/z_image_turbo",
           "file": "split_files/diffusion_models/z_image_turbo_bf16.safetensors",
