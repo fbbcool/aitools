@@ -117,16 +117,12 @@ class AInstaller:
                 print(f"warning: couldn't install {item}: {e}")
                 continue
 
-            target_var_list = item.get('target_var', [])
-            for target_var in target_var_list:
+            target_var_dict = item.get('target_var', {})
+            for var_bound, data in target_var_dict.item():
                 var_value = item.get('link', None)
                 if var_value is None:
                     continue
-                split = target_var.split(':')
-                var_bound = split[0]
-                var_type = 'str'
-                if len(split) > 1:
-                    var_type = split[1]
+                var_type = data.get('type', 'str')
 
                 if var_type == 'str':
                     var_value = str(var_value)
@@ -140,7 +136,9 @@ class AInstaller:
                     var_value = [int(var_value)]
                 elif var_type == 'list_float':
                     var_value = [float(var_value)]
-                self._vars_bound |= {var_bound: var_value}
+                self._vars_bound |= {
+                    var_bound: {'value': var_value, 'format': data.get('format', '')}
+                }
 
         # create python requirements.txt
         self.requirements = list(set(self.requirements))
@@ -322,13 +320,22 @@ class AInstaller:
     def _setup_item_diffpipe(self, item: dict) -> dict:
         # build target vars for templater
         map_target_vars = {
-            'ckpt': ['model___ckpt_path:str', 'model___diffusion_model:str'],
-            'diffuser': ['model___diffusers_path:str'],
-            'vae': ['model___vae_path:str', 'model___vae:str'],
-            'lora': ['model___merge_adapters:list_str'],
-            'clip': ['model___clip_path:str'],
-            'transformer': ['model___transformer_path:str'],
-            'text_encoder': ['model___llm_path:str'],
+            'ckpt': {
+                'model___ckpt_path': {'type': 'str'},
+                'model___diffusion_model': {'type': 'str'},
+            },
+            'diffuser': {'model___diffusers_path': {'type': 'str'}},
+            'vae': {'model___vae_path': {'type': 'str'}, 'model___vae': {'type': 'str'}},
+            'lora': {'model___merge_adapters': {'type': 'list_str'}},
+            'clip': {'model___clip_path': {'type': 'str'}},
+            'transformer': {'model___transformer_path': {'type': 'str'}},
+            'text_encoder': {
+                'model___llm_path': {'type': 'str'},
+                'model___text_encoders_zimage': {
+                    'type': 'str',
+                    'format': '${parameter} = [{path = ${value}, type = "lumina2"]',
+                },
+            },
         }
         # build target url
         map_target_dirs = {

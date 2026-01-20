@@ -14,11 +14,14 @@ class TemplaterVariable:
         name: str,
         value: str | int | float | list[str] | list[int] | list[float],
         disable: bool = False,
-        format: str = '${parameter} = ${value}',
+        format: str | None = None,
     ) -> None:
         self._typelist = [str, int, float]
         self.name = name
-        self._format = format
+        if format is None:
+            self._format = '${parameter} = ${value}'
+        else:
+            self._format = format
         if isinstance(value, list):
             if not value:
                 raise ValueError('Empty lists not allowed!')
@@ -175,8 +178,16 @@ class Templater:
 
     def _make_substitutes_from_dict(self, vars: dict) -> dict[str, Any]:
         ret = {}
-        for key, val in vars.items():
-            v = TemplaterVariable(key, val)
+        for key, data in vars.items():
+            if isinstance(data, dict):
+                val = data.get('value', '')
+                format = data.get('format', '')
+                if not format:
+                    format = None
+            else:
+                val = data
+                format = None
+            v = TemplaterVariable(key, val, format=format)
             ret |= v.substitute
         return ret
 

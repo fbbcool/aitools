@@ -108,7 +108,7 @@ video_clip_mode = 'single_beginning'
 type = 'z_image'
 # this is the config checkout for the checkpoint but w/o the specific model
 ${model___diffusion_model}
-${model___text_encoders}
+${model___text_encoders_zimage}
 ${model___vae}
 #merge_adapters
 ${model___merge_adapters}
