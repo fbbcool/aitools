@@ -1,7 +1,7 @@
 {
   "train_zimage": {
     "common": {
-      "ckpt": [
+      "diffuser": [
         {
           "repo_id": "Tongyi-MAI/Z-Image-Turbo"
         }
