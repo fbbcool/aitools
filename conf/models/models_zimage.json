@@ -31,6 +31,11 @@
     "turbo": {
       "transformer": [
         {
+          "link": "https://civitai.com/api/download/models/2564070?type=Model&format=SafeTensor&size=full&fp=fp16",
+          "rename": "unstable-revol-v2",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2511897?type=Model&format=SafeTensor&size=full&fp=fp16",
           "rename": "JibMix",
           "skip": false

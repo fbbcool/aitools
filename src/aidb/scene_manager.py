@@ -46,10 +46,10 @@ class SceneManager:
         return id
 
     def id_from_url(self, url: str | Path) -> None | str:
-        data = self.data_from_url(url)
+        data = self.data_from_url_db(url)
         if data is None:
             return None
-        return str(data.get('_id', ''))
+        return str(data.get(self.FIELD_OID, ''))
 
     @property
     def ids(self) -> Generator:
@@ -72,7 +72,7 @@ class SceneManager:
         self._log(f'DATABASE INCONSISTENCY: id {id} is multiple', level='error')
         return None
 
-    def data_from_url(self, url: str | Path) -> dict | None:
+    def data_from_url_db(self, url: str | Path) -> dict | None:
         docs = self._dbm.find_documents(self.SCENE_COLLECTION, query={self.FIELD_URL: str(url)})
         if len(docs) == 0:
             return None
@@ -81,6 +81,11 @@ class SceneManager:
 
         self._log(f'DATABASE INCONSISTENCY: id {id} is multiple', level='error')
         return None
+
+    def data_from_url_dotfile(self, url: str | Path) -> dict | None:
+        id = self.id_from_dotfile(url)
+        data = self.data_from_id(id)
+        return data
 
     def is_id(self, id: str) -> bool:
         if self.data_from_id(id) is not None:

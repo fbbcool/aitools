@@ -18,7 +18,8 @@
         {
           "action": "link",
           "repo_type": "dataset",
-          "repo_id": "fbbcool/1legsemp"
+          "repo_id": "fbbcool/1legsemp",
+          "skip": true
         }
       ]
     }

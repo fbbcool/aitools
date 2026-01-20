@@ -19,26 +19,53 @@ class Scene:
             except Exception:
                 url = None
         if url is not None:
-            data = scm.data_from_url(url)
+            data = scm.data_from_url_dotfile(url)
+            if data is None:
+                data = scm.data_from_url_db(url)
+                url = None
 
         if data is None:
+            url = None
             data = scm.data_from_id(id_or_url)
 
         if data is None:
             raise ValueError('Scene does not exist')
 
         self.data = data
+        self.url = url
+        """the "called" url, not the db stored! should be None if data was loaded from id."""
 
     @property
     def id(self) -> str:
         return str(self.data.get(SceneManager.FIELD_OID, ''))
 
     @property
-    def url(self) -> Path:
+    def url_from_data(self) -> Path:
         return Path(self.data.get(SceneManager.FIELD_URL, ''))
+
+    def url_sync(self) -> bool:
+        """
+        If scene was successfully instanciated from a specific url, this url
+        will be synced to the url in the database.
+        Warning: the url stored in the database will be overwritten and no checks
+        of physical existence will be applied!
+        """
+        if self.url is None:
+            return False
+        url = str(self.url)
+        if str(self.url_from_data) != url:
+            self.data |= {SceneManager.FIELD_URL: url}
+            return self._dbstore()
+        return False
 
     def _dbstore(self) -> bool:
         return self._scm._db_update_scene(self.data)
 
+    def update(self) -> None:
+        if self.url_sync():
+            print(f'synced url[{self.url}]')
+
     def __str__(self) -> str:
-        return pprint.pformat(self.data)
+        ret = f'url: {self.url}\n'
+        ret += 'data: ' + pprint.pformat(self.data)
+        return ret

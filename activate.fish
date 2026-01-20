@@ -72,8 +72,11 @@ function ait_img_caption_clipspace
     echo -n (wl-paste)
 end
 
-function ait_scene_clipspace
-    python3 $HOME_AIT/script/make_scene_new.py (wl-paste)
+function ait_scene_new_clipspace
+    python3 $HOME_AIT/script/scene_make_new.py (wl-paste)
+end
+function ait_scene_update_clipspace
+    python3 $HOME_AIT/script/scene_update.py (wl-paste)
 end
 
 function ait_caption

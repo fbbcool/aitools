@@ -71,6 +71,18 @@
           "skip": true
         },
         {
+          "link": "https://civitai.com/api/download/models/2590244?type=Model&format=SafeTensor&size=full&fp=fp8",
+          "method_download": "civitai",
+          "rename": "BeautyFool",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2610862?type=Model&format=SafeTensor&size=pruned&fp=fp8",
+          "method_download": "civitai",
+          "rename": "FasciumQWEN",
+          "skip": false
+        },
+        {
           "repo_id": "fbbcool/qwen-gts",
           "file": "qwen-gts_001.safetensors",
           "rename": "1gts_v1",
