@@ -118,7 +118,7 @@ class AInstaller:
                 continue
 
             target_var_dict = item.get('target_var', {})
-            for var_bound, data in target_var_dict.item():
+            for var_bound, data in target_var_dict.items():
                 var_value = item.get('link', None)
                 if var_value is None:
                     continue
