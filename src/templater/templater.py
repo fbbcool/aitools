@@ -14,9 +14,11 @@ class TemplaterVariable:
         name: str,
         value: str | int | float | list[str] | list[int] | list[float],
         disable: bool = False,
+        format: str = '${parameter} = ${value}',
     ) -> None:
         self._typelist = [str, int, float]
         self.name = name
+        self._format = format
         if isinstance(value, list):
             if not value:
                 raise ValueError('Empty lists not allowed!')
@@ -41,24 +43,26 @@ class TemplaterVariable:
         self._disable = True
 
     @property
-    def value_string(self) -> str:
+    def format_substitution(self) -> str:
         # setup parameter, always use last split
         parameter = self.name.split(self.PARAMETER_SPITTER)[-1]
-
-        vstr = ''
-        if self._disable:
-            vstr = '#'
-        vstr += f'{parameter} = '
+        # setup value
         if isinstance(self.value, str):
-            vstr += f"'{self.value}'"
+            value = f"'{self.value}'"
         else:
-            vstr += str(self.value)
+            value = str(self.value)
 
-        return vstr
+        sub = {'parameter': parameter}
+        sub |= {'value': value}
+        ret = Template(self._format).safe_substitute(sub)
+        if self._disable:
+            ret = '#' + ret
+
+        return ret
 
     @property
     def substitute(self) -> dict[str, Any]:
-        return {self.name: self.value_string}
+        return {self.name: self.format_substitution}
 
 
 class Templater:

@@ -3,11 +3,33 @@
     "common": {
       "diffuser": [
         {
-          "repo_id": "Tongyi-MAI/Z-Image-Turbo"
+          "repo_id": "Tongyi-MAI/Z-Image-Turbo",
+          "skip": true
+        }
+      ],
+      "vae": [
+        {
+          "repo_id": "Comfy-Org/z_image_turbo",
+          "file": "split_files/vae/ae.safetensors",
+          "skip": false
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/z_image_turbo",
+          "file": "split_files/text_encoders/qwen_3_4b.safetensors",
+          "skip": false
         }
       ]
     },
     "turbo": {
+      "diffusion_model": [
+        {
+          "repo_id": "Comfy-Org/z_image_turbo",
+          "file": "split_files/diffusion_models/z_image_turbo_bf16.safetensors",
+          "skip": false
+        }
+      ],
       "lora": [
         {
           "repo_id": "ostris/zimage_turbo_training_adapter",

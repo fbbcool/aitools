@@ -322,13 +322,13 @@ class AInstaller:
     def _setup_item_diffpipe(self, item: dict) -> dict:
         # build target vars for templater
         map_target_vars = {
-            'ckpt': 'model___ckpt_path:str',
-            'diffuser': 'model___diffusers_path:str',
-            'vae': 'model___vae_path:str',
-            'lora': 'model___merge_adapters:list_str',
-            'clip': 'model___clip_path:str',
-            'transformer': 'model___transformer_path:str',
-            'text_encoder': 'model___llm_path:str',
+            'ckpt': ['model___ckpt_path:str'],
+            'diffuser': ['model___diffusers_path:str'],
+            'vae': ['model___vae_path:str'],
+            'lora': ['model___merge_adapters:list_str'],
+            'clip': ['model___clip_path:str'],
+            'transformer': ['model___transformer_path:str'],
+            'text_encoder': ['model___llm_path:str'],
         }
         # build target url
         map_target_dirs = {
