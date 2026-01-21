@@ -36,17 +36,17 @@ config_trainer = {
     'adapter___rank': 32,
     'optimizer___lr': 5e-5,
 }
-config_dataset = {'num_repeats': 2, 'resolutions': [1024]}
+config_dataset = {'num_repeats': 1, 'resolutions': [1024]}
 
 
-dataset_repo_ids = [('fbbcool/1gts-xlasm-01', 0)]
+# dataset_repo_ids = [('fbbcool/1gts-xlasm-01', 0)]
 # dataset_repo_ids = [('fbbcool/1fbb_02', 150)]
-# dataset_repo_ids = [
-#    ('fbbcool/1busty', 100),
-#    ('fbbcool/1legsemp', 100),
-#    ('fbbcool/1fem', 100),
-#    ('fbbcool/1fbb_02', 100),
-# ]
+dataset_repo_ids = [
+    ('fbbcool/1busty', 100),
+    ('fbbcool/1legsemp', 100),
+    ('fbbcool/1fem', 100),
+    ('fbbcool/1fbb_02', 100),
+]
 # Trainer(
 #    'qwen',
 #    dataset_repo_ids,

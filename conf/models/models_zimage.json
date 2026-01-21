@@ -114,6 +114,11 @@
           "skip": false
         },
         {
+          "link": "https://civitai.com/api/download/models/2581135?type=Model&format=SafeTensor",
+          "rename": "mystic-xxx-v5",
+          "skip": false
+        },
+        {
           "repo_id": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
           "file": "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
           "subdir": "auto",
