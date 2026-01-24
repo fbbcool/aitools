@@ -14,7 +14,7 @@ if __name__ == '__main__':
     else:
         print(urls_img)
 
-    scm = SceneManager()
+    scm = SceneManager(subdir_scenes='subdir')
 
     scm.new_scene_from_urls(urls_img)
     scm.new_scene_from_urls(urls_dir)

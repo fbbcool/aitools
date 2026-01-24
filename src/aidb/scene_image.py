@@ -1,8 +1,7 @@
 from pathlib import Path
 import pprint
 from typing import Any
-from .scene_common import SceneDef
-from .scene_manager import SceneManager
+from aidb.scene_manager import SceneManager
 
 
 class Scene:
@@ -38,11 +37,11 @@ class Scene:
 
     @property
     def id(self) -> str:
-        return str(self.data.get(SceneDef.FIELD_OID, ''))
+        return str(self.data.get(SceneManager.FIELD_OID, ''))
 
     @property
     def url_from_data(self) -> Path:
-        return Path(self.data.get(SceneDef.FIELD_URL, ''))
+        return Path(self.data.get(SceneManager.FIELD_URL, ''))
 
     def url_sync(self) -> bool:
         """
@@ -55,7 +54,7 @@ class Scene:
             return False
         url = str(self.url)
         if str(self.url_from_data) != url:
-            self.data |= {SceneDef.FIELD_URL: url}
+            self.data |= {SceneManager.FIELD_URL: url}
             return self._dbstore()
         return False
 

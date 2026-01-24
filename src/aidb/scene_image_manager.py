@@ -4,21 +4,14 @@ from typing import Any, Final, Generator
 import json
 
 from aidb.dbmanager import DBManager
+from .scene_common import SceneDef
 from ait.tools.files import is_img_or_vid, subdir_inc, urls_to_dir, is_dir, imgs_from_url
 
-from .scene_common import SceneDef
 
+class SceneImageManager:
+    SCENE_COLLECTION: Final = 'images'
 
-class SceneManager:
-    DOTFILE: Final = '.scenemanager'
-    SCENE_COLLECTION: Final = 'scenes'
-
-    def __init__(
-        self,
-        dbm: DBManager | None = None,
-        config: str | None = None,
-        subdir_scenes: str | None = None,
-    ) -> None:
+    def __init__(self, dbm: DBManager | None = None, config: str | None = None) -> None:
         if config is None:
             config = SceneDef.CONFIG_DEFAULT
         self.config = config
@@ -27,8 +20,6 @@ class SceneManager:
             self._dbm = DBManager(config_file=str(self.config_file))
         else:
             self._dbm = dbm
-
-        self._subdir_scenes = subdir_scenes
 
     @property
     def root(self) -> Path:
@@ -269,15 +260,10 @@ class SceneManager:
         return True
 
     def scene_from_id_or_url(self, id_or_url: str | Path) -> Any:
-        from .scene import Scene
+        from aidb import Scene
 
         self._log(f'make scene from: [{str(id_or_url)}]', 'debug')
         return Scene(self, id_or_url)
-
-    def scene_image_manager(self) -> Any:
-        from .scene_image_manager import SceneImageManager
-
-        return SceneImageManager(dbm=self._dbm, config=self.config)
 
     @staticmethod
     def _json_read(url: Path) -> dict:
