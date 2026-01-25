@@ -10,7 +10,7 @@ from aidb.dbmanager import DBManager  # Updated import
 from aidb.hfdataset import HFDatasetImg
 from aidb.tagger import tagger_wd as tagger  # Updated import
 
-from ait.image import get_prompt_comfy
+from ait.tools.images import _image_extract_prompt_from_info_ext
 
 
 class Image:
@@ -49,6 +49,7 @@ class Image:
             )
 
         self._db_manager = db_manager
+        self._pil: PILImage.Image | None = None
         self._image_id = image_id
         self._data = doc  # Store the pre-fetched document
         self.score = 0.0
@@ -254,17 +255,12 @@ class Image:
 
     @property
     def _prompt_meta(self) -> str | None:
-        prompt = None
-        try:
-            pil = self.pil
-            if pil is None:
-                return None
-            prompt = get_prompt_comfy(pil=pil)
-        except Exception:
+        pil = self.pil
+        if pil is None:
             return None
+        prompt = _image_extract_prompt_from_info_ext(pil.info)
 
-        # always return None, regardless of None or empty.
-        if not prompt:
+        if prompt is None:
             return None
         if isinstance(prompt, str):
             for trigger in TAGS_TRIGGER:
@@ -353,6 +349,9 @@ class Image:
             Optional[PILImage.Image]: A PIL Image object, or None if the image
                                       file cannot be found or opened.
         """
+        if self._pil is not None:
+            return self._pil
+
         full_path = self.get_full_path()
         if full_path is None:
             print(f"Cannot get PIL image: Full path not available for image ID '{self._image_id}'.")
@@ -370,9 +369,10 @@ class Image:
                     break
 
         try:
-            pil_image = PILImage.open(full_path)
+            self._pil = PILImage.open(full_path)
             # print(f"Successfully opened image '{full_path}' as PIL image.") # Too verbose
-            return pil_image
+            self._pil.load()
+            return self._pil
         except FileNotFoundError:
             print(f"Error: Image file not found at '{full_path}'.")
             return None

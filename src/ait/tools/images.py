@@ -137,4 +137,3 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
     if not prompt:
         return None
     return prompt
-    pass
