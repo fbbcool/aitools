@@ -9,7 +9,7 @@ from ait.tools.files import is_img_or_vid, subdir_inc, urls_to_dir, is_dir, imgs
 
 
 class SceneImageManager:
-    SCENE_COLLECTION: Final = 'images'
+    IMAGE_COLLECTION: Final = 'images'
 
     def __init__(self, dbm: DBManager | None = None, config: str | None = None) -> None:
         if config is None:
@@ -26,32 +26,9 @@ class SceneImageManager:
         return Path(self._dbm._root)
 
     @property
-    def url_scenes(self) -> Path:
+    def url_imgs(self) -> Path:
         url = self.root
-        if self._subdir_scenes is not None:
-            url = url / self._subdir_scenes
         return url
-
-    @classmethod
-    def _url_dotfile_path(cls, url: str | Path) -> Path:
-        url = Path(url)
-        return url / cls.DOTFILE
-
-    @classmethod
-    def _url_dotfile_load(cls, url: str | Path) -> None | dict:
-        dotfile = cls._url_dotfile_path(url)
-        data = cls._json_read(dotfile)
-        if not data:
-            return None
-        return data
-
-    @classmethod
-    def id_from_dotfile(cls, url: str | Path) -> None | str:
-        data = cls._url_dotfile_load(url)
-        if data is None:
-            return None
-        id = data.get(SceneDef.FIELD_OID, None)
-        return id
 
     def id_from_url(self, url: str | Path) -> None | str:
         data = self.data_from_url_db(url)
@@ -61,9 +38,9 @@ class SceneImageManager:
 
     @property
     def ids(self) -> Generator:
-        """Returns a generator of scene oid's for all scenes in the db"""
+        """Returns a generator of image oid's for all images in the db"""
 
-        docs = self._dbm.find_documents(self.SCENE_COLLECTION, query={})
+        docs = self._dbm.find_documents(self.IMAGE_COLLECTION, query={})
         for doc in docs:
             yield str(doc['_id'])
 
@@ -71,7 +48,7 @@ class SceneImageManager:
         oid = self._dbm.to_oid(id)
         if oid is None:
             return None
-        docs = self._dbm.documents_from_oid(self.SCENE_COLLECTION, oid)
+        docs = self._dbm.documents_from_oid(self.IMAGE_COLLECTION, oid)
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -81,7 +58,7 @@ class SceneImageManager:
         return None
 
     def data_from_url_db(self, url: str | Path) -> dict | None:
-        docs = self._dbm.find_documents(self.SCENE_COLLECTION, query={SceneDef.FIELD_URL: str(url)})
+        docs = self._dbm.find_documents(self.IMAGE_COLLECTION, query={SceneDef.FIELD_URL: str(url)})
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -90,159 +67,61 @@ class SceneImageManager:
         self._log(f'DATABASE INCONSISTENCY: id {id} is multiple', level='error')
         return None
 
-    def data_from_url_dotfile(self, url: str | Path) -> dict | None:
-        id = self.id_from_dotfile(url)
-        data = self.data_from_id(id)
-        return data
-
     def is_id(self, id: str) -> bool:
         if self.data_from_id(id) is not None:
             return True
         return False
 
-    def update_from_url(self, url: str | Path) -> str | None:
+    def _data_from_url(self, url: Path | str) -> dict | None:
         url = Path(url)
-        if not url.exists():
-            self._log(f'url does not exist: {url}')
-            return
-        elif not url.is_dir():
-            self._log(f'url is not a dir: {url}')
-            return
-
-        oid = self.id_from_dotfile(url)
-        self._log(f'{url} got dotfile oid {oid}', level='debug')
-
-        oid = self.id_from_url(url)
-        self._log(f'{url} got oid {oid}', level='debug')
-
-        if oid is None:
-            if oid is None:
-                # add new scene
-                meta = self._meta_init_data(url=url)
-                meta = self._scene_update(meta)
-                if meta is not None:
-                    oid = meta.get(SceneDef.FIELD_OID, None)
-            data_dotfile = self._dotfile_init_data(oid=oid)
-            self._dotfile_update(url, data_dotfile)
-        else:
-            if oid is None:
-                # update url in db with check of db url?
-                self._log(f'DATABASE INCONSISTENCY: {url} has no oid, TODO fix!', level='error')
-            elif oid != oid:
-                # update url in db with check of db url?
-                self._log(
-                    f'DATABASE INCONSISTENCY: {url} dotfile oid does match to oid, TODO fix!',
-                    level='error',
-                )
-            else:
-                # all good: scene db and dotfile consistent
-                pass
-
-        return oid
-
-    def _dotfile_init_data(self, oid: str | None = None) -> dict:
-        data = {}
-
-        if not oid:
-            oid = None
-        if oid is not None:
-            data |= {SceneDef.FIELD_OID: str(oid)}
-
-        return data
-
-    def _dotfile_update(self, url: Path | str, up_data: dict) -> dict | None:
-        url = Path(url)
-
-        if not url.exists():
-            self._log(f'url {url} not exists for dotfile: {up_data}', level='warning')
+        if not is_img_or_vid(url):
             return None
 
-        dotfile = url / self.DOTFILE
-        data = self._json_read(dotfile)
-        data |= up_data
-        self._json_write(dotfile, data)
-
-    def _meta_init_data(self, url: Path | str | None = None) -> dict:
         data = {}
-
-        if not url:
-            url = None
-        if url is not None:
-            data |= {SceneDef.FIELD_URL: str(url)}
+        data |= {SceneDef.FIELD_URL: str(url)}
         return data
 
-    def _scene_update(self, meta: dict) -> dict | None:
-        url = meta.get(SceneDef.FIELD_URL, '')
+    def _image_update(self, data: dict) -> dict | None:
+        url = data.get(SceneDef.FIELD_URL, '')
         if not url:
             self._log('no url found in meta!')
             return None
 
-        # does scene url already exist?
+        # does url already exist?
         oid = self.id_from_url(url)
         if oid is None:
-            oid = self._dbm.insert_document(self.SCENE_COLLECTION, meta)
-            self._log('scene added: {url}.', level='message')
+            oid = self._dbm.insert_document(self.IMAGE_COLLECTION, data)
+            self._log('image added: {url}.', level='message')
         else:
-            self._log(f'scene not added, already exists: {url} oid={oid}.', level='debug')
+            self._log(f'image not added, already exists: {url} oid={oid}.', level='debug')
 
         if oid:
-            meta |= {SceneDef.FIELD_OID: oid}
+            data |= {SceneDef.FIELD_OID: oid}
 
-        return meta
-
-    def new_scene_from_urls(self, _urls: list[str] | list[Path] | str | Path) -> list[str] | None:
-        if not isinstance(_urls, list):
-            urls = [_urls]
-        else:
-            urls = _urls
-        urls_img = [Path(url) for url in urls if is_img_or_vid(url)]
-
-        ret = []
-        if urls_img:
-            oid = self._scene_new_imgs(urls_img)
-            if oid is not None:
-                ret.append(oid)
-
-        dirs = [Path(url) for url in urls if is_dir(url)]
-        for dir in dirs:
-            oid = self._scene_new_dir(dir)
-            if oid is not None:
-                ret.append(oid)
-
-    def _scene_new_imgs(self, url_imgs: list[str] | list[Path]) -> None | str:
-        """
-        private: makes a new scene from a list of img urls.
-
-        url_imgs should be completely valid (e.g. generated by is_img_or_vid(), they're not gonna be checked again.
-
-        returns the new oid:str
-        """
-
-        if not url_imgs:
-            return None
-
-        # physical files movement
-        self.url_scenes.mkdir(parents=True, exist_ok=True)
-        dir_scene = subdir_inc(self.url_scenes)
-        urls_to_dir(url_imgs, dir_scene)
-
-        # db entry
-        oid = self.update_from_url(dir_scene)
-
-        return oid
-
-    def _scene_new_dir(self, dir: str | Path) -> None | str:
-        return self._scene_new_imgs(imgs_from_url(dir))
+        return data
 
     @property
-    def _dbc_scenes(self):
-        return self._dbm._get_collection(self.SCENE_COLLECTION)
+    def _dbc_images(self):
+        return self._dbm._get_collection(self.IMAGE_COLLECTION)
 
     def _dbc_to_id(self, id: str):
         self._dbm.to_oid(id)
 
-    def _db_update_scene(self, data: dict) -> bool:
-        dbc = self._dbc_scenes
+    def _db_insert_image(self, data: dict) -> str | None:
+        dbc = self._dbc_images
+        if dbc is None:
+            return None
+
+        oid = data.get(SceneDef.FIELD_OID, None)
+        if oid is not None:
+            return None
+        set_data = data.copy()
+        set_data.pop(SceneDef.FIELD_OID, None)
+        id = self._dbm.insert_document(self.IMAGE_COLLECTION, set_data)
+        return id
+
+    def _db_update_image(self, data: dict) -> bool:
+        dbc = self._dbc_images
         if dbc is None:
             return False
 
@@ -259,11 +138,11 @@ class SceneImageManager:
             return False
         return True
 
-    def scene_from_id_or_url(self, id_or_url: str | Path) -> Any:
-        from aidb import Scene
+    def image_from_id_or_url(self, id_or_url: str | Path) -> Any:
+        from .scene_image import SceneImage
 
-        self._log(f'make scene from: [{str(id_or_url)}]', 'debug')
-        return Scene(self, id_or_url)
+        self._log(f'make scene image from: [{str(id_or_url)}]', 'debug')
+        return SceneImage(self, id_or_url)
 
     @staticmethod
     def _json_read(url: Path) -> dict:
@@ -283,4 +162,4 @@ class SceneImageManager:
             json.dump(data, f)
 
     def _log(self, msg: str, level: str = 'warning') -> None:
-        print(f'[scm:{level}] {msg}')
+        print(f'[im:{level}] {msg}')

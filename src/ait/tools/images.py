@@ -1,23 +1,62 @@
+import json
 from pathlib import Path
 from PIL import Image as PILImage
-import json
+
+from ait.tools.files import is_img
 
 
-def get_prompt_comfy(
-    img_path: Path | str = '', pil: PILImage.Image | None = None, verbose: bool = False
-) -> str | None:
+def image_from_url(url: str | Path) -> PILImage.Image | None:
+    url = Path(url)
+    if not is_img(url):
+        return None
+
+    try:
+        pil_image = PILImage.open(url)
+        # print(f"Successfully opened image '{full_path}' as PIL image.") # Too verbose
+        return pil_image
+    except FileNotFoundError:
+        # print(f"Error: Image file not found at '{url}'.")
+        return None
+    except IOError:
+        # print(f"Error opening image file '{url}': {e}")
+        return None
+    except Exception:
+        # print(f"An unexpected error occurred while getting PIL image for '{url}': {e}")
+        return None
+
+
+def image_info_from_url(url: Path | str) -> dict | None:
+    url = Path(url)
+    pil = image_from_url(url)
     if pil is None:
-        img_path = Path(img_path)
-        if not img_path.exists():
-            return None
-        if not img_path.is_file():
-            return None
-        img_pil = PILImage.open(img_path)
-    else:
-        img_pil = pil
+        return None
+    pil.load()
 
-    img_pil.load()
-    data = json.loads(img_pil.info['prompt'])
+    info = {'url_src': str(url)}
+    info |= {'info_ext': pil.info}
+
+    # timestamps
+    # get creation time
+    info |= {'timestamp_created': url.stat().st_ctime}
+
+    # size
+    info |= {'width': pil.width}
+    info |= {'height': pil.height}
+    info |= {'size': pil.width * pil.height}
+
+    # prompt
+    prompt = _image_extract_prompt_from_info_ext(pil.info)
+    if prompt is not None:
+        info |= {'prompt': prompt}
+
+    return info
+
+
+def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | None:
+    info_prompt = info_ext.get('prompt', None)
+    if info_prompt is None:
+        return None
+    data = json.loads(info_prompt)
 
     prompt = None
     try:
@@ -98,3 +137,4 @@ def get_prompt_comfy(
     if not prompt:
         return None
     return prompt
+    pass

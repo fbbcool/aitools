@@ -84,6 +84,11 @@ function ait_caption
     ait_img_caption_clipspace
 end
 
+function ait_prompt
+    ait_tmp_clipspace
+    ait_img_prompt_clipspace
+end
+
 function ait_tmp_clipspace
     set input (wl-paste)
     echo $input

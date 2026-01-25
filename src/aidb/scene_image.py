@@ -1,12 +1,12 @@
 from pathlib import Path
 import pprint
 from typing import Any
-from aidb.scene_manager import SceneManager
+from .scene_image_manager import SceneImageManager
 
 
-class Scene:
-    def __init__(self, scm: SceneManager, id_or_url: Any) -> None:
-        self._scm = scm
+class SceneImage:
+    def __init__(self, im: SceneImageManager, id_or_url: Any) -> None:
+        self._im = im
 
         data = None
 
@@ -19,14 +19,14 @@ class Scene:
             except Exception:
                 url = None
         if url is not None:
-            data = scm.data_from_url_dotfile(url)
+            data = im.data_from_url_dotfile(url)
             if data is None:
-                data = scm.data_from_url_db(url)
+                data = im.data_from_url_db(url)
                 url = None
 
         if data is None:
             url = None
-            data = scm.data_from_id(id_or_url)
+            data = im.data_from_id(id_or_url)
 
         if data is None:
             raise ValueError('Scene does not exist')
@@ -59,7 +59,7 @@ class Scene:
         return False
 
     def _dbstore(self) -> bool:
-        return self._scm._db_update_scene(self.data)
+        return self._im._db_update_scene(self.data)
 
     def update(self) -> None:
         if self.url_sync():
