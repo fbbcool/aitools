@@ -25,7 +25,7 @@ def image_from_url(url: str | Path) -> PILImage.Image | None:
         return None
 
 
-def image_info_from_url(url: Path | str) -> dict | None:
+def image_info_from_url(url: Path | str, include_info_ext: bool = False) -> dict | None:
     """
     Creates an info struct if image exists, otherwise returns None.
 
@@ -38,7 +38,6 @@ def image_info_from_url(url: Path | str) -> dict | None:
     pil.load()
 
     info = {'url_src': str(url)}
-    info |= {'info_ext': pil.info}
 
     # timestamps
     # get creation time
@@ -53,6 +52,10 @@ def image_info_from_url(url: Path | str) -> dict | None:
     prompt = _image_extract_prompt_from_info_ext(pil.info)
     if prompt is not None:
         info |= {'prompt': prompt}
+
+    # info_ext
+    if include_info_ext:
+        info |= {'info_ext': pil.info}
 
     return info
 
