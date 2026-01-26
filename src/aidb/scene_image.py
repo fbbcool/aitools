@@ -1,6 +1,10 @@
 from pathlib import Path
 import pprint
 from typing import Any
+
+from ait.tools.files import is_img_or_vid
+
+from .scene_common import SceneDef
 from .scene_image_manager import SceneImageManager
 
 
@@ -9,19 +13,18 @@ class SceneImage:
         self._im = im
 
         data = None
-
         url = None
+
+        if is_img_or_vid(id_or_url):
+            self.url = Path(id_or_url)
+            data = im.init_data_from_url(self.url)
+
         if isinstance(id_or_url, Path):
             url = id_or_url
         if isinstance(id_or_url, str):
             try:
                 url = Path(id_or_url)
             except Exception:
-                url = None
-        if url is not None:
-            data = im.data_from_url_dotfile(url)
-            if data is None:
-                data = im.data_from_url_db(url)
                 url = None
 
         if data is None:
@@ -37,11 +40,11 @@ class SceneImage:
 
     @property
     def id(self) -> str:
-        return str(self.data.get(SceneManager.FIELD_OID, ''))
+        return str(self.data.get(SceneDef.FIELD_OID, ''))
 
     @property
     def url_from_data(self) -> Path:
-        return Path(self.data.get(SceneManager.FIELD_URL, ''))
+        return Path(self.data.get(SceneDef.FIELD_URL, ''))
 
     def url_sync(self) -> bool:
         """
@@ -54,12 +57,12 @@ class SceneImage:
             return False
         url = str(self.url)
         if str(self.url_from_data) != url:
-            self.data |= {SceneManager.FIELD_URL: url}
+            self.data |= {SceneDef.FIELD_URL: url}
             return self._dbstore()
         return False
 
     def _dbstore(self) -> bool:
-        return self._im._db_update_scene(self.data)
+        return self._im._db_update_image(self.data)
 
     def update(self) -> None:
         if self.url_sync():

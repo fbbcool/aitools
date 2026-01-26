@@ -1,7 +1,7 @@
 import os
 import shutil
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 SUFFIX_IMG: Final = ['png', 'webp', 'jpg', 'jpeg']
 SUFFIX_VID: Final = ['mov', 'mp4']
@@ -23,7 +23,10 @@ def suffix_vid() -> list[str]:
     return [f'.{pf}' for pf in ret]
 
 
-def is_img_or_vid(url: str | Path) -> bool:
+def is_img_or_vid(url: Any) -> bool:
+    """True if url:str|Path is an image or video, otherwise False"""
+    if not (isinstance(url, str) or isinstance(url, Path)):
+        return False
     return is_img(url) or is_vid(url)
 
 
@@ -113,3 +116,40 @@ def urls_to_dir(_urls: list[str] | list[Path] | str | Path, to_dir: str | Path) 
 def imgs_from_url(url: str | Path) -> list[Path]:
     img_urls = [Path(f.path) for f in os.scandir(url) if is_img_or_vid(f.path)]
     return img_urls
+
+
+def url_move_to_new_parent(
+    url_src: str | Path,
+    to_parent: str | Path,
+    new_name: str | None = None,
+    delete_src=False,
+    exist_ok=False,
+) -> None:
+    """
+    Moves an url to a new parent and optionally renames it.
+
+    The url suffix is preserved.
+    The parent must exist.
+    """
+    url_src = Path(url_src)
+    url_parent = Path(to_parent)
+    if not url_src.exists():
+        return
+    if not is_dir(url_parent):
+        return
+
+    if new_name is None:
+        new_name = url_src.stem
+
+    url_to = (url_parent / new_name).with_suffix(url_src.suffix)
+
+    if not exist_ok and url_to.exists():
+        return
+
+    shutil.copy2(str(url_src), str(url_to))
+
+    if not url_to.exists():
+        return
+
+    if delete_src:
+        os.remove(str(url_src))

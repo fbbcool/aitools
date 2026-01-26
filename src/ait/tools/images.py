@@ -26,6 +26,11 @@ def image_from_url(url: str | Path) -> PILImage.Image | None:
 
 
 def image_info_from_url(url: Path | str) -> dict | None:
+    """
+    Creates an info struct if image exists, otherwise returns None.
+
+    The given url is stored in ['url_src'].
+    """
     url = Path(url)
     pil = image_from_url(url)
     if pil is None:
