@@ -113,9 +113,18 @@ def urls_to_dir(_urls: list[str] | list[Path] | str | Path, to_dir: str | Path) 
         shutil.move(str(from_url), str(to_url))
 
 
+def imgs_and_vids_from_url(url: str | Path) -> list[Path]:
+    urls = [Path(f.path) for f in os.scandir(url) if is_img_or_vid(f.path)]
+    return urls
+
+
 def imgs_from_url(url: str | Path) -> list[Path]:
-    img_urls = [Path(f.path) for f in os.scandir(url) if is_img_or_vid(f.path)]
-    return img_urls
+    urls = [Path(f.path) for f in os.scandir(url) if is_img(f.path)]
+    return urls
+
+
+def img_latest_from_url(url: str | Path) -> Path:
+    return max(imgs_from_url(url), key=lambda x: x.stat().st_ctime)
 
 
 def url_move_to_new_parent(

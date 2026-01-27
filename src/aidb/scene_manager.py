@@ -41,6 +41,10 @@ class SceneManager:
             url = url / self._subdir_scenes
         return url
 
+    @property
+    def url_thumbnails(self) -> Path:
+        return self.root / SceneDef.DIR_THUMBNAILS
+
     @classmethod
     def _url_dotfile_path(cls, url: str | Path) -> Path:
         url = Path(url)
@@ -271,7 +275,6 @@ class SceneManager:
     def scene_from_id_or_url(self, id_or_url: str | Path) -> Any:
         from .scene import Scene
 
-        self._log(f'make scene from: [{str(id_or_url)}]', 'debug')
         return Scene(self, id_or_url)
 
     def scene_image_manager(self) -> Any:

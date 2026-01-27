@@ -27,6 +27,11 @@
         {
           "repo_id": "Comfy-Org/z_image_turbo",
           "file": "split_files/diffusion_models/z_image_turbo_bf16.safetensors",
+          "skip": true
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2603643?type=Model&format=SafeTensor&size=full&fp=fp16",
+          "rename": "center-fp16-v5",
           "skip": false
         }
       ],

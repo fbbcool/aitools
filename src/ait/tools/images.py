@@ -1,8 +1,11 @@
 import json
 from pathlib import Path
+from typing import Final
 from PIL import Image as PILImage
 
 from ait.tools.files import is_img
+
+THUMBNAIL_SIZE: Final = 256
 
 
 def image_from_url(url: str | Path) -> PILImage.Image | None:
@@ -58,6 +61,18 @@ def image_info_from_url(url: Path | str, include_info_ext: bool = False) -> dict
         info |= {'info_ext': pil.info}
 
     return info
+
+
+def thumbnail_to_url(url_from: Path | str, url_to: Path | str, size: int = THUMBNAIL_SIZE) -> None:
+    """Will create url_to parent and overrides url_to. url_from stoic"""
+    if not is_img(url_from):
+        return None
+
+    url_to = Path(url_to)
+    url_to.parent.mkdir(exist_ok=True, parents=True)
+    pil = PILImage.open(url_from)
+    pil.thumbnail((size, size))
+    pil.save(url_to)
 
 
 def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | None:
