@@ -1,8 +1,5 @@
 from pathlib import Path
-from re import S
 from typing import Any, Final
-
-from ait.tools.files import SUFFIX_IMG
 
 
 class SceneDef:
@@ -23,7 +20,7 @@ class SceneDef:
     FIELD_URL_SRC: Final = 'url_src'
     FIELD_URL_PARENT: Final = 'url_parent'
 
-    DIR_THUMBNAILS: Final = '.thumbnails'
+    DIR_THUMBNAILS: Final = f'{SEPERATOR_ID}thumbnails'
 
     @classmethod
     def filename_from_id(cls, prefix: str, id: Any, suffix: str | None = None) -> str | None:

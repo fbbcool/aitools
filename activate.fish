@@ -72,16 +72,6 @@ function ait_img_caption_clipspace
     echo -n (wl-paste)
 end
 
-function aidb_scene_new_clipspace
-    python3 $HOME_AIT/script/scene_make_new.py (wl-paste)
-end
-function aidb_scene_update_clipspace
-    python3 $HOME_AIT/script/scene_update.py (wl-paste)
-end
-function aidb_scene_images_register_clipspace
-    python3 $HOME_AIT/script/scene_images_register.py (wl-paste)
-end
-
 function ait_caption
     ait_tmp_clipspace
     ait_img_caption_clipspace
@@ -100,6 +90,24 @@ end
 
 function ait_tmp_clean
     rm $AIT_TMP/*.png
+end
+
+function aidb_scene_cd_clipspace
+    echo (wl-paste)
+    set output (python3 $HOME_AIT/script/scene_url_from_reg_file.py (wl-paste))
+    echo $output
+    echo $output | wl-copy
+    cd $output
+end
+
+function aidb_scene_new_clipspace
+    python3 $HOME_AIT/script/scene_make_new.py (wl-paste)
+end
+function aidb_scene_update_clipspace
+    python3 $HOME_AIT/script/scene_update.py (wl-paste)
+end
+function aidb_scene_images_register_clipspace
+    python3 $HOME_AIT/script/scene_images_register.py (wl-paste)
 end
 
 function comfy_clean_gen

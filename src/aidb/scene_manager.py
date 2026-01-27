@@ -25,13 +25,15 @@ class SceneManager:
         dbm: DBManager | None = None,
         config: str | None = None,
         subdir_scenes: str | None = None,
+        verbose: int = 1,
     ) -> None:
+        self._verbose = verbose
         if config is None:
             config = SceneDef.CONFIG_DEFAULT
         self.config = config
         self.config_file = Path(os.environ['CONF_AIT']) / 'aidb' / f'dbmanager_{config}.yaml'
         if dbm is None:
-            self._dbm = DBManager(config_file=str(self.config_file))
+            self._dbm = DBManager(config_file=str(self.config_file), verbose=self._verbose)
         else:
             self._dbm = dbm
 
@@ -114,6 +116,12 @@ class SceneManager:
         id = self.id_from_dotfile(url)
         data = self.data_from_id(id)
         return data
+
+    def url_from_id(self, id: Any) -> Path | None:
+        data = self.data_from_id(id)
+        if data is None:
+            return None
+        return data.get(SceneDef.FIELD_URL, None)
 
     def is_id(self, id: str) -> bool:
         if self.data_from_id(id) is not None:
@@ -278,6 +286,12 @@ class SceneManager:
         if result is None:
             return False
         return True
+
+    def url_from_registered_file(self, reg_file: str | Path) -> Path | None:
+        res = SceneDef.id_and_prefix_from_filename(reg_file)
+        if res is None:
+            return None
+        return self.url_from_id(res[0])
 
     def scene_from_id_or_url(self, id_or_url: str | Path) -> Any:
         from .scene import Scene

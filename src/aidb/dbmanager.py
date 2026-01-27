@@ -31,6 +31,7 @@ class DBManager:
         port: int = 27017,
         db_name: str = '',
         collection: str = '',
+        verbose=1,
     ) -> None:
         """
         Initializes the MongoDB connection. Configuration can be loaded from a YAML file.
@@ -45,6 +46,7 @@ class DBManager:
         """
         self.client: Optional[pymongo.MongoClient] = None
         self.db: Optional[pymongo.database.Database] = None
+        self._verbose = verbose
 
         # Initialize connection parameters with provided arguments (these are fallbacks)
         self._host: str = host
@@ -81,17 +83,17 @@ class DBManager:
             # The ismaster command is cheap and does not require auth.
             self.client.admin.command('ismaster')
             self.db = self.client[self._db_name]
-            print(
+            self._log(
                 f'Successfully connected to MongoDB at {self._host}:{self._port}, database: {self._db_name}'
             )
-            print(f'Using collection {self._collection}')
+            self._log(f'Using collection {self._collection}')
 
         except ConnectionFailure as e:
-            print(f'Could not connect to MongoDB: {e}')
+            self._log(f'Could not connect to MongoDB: {e}')
             self.client = None
             self.db = None
         except Exception as e:
-            print(f'An unexpected error occurred during MongoDB connection: {e}')
+            self._log(f'An unexpected error occurred during MongoDB connection: {e}')
             self.client = None
             self.db = None
 
@@ -114,7 +116,7 @@ class DBManager:
             self._hfds[repo_id] = hfd
             return hfd
         except Exception as e:
-            print(f'Failed connecting to HF dataset: {repo_id}\n{e}')
+            self._log(f'Failed connecting to HF dataset: {repo_id}\n{e}')
             self._hfds[repo_id] = None
             return None
 
@@ -132,7 +134,7 @@ class DBManager:
         The collection is only changed if the collection exists, otherwise an Exception is raised.
         """
         if self.db is None:
-            print('Database not connected. Cannot set collection.')
+            self._log('Database not connected. Cannot set collection.')
             return
 
         if collection_name not in self.db.list_collection_names():
@@ -142,18 +144,18 @@ class DBManager:
                 raise ValueError(f"Collection '{collection_name}' does not exist in the database.")
 
         self._collection = collection_name
-        print(f'Collection set to: {self._collection}')
+        self._log(f'Collection set to: {self._collection}')
 
     def create_collection(self, collection_name: str) -> None:
         """
         Creates a new collection in the current database.
         """
         if self.db is None:
-            print('Database not connected. Cannot create collection.')
+            self._log('Database not connected. Cannot create collection.')
             return
 
         self.db.create_collection(collection_name)
-        print(f"Collection '{collection_name}' created.")
+        self._log(f"Collection '{collection_name}' created.")
 
     @property
     def collections_images(self) -> list[str]:
@@ -161,7 +163,7 @@ class DBManager:
         Returns all collection names of the current DB.
         """
         if self.db is None:
-            print('Database not connected. Cannot retrieve collection names.')
+            self._log('Database not connected. Cannot retrieve collection names.')
             return []
 
         # List all collection names in the current database
@@ -178,19 +180,19 @@ class DBManager:
         Renames a collection in the DB.
         """
         if self.db is None:
-            print('Database not connected. Cannot rename collection.')
+            self._log('Database not connected. Cannot rename collection.')
             return
 
         try:
             self.db[name_from].rename(name_to)
-            print(f"Collection '{name_from}' renamed to '{name_to}'.")
+            self._log(f"Collection '{name_from}' renamed to '{name_to}'.")
             # If the current collection name matches the old name, update it
             if self._collection == name_from:
                 self._collection = name_to
         except OperationFailure as e:
-            print(f"Failed to rename collection '{name_from}' to '{name_to}': {e}")
+            self._log(f"Failed to rename collection '{name_from}' to '{name_to}': {e}")
         except Exception as e:
-            print(f'An unexpected error occurred during collection rename: {e}')
+            self._log(f'An unexpected error occurred during collection rename: {e}')
 
     def _get_collection(self, collection_name: str) -> Optional[pymongo.collection.Collection]:
         """
@@ -205,7 +207,7 @@ class DBManager:
         if self.db is not None:
             return self.db[collection_name]
         else:
-            print('Database not connected. Cannot access collection.')
+            self._log('Database not connected. Cannot access collection.')
             return None
 
     def _load_config_from_yaml(self, config_file: str) -> None:
@@ -215,7 +217,7 @@ class DBManager:
         """
         config_path = Path(config_file)
         if not config_path.exists():
-            print(
+            self._log(
                 f"Warning: Configuration file '{config_file}' not found. Using constructor/default settings."
             )
             return
@@ -239,9 +241,9 @@ class DBManager:
                         mongo_settings['collection'], str
                     ):
                         self._collection = mongo_settings['collection']
-                    print(f"MongoDB connection configuration loaded from '{config_file}'.")
+                    self._log(f"MongoDB connection configuration loaded from '{config_file}'.")
                 else:
-                    print(
+                    self._log(
                         f"Warning: 'mongodb_settings' section not found or malformed in '{config_file}'. Using constructor/default MongoDB settings."
                     )
 
@@ -274,9 +276,9 @@ class DBManager:
                         self._default_thumbnail_size = tuple(
                             thumb_settings['default_thumbnail_size']
                         )
-                    print(f"Thumbnail configuration loaded from '{config_file}'.")
+                    self._log(f"Thumbnail configuration loaded from '{config_file}'.")
                 else:
-                    print(
+                    self._log(
                         f"Warning: 'thumbnail_settings' section not found or malformed in '{config_file}'. Using default thumbnail settings."
                     )
 
@@ -299,9 +301,9 @@ class DBManager:
                         self._default_train_image_size = tuple(
                             train_img_settings['default_train_image_size']
                         )
-                    print(f"Train image configuration loaded from '{config_file}'.")
+                    self._log(f"Train image configuration loaded from '{config_file}'.")
                 else:
-                    print(
+                    self._log(
                         f"Warning: 'train_image_settings' section not found or malformed in '{config_file}'. Using default train image settings."
                     )
 
@@ -319,21 +321,21 @@ class DBManager:
                             collection2hfd |= mapping
                         self._collection2hfd = collection2hfd
                 else:
-                    print(
+                    self._log(
                         f"Warning: 'hf_dataset_settings' section not found or malformed in '{config_file}'. Using default HF dataset settings."
                     )
 
             else:
-                print(
+                self._log(
                     f"Warning: Configuration file '{config_file}' is empty or malformed. Using constructor/default settings."
                 )
 
         except yaml.YAMLError as e:
-            print(
+            self._log(
                 f"Error parsing YAML file '{config_file}': {e}. Using constructor/default settings."
             )
         except Exception as e:
-            print(
+            self._log(
                 f"An unexpected error occurred while reading '{config_file}': {e}. Using constructor/default settings."
             )
 
@@ -347,9 +349,9 @@ class DBManager:
                 for doc in collection.find({}):
                     yield Image(self, str(doc['_id']), collection=collection_name, doc=doc)
             except OperationFailure as e:
-                print(f"Failed to retrieve images from '{collection_name}': {e}")
+                self._log(f"Failed to retrieve images from '{collection_name}': {e}")
             except Exception as e:
-                print(
+                self._log(
                     f"An unexpected error occurred while retrieving images from '{collection_name}': {e}"
                 )
 
@@ -357,7 +359,7 @@ class DBManager:
     def image_ids(self):
         """Returns a generator of Images id's for all images in the db"""
         if self.db is None:
-            print('Database not connected. Cannot retrieve image IDs.')
+            self._log('Database not connected. Cannot retrieve image IDs.')
             return
 
         image_docs = self.find_documents(self._collection, query={})  # Only fetch _id
@@ -368,7 +370,7 @@ class DBManager:
     def images(self):
         """Returns a generator of Images instances for all images in the db"""
         if self.db is None:
-            print('Database not connected. Cannot retrieve images.')
+            self._log('Database not connected. Cannot retrieve images.')
             return
 
         return self._images_from_collection(self._collection)
@@ -377,7 +379,7 @@ class DBManager:
     def all_images(self):
         """Returns a generator of all images in the db"""
         if self.db is None:
-            print('Database not connected. Cannot retrieve images.')
+            self._log('Database not connected. Cannot retrieve images.')
             return
 
         for collection in self.collections_images:
@@ -387,7 +389,7 @@ class DBManager:
     def container_names(self) -> Generator:
         """Returns a generator of for all container names in the db"""
         if self.db is None:
-            print('Database not connected.')
+            self._log('Database not connected.')
             return
 
         docs = self.find_documents('containers')
@@ -444,14 +446,14 @@ class DBManager:
             try:
                 result = collection.insert_one(document)
                 # MongoDB automatically generates '_id'
-                print(
+                self._log(
                     f"Document inserted into '{collection_name}' with MongoDB _id: {result.inserted_id}"
                 )
                 return str(result.inserted_id)
             except OperationFailure as e:
-                print(f"Failed to insert document into '{collection_name}': {e}")
+                self._log(f"Failed to insert document into '{collection_name}': {e}")
             except Exception as e:
-                print(
+                self._log(
                     f"An unexpected error occurred during insertion into '{collection_name}': {e}"
                 )
         return None
@@ -488,9 +490,9 @@ class DBManager:
                     query = {}
                 return list(collection.find(query))
             except OperationFailure as e:
-                print(f"Failed to find documents in '{collection_name}': {e}")
+                self._log(f"Failed to find documents in '{collection_name}': {e}")
             except Exception as e:
-                print(
+                self._log(
                     f"An unexpected error occurred during finding documents in '{collection_name}': {e}"
                 )
         return []
@@ -517,12 +519,12 @@ class DBManager:
         if collection is not None:
             try:
                 result = collection.update_many(query, new_values)
-                print(f"Modified {result.modified_count} document(s) in '{collection_name}'.")
+                self._log(f"Modified {result.modified_count} document(s) in '{collection_name}'.")
                 return result.modified_count
             except OperationFailure as e:
-                print(f"Failed to update documents in '{collection_name}': {e}")
+                self._log(f"Failed to update documents in '{collection_name}': {e}")
             except Exception as e:
-                print(
+                self._log(
                     f"An unexpected error occurred during updating documents in '{collection_name}': {e}"
                 )
         return None
@@ -543,12 +545,12 @@ class DBManager:
         if collection is not None:
             try:
                 result = collection.delete_many(query)
-                print(f"Deleted {result.deleted_count} document(s) from '{collection_name}'.")
+                self._log(f"Deleted {result.deleted_count} document(s) from '{collection_name}'.")
                 return result.deleted_count
             except OperationFailure as e:
-                print(f"Failed to delete documents from '{collection_name}': {e}")
+                self._log(f"Failed to delete documents from '{collection_name}': {e}")
             except Exception as e:
-                print(
+                self._log(
                     f"An unexpected error occurred during deleting documents from '{collection_name}': {e}"
                 )
         return None
@@ -582,13 +584,13 @@ class DBManager:
             raise TypeError(f'{container_local_path} has wrong type!')
 
         if not container_path_obj.is_dir():
-            print(
+            self._log(
                 f"Error: Container path '{container_local_path}' does not exist or is not a directory."
             )
             return None
 
         if not container_path_obj.exists():
-            print(
+            self._log(
                 f"Error: Container path '{container_local_path}' exists, force option not implemented!"
             )
             return None
@@ -607,7 +609,7 @@ class DBManager:
                 datetime.datetime.fromtimestamp(container_modified_timestamp).isoformat() + 'Z'
             )
         except OSError as e:
-            print(f'Error getting container directory timestamps: {e}')
+            self._log(f'Error getting container directory timestamps: {e}')
             container_creation_date = datetime.datetime.now().isoformat() + 'Z'
             container_last_modified_date = datetime.datetime.now().isoformat() + 'Z'
 
@@ -623,13 +625,13 @@ class DBManager:
 
         inserted_container_id = self.insert_document('containers', container_metadata)
         if inserted_container_id is None:
-            print(f"Failed to insert container metadata for '{container_local_path}'.")
+            self._log(f"Failed to insert container metadata for '{container_local_path}'.")
             return None
 
         # Convert the string ID back to ObjectId for internal use
         inserted_container_object_id = ObjectId(inserted_container_id)
 
-        print(f"Container '{container_name}' added with ID: {inserted_container_id}")
+        self._log(f"Container '{container_name}' added with ID: {inserted_container_id}")
 
         # Supported image extensions and their MIME types
         image_extensions = {
@@ -678,11 +680,11 @@ class DBManager:
                 {'_id': inserted_container_object_id},
                 {'$set': {'image_ids': added_image_object_ids}},
             )
-            print(
+            self._log(
                 f"Container '{container_name}' ({inserted_container_id}) updated with {len(added_image_object_ids)} image references."
             )
         else:
-            print(
+            self._log(
                 f"No images found or added to container '{container_name}' ({inserted_container_id})."
             )
 
@@ -723,7 +725,7 @@ class DBManager:
                     datetime.datetime.fromtimestamp(file_modified_timestamp).isoformat() + 'Z'
                 )
             except OSError as e:
-                print(f"Error getting file timestamps for '{full_image_path_obj}': {e}")
+                self._log(f"Error getting file timestamps for '{full_image_path_obj}': {e}")
                 file_creation_date = datetime.datetime.now().isoformat() + 'Z'
                 file_last_modified_date = datetime.datetime.now().isoformat() + 'Z'
 
@@ -752,7 +754,7 @@ class DBManager:
             }
             return self.insert_document(self._collection, image_metadata)
         else:
-            print(f'Skipping non-image file: {full_image_path_obj.name}')
+            self._log(f'Skipping non-image file: {full_image_path_obj.name}')
             return None
 
     def update_container(
@@ -796,17 +798,19 @@ class DBManager:
             try:
                 update_fields['image_ids'] = [ObjectId(img_id) for img_id in image_ids]
             except Exception:
-                print('Invalid image_ids format: one or more IDs are not valid ObjectId strings.')
+                self._log(
+                    'Invalid image_ids format: one or more IDs are not valid ObjectId strings.'
+                )
                 return None
 
         if not update_fields:
-            print('No fields provided for container update.')
+            self._log('No fields provided for container update.')
             return 0
 
         try:
             object_id = ObjectId(container_id)
         except Exception:
-            print(f'Invalid container_id format: {container_id}')
+            self._log(f'Invalid container_id format: {container_id}')
             return None
 
         return self.update_document('containers', {'_id': object_id}, {'$set': update_fields})
@@ -879,17 +883,17 @@ class DBManager:
             try:
                 update_fields['container_db_id'] = ObjectId(container_db_id)
             except Exception:
-                print(f'Invalid container_db_id format: {container_db_id}')
+                self._log(f'Invalid container_db_id format: {container_db_id}')
                 return 0
 
         if not update_fields:
-            print('No fields provided for image update.')
+            self._log('No fields provided for image update.')
             return 0
 
         try:
             object_id = ObjectId(image_id)
         except Exception:
-            print(f'Invalid image_id format: {image_id}')
+            self._log(f'Invalid image_id format: {image_id}')
             return 0
 
         return self.update_document(self._collection, {'_id': object_id}, {'$set': update_fields})  # pyright: ignore
@@ -903,12 +907,12 @@ class DBManager:
                 existing_doc = collection.find_one({'_id': ObjectId(img_id)}, {fieldname: 1})
                 if existing_doc and fieldname in existing_doc:
                     if not force:
-                        print(
+                        self._log(
                             f"Field '{fieldname}' already exists for image {img_id}. Use force=True to overwrite."
                         )
                         return 0
                     else:
-                        print(
+                        self._log(
                             f"Field '{fieldname}' already exists for image {img_id}. Overwriting as force=True."
                         )
 
@@ -917,15 +921,15 @@ class DBManager:
                     {'_id': ObjectId(img_id)}, {'$set': {fieldname: value}}
                 )
                 if result.modified_count > 0:
-                    print(f"Field '{fieldname}' added/updated for image {img_id}.")
+                    self._log(f"Field '{fieldname}' added/updated for image {img_id}.")
                     return result.modified_count
                 else:
-                    print(f"Image {img_id} not found or field '{fieldname}' not modified.")
+                    self._log(f"Image {img_id} not found or field '{fieldname}' not modified.")
                     return 0
             except OperationFailure as e:
-                print(f"Failed to add/update field '{fieldname}' for image {img_id}: {e}")
+                self._log(f"Failed to add/update field '{fieldname}' for image {img_id}: {e}")
             except Exception as e:
-                print(
+                self._log(
                     f"An unexpected error occurred while adding/updating field '{fieldname}' for image {img_id}: {e}"
                 )
         return None
@@ -936,14 +940,14 @@ class DBManager:
         """
         if self.client is not None:
             self.client.close()
-            print('MongoDB connection closed.')
+            self._log('MongoDB connection closed.')
         else:
-            print('No active MongoDB connection to close.')
+            self._log('No active MongoDB connection to close.')
 
     def export_db(self):
         """exports the current db to a file named like the current db name. if the file already exists, it will be overwritten."""
         if self.db is None:
-            print('Database not connected. Cannot export.')
+            self._log('Database not connected. Cannot export.')
             return
 
         db_name = self.db.name
@@ -969,44 +973,44 @@ class DBManager:
         try:
             with open(export_file_name, 'w') as f:
                 json.dump(export_data, f, indent=4)
-            print(f"Database '{db_name}' exported successfully to '{export_file_name}'.")
+            self._log(f"Database '{db_name}' exported successfully to '{export_file_name}'.")
         except IOError as e:
-            print(f"Error writing export file '{export_file_name}': {e}")
+            self._log(f"Error writing export file '{export_file_name}': {e}")
         except Exception as e:
-            print(f'An unexpected error occurred during database export: {e}')
+            self._log(f'An unexpected error occurred during database export: {e}')
 
     def import_db(self, import_file_name: str, db_name: str) -> None:
         """imports a database from a file to a new database. if the database already exists, the export is canceled."""
         if self.client is None:
-            print('MongoDB client not initialized. Cannot import.')
+            self._log('MongoDB client not initialized. Cannot import.')
             return
 
         # Check if the target database already exists
         if db_name in self.client.list_database_names():
-            print(
+            self._log(
                 f"Error: Database '{db_name}' already exists. Import canceled to prevent accidental overwrite."
             )
-            print('Please drop the existing database or choose a different name for import.')
+            self._log('Please drop the existing database or choose a different name for import.')
             return
 
         try:
             with open(import_file_name, 'r') as f:
                 import_data = json.load(f)
         except FileNotFoundError:
-            print(f"Error: Import file '{import_file_name}' not found.")
+            self._log(f"Error: Import file '{import_file_name}' not found.")
             return
         except json.JSONDecodeError as e:
-            print(f"Error decoding JSON from '{import_file_name}': {e}")
+            self._log(f"Error decoding JSON from '{import_file_name}': {e}")
             return
         except Exception as e:
-            print(
+            self._log(
                 f"An unexpected error occurred while reading import file '{import_file_name}': {e}"
             )
             return
 
         # Connect to the new database
         new_db = self.client[db_name]
-        print(f"Attempting to import data into new database '{db_name}'...")
+        self._log(f"Attempting to import data into new database '{db_name}'...")
 
         for collection_name, documents in import_data.items():
             collection = new_db[collection_name]
@@ -1047,15 +1051,19 @@ class DBManager:
             if docs_to_insert:
                 try:
                     collection.insert_many(docs_to_insert)
-                    print(
+                    self._log(
                         f"Imported {len(docs_to_insert)} documents into collection '{collection_name}'."
                     )
                 except OperationFailure as e:
-                    print(f"Error inserting documents into '{collection_name}': {e}")
+                    self._log(f"Error inserting documents into '{collection_name}': {e}")
             else:
-                print(f"No documents to insert into collection '{collection_name}'.")
+                self._log(f"No documents to insert into collection '{collection_name}'.")
 
-        print(f"Database '{db_name}' imported successfully from '{import_file_name}'.")
+        self._log(f"Database '{db_name}' imported successfully from '{import_file_name}'.")
         # Update the current DBManager's connection to the newly imported database
         self.db = new_db
         self._db_name = db_name
+
+    def _log(self, msg: str, level: str = 'message') -> None:
+        if self._verbose > 0:
+            print(f'[dbm:{level}] {msg}')
