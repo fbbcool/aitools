@@ -101,6 +101,8 @@ class Scene:
         if self.url_thumbnail.exists():
             return False
         latest = img_latest_from_url(self.url)
+        if latest is None:
+            return False
         thumbnail_to_url(latest, self.url_thumbnail, size=self._scm._dbm._default_thumbnail_size[0])
         return True
 

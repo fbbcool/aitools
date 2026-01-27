@@ -123,8 +123,12 @@ def imgs_from_url(url: str | Path) -> list[Path]:
     return urls
 
 
-def img_latest_from_url(url: str | Path) -> Path:
-    return max(imgs_from_url(url), key=lambda x: x.stat().st_ctime)
+def img_latest_from_url(url: str | Path) -> Path | None:
+    urls_img = imgs_from_url(url)
+    if urls_img:
+        return max(urls_img, key=lambda x: x.stat().st_ctime)
+    else:
+        return None
 
 
 def url_move_to_new_parent(
