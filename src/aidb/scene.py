@@ -38,7 +38,12 @@ class Scene:
 
         self._data = data
         self._url_called = url
-        """the "called" url, not the db stored! should be None if data was loaded from id."""
+
+        if self._url_called is None:
+            if not self.url.exists():
+                raise FileNotFoundError(
+                    f"Scene (id={self.id}, url={self.url}) doesn't physically exist!"
+                )
 
     @property
     def id(self) -> str:
@@ -68,7 +73,7 @@ class Scene:
     def url_from_data(self) -> Path:
         return Path(self._data.get(SceneDef.FIELD_URL, ''))
 
-    def url_sync(self) -> bool:
+    def _url_sync(self) -> bool:
         """
         If scene was successfully instanciated from a specific url, this url
         will be synced to the url in the database.
@@ -87,16 +92,22 @@ class Scene:
         return self._scm._db_update_scene(self._data)
 
     def update(self) -> None:
-        if self.url_sync():
-            print(f'synced url[{self._url_called}]')
+        if self._url_sync():
+            self._log(f'synced url[{self._url_called}]', level='message')
+        if self._update_thumbnail():
+            self._log('thumbnail update.', level='message')
 
-    def _update_thumbnail(self) -> None:
+    def _update_thumbnail(self) -> bool:
         if self.url_thumbnail.exists():
-            return
+            return False
         latest = img_latest_from_url(self.url)
         thumbnail_to_url(latest, self.url_thumbnail, size=self._scm._dbm._default_thumbnail_size[0])
+        return True
 
     def __str__(self) -> str:
         ret = f'url: {self._url_called}\n'
         ret += 'data: ' + pprint.pformat(self._data)
         return ret
+
+    def _log(self, msg: str, level: str = 'message') -> None:
+        print(f'[scene id({self.id}):{level}] {msg}')

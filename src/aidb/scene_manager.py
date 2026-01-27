@@ -4,7 +4,14 @@ from typing import Any, Final, Generator
 import json
 
 from aidb.dbmanager import DBManager
-from ait.tools.files import is_img_or_vid, subdir_inc, urls_to_dir, is_dir, imgs_from_url
+from ait.tools.files import (
+    imgs_and_vids_from_url,
+    is_img_or_vid,
+    subdir_inc,
+    urls_to_dir,
+    is_dir,
+    imgs_from_url,
+)
 
 from .scene_common import SceneDef
 
@@ -245,7 +252,7 @@ class SceneManager:
         return oid
 
     def _scene_new_dir(self, dir: str | Path) -> None | str:
-        return self._scene_new_imgs(imgs_from_url(dir))
+        return self._scene_new_imgs(imgs_and_vids_from_url(dir))
 
     @property
     def _dbc_scenes(self):
@@ -276,6 +283,20 @@ class SceneManager:
         from .scene import Scene
 
         return Scene(self, id_or_url)
+
+    def scenes_update(self) -> None:
+        from .scene import Scene
+
+        for id in self.ids:
+            try:
+                scene = Scene(self, id)
+            except FileNotFoundError as e:
+                self._log(str(e), level='warning')
+                continue
+            except ValueError as e:
+                self._log(str(e), level='warning')
+                continue
+            scene.update()
 
     def scene_image_manager(self) -> Any:
         from .scene_image_manager import SceneImageManager

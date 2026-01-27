@@ -52,7 +52,7 @@ def image_info_from_url(url: Path | str, include_info_ext: bool = False) -> dict
     info |= {'size': pil.width * pil.height}
 
     # prompt
-    prompt = _image_extract_prompt_from_info_ext(pil.info)
+    prompt = _image_extract_prompt_from_info_ext(pil.info, verbose=False)
     if prompt is not None:
         info |= {'prompt': prompt}
 
