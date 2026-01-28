@@ -22,6 +22,15 @@
         }
       ]
     },
+    "base": {
+      "ckpt": [
+        {
+          "repo_id": "Comfy-Org/z_image",
+          "file": "split_files/diffusion_models/z_image_bf16.safetensors",
+          "skip": false
+        }
+      ]
+    },
     "turbo": {
       "ckpt": [
         {

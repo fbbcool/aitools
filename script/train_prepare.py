@@ -59,7 +59,7 @@ dataset_repo_ids = [('fbbcool/1gts-xlasm-01', 0)]
 Trainer(
     'zimage',
     dataset_repo_ids,
-    variant='turbo',
+    variant='base',
     config_trainer=config_trainer,
     config_dataset=config_dataset,
     multithread=True,
