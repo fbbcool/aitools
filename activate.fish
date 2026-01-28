@@ -92,12 +92,9 @@ function ait_tmp_clean
     rm $AIT_TMP/*.png
 end
 
-function aidb_scene_cd_clipspace
-    echo (wl-paste)
+function aidb_scene_path_clipspace
     set output (python3 $HOME_AIT/script/scene_url_from_reg_file.py (wl-paste))
-    echo $output
-    echo $output | wl-copy
-    cd $output
+    wl-copy (string trim $output)
 end
 
 function aidb_scene_new_clipspace
