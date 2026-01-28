@@ -10,7 +10,6 @@ from ait.tools.files import (
     subdir_inc,
     urls_to_dir,
     is_dir,
-    imgs_from_url,
 )
 
 from .scene_common import SceneDef

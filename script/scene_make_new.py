@@ -2,7 +2,7 @@ import sys
 
 # from pprint import pprint
 from ait.tools.files import is_dir, is_img_or_vid
-from aidb import SceneManager
+from aidb import SceneManager, SceneDef
 
 if __name__ == '__main__':
     urls = sys.argv[1:]
@@ -14,8 +14,19 @@ if __name__ == '__main__':
     else:
         print(urls_img_vid)
 
-    # scm = SceneManager(subdir_scenes='grow')
-    scm = SceneManager()
+    scenes_subdir = input('enter scenes subdir: ')
+    scenes_subdir_name = scenes_subdir
+    if not scenes_subdir_name:
+        scenes_subdir_name = 'NO subdir'
+    yesno = input(f'sure using {scenes_subdir_name} as subdir (yes = enter | cancel = else)?')
+    if yesno:
+        exit()
+
+    if not scenes_subdir:
+        scenes_subdir = None
+
+    # scm = SceneManager(config=SceneDef.CONFIG_TEST, subdir_scenes=scenes_subdir, verbose=0)
+    scm = SceneManager(config=SceneDef.CONFIG_PROD, subdir_scenes=scenes_subdir, verbose=0)
 
     scm.new_scene_from_urls(urls_img_vid)
     scm.new_scene_from_urls(urls_dir)

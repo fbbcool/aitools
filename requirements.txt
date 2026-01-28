@@ -16,3 +16,5 @@ torchvision
 more_itertools
 #liger-kernel==0.5.9
 scikit-learn
+debugpy
+pytest

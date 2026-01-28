@@ -3,7 +3,9 @@ from typing import Any, Final
 
 
 class SceneDef:
-    CONFIG_DEFAULT: Final = 'test_scenes'
+    CONFIG_PROD: Final = 'scenes_prod'
+    CONFIG_TEST: Final = 'scenes_test'
+    CONFIG_DEFAULT: Final = CONFIG_PROD
 
     IMAGE_COLLECTION: Final = 'images'
 

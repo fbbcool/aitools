@@ -5,12 +5,12 @@ mongodb_settings:
   #host: "mongodb://mongo:mongo@n100"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
   host: "mongodb://mongo:mongo@192.168.0.120"  # Or your MongoDB host, e.g., "mongodb://mongo:mongo@n100"
   port: 27017        # Or your MongoDB port
-  db_name: "test_scenes_new" # Or your database name, e.g., "prod_ai"
+  db_name: "scenes_prod" # Or your database name, e.g., "prod_ai"
   #collection: "scene"   # Or your collection name, e.g., "images"
 
 # Directory settings
 directory_settings:
-  root_dir: "/home/misw/Data/AI/scenes"
+  root_dir: "/home/misw/Data/AI/scenes_prod"
 
 # Thumbnail generation settings
 thumbnail_settings:

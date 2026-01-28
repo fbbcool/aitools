@@ -12,6 +12,6 @@ if __name__ == '__main__':
     else:
         print(urls_img)
 
-    iscm = SceneManager().scene_image_manager()
+    iscm = SceneManager(verbose=0).scene_image_manager()
     for url in urls_img:
         iscm.register_from_url(url)
