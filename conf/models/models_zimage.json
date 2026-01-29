@@ -36,6 +36,11 @@
     "turbo": {
       "transformer": [
         {
+          "link": "https://civitai.com/api/download/models/2640105?type=Model&format=SafeTensor&size=full&fp=bf16",
+          "rename": "eason-real-nsfw-v2",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2603643?type=Model&format=SafeTensor&size=full&fp=fp16",
           "rename": "center-fp16-v5",
           "skip": false
@@ -46,8 +51,8 @@
           "skip": false
         },
         {
-          "link": "https://civitai.com/api/download/models/2511897?type=Model&format=SafeTensor&size=full&fp=fp16",
-          "rename": "JibMix",
+          "link": "https://civitai.com/api/download/models/2637947?type=Model&format=SafeTensor&size=full&fp=fp16",
+          "rename": "jibmix-v2",
           "skip": false
         },
         {
