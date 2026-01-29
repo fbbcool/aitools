@@ -8,9 +8,14 @@
           "rename": "vae-ultraflux-v1"
         },
         {
+          "repo_id": "Comfy-Org/z_image",
+          "file": "split_files/vae/ae.safetensors",
+          "rename": "vae-base"
+        },
+        {
           "repo_id": "Comfy-Org/z_image_turbo",
           "file": "split_files/vae/ae.safetensors",
-          "rename": "vae"
+          "rename": "vae-turbo"
         }
       ],
       "text_encoder": [

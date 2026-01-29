@@ -64,3 +64,9 @@ Trainer(
     config_dataset=config_dataset,
     multithread=True,
 )
+
+"""
+    NOTES ZIMAGE Base:
+    - lr 5e-5 seems too less
+    - rank 32 seems too less
+"""
