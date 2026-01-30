@@ -47,10 +47,14 @@ config_dataset = {'num_repeats': 2, 'resolutions': [1024]}
 #    ('fbbcool/1fem', 100),
 #    ('fbbcool/1fbb_02', 100),
 # ]
+# dataset_repo_ids = [
+#    ('fbbcool/1busty', 150),
+#    ('fbbcool/1busty-gts', 150),
+#    ('fbbcool/1fem', 150),
+# ]
 dataset_repo_ids = [
-    ('fbbcool/1busty', 150),
-    ('fbbcool/1busty-gts', 150),
-    ('fbbcool/1fem', 150),
+    ('fbbcool/1legsemp', 0),
+    ('fbbcool/1fbb_02', 200),
 ]
 # Trainer(
 #    'qwen',
