@@ -98,11 +98,14 @@ class Scene:
             self._log('thumbnail update.', level='message')
 
     def _update_thumbnail(self) -> bool:
-        if self.url_thumbnail.exists():
-            return False
         latest = img_latest_from_url(self.url)
         if latest is None:
             return False
+        ts_latest = latest.stat().st_ctime
+        if self.url_thumbnail.exists():
+            ts_thumbnail = self.url_thumbnail.stat().st_ctime
+            if ts_thumbnail > ts_latest:
+                return False
         thumbnail_to_url(latest, self.url_thumbnail, size=self._scm._dbm._default_thumbnail_size[0])
         return True
 
