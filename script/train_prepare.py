@@ -27,16 +27,16 @@ from trainer import Trainer
 #    'optimizer___type': 'adamw_optimi',
 # }
 config_trainer = {
-    'epochs': 100,
+    'epochs': 1000,
     'micro_batch_size_per_gpu': 4,
     'warmup_steps': 20,
     'save_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 16,
-    'optimizer___lr': 8e-5,
+    'adapter___rank': 32,
+    'optimizer___lr': 2e-4,
 }
-config_dataset = {'num_repeats': 4, 'resolutions': [1024]}
+config_dataset = {'num_repeats': 8, 'resolutions': [1024]}
 
 
 # dataset_repo_ids = [('fbbcool/1gts-xlasm-01', 0)]
