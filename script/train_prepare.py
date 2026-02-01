@@ -33,10 +33,10 @@ config_trainer = {
     'save_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 64,
+    'adapter___rank': 16,
     'optimizer___lr': 8e-5,
 }
-config_dataset = {'num_repeats': 2, 'resolutions': [1024]}
+config_dataset = {'num_repeats': 4, 'resolutions': [1024]}
 
 
 # dataset_repo_ids = [('fbbcool/1gts-xlasm-01', 0)]
@@ -52,9 +52,12 @@ config_dataset = {'num_repeats': 2, 'resolutions': [1024]}
 #    ('fbbcool/1busty-gts', 150),
 #    ('fbbcool/1fem', 150),
 # ]
+# dataset_repo_ids = [
+#    ('fbbcool/1legsemp', 0),
+#    ('fbbcool/1fbb_02', 200),
+# ]
 dataset_repo_ids = [
-    ('fbbcool/1legsemp', 0),
-    ('fbbcool/1fbb_02', 200),
+    ('fbbcool/1fem_alexandra', 0),
 ]
 # Trainer(
 #    'qwen',

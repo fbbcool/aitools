@@ -113,11 +113,15 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
         max_loop = 10
         while not isinstance(prompt, str):
             if prompt is None:
+                if verbose:
+                    print('prompt is None!')
                 return None
 
             max_loop -= 1
             if max_loop < 0:
                 prompt = None
+                if verbose:
+                    print('max_loop is <0!')
                 return None
 
             inputs = None
@@ -133,13 +137,17 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
                 if verbose:
                     print(f'inputs[{inputs}] found!')
             else:
+                if verbose:
+                    print(f'prompt [{prompt}] is neither dict nor list')
                 return None
 
             if inputs is None:
+                if verbose:
+                    print('inputs is None!')
                 return None
 
             prompt = inputs.get('text', None)
-            keys = ['Text', 'string_b', 'positive_prompt']
+            keys = ['Text', 'string_b', 'positive_prompt', 'conditioning']
             for key in keys:
                 value = inputs.get(key, None)
                 if value is not None:
@@ -153,10 +161,14 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
                     if value is not None:
                         prompt = value
 
-    except Exception:
+    except Exception as e:
+        if verbose:
+            print(f'got an exception: {e}')
         return None
 
     # always return None, regardless of None or empty.
     if not prompt:
+        if verbose:
+            print('prompt is empty')
         return None
     return prompt

@@ -145,6 +145,11 @@
     "base": {
       "transformer": [
         {
+          "link": "https://civitai.com/api/download/models/2604233?type=Model&format=SafeTensor&size=full&fp=bf16",
+          "rename": "ZOMG",
+          "skip": false
+        },
+        {
           "repo_id": "Comfy-Org/z_image",
           "file": "split_files/diffusion_models/z_image_bf16.safetensors",
           "rename": "bf16",

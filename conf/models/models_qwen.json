@@ -41,10 +41,16 @@
     "image": {
       "transformer": [
         {
+          "link": "https://civitai.com/api/download/models/2626779?type=Model&format=SafeTensor&size=full&fp=fp8",
+          "method_download": "civitai",
+          "rename": "beauty-fool-v3",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2567280?type=Model&format=SafeTensor&size=full&fp=fp8",
           "method_download": "civitai",
           "rename": "AGQI_2512_NSFW",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2398473?type=Model&format=SafeTensor&size=pruned&fp=fp8",
