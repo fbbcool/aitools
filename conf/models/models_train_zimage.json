@@ -31,6 +31,21 @@
         }
       ]
     },
+    "base-xlasm": {
+      "ckpt": [
+        {
+          "repo_id": "Comfy-Org/z_image",
+          "file": "split_files/diffusion_models/z_image_bf16.safetensors",
+          "skip": false
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "fbbcool/zimage-base-lora",
+          "file": "xlasm-base-rl-30.safetensors"
+        }
+      ]
+    },
     "turbo": {
       "ckpt": [
         {

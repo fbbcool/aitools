@@ -71,7 +71,7 @@ dataset_repo_ids = [
 Trainer(
     'zimage',
     dataset_repo_ids,
-    variant='base',
+    variant='base-xlasm',
     config_trainer=config_trainer,
     config_dataset=config_dataset,
     multithread=True,
