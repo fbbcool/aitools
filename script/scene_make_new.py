@@ -1,3 +1,4 @@
+import os
 import sys
 
 # from pprint import pprint
@@ -14,11 +15,11 @@ if __name__ == '__main__':
     else:
         print(urls_img_vid)
 
-    scenes_subdir = input('enter scenes subdir: ')
-    scenes_subdir_name = scenes_subdir
-    if not scenes_subdir_name:
-        scenes_subdir_name = 'NO subdir'
-    yesno = input(f'sure using {scenes_subdir_name} as subdir (yes = enter | cancel = else)?')
+    scenes_subdir_default = os.environ['AIDB_SCENE_DEFAULT']
+    scenes_subdir = input(f'enter scenes subdir [{scenes_subdir_default}]: ')
+    if not scenes_subdir:
+        scenes_subdir = scenes_subdir_default
+    yesno = input(f'sure using {scenes_subdir} as subdir (yes = enter | cancel = else)?')
     if yesno:
         exit()
 

@@ -1,5 +1,6 @@
-set -xg AIT_TMP $HOME/Downloads/000_tmp/
 set -xg WORKSPACE $HOME/Workspace
+set -xg AIT_TMP $HOME/Downloads/000_tmp/
+set -xg AIDB_SCENE_DEFAULT 0000
 
 function ait_update
     echo "update aitools ..."
@@ -105,6 +106,9 @@ function aidb_scene_update_clipspace
 end
 function aidb_scene_images_register_clipspace
     python3 $HOME_AIT/script/scene_images_register.py (wl-paste)
+end
+function aidb_scene_default
+    set -xg AIDB_SCENE_DEFAULT $argv
 end
 
 function comfy_clean_gen
