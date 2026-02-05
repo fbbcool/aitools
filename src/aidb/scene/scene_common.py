@@ -7,7 +7,8 @@ class SceneDef:
     CONFIG_TEST: Final = 'scenes_test'
     CONFIG_DEFAULT: Final = CONFIG_PROD
 
-    IMAGE_COLLECTION: Final = 'images'
+    COLLECTION_IMAGES: Final = 'images'
+    COLLECTION_SCENES: Final = 'scenes'
 
     SEPERATOR_ID: Final = '___'
 
@@ -23,6 +24,13 @@ class SceneDef:
     FIELD_URL_PARENT: Final = 'url_parent'
 
     DIR_THUMBNAILS: Final = f'{SEPERATOR_ID}thumbnails'
+
+    FIELD_RATING: Final = 'rating'
+    RATING_MIN: Final = -2
+    RATING_MAX: Final = 5
+    RATING_INIT: Final = -1
+
+    FIELD_LABELS: Final = 'labels'
 
     @classmethod
     def filename_from_id(cls, prefix: str, id: Any, suffix: str | None = None) -> str | None:

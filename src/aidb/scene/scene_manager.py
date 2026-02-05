@@ -17,7 +17,7 @@ from .scene_common import SceneDef
 
 class SceneManager:
     DOTFILE: Final = '.scenemanager'
-    SCENE_COLLECTION: Final = 'scenes'
+    COLLECTION: Final = SceneDef.COLLECTION_SCENES
 
     def __init__(
         self,
@@ -81,18 +81,27 @@ class SceneManager:
         return str(data.get(SceneDef.FIELD_OID, ''))
 
     @property
-    def ids(self) -> Generator:
+    def ids(self) -> Generator[str]:
         """Returns a generator of scene oid's for all scenes in the db"""
 
-        docs = self._dbm.find_documents(self.SCENE_COLLECTION, query={})
+        docs = self._dbm.find_documents(self.COLLECTION, query={})
         for doc in docs:
             yield str(doc['_id'])
+
+    def ids_from_query(self, query: dict) -> Generator[str]:
+        docs = self._dbm.find_documents(self.COLLECTION, query)
+        for doc in docs:
+            yield str(doc['_id'])
+
+    def ids_from_rating(self, min: int, max: int) -> Generator[str]:
+        query: dict[str, Any] = {SceneDef.FIELD_RATING: {'$gte': min, '$lte': max}}
+        return self.ids_from_query(query)
 
     def data_from_id(self, id: Any) -> dict | None:
         oid = self._dbm.to_oid(id)
         if oid is None:
             return None
-        docs = self._dbm.documents_from_oid(self.SCENE_COLLECTION, oid)
+        docs = self._dbm.documents_from_oid(self.COLLECTION, oid)
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -102,7 +111,7 @@ class SceneManager:
         return None
 
     def data_from_url_db(self, url: str | Path) -> dict | None:
-        docs = self._dbm.find_documents(self.SCENE_COLLECTION, query={SceneDef.FIELD_URL: str(url)})
+        docs = self._dbm.find_documents(self.COLLECTION, query={SceneDef.FIELD_URL: str(url)})
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -207,7 +216,7 @@ class SceneManager:
         # does scene url already exist?
         oid = self.id_from_url(url)
         if oid is None:
-            oid = self._dbm.insert_document(self.SCENE_COLLECTION, meta)
+            oid = self._dbm.insert_document(self.COLLECTION, meta)
             self._log('scene added: {url}.', level='message')
         else:
             self._log(f'scene not added, already exists: {url} oid={oid}.', level='debug')
@@ -263,7 +272,7 @@ class SceneManager:
 
     @property
     def _dbc_scenes(self):
-        return self._dbm._get_collection(self.SCENE_COLLECTION)
+        return self._dbm._get_collection(self.COLLECTION)
 
     def _dbc_to_id(self, id: str):
         self._dbm.to_oid(id)

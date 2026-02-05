@@ -2,8 +2,8 @@ import json
 
 from bson import ObjectId
 from aidb.dbmanager import DBManager
-from aidb.image import Image # Import the Image class
-from aidb.tagger import TAGS_FOCUS
+from aidb.image import Image  # Import the Image class
+from aidb.tagger_defines import TaggerDef
 from typing import Dict, Any, List, Optional
 from collections import defaultdict
 import numpy as np
@@ -23,10 +23,10 @@ class Statistics:
             db_manager (DBManager): An instance of the DBManager class.
         """
         if not isinstance(db_manager, DBManager):
-            raise TypeError("db_manager must be an instance of DBManager.")
-        
+            raise TypeError('db_manager must be an instance of DBManager.')
+
         self._db_manager = db_manager
-        print("Statistics object initialized.")
+        print('Statistics object initialized.')
 
     def get_average_tag_occurrence(self, images: Optional[List[Image]] = None) -> Dict[str, float]:
         """
@@ -44,29 +44,34 @@ class Statistics:
                               Returns an empty dictionary if no images are found
                               or no tags are present.
         """
-        print("Calculating average tag occurrence...")
-        
+        print('Calculating average tag occurrence...')
+
         tag_probabilities_sum: Dict[str, float] = defaultdict(float)
         tag_occurrence_count: Dict[str, int] = defaultdict(int)
 
         # Determine which images to process
         if images:
             images_to_process = images
-            print(f"Processing {len(images_to_process)} provided images for average tag occurrence.")
+            print(
+                f'Processing {len(images_to_process)} provided images for average tag occurrence.'
+            )
         else:
             # Retrieve all image documents if no specific list is provided
-            print("No specific images provided, fetching all images from database.")
+            print('No specific images provided, fetching all images from database.')
             image_docs = self._db_manager.find_documents(self._db_manager._collection)
             if not image_docs:
-                print("No image documents found in the database.")
+                print('No image documents found in the database.')
                 return {}
             # Convert documents to Image objects for consistent processing
-            images_to_process = [Image(self._db_manager, str(doc['_id']), doc=doc) for doc in image_docs if '_id' in doc]
-            print(f"Found {len(images_to_process)} images in the database.")
-
+            images_to_process = [
+                Image(self._db_manager, str(doc['_id']), doc=doc)
+                for doc in image_docs
+                if '_id' in doc
+            ]
+            print(f'Found {len(images_to_process)} images in the database.')
 
         if not images_to_process:
-            print("No images to process for average tag occurrence.")
+            print('No images to process for average tag occurrence.')
             return {}
 
         for img_obj in images_to_process:
@@ -79,7 +84,7 @@ class Statistics:
                     tag_occurrence_count[tag] += 1
             else:
                 # print(f"Image {img_obj.image_id} has no 'tags' or 'tags_wd' field.")
-                pass # Silently skip images without tag data
+                pass  # Silently skip images without tag data
 
         average_tag_occurrence: Dict[str, float] = {}
         for tag, total_probability in tag_probabilities_sum.items():
@@ -87,9 +92,11 @@ class Statistics:
             if count > 0:
                 average_tag_occurrence[tag] = total_probability / count
             else:
-                average_tag_occurrence[tag] = 0.0 
-        
-        print(f"Finished calculating average tag occurrence for {len(average_tag_occurrence)} unique tags.")
+                average_tag_occurrence[tag] = 0.0
+
+        print(
+            f'Finished calculating average tag occurrence for {len(average_tag_occurrence)} unique tags.'
+        )
         return average_tag_occurrence
 
     def get_absolute_tag_occurrence(self, images: Optional[List[Image]] = None) -> Dict[str, int]:
@@ -108,27 +115,33 @@ class Statistics:
                             Returns an empty dictionary if no images are found
                             or no tags are present.
         """
-        print("Calculating absolute tag occurrence...")
-        
+        print('Calculating absolute tag occurrence...')
+
         tag_counts: Dict[str, int] = defaultdict(int)
 
         # Determine which images to process
         if images:
             images_to_process = images
-            print(f"Processing {len(images_to_process)} provided images for absolute tag occurrence.")
+            print(
+                f'Processing {len(images_to_process)} provided images for absolute tag occurrence.'
+            )
         else:
             # Retrieve all image documents if no specific list is provided
-            print("No specific images provided, fetching all images from database.")
+            print('No specific images provided, fetching all images from database.')
             image_docs = self._db_manager.find_documents('images')
             if not image_docs:
-                print("No image documents found in the database.")
+                print('No image documents found in the database.')
                 return {}
             # Convert documents to Image objects for consistent processing
-            images_to_process = [Image(self._db_manager, str(doc['_id']), doc=doc) for doc in image_docs if '_id' in doc]
-            print(f"Found {len(images_to_process)} images in the database.")
+            images_to_process = [
+                Image(self._db_manager, str(doc['_id']), doc=doc)
+                for doc in image_docs
+                if '_id' in doc
+            ]
+            print(f'Found {len(images_to_process)} images in the database.')
 
         if not images_to_process:
-            print("No images to process for absolute tag occurrence.")
+            print('No images to process for absolute tag occurrence.')
             return {}
 
         for img_obj in images_to_process:
@@ -136,27 +149,26 @@ class Statistics:
             image_data = img_obj.data
             if image_data and 'tags' in image_data and 'tags_wd' in image_data['tags']:
                 wd_tags = image_data['tags']['tags_wd']
-                for tag in wd_tags.keys(): # Just count the presence of the tag
+                for tag in wd_tags.keys():  # Just count the presence of the tag
                     tag_counts[tag] += 1
             else:
-                pass # Silently skip images without tag data
+                pass  # Silently skip images without tag data
 
-        print(f"Finished calculating absolute tag occurrence for {len(tag_counts)} unique tags.")
-        return dict(tag_counts) # Convert defaultdict to a regular dict for return
-    
+        print(f'Finished calculating absolute tag occurrence for {len(tag_counts)} unique tags.')
+        return dict(tag_counts)  # Convert defaultdict to a regular dict for return
+
     @property
     def img_rand(self) -> Image:
         """picks a random existing image from the db."""
         image_docs = self._db_manager.find_documents(self._db_manager._collection)
         if not image_docs:
-            raise ValueError("No images found in the database.")
-        
+            raise ValueError('No images found in the database.')
+
         # Pick a random document
         random_doc = image_docs[np.random.randint(len(image_docs))]
-        
+
         # Create and return an Image object
         return Image(self._db_manager, str(random_doc['_id']), doc=random_doc)
-        
 
     def img_calc_focus_vector(self, img: Image | str) -> np.ndarray:
         """takes an image or image id and builds a numpy vector of its tag probabilities wrt. TAGS_FOCUS"""
@@ -166,30 +178,36 @@ class Statistics:
         elif isinstance(img, Image):
             img_obj = img
         else:
-            raise TypeError("Input must be an Image object or an image_id string.")
+            raise TypeError('Input must be an Image object or an image_id string.')
 
-        focus_vector = np.zeros(len(TAGS_FOCUS))
-        for i, tag in enumerate(TAGS_FOCUS.keys()):
+        focus_vector = np.zeros(len(TaggerDef.TAGS_FOCUS))
+        for i, tag in enumerate(TaggerDef.TAGS_FOCUS.keys()):
             focus_vector[i] = img_obj.get_tag_probability(tag)
         return focus_vector
-    
+
     def dist_img(self, img0: Image | str, img1: Image | str) -> float:
         """calcs a distance of 2 imgs based on the focus vector"""
         vec0 = self.img_calc_focus_vector(img0)
         vec1 = self.img_calc_focus_vector(img1)
         return self.dist_focus_vector(vec0, vec1)
-    
-    def dist_img_list(self, img0: Image | str, imgl: list[Image] | list[str] = [], self_compare: bool = False) -> dict[str,float]:
+
+    def dist_img_list(
+        self, img0: Image | str, imgl: list[Image] | list[str] = [], self_compare: bool = False
+    ) -> dict[str, float]:
         """calcs a dictionary of image ids as keys and its distance to img0 as values. if the image list is empty, all images in the db will be used"""
-        distances: dict[str,float] = {}
+        distances: dict[str, float] = {}
         if not imgl:
             # If imgl is empty, use all images from the database
             image_docs = self._db_manager.find_documents(self._db_manager._collection)
             if not image_docs:
-                return distances # No images in DB
-            
+                return distances  # No images in DB
+
             # Convert documents to Image objects for consistent processing
-            images_to_compare = [Image(self._db_manager, str(doc['_id']), doc=doc) for doc in image_docs if '_id' in doc]
+            images_to_compare = [
+                Image(self._db_manager, str(doc['_id']), doc=doc)
+                for doc in image_docs
+                if '_id' in doc
+            ]
         else:
             images_to_compare = []
             for item in imgl:
@@ -198,7 +216,7 @@ class Statistics:
                 elif isinstance(item, Image):
                     images_to_compare.append(item)
                 else:
-                    print(f"Warning: Skipping invalid item in imgl: {item}")
+                    print(f'Warning: Skipping invalid item in imgl: {item}')
                     continue
 
         if not images_to_compare:
@@ -212,13 +230,12 @@ class Statistics:
             if not self_compare:
                 if img_to_compare.id == (img0.id if isinstance(img0, Image) else img0):
                     continue
-            
+
             vec_compare = self.img_calc_focus_vector(img_to_compare)
             distance = self.dist_focus_vector(vec0, vec_compare)
             distances[img_to_compare.id] = distance
-        
-        return Statistics.sort_tags(distances, highest2lowest=False)
 
+        return Statistics.sort_tags(distances, highest2lowest=False)
 
     def img_statistics_init(self, img: Image | str, force: bool = False) -> None:
         """
@@ -230,37 +247,35 @@ class Statistics:
         elif isinstance(img, Image):
             img_obj = img
         else:
-            raise TypeError("Input must be an Image object or an image_id string.")
+            raise TypeError('Input must be an Image object or an image_id string.')
 
         # Check if 'statistics' field already exists
         if img_obj.data and 'statistics' in img_obj.data:
-            print(f"Statistics already initialized for image {img_obj.id}.")
+            print(f'Statistics already initialized for image {img_obj.id}.')
             if not force:
-                print(f"\tNo force option: Skipping!")
+                print(f'\tNo force option: Skipping!')
                 return
-        
+
         # create an empty statistics section in the db and store it
         self._db_manager.img_add_field(img.id, 'statistics', {}, force=True)
 
         # Initialize an empty statistics dictionary
         initial_statistics = {
-            "focus_vector": self.img_calc_focus_vector(img_obj).tolist(), # Store as list for JSON/BSON compatibility
-            "neighbors": {}, # dict of the closest 10 image ids with distance value 
+            'focus_vector': self.img_calc_focus_vector(
+                img_obj
+            ).tolist(),  # Store as list for JSON/BSON compatibility
+            'neighbors': {},  # dict of the closest 10 image ids with distance value
         }
 
         # Update the image document in the database
-        update_result = self.img_statistics_save(
-            img_obj.id,
-            initial_statistics,
-            force = True
-        )
+        update_result = self.img_statistics_save(img_obj.id, initial_statistics, force=True)
         if update_result is not None and update_result > 0:
-            print(f"Statistics initialized for image {img_obj.id}.")
+            print(f'Statistics initialized for image {img_obj.id}.')
             # Invalidate cached data to ensure next access includes new 'statistics' field
-            img_obj._data = None 
+            img_obj._data = None
         else:
-            print(f"Failed to initialize statistics for image {img_obj.id}.")
-                
+            print(f'Failed to initialize statistics for image {img_obj.id}.')
+
     def img_statistics_save(self, img: Image | str, statistics: dict, force: bool = False) -> int:
         """
         Writes a statistics dict to the image metadata.
@@ -273,33 +288,37 @@ class Statistics:
         elif isinstance(img, Image):
             img_obj = img
         else:
-            raise TypeError("Input must be an Image object or an image_id string.")
+            raise TypeError('Input must be an Image object or an image_id string.')
 
         # Check if 'statistics' field exists and handle force option
         if img_obj.data and 'statistics' in img_obj.data:
             if not force:
-                print(f"Statistics already exist for image {img_obj.id}. Use force=True to overwrite.")
+                print(
+                    f'Statistics already exist for image {img_obj.id}. Use force=True to overwrite.'
+                )
                 return 0
             else:
-                print(f"Overwriting existing statistics for image {img_obj.id} as force=True.")
-        
+                print(f'Overwriting existing statistics for image {img_obj.id} as force=True.')
+
         # Update the image document in the database
         update_result = self._db_manager.update_document(
             self._db_manager._collection,
-            {"_id": ObjectId(img_obj.id)},
-            {"$set": {"statistics": statistics}}
+            {'_id': ObjectId(img_obj.id)},
+            {'$set': {'statistics': statistics}},
         )
-        
+
         if update_result is not None and update_result > 0:
-            print(f"Statistics saved for image {img_obj.id}.")
+            print(f'Statistics saved for image {img_obj.id}.')
             # Invalidate cached data to ensure next access includes new 'statistics' field
-            img_obj._data = None 
+            img_obj._data = None
             return update_result
         else:
-            print(f"Failed to save statistics for image {img_obj.id}.")
+            print(f'Failed to save statistics for image {img_obj.id}.')
             return 0
-    
-    def imgs_calc_neighborhood(self, imgs: list[Image], size: int = 10) -> dict[str, dict[str, float]]:
+
+    def imgs_calc_neighborhood(
+        self, imgs: list[Image], size: int = 10
+    ) -> dict[str, dict[str, float]]:
         """
         Returns the neighborhood of every image in the list wrt. the other images in the list.
 
@@ -308,7 +327,7 @@ class Statistics:
         The individual focus vectors are not calculated rather than read from the image metadata.
         """
         neighborhoods: dict[str, dict[str, float]] = {}
-        
+
         # Pre-calculate all focus vectors to avoid redundant calculations
         focus_vectors: dict[str, np.ndarray] = {}
         for img in imgs:
@@ -317,60 +336,67 @@ class Statistics:
         for i, img_i in enumerate(imgs):
             current_image_id = img_i.id
             distances_to_others: dict[str, float] = {}
-            
+
             # Retrieve focus vector for the current image
             vec_i = focus_vectors.get(current_image_id)
             if vec_i is None:
-                print(f"Warning: Focus vector not found for image {current_image_id}. Skipping.")
+                print(f'Warning: Focus vector not found for image {current_image_id}. Skipping.')
                 continue
 
             for j, img_j in enumerate(imgs):
-                if i == j: # Don't compare an image to itself
+                if i == j:  # Don't compare an image to itself
                     continue
-                
+
                 other_image_id = img_j.id
                 vec_j = focus_vectors.get(other_image_id)
                 if vec_j is None:
-                    print(f"Warning: Focus vector not found for image {other_image_id}. Skipping comparison with {current_image_id}.")
+                    print(
+                        f'Warning: Focus vector not found for image {other_image_id}. Skipping comparison with {current_image_id}.'
+                    )
                     continue
 
                 distance = self.dist_focus_vector(vec_i, vec_j)
                 distances_to_others[other_image_id] = distance
-            
+
             # Sort distances and take the top 'size' neighbors
             sorted_distances = sorted(distances_to_others.items(), key=lambda item: item[1])
-            
+
             # Store only the top 'size' neighbors
             neighborhoods[current_image_id] = dict(sorted_distances[:size])
-            
+
         return neighborhoods
-    
-    def imgs_set_neighborhood(self, neighborhood: dict[str, dict[str, float]], force: bool = False) -> None:
+
+    def imgs_set_neighborhood(
+        self, neighborhood: dict[str, dict[str, float]], force: bool = False
+    ) -> None:
         """
         Writes the neighborhood dict to the image metadata wrt. the force option.
         """
         for image_id, neighbors_data in neighborhood.items():
             img_obj = Image(self._db_manager, image_id)
-            
+
             # Get current statistics, or initialize if not present
             current_statistics = img_obj.statistics
             if not current_statistics:
-                print(f"Warning: Statistics not initialized for image {image_id}. Initializing with empty data.")
+                print(
+                    f'Warning: Statistics not initialized for image {image_id}. Initializing with empty data.'
+                )
                 current_statistics = {
-                    "focus_vector": self.img_calc_focus_vector(img_obj).tolist(),
-                    "neighbors": {}
+                    'focus_vector': self.img_calc_focus_vector(img_obj).tolist(),
+                    'neighbors': {},
                 }
-            
+
             # Update the neighbors section
-            if "neighbors" not in current_statistics or force:
-                current_statistics["neighbors"] = neighbors_data
+            if 'neighbors' not in current_statistics or force:
+                current_statistics['neighbors'] = neighbors_data
             else:
-                print(f"Warning: Neighborhood not overwritten for image {image_id}, no force option.")
+                print(
+                    f'Warning: Neighborhood not overwritten for image {image_id}, no force option.'
+                )
                 return
-            
+
             # Save the updated statistics back to the database
             self.img_statistics_save(image_id, current_statistics, force=force)
-
 
     def imgs_cluster(self, imgs: list[Image], eps: float = 0.5, min_samples: int = 5) -> dict:
         """
@@ -380,7 +406,7 @@ class Statistics:
         from sklearn.preprocessing import StandardScaler
 
         if not imgs:
-            print("No images provided for clustering.")
+            print('No images provided for clustering.')
             return {}
 
         image_ids = [img.id for img in imgs]
@@ -390,12 +416,12 @@ class Statistics:
             if vec is not None:
                 focus_vectors.append(vec)
             else:
-                print(f"Warning: Image {img.id} has no focus vector. Skipping from clustering.")
+                print(f'Warning: Image {img.id} has no focus vector. Skipping from clustering.')
                 # Handle cases where focus_vector might be None, e.g., by skipping or assigning a default
-                continue 
-        
+                continue
+
         if not focus_vectors:
-            print("No valid focus vectors found for clustering.")
+            print('No valid focus vectors found for clustering.')
             return {}
 
         # Convert list of numpy arrays to a 2D numpy array
@@ -407,38 +433,40 @@ class Statistics:
         # Perform DBSCAN clustering
         # You might need to tune eps and min_samples based on your data
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(X_scaled)
-        
+
         labels = db.labels_
 
         # Group images by cluster label
         clusters: Dict[int, List[str]] = defaultdict(list)
         for i, label in enumerate(labels):
-            clusters[label].append(image_ids[i]) # Assuming image_ids and focus_vectors are aligned
+            clusters[label].append(image_ids[i])  # Assuming image_ids and focus_vectors are aligned
 
         # Convert defaultdict to regular dict for return
         return dict(clusters)
-    
+
     def imgs_stdev(self, imgs: list[Image]) -> float:
         """
         Calculates the std dev of a list of images based on their focus vectors.
         """
         if not imgs:
-            print("No images provided for std dev calculation.")
+            print('No images provided for std dev calculation.')
             return 0.0
 
         focus_vectors = []
         for img in imgs:
-            if isinstance(img,str):
+            if isinstance(img, str):
                 img = Image(self._db_manager, img)
             vec = img.focus_vector
             if vec is not None:
                 focus_vectors.append(vec)
             else:
-                print(f"Warning: Image {img.id} has no focus vector. Skipping from std dev calculation.")
-                continue 
-        
+                print(
+                    f'Warning: Image {img.id} has no focus vector. Skipping from std dev calculation.'
+                )
+                continue
+
         if not focus_vectors:
-            print("No valid focus vectors found for std dev calculation.")
+            print('No valid focus vectors found for std dev calculation.')
             return 0.0
 
         # Convert list of numpy arrays to a 2D numpy array
@@ -448,13 +476,12 @@ class Statistics:
         # and then average these standard deviations.
         # Or, calculate the Frobenius norm of the covariance matrix, etc.
         # For simplicity, let's calculate the mean of the standard deviations of each feature.
-        
+
         # Calculate standard deviation for each feature (column)
         std_devs_per_feature = np.std(X, axis=0)
-        
+
         # Return the mean of these standard deviations
         return np.mean(std_devs_per_feature)
-        
 
     @staticmethod
     def dist_focus_vector(vec0: np.ndarray, vec1: np.ndarray) -> float:
@@ -472,7 +499,7 @@ class Statistics:
             Dict[str, float]: A new dictionary with tags sorted by value in descending order.
         """
         return dict(sorted(tags.items(), key=lambda item: item[1], reverse=highest2lowest))
-    
+
     @staticmethod
     def save_json(data: Any, filename: str) -> None:
         """
@@ -485,10 +512,10 @@ class Statistics:
         try:
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
-            print(f"Data successfully saved to {filename}")
+            print(f'Data successfully saved to {filename}')
         except IOError as e:
-            print(f"Error saving data to {filename}: {e}")
-            
+            print(f'Error saving data to {filename}: {e}')
+
     # Placeholder for future methods
     # def get_tag_frequency(self) -> Dict[str, int]:
     #     """

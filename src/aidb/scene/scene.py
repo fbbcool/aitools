@@ -97,6 +97,13 @@ class Scene:
         if self._update_thumbnail():
             self._log('thumbnail update.', level='message')
 
+        # add init data, if not present
+        self._init_data()
+
+        # store
+        if self._dbstore():
+            self._log('data update.', level='message')
+
     def _update_thumbnail(self) -> bool:
         latest = img_latest_from_url(self.url)
         if latest is None:
@@ -108,6 +115,76 @@ class Scene:
                 return False
         thumbnail_to_url(latest, self.url_thumbnail, size=self._scm._dbm._default_thumbnail_size[0])
         return True
+
+    def _init_data(self) -> None:
+        # rating
+        if self._data.get(SceneDef.FIELD_RATING, None) is None:
+            self.set_rating(self.get_rating)
+        # labels
+        if self._data.get(SceneDef.FIELD_LABELS, None) is None:
+            self.set_labels(self.get_labels)
+
+    @property
+    def get_rating(self) -> int:
+        """
+        Returns the rating as int.
+
+        If rating isn't set, the init value is given.
+        """
+        get_data = self._data.get(SceneDef.FIELD_RATING, SceneDef.RATING_INIT)
+        return get_data
+
+    def set_rating(self, value: int) -> None:
+        if not isinstance(value, int):
+            return
+        if value < SceneDef.RATING_MIN:
+            value = SceneDef.RATING_MIN
+        if value > SceneDef.RATING_MAX:
+            value = SceneDef.RATING_MAX
+
+        set_data = {SceneDef.FIELD_RATING: value}
+        self._data |= set_data
+        return
+
+    def set_labels(self, value: list[str]) -> None:
+        if not isinstance(value, list):
+            return
+
+        set_data = {SceneDef.FIELD_LABELS: list(set(value))}
+        self._data |= set_data
+        return
+
+    @property
+    def get_labels(self) -> list[str]:
+        """
+        Returns the labels as a list of strings.
+
+        If labels aren't set, an empty list is given.
+        """
+        get_data = self._data.get(SceneDef.FIELD_LABELS, [])
+        return get_data
+
+    def update_label(self, label: str) -> None:
+        """
+        Updates the labels by adding or removing the given label.
+
+        a subsequent + or - given in the label string indicates adding or removing.
+        if no +|- is given, adding is asumed.
+        """
+        if len(label) <= 2:  # at least 2 chars!
+            return
+        labels = self.get_labels.copy()
+        op = label[0]
+
+        if op == '-':
+            labels.remove(label[1:])
+        elif op == '+':
+            labels.append(label[1:])
+        else:
+            labels.append(label)
+
+        self.set_labels(labels)
+        return
 
     def __str__(self) -> str:
         ret = f'url: {self._url_called}\n'
