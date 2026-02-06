@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, Optional
 
 
 class SceneDef:
@@ -64,3 +64,12 @@ class SceneDef:
         if prefix in cls.PREFIXES:
             return id, prefix
         return None
+
+    @classmethod
+    def id_from_filename_orig(cls, url: str | Path) -> Optional[str]:
+        id_and_prefix = cls.id_and_prefix_from_filename(url)
+        if id_and_prefix is None:
+            return None
+        if id_and_prefix[1] != cls.PREFIX_ORIG:
+            return None
+        return id_and_prefix[0]

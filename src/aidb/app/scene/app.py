@@ -255,7 +255,7 @@ class AIDBSceneApp:
                     ],
                 )
                 advanced_search_go_to_page_btn.click(
-                    self._go_to_specific_page,
+                    self.display_scene,
                     inputs=[
                         advanced_search_scene_cache,
                         advanced_search_current_page,
@@ -357,81 +357,26 @@ class AIDBSceneApp:
             #    ],  # Update the grid
             # )
 
-            with gr.Tab('Image Set View'):
-                # drop down menu for image sets stored in the db
-
+            with gr.Tab('Scene View'):
                 with gr.Column(visible=True):
-                    image_set_html_display = gr.HTML(label='Images in Set')
+                    scene_display_html = gr.HTML(label='Images in Scene')
                     with gr.Row():
-                        image_set_prev_btn = gr.Button('Previous Page')
-                        image_set_page_info = gr.Textbox(label='Page', interactive=False, scale=0)
-                        image_set_next_btn = gr.Button('Next Page')
-                        image_set_go_to_page_num = gr.Number(
-                            label='Go to Page', value=1, precision=0, scale=0
-                        )
-                        image_set_go_to_page_btn = gr.Button('Go')
-                        image_set_refresh_button = gr.Button('Refresh Current Page')
+                        scene_id_textbox = gr.Textbox(label='Scene id')
+                        scene_go_button = gr.Button('Go')
 
                 # State variables for image set pagination
                 image_set_cache = gr.State(value=[])
                 image_set_current_page = gr.State(value=1)
 
-                image_set_prev_btn.click(
-                    self._paginate_scenes,
-                    inputs=[image_set_cache, image_set_current_page, gr.State(-1), mode],
-                    outputs=[
-                        image_set_html_display,
-                        image_set_current_page,
-                        image_set_page_info,
-                    ],
-                )
-                image_set_next_btn.click(
-                    self._paginate_scenes,
-                    inputs=[image_set_cache, image_set_current_page, gr.State(1), mode],
-                    outputs=[
-                        image_set_html_display,
-                        image_set_current_page,
-                        image_set_page_info,
-                    ],
-                )
-                image_set_go_to_page_btn.click(
-                    self._go_to_specific_page,
+                scene_go_button.click(
+                    self.display_scene,
                     inputs=[
-                        image_set_cache,
-                        image_set_current_page,
-                        image_set_go_to_page_num,
+                        scene_id_textbox,
                         mode,
                     ],
                     outputs=[
-                        image_set_html_display,
-                        image_set_current_page,
-                        image_set_page_info,
+                        scene_display_html,
                     ],
-                )
-                image_set_refresh_button.click(
-                    self._refresh_scene_grid,
-                    inputs=[image_set_cache, image_set_current_page, mode],
-                    outputs=[
-                        image_set_html_display,
-                        image_set_current_page,
-                        image_set_page_info,
-                    ],
-                )
-
-            with gr.Tab('Set Collection'):
-                gr.Markdown('## Set Collection')
-                with gr.Row():
-                    collection_dropdown = gr.Dropdown(
-                        label='Select Collection',
-                        value=self._dbm._collection,
-                        choices=self._dbm.collections_images,
-                        interactive=True,
-                    )
-                # selected collection is set foe db manager
-                collection_dropdown.change(
-                    lambda x: self._dbm.set_collection(x),
-                    inputs=[collection_dropdown],
-                    outputs=[],
                 )
 
         return demo
@@ -652,7 +597,7 @@ class AIDBSceneApp:
 
         return html_output, new_page, page_info_text
 
-    def _go_to_specific_page(
+    def display_scene(
         self,
         scene_cache: list[Scene],
         current_page: int,  # This is the current page before the jump
@@ -911,9 +856,8 @@ class AIDBSceneApp:
 
 
 if __name__ == '__main__':
-    # config = SceneDef.CONFIG_TEST
-    config = SceneDef.CONFIG_PROD
-    scm = SceneManager(config=config)
+    scm = SceneManager(config='test')
+    # scm = SceneManager(config='prod')
     scm.scenes_update()
     app = AIDBSceneApp(scm)
     app.launch(server_port=7861)

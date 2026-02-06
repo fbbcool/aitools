@@ -63,6 +63,13 @@ class Scene:
             yield url
 
     @property
+    def ids_img(self) -> Generator[str]:
+        for url_img in self.urls_img:
+            id = SceneDef.id_from_filename_orig(url_img)
+            if id is not None:
+                yield id
+
+    @property
     def url_thumbnail(self) -> Path:
         filename_thumbnail = SceneDef.filename_thumbnail_from_id(self.id)
         if filename_thumbnail is None:

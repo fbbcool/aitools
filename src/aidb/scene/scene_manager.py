@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Final, Generator
+from typing import Any, Final, Generator, Literal
 import json
 
 from aidb.dbmanager import DBManager
@@ -22,15 +22,18 @@ class SceneManager:
     def __init__(
         self,
         dbm: DBManager | None = None,
-        config: str | None = None,
+        config: Literal['test', 'prod', 'default'] = 'default',
         subdir_scenes: str | None = None,
         verbose: int = 1,
     ) -> None:
         self._verbose = verbose
-        if config is None:
-            config = SceneDef.CONFIG_DEFAULT
-        self.config = config
-        self.config_file = Path(os.environ['CONF_AIT']) / 'aidb' / f'dbmanager_{config}.yaml'
+        if config == 'prod':
+            self.config = SceneDef.CONFIG_PROD
+        elif config == 'test':
+            self.config = SceneDef.CONFIG_TEST
+        else:
+            self.config = SceneDef.CONFIG_DEFAULT
+        self.config_file = Path(os.environ['CONF_AIT']) / 'aidb' / f'dbmanager_{self.config}.yaml'
         if dbm is None:
             self._dbm = DBManager(config_file=str(self.config_file), verbose=self._verbose)
         else:

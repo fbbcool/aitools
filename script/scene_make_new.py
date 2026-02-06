@@ -26,8 +26,8 @@ if __name__ == '__main__':
     if not scenes_subdir:
         scenes_subdir = None
 
-    # scm = SceneManager(config=SceneDef.CONFIG_TEST, subdir_scenes=scenes_subdir, verbose=0)
-    scm = SceneManager(config=SceneDef.CONFIG_PROD, subdir_scenes=scenes_subdir, verbose=0)
+    # scm = SceneManager(config='test', subdir_scenes=scenes_subdir, verbose=0)
+    scm = SceneManager(subdir_scenes=scenes_subdir, verbose=0)
 
     scm.new_scene_from_urls(urls_img_vid)
     scm.new_scene_from_urls(urls_dir)
