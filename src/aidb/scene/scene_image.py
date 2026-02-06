@@ -1,8 +1,10 @@
 from pathlib import Path
 import pprint
-from typing import Any
+from typing import Any, Optional
+from PIL import Image as PILImage
 
 from ait.tools.files import is_img_or_vid
+from ait.tools.images import image_from_url
 
 from .scene_common import SceneDef
 from .scene_image_manager import SceneImageManager
@@ -43,8 +45,20 @@ class SceneImage:
         return str(self.data.get(SceneDef.FIELD_OID, ''))
 
     @property
-    def url_from_data(self) -> Path:
-        return Path(self.data.get(SceneDef.FIELD_URL, ''))
+    def url_from_data(self) -> Optional[Path]:
+        id = self.id
+        filename = SceneDef.filename_orig_from_id(id, suffix=SceneDef.SUFFIX_IMG_STD)
+        if filename is None:
+            return None
+        parent = Path(str(self.data.get(SceneDef.FIELD_URL_PARENT)))
+        return parent / filename
+
+    @property
+    def pil(self) -> Optional[PILImage.Image]:
+        url = self.url_from_data
+        if url is None:
+            return None
+        return image_from_url(url)
 
     def url_sync(self) -> bool:
         """
