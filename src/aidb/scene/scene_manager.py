@@ -93,8 +93,17 @@ class SceneManager:
         for doc in docs:
             yield str(doc['_id'])
 
-    def ids_from_rating(self, min: int, max: int) -> Generator[str]:
+    def ids_from_rating(
+        self, min: int, max: int, labels: list[str] | None = None
+    ) -> Generator[str]:
         query: dict[str, Any] = {SceneDef.FIELD_RATING: {'$gte': min, '$lte': max}}
+        if labels is not None:
+            if not labels:
+                query |= {SceneDef.FIELD_LABELS: {'$size': 0}}
+            else:
+                query |= {SceneDef.FIELD_LABELS: {'$in': labels}}
+
+        print(f'query: [{query}]')
         return self.ids_from_query(query)
 
     def data_from_id(self, id: Any) -> dict | None:

@@ -1,4 +1,7 @@
-from typing import Final, Optional
+from typing import Final, Literal, Optional
+
+
+AppOpMmode = Literal['info', 'rate', 'label', 'none']
 
 
 class AppHtml:
@@ -19,5 +22,9 @@ class AppHtml:
         return cls.make_elem_id(obj, action='update', html_obj='button')
 
     @classmethod
-    def make_elem_id_databus(cls, obj: str) -> str:
+    def make_elem_id_button_get(cls, obj: str) -> str:
+        return cls.make_elem_id(obj, action='get', html_obj='button')
+
+    @classmethod
+    def make_elem_id_databus_textbox(cls, obj: str) -> str:
         return cls.make_elem_id(obj, html_obj='databus')

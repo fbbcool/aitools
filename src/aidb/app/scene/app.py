@@ -1,13 +1,14 @@
 import gradio as gr
+from typing import Final, Optional
+import json
+import pyperclip
+
 from aidb import SceneManager, SceneDef, Scene
 from aidb.query import Query
 from aidb.dbstatistics import Statistics
 from aidb.tagger_defines import TaggerDef
 from aidb.app.cell_scene import AppSceneCell
-from aidb.app.html import AppHtml
-from typing import Final, Literal, Optional
-import html
-import json
+from aidb.app.html import AppHtml, AppOpMmode
 
 from ait.tools.images import image_from_url  # Import json for robust string escaping
 
@@ -32,10 +33,6 @@ class AIDBSceneApp:
         self._query_handler = Query(self._dbm)
         self._statistics_handler = Statistics(self._dbm)
 
-        # hidden update triggers
-        self._get_full_scene_data_trigger_elem_id = 'get_full_image_data_trigger_btn'
-        # hidden data busses
-
         self.interface = self._create_interface()
 
     def _create_interface(self):
@@ -59,10 +56,15 @@ class AIDBSceneApp:
 
             # --- Hidden Components for Robust Event Handling ---
             # Trigger buttons (no data, just event triggers)
-            get_full_scene_data_trigger = gr.Button(
-                'Get Full Scene Data Trigger',
+            data_get_trigger = gr.Button(
+                'Get Full Data Trigger',
                 visible=False,
-                elem_id=self._get_full_scene_data_trigger_elem_id,
+                elem_id=AppHtml.make_elem_id_button_get('data'),
+            )
+            info_update_trigger = gr.Button(
+                'Hidden Info Update Trigger',
+                visible=False,
+                elem_id=AppHtml.make_elem_id_button_update('info'),  # has to be a mode
             )
             rate_update_trigger = gr.Button(
                 'Hidden Rating Update Trigger',
@@ -76,11 +78,14 @@ class AIDBSceneApp:
             )
 
             # Data bus textboxes (hold data passed from JS to Python)
+            info_data_bus = gr.Textbox(
+                visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('info')
+            )  # has to be a mode
             rate_data_bus = gr.Textbox(
-                visible=False, elem_id=AppHtml.make_elem_id_databus('rate')
+                visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('rate')
             )  # has to be a mode
             label_data_bus = gr.Textbox(
-                visible=False, elem_id=AppHtml.make_elem_id_databus('label')
+                visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('label')
             )  # has to be a mode
 
             # Data bus textboxes for the scene modal
@@ -167,9 +172,9 @@ class AIDBSceneApp:
                     )
                 with gr.Row():
                     mode = gr.Dropdown(
-                        label='Operation',
-                        choices=['none', 'rate', 'labels'],
-                        value='rate',
+                        label='Mode Operation',
+                        choices=['info', 'rate', 'label'],
+                        value='info',
                         allow_custom_value=False,
                         interactive=True,
                     )
@@ -276,8 +281,8 @@ class AIDBSceneApp:
                 )
 
             # Link hidden triggers to functions
-            get_full_scene_data_trigger.click(
-                self._get_full_scene_data_for_modal,
+            data_get_trigger.click(
+                self._get_data_for_modal,
                 inputs=[label_data_bus],
                 outputs=[modal_img_data_bus, modal_details_data_bus],
             ).then(  # Chaining .then() to update the modal after data is received
@@ -322,6 +327,11 @@ class AIDBSceneApp:
                 """,
             )
 
+            info_update_trigger.click(
+                self._update_scene_info,  # Call the update function first
+                inputs=[info_data_bus],  # Input is the data bus textbox
+                outputs=[],  # This function doesn't update UI directly
+            )
             rate_update_trigger.click(
                 self._update_scene_rating,  # Call the update function first
                 inputs=[rate_data_bus],  # Input is the data bus textbox
@@ -442,16 +452,12 @@ class AIDBSceneApp:
         print(f'Found {len(tag_names)} unique WD tags.')
         return tag_names
 
-    def _generate_scene_html(
-        self, scenes_on_page_data: list[Scene], mode: Literal['none', 'rate', 'labels']
-    ) -> str:
+    def _generate_scene_html(self, scenes_on_page_data: list[Scene], mode: AppOpMmode) -> str:
         """
         Generates HTML for a two-column grid of scenes with captions, rating controls,
         and contributing tags.
         Includes client-side JavaScript for scene click to show full-size overlay.
         """
-        # Get the dynamically generated IDs for the hidden Gradio components
-        get_full_scene_data_trigger_id = self._get_full_scene_data_trigger_elem_id
 
         img_width = 250
         html_content = f"""
@@ -612,7 +618,6 @@ class AIDBSceneApp:
             html_content += AppSceneCell.make(
                 scene,
                 mode,
-                get_full_scene_data_trigger_id=get_full_scene_data_trigger_id,
             )
 
         html_content += '</div>'
@@ -623,7 +628,7 @@ class AIDBSceneApp:
         scene_cache: list[Scene],
         current_page: int,
         direction: int,
-        mode: Literal['rate', 'labels', 'none'],
+        mode: AppOpMmode,
     ) -> tuple[str, int, str]:
         """
         Handles pagination for image displays.
@@ -652,7 +657,7 @@ class AIDBSceneApp:
         scene_cache: list[Scene],
         current_page: int,  # This is the current page before the jump
         target_page_number: float,  # Gradio's Number component returns float
-        mode: Literal['rate', 'labels', 'none'],
+        mode: AppOpMmode,
     ) -> tuple[str, int, str]:
         """
         Jumps to a specific page in the image display.
@@ -680,7 +685,7 @@ class AIDBSceneApp:
         opt_tag3: Optional[str],
         rating_min: Optional[str],
         rating_max: Optional[str],
-        mode: Optional[Literal['none', 'rate', 'labels']],
+        mode: Optional[AppOpMmode],
         opt_label: Optional[str],
     ) -> tuple[str, list[Scene], int, str]:
         """
@@ -706,8 +711,17 @@ class AIDBSceneApp:
         r_max = SceneDef.RATING_MAX
         if rating_max is not None:
             r_max = int(rating_max)
+        if opt_label is None:
+            labels = None
+        elif opt_label in ['Ignore', 'None']:
+            labels = None
+        elif opt_label in ['Empty']:
+            labels = []
+        else:
+            labels = [opt_label]
         scenes = [
-            self._scm.scene_from_id_or_url(id) for id in self._scm.ids_from_rating(r_min, r_max)
+            self._scm.scene_from_id_or_url(id)
+            for id in self._scm.ids_from_rating(r_min, r_max, labels=labels)
         ]
         print(f'Found {len(scenes)} scenes matching advanced search criteria.')
 
@@ -727,7 +741,7 @@ class AIDBSceneApp:
 
         return html_output, scenes, current_page, page_info_text
 
-    def _get_full_scene_data_for_modal(self, scene_id: str) -> tuple[str, str, str]:
+    def _get_data_for_modal(self, scene_id: str) -> tuple[str, str]:
         """
         Fetches full scene data for the modal display.
         Returns a raw base64 string and a JSON-serialized string of the scene details.
@@ -744,56 +758,55 @@ class AIDBSceneApp:
             print(f"ERROR: Invalid ObjectId for image ID '{scene_id}'")
             return '', json.dumps({'error': f'Invalid image ID format: {scene_id}'})  # pyright: ignore
 
-        scene_data = scene.data
-        if scene_data is None:
-            print(
-                f"ERROR: Image with ID '{
-                    scene_id
-                }' not found in the database or data could not be retrieved."
-            )
-            return '', json.dumps(  # pyright: ignore
-                {'error': f"Image with ID '{scene_id}' not found in the database."}
-            )
-
         pil_img = image_from_url(scene.url_thumbnail)
         if pil_img is None:
             print(f'ERROR: Could not load PIL image file for image ID: {scene_id}.')
             return '', json.dumps({'error': f'Could not load image file for ID: {scene_id}.'})  # pyright: ignore
 
-        scene_caption = ''
-        # scene_caption = scene.caption
-        # if scene_caption is None:
-        #    scene_caption = scene.caption
-        # if scene_caption is None:
-        #    scene_caption = scene.prompt
-        # if scene_caption is None:
-        #    scene_caption = ''
-
         full_img_base64 = AppSceneCell._pil_to_base64(pil_img)
 
-        tags_wd = scene_data.get('tags', {}).get('tags_wd', {})
-        sorted_tags_wd = sorted(tags_wd.items(), key=lambda item: item[1], reverse=True)
-        # Escape tag names to prevent potential HTML injection issues
-        modal_formatted_tags = ''.join(
-            [f'{html.escape(tag)}: {prob:.2f}<br>' for tag, prob in sorted_tags_wd]
-        )
+        return full_img_base64, json.dumps(scene.data)
 
-        scene_details = {
-            'id': str(scene.id),
-            'full_path': str(scene.url) if scene.url else 'N/A',
-            'rating': scene.get_rating,
-            'labels': scene.get_labels,
-            'category': scene.data.get('category', 'N/A'),
-            'dimensions_width': scene_data.get('dimensions', {}).get('width', 'N/A'),
-            'dimensions_height': scene_data.get('dimensions', {}).get('height', 'N/A'),
-            'dimensions_unit': scene_data.get('dimensions', {}).get('unit', ''),
-            'creation_date': scene_data.get('creation_date', 'N/A'),
-            'last_modified_date': scene_data.get('last_modified_date', 'N/A'),
-            'tags_html': modal_formatted_tags if modal_formatted_tags else 'No WD tags available.',
-            'caption': scene_caption,
-        }
+    def _update_scene_info(
+        self,
+        data_str: str,
+    ) -> None:  # No outputs from this function
+        """
+        Updates an scene's info in the database.
+        This function is triggered by a hidden button and receives its data from a hidden 'data bus' textbox.
+        """
+        print(f"DEBUG: _update_scene_info called with data from bus: '{data_str}'")
 
-        return full_img_base64, json.dumps(scene_details)  # pyright: ignore
+        if not data_str or not isinstance(data_str, str):
+            print(f'ERROR: Invalid or empty data [{data_str}]')
+            gr.Warning('Could not update info: Invalid data received from frontend.')
+            return None
+
+        # We expect a string like "scene_id_val,new_info_val"
+        parts = data_str.split(',')
+        if len(parts) != 2:
+            print(f'ERROR: Invalid data format for _update_scene_info: {data_str}')
+            gr.Warning(f"Could not update info: Malformed data '{data_str}'.")
+            return None
+
+        scene_id = parts[0].strip()
+        try:
+            new_info = str(parts[1].strip())
+        except ValueError:
+            print(f'ERROR: Invalid info value received in data: {data_str}')
+            gr.Warning(f"Could not update info: Invalid info value in '{data_str}'.")
+            return None
+        print(f'DEBUG: _update_scene_rating called for scene {scene_id} with info {new_info}')
+        scene: Scene = self._scm.scene_from_id_or_url(scene_id)
+
+        clipspace = ''
+        if new_info == 'id':
+            clipspace = str(scene.id)
+        elif new_info == 'url':
+            clipspace = str(scene.url)
+
+        pyperclip.copy(clipspace)
+        return None
 
     def _update_scene_rating(
         self,
@@ -862,7 +875,7 @@ class AIDBSceneApp:
             print(f'ERROR: Invalid rating value received in data: {data_str}')
             gr.Warning(f"Could not update rating: Invalid rating value in '{data_str}'.")
             return None
-        print(f'DEBUG: _update_scene_rating called for scene {scene_id} with rating {update_label}')
+        print(f'DEBUG: _update_scene_label called for scene {scene_id} with rating {update_label}')
         # Update the database
         scene: Scene = self._scm.scene_from_id_or_url(scene_id)
         scene.update_label(update_label)
@@ -875,7 +888,7 @@ class AIDBSceneApp:
         self,
         advanced_search_scene_cache: list[Scene],
         advanced_search_current_page: int,
-        mode: Literal['rate', 'labels', 'none'],
+        mode: AppOpMmode,
     ) -> tuple[str, int, str]:
         """
         Refreshes the scene grid display based on the current cache and page.
@@ -898,8 +911,8 @@ class AIDBSceneApp:
 
 
 if __name__ == '__main__':
-    config = SceneDef.CONFIG_TEST
-    # config = SceneDef.CONFIG_PROD
+    # config = SceneDef.CONFIG_TEST
+    config = SceneDef.CONFIG_PROD
     scm = SceneManager(config=config)
     scm.scenes_update()
     app = AIDBSceneApp(scm)

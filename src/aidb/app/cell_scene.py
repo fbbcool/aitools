@@ -1,12 +1,11 @@
 import base64
 from io import BytesIO
-from typing_extensions import Literal
 from PIL import Image as PILImage
 
 # import html
 import gradio as gr
 
-from aidb.app.html import AppHtml
+from aidb.app.html import AppHtml, AppOpMmode
 from aidb.scene import Scene, SceneDef
 from aidb.tagger_defines import TaggerDef
 
@@ -23,8 +22,7 @@ class AppSceneCell:
     @staticmethod
     def make(
         scene: Scene,
-        mode: Literal['rate', 'labels', 'none'],
-        get_full_scene_data_trigger_id: str,
+        mode: AppOpMmode,
     ) -> str:
         """
         Generates the HTML string for a single scene cell.
@@ -74,7 +72,7 @@ class AppSceneCell:
         const bus = document.querySelector('#image_id_bus_elem textarea');
         bus.value = '{scene.id}';
         bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        document.getElementById('{get_full_scene_data_trigger_id}').click();""".replace(
+        document.getElementById('{AppHtml.make_elem_id_button_get('data')}').click();""".replace(
             '\n', ' '
         ).replace('"', '&quot;')
 
@@ -92,16 +90,43 @@ class AppSceneCell:
     @staticmethod
     def html_operation(
         scene: Scene,
-        mode: Literal['rate', 'labels', 'none'],
+        mode: AppOpMmode,
     ) -> str:
-        if mode is None:
+        if mode == 'none':
             return ''
-        elif mode == 'none':
-            return ''
+        elif mode == 'info':
+            return AppSceneCell._html_op_info(scene)
         elif mode == 'rate':
             return AppSceneCell._html_op_rate(scene)
-        elif mode == 'labels':
-            return AppSceneCell._html_op_labels(scene)
+        elif mode == 'label':
+            return AppSceneCell._html_op_label(scene)
+
+    @staticmethod
+    def _html_op_info(scene: Scene) -> str:
+        fields = ['id', 'url', 'prompt', 'caption']
+
+        operation_html = ''
+        for field in fields:
+            checked = ''
+            onclick_js = f"""
+            event.stopPropagation();
+            const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('info')} textarea');
+            bus.value = '{scene.id},{field}';
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            document.getElementById('{AppHtml.make_elem_id_button_update('info')}').click();""".replace(
+                '\n', ' '
+            ).replace('"', '&quot;')
+            operation_html += f"""
+                <input type="radio" id="rating-{scene.id}-{field}" name="rating-{scene.id}" value="{field}" {checked}
+                       onclick="{onclick_js}">
+                <label for="rating-{scene.id}-{field}" class="rating-label-btn">{field}</label>
+                """
+
+        return f"""
+                <div class="operation-radio-group">
+                    {operation_html}
+                </div>
+                """
 
     @staticmethod
     def _html_op_rate(scene: Scene) -> str:
@@ -118,7 +143,7 @@ class AppSceneCell:
             # 4. Programmatically click the hidden trigger button.
             onclick_js = f"""
             event.stopPropagation();
-            const bus = document.querySelector('#{AppHtml.make_elem_id_databus('rate')} textarea');
+            const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('rate')} textarea');
             bus.value = '{scene.id},{r}';
             bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
             document.getElementById('{AppHtml.make_elem_id_button_update('rate')}').click();""".replace(
@@ -138,7 +163,7 @@ class AppSceneCell:
                 """
 
     @staticmethod
-    def _html_op_labels(scene: Scene) -> str:
+    def _html_op_label(scene: Scene) -> str:
         current_labels = scene.get_labels
 
         operation_html = ''
@@ -153,7 +178,7 @@ class AppSceneCell:
             # 4. Programmatically click the hidden trigger button.
             onclick_js = f"""
             event.stopPropagation();
-            const bus = document.querySelector('#{AppHtml.make_elem_id_databus('label')} textarea');
+            const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('label')} textarea');
             bus.value = '{scene.id},{add_del}{label}';
             bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
             document.getElementById('{AppHtml.make_elem_id_button_update('label')}').click();""".replace(

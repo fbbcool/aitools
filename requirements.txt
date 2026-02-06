@@ -14,6 +14,7 @@ transformers
 sentencepiece
 torchvision
 more_itertools
+pyperclip
 #liger-kernel==0.5.9
 scikit-learn
 debugpy
