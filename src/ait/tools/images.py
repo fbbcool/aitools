@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Final
 from PIL import Image as PILImage
+import time
 
 from ait.tools.files import is_img
 
@@ -45,6 +46,8 @@ def image_info_from_url(url: Path | str, include_info_ext: bool = False) -> dict
     # timestamps
     # get creation time
     info |= {'timestamp_created': url.stat().st_ctime}
+    # set data ts to current time
+    info |= {'timestamp_data': time.time()}
 
     # size
     info |= {'width': pil.width}
