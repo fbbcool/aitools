@@ -84,21 +84,19 @@ class SceneManager:
         return str(data.get(SceneDef.FIELD_OID, ''))
 
     @property
-    def ids(self) -> Generator[str]:
+    def ids(self) -> Generator:
         """Returns a generator of scene oid's for all scenes in the db"""
 
         docs = self._dbm.find_documents(self.COLLECTION, query={})
         for doc in docs:
             yield str(doc['_id'])
 
-    def ids_from_query(self, query: dict) -> Generator[str]:
+    def ids_from_query(self, query: dict) -> Generator:
         docs = self._dbm.find_documents(self.COLLECTION, query)
         for doc in docs:
             yield str(doc['_id'])
 
-    def ids_from_rating(
-        self, min: int, max: int, labels: list[str] | None = None
-    ) -> Generator[str]:
+    def ids_from_rating(self, min: int, max: int, labels: list[str] | None = None) -> Generator:
         query: dict[str, Any] = {SceneDef.FIELD_RATING: {'$gte': min, '$lte': max}}
         if labels is not None:
             if not labels:

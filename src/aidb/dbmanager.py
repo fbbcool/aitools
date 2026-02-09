@@ -469,6 +469,18 @@ class DBManager:
             return None
         return oid
 
+    def datetime_from_oid(self, id: Any) -> datetime.datetime | None:
+        oid: ObjectId
+        if isinstance(id, ObjectId):
+            return id.generation_time
+        if not isinstance(id, str):
+            return None
+        try:
+            oid = ObjectId(id)
+        except InvalidId:
+            return None
+        return oid.generation_time
+
     def find_documents(
         self, collection_name: str, query: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:

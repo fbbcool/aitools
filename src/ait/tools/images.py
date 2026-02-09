@@ -47,7 +47,8 @@ def image_info_from_url(url: Path | str, include_info_ext: bool = False) -> dict
     # get creation time
     info |= {'timestamp_created': url.stat().st_ctime}
     # set data ts to current time
-    info |= {'timestamp_data': time.time()}
+    # DISABLED: oid stores db creation time!
+    # info |= {'timestamp_data': time.time()}
 
     # size
     info |= {'width': pil.width}

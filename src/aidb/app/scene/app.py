@@ -856,8 +856,8 @@ class AIDBSceneApp:
 
 
 if __name__ == '__main__':
-    scm = SceneManager(config='test')
-    # scm = SceneManager(config='prod')
+    # scm = SceneManager(config='test')
+    scm = SceneManager(config='prod')
     scm.scenes_update()
     app = AIDBSceneApp(scm)
     app.launch(server_port=7861)

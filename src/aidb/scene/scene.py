@@ -63,7 +63,7 @@ class Scene:
             yield url
 
     @property
-    def ids_img(self) -> Generator[str]:
+    def ids_img(self) -> Generator:
         for url_img in self.urls_img:
             id = SceneDef.id_from_filename_orig(url_img)
             if id is not None:
