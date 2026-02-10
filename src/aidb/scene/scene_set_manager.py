@@ -40,7 +40,7 @@ class SceneSetManager:
 
     @property
     def ids(self) -> Generator:
-        """Returns a generator of image oid's for all images in the db"""
+        """Returns a generator of oids for all sets in the db"""
 
         docs = self._dbc.find_documents(self._collection, query={})
         for doc in docs:
@@ -147,4 +147,5 @@ class SceneSetManager:
             json.dump(data, f)
 
     def _log(self, msg: str, level: str = 'warning') -> None:
-        print(f'[ssm:{level}] {msg}')
+        if self._verbose > 0:
+            print(f'[ssm:{level}] {msg}')

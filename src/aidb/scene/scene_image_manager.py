@@ -212,4 +212,5 @@ class SceneImageManager:
             json.dump(data, f)
 
     def _log(self, msg: str, level: str = 'warning') -> None:
-        print(f'[im:{level}] {msg}')
+        if self._verbose > 0:
+            print(f'[im:{level}] {msg}')

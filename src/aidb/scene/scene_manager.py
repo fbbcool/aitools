@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Any, Final, Generator, Literal
 import json
@@ -351,4 +350,5 @@ class SceneManager:
             json.dump(data, f)
 
     def _log(self, msg: str, level: str = 'warning') -> None:
-        print(f'[scm:{level}] {msg}')
+        if self._verbose > 0:
+            print(f'[scm:{level}] {msg}')
