@@ -155,4 +155,4 @@ class SceneSetManager:
             json.dump(data, f)
 
     def _log(self, msg: str, level: str = 'warning') -> None:
-        print(f'[im:{level}] {msg}')
+        print(f'[ssm:{level}] {msg}')
