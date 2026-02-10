@@ -599,18 +599,16 @@ class AIDBSceneApp:
 
     def display_scene(
         self,
-        scene_cache: list[Scene],
-        current_page: int,  # This is the current page before the jump
-        target_page_number: float,  # Gradio's Number component returns float
+        scene_id: str,
         mode: AppOpMmode,
     ) -> tuple[str, int, str]:
         """
         Jumps to a specific page in the image display.
         """
-        if not scene_cache:
+        if not scene_id:
             return '', 1, 'Page 0/0'
 
-        total_images = len(scene_cache)
+        total_images = len(scene_id)
         total_pages = (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE
 
         # Ensure target_page_number is an integer and within valid bounds
@@ -618,7 +616,7 @@ class AIDBSceneApp:
         target_page = max(1, min(target_page, total_pages))
 
         # Call paginate_images with the calculated target page and no relative direction
-        return self._paginate_scenes(scene_cache, target_page, 0, mode)
+        return self._paginate_scenes(scene_id, target_page, 0, mode)
 
     def _scenes_search_and_op(
         self,

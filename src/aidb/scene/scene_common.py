@@ -9,6 +9,7 @@ class SceneDef:
 
     COLLECTION_IMAGES: Final = 'images'
     COLLECTION_SCENES: Final = 'scenes'
+    COLLECTION_SETS: Final = 'sets'
 
     SEPERATOR_ID: Final = '___'
 
@@ -22,6 +23,9 @@ class SceneDef:
     FIELD_URL: Final = 'url'
     FIELD_URL_SRC: Final = 'url_src'
     FIELD_URL_PARENT: Final = 'url_parent'
+    FIELD_NAME: Final = 'name'
+    FIELD_DESCRIPTION: Final = 'description'
+    FIELD_QUERY: Final = 'query'
 
     DIR_THUMBNAILS: Final = f'{SEPERATOR_ID}thumbnails'
 
