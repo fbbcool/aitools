@@ -1,29 +1,32 @@
-import os
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any, Generator, Literal
 import json
 
-from aidb.dbmanager import DBManager
+from .db_connect import DBConnection
 from .scene_common import SceneDef
 
-from ait.tools.files import is_img_or_vid, is_dir, url_move_to_new_parent
+from ait.tools.files import is_img_or_vid, url_move_to_new_parent
 from ait.tools.images import image_info_from_url
 
 
 class SceneImageManager:
-    def __init__(self, dbm: DBManager | None = None, config: str | None = None) -> None:
-        if config is None:
-            config = SceneDef.CONFIG_DEFAULT
-        self.config = config
-        self.config_file = Path(os.environ['CONF_AIT']) / 'aidb' / f'dbmanager_{config}.yaml'
-        if dbm is None:
-            self._dbm = DBManager(config_file=str(self.config_file))
+    def __init__(
+        self,
+        dbc: DBConnection | None = None,
+        config: Literal['test', 'prod', 'default'] = 'default',
+        verbose: int = 1,
+    ) -> None:
+        self._verbose = verbose
+        if dbc is None:
+            self._dbc = DBConnection(config=config, verbose=self._verbose)
         else:
-            self._dbm = dbm
+            self._dbc = dbc
+
+        self._collection = SceneDef.COLLECTION_IMAGES
 
     @property
     def root(self) -> Path:
-        return Path(self._dbm._root)
+        return Path(self._dbc.config.root)
 
     def id_from_url(self, url: str | Path) -> None | str:
         data = self.data_from_url_db(url)
@@ -35,15 +38,15 @@ class SceneImageManager:
     def ids(self) -> Generator:
         """Returns a generator of image oid's for all images in the db"""
 
-        docs = self._dbm.find_documents(SceneDef.COLLECTION_IMAGES, query={})
+        docs = self._dbc.find_documents(self._collection, query={})
         for doc in docs:
             yield str(doc['_id'])
 
     def data_from_id(self, id: Any) -> dict | None:
-        oid = self._dbm.to_oid(id)
+        oid = self._dbc.to_oid(id)
         if oid is None:
             return None
-        docs = self._dbm.documents_from_oid(SceneDef.COLLECTION_IMAGES, oid)
+        docs = self._dbc.documents_from_oid(self._collection, oid)
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -72,9 +75,7 @@ class SceneImageManager:
         return ret
 
     def data_from_url_db(self, url: str | Path) -> dict | None:
-        docs = self._dbm.find_documents(
-            SceneDef.COLLECTION_IMAGES, query={SceneDef.FIELD_URL: str(url)}
-        )
+        docs = self._dbc.find_documents(self._collection, query={SceneDef.FIELD_URL: str(url)})
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -104,7 +105,7 @@ class SceneImageManager:
         # does url already exist?
         oid = self.id_from_url(url)
         if oid is None:
-            oid = self._dbm.insert_document(SceneDef.COLLECTION_IMAGES, data)
+            oid = self._dbc.insert_document(self._collection, data)
             self._log('image added: {url}.', level='message')
         else:
             self._log(f'image not added, already exists: {url} oid={oid}.', level='debug')
@@ -116,16 +117,16 @@ class SceneImageManager:
 
     @property
     def _dbc_images(self):
-        return self._dbm._get_collection(SceneDef.COLLECTION_IMAGES)
+        return self._dbc._get_collection(self._collection)
 
     def _dbc_to_id(self, id: str):
-        self._dbm.to_oid(id)
+        self._dbc.to_oid(id)
 
     def _db_url_src_exists(self, url_src: Path | str | None) -> bool:
         if url_src is None:
             return False
         url_src = str(url_src)
-        res = self._dbm.find_documents(
+        res = self._dbc.find_documents(
             SceneDef.COLLECTION_IMAGES, query={SceneDef.FIELD_URL_SRC: url_src}
         )
         if not res:
@@ -142,7 +143,7 @@ class SceneImageManager:
         set_data = data.copy()
         set_data.pop(SceneDef.FIELD_OID, None)
         set_data |= {SceneDef.FIELD_URL_PARENT: str(Path(url_src).parent)}
-        id = self._dbm.insert_document(SceneDef.COLLECTION_IMAGES, set_data)
+        id = self._dbc.insert_document(self._collection, set_data)
 
         self.image_move_src(id)
 
@@ -173,7 +174,7 @@ class SceneImageManager:
         return SceneImage(self, id_or_url)
 
     def image_move_src(self, id: Any) -> None:
-        oid = self._dbm.to_oid(id)
+        oid = self._dbc.to_oid(id)
         if oid is None:
             return
         data = self.data_from_id(oid)

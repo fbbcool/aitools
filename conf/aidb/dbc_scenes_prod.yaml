@@ -1,0 +1,13 @@
+mongodb:
+  host: "mongodb://mongo:mongo@192.168.0.120"
+  port: 27017
+  name: "scenes_prod"
+
+url:
+  root: "/home/misw/Data/AI/scenes_prod"
+  thumbnail: "___thumbnails"
+  train: "___train"
+
+size:
+  thumbnail: 256
+  train: 1024

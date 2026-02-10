@@ -74,7 +74,7 @@ class Scene:
         filename_thumbnail = SceneDef.filename_thumbnail_from_id(self.id)
         if filename_thumbnail is None:
             raise ValueError("Filename for thumbnail couldn't be created!")
-        return self._scm.url_thumbnails / filename_thumbnail
+        return self._scm.url_thumbs / filename_thumbnail
 
     @property
     def url_from_data(self) -> Path:
@@ -120,7 +120,7 @@ class Scene:
             ts_thumbnail = self.url_thumbnail.stat().st_ctime
             if ts_thumbnail > ts_latest:
                 return False
-        thumbnail_to_url(latest, self.url_thumbnail, size=self._scm._dbm._default_thumbnail_size[0])
+        thumbnail_to_url(latest, self.url_thumbnail, size=self._scm._dbc._default_thumbnail_size[0])
         return True
 
     def _init_data(self) -> None:

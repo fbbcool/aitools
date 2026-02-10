@@ -1,33 +1,25 @@
-import os
 from pathlib import Path
 from typing import Any, Generator, Literal, Optional
 import json
 
 from bson import ObjectId
 
-from aidb.dbmanager import DBManager
+from .db_connect import DBConnection
 from .scene_common import SceneDef
 
 
 class SceneSetManager:
     def __init__(
         self,
-        dbm: DBManager | None = None,
+        dbc: DBConnection | None = None,
         config: Literal['test', 'prod', 'default'] = 'default',
         verbose: int = 1,
     ) -> None:
         self._verbose = verbose
-        if config == 'prod':
-            self.config = SceneDef.CONFIG_PROD
-        elif config == 'test':
-            self.config = SceneDef.CONFIG_TEST
+        if dbc is None:
+            self._dbc = DBConnection(config=config, verbose=self._verbose)
         else:
-            self.config = SceneDef.CONFIG_DEFAULT
-        self.config_file = Path(os.environ['CONF_AIT']) / 'aidb' / f'dbmanager_{self.config}.yaml'
-        if dbm is None:
-            self._dbm = DBManager(config_file=str(self.config_file), verbose=self._verbose)
-        else:
-            self._dbm = dbm
+            self._dbc = dbc
 
         self._collection = SceneDef.COLLECTION_SETS
 
@@ -50,15 +42,15 @@ class SceneSetManager:
     def ids(self) -> Generator:
         """Returns a generator of image oid's for all images in the db"""
 
-        docs = self._dbm.find_documents(self._collection, query={})
+        docs = self._dbc.find_documents(self._collection, query={})
         for doc in docs:
             yield str(doc['_id'])
 
     def data_from_id(self, id: Any) -> dict | None:
-        oid = self._dbm.to_oid(id)
+        oid = self._dbc.to_oid(id)
         if oid is None:
             return None
-        docs = self._dbm.documents_from_oid(self._collection, oid)
+        docs = self._dbc.documents_from_oid(self._collection, oid)
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -68,7 +60,7 @@ class SceneSetManager:
         return None
 
     def data_from_name(self, name: str) -> dict | None:
-        docs = self._dbm.find_documents(self._collection, query={SceneDef.FIELD_NAME: name})
+        docs = self._dbc.find_documents(self._collection, query={SceneDef.FIELD_NAME: name})
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -84,7 +76,7 @@ class SceneSetManager:
 
     @property
     def _dbc_sets(self):
-        return self._dbm._get_collection(self._collection)
+        return self._dbc._get_collection(self._collection)
 
     def make_new_set(
         self, name: str, descr: Optional[str] = None, query: Optional[dict] = None
@@ -100,7 +92,7 @@ class SceneSetManager:
         return id
 
     def _dbc_to_id(self, id: str):
-        self._dbm.to_oid(id)
+        self._dbc.to_oid(id)
 
     def _db_insert_set(self, data: dict) -> str | None:
         name = data.get(SceneDef.FIELD_NAME, None)
@@ -109,7 +101,7 @@ class SceneSetManager:
 
         set_data = data.copy()
         set_data.pop(SceneDef.FIELD_OID, None)
-        id = self._dbm.insert_document(self._collection, set_data)
+        id = self._dbc.insert_document(self._collection, set_data)
 
         return id
 

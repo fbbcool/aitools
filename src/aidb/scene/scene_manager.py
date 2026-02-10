@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Final, Generator, Literal
 import json
 
-from aidb.dbmanager import DBManager
+from aidb.scene.db_connect import DBConnection
 from ait.tools.files import (
     imgs_and_vids_from_url,
     is_img_or_vid,
@@ -17,33 +17,26 @@ from .scene_common import SceneDef
 
 class SceneManager:
     DOTFILE: Final = '.scenemanager'
-    COLLECTION: Final = SceneDef.COLLECTION_SCENES
 
     def __init__(
         self,
-        dbm: DBManager | None = None,
+        dbc: DBConnection | None = None,
         config: Literal['test', 'prod', 'default'] = 'default',
         subdir_scenes: str | None = None,
         verbose: int = 1,
     ) -> None:
         self._verbose = verbose
-        if config == 'prod':
-            self.config = SceneDef.CONFIG_PROD
-        elif config == 'test':
-            self.config = SceneDef.CONFIG_TEST
+        if dbc is None:
+            self._dbc = DBConnection(config, verbose=self._verbose)
         else:
-            self.config = SceneDef.CONFIG_DEFAULT
-        self.config_file = Path(os.environ['CONF_AIT']) / 'aidb' / f'dbmanager_{self.config}.yaml'
-        if dbm is None:
-            self._dbm = DBManager(config_file=str(self.config_file), verbose=self._verbose)
-        else:
-            self._dbm = dbm
+            self._dbc = dbc
 
         self._subdir_scenes = subdir_scenes
+        self._collection = SceneDef.COLLECTION_SCENES
 
     @property
     def root(self) -> Path:
-        return Path(self._dbm._root)
+        return self._dbc.config.root
 
     @property
     def url_scenes(self) -> Path:
@@ -53,8 +46,8 @@ class SceneManager:
         return url
 
     @property
-    def url_thumbnails(self) -> Path:
-        return self.root / SceneDef.DIR_THUMBNAILS
+    def url_thumbs(self) -> Path:
+        return self._dbc.config.thumbs_url
 
     @classmethod
     def _url_dotfile_path(cls, url: str | Path) -> Path:
@@ -87,12 +80,12 @@ class SceneManager:
     def ids(self) -> Generator:
         """Returns a generator of scene oid's for all scenes in the db"""
 
-        docs = self._dbm.find_documents(self.COLLECTION, query={})
+        docs = self._dbc.find_documents(self._collection, query={})
         for doc in docs:
             yield str(doc['_id'])
 
     def ids_from_query(self, query: dict) -> Generator:
-        docs = self._dbm.find_documents(self.COLLECTION, query)
+        docs = self._dbc.find_documents(self._collection, query)
         for doc in docs:
             yield str(doc['_id'])
 
@@ -108,10 +101,10 @@ class SceneManager:
         return self.ids_from_query(query)
 
     def data_from_id(self, id: Any) -> dict | None:
-        oid = self._dbm.to_oid(id)
+        oid = self._dbc.to_oid(id)
         if oid is None:
             return None
-        docs = self._dbm.documents_from_oid(self.COLLECTION, oid)
+        docs = self._dbc.documents_from_oid(self._collection, oid)
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -121,7 +114,7 @@ class SceneManager:
         return None
 
     def data_from_url_db(self, url: str | Path) -> dict | None:
-        docs = self._dbm.find_documents(self.COLLECTION, query={SceneDef.FIELD_URL: str(url)})
+        docs = self._dbc.find_documents(self._collection, query={SceneDef.FIELD_URL: str(url)})
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -226,7 +219,7 @@ class SceneManager:
         # does scene url already exist?
         oid = self.id_from_url(url)
         if oid is None:
-            oid = self._dbm.insert_document(self.COLLECTION, meta)
+            oid = self._dbc.insert_document(self._collection, meta)
             self._log('scene added: {url}.', level='message')
         else:
             self._log(f'scene not added, already exists: {url} oid={oid}.', level='debug')
@@ -282,10 +275,10 @@ class SceneManager:
 
     @property
     def _dbc_scenes(self):
-        return self._dbm._get_collection(self.COLLECTION)
+        return self._dbc._get_collection(self._collection)
 
     def _dbc_to_id(self, id: str):
-        self._dbm.to_oid(id)
+        self._dbc.to_oid(id)
 
     def _db_update_scene(self, data: dict) -> bool:
         dbc = self._dbc_scenes
@@ -333,7 +326,12 @@ class SceneManager:
     def scene_image_manager(self) -> Any:
         from .scene_image_manager import SceneImageManager
 
-        return SceneImageManager(dbm=self._dbm, config=self.config)
+        return SceneImageManager(dbc=self._dbc)
+
+    def scene_set_manager(self) -> Any:
+        from .scene_set_manager import SceneSetManager
+
+        return SceneSetManager(dbc=self._dbc)
 
     @staticmethod
     def _json_read(url: Path) -> dict:
