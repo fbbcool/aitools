@@ -9,6 +9,7 @@ class ConfigReader:
     SECTION_DB: Final = 'mongodb'
     SECTION_URL: Final = 'url'
     SECTION_SIZE: Final = 'size'
+    CONFIG_DEFAULT: Final = 'prod'
 
     def __init__(
         self,
@@ -17,6 +18,8 @@ class ConfigReader:
         make_urls: bool = True,
     ) -> None:
         self.config = config
+        if self.config == 'default':
+            self.config = self.CONFIG_DEFAULT
         self._url_config = Path(os.environ['CONF_AIT']) / 'aidb' / f'dbc_scenes_{self.config}.yaml'
         self._verbose = verbose
 

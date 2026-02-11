@@ -1,3 +1,4 @@
+import os
 import gradio as gr
 from typing import Optional
 import json
@@ -602,8 +603,12 @@ class AIDBSceneApp:
 
 
 if __name__ == '__main__':
-    scm = SceneManager(config='test')
-    # scm = SceneManager(config='prod')
+    config = os.environ['AIDB_SCENE_CONFIG']
+    print(f'from environment: config {[config]}')
+    if not config:
+        config = 'default'
+    print(f'using config {[config]}')
+    scm = SceneManager(config=config)  # type: ignore
     scm.scenes_update()
     app = AIDBSceneApp(scm)
     app.launch(server_port=7861)

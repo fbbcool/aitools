@@ -1,7 +1,7 @@
 set -xg WORKSPACE $HOME/Workspace
 set -xg AIT_TMP $HOME/Downloads/000_tmp/
 set -xg AIDB_SCENE_DEFAULT 0000
-set -xg AIDB_SCENE_CONFIG prod
+set -xg AIDB_SCENE_CONFIG default
 
 function ait_update
     echo "update aitools ..."
@@ -110,6 +110,9 @@ function aidb_scene_images_register_clipspace
 end
 function aidb_scene_default
     set -xg AIDB_SCENE_DEFAULT $argv
+end
+function aidb_scene_config
+    set -xg AIDB_SCENE_CONFIG $argv
 end
 
 function comfy_clean_gen
