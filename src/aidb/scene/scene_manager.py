@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Final, Generator, Literal
+from typing import Any, Final, Generator
 import json
 
 from aidb.scene.db_connect import DBConnection
@@ -11,7 +11,7 @@ from ait.tools.files import (
     is_dir,
 )
 
-from .scene_common import SceneDef
+from .scene_common import SceneDef, SceneConfig
 
 
 class SceneManager:
@@ -20,18 +20,22 @@ class SceneManager:
     def __init__(
         self,
         dbc: DBConnection | None = None,
-        config: Literal['test', 'prod', 'default'] = 'default',
+        config: SceneConfig = 'default',
         subdir_scenes: str | None = None,
         verbose: int = 1,
     ) -> None:
-        self._verbose = verbose
         if dbc is None:
-            self._dbc = DBConnection(config, verbose=self._verbose)
+            self._verbose = verbose
+            self._dbc = DBConnection(config=config, verbose=self._verbose)
         else:
             self._dbc = dbc
-
+            self._verbose = self._dbc._verbose
         self._subdir_scenes = subdir_scenes
         self._collection = SceneDef.COLLECTION_SCENES
+
+    @property
+    def config(self):
+        return self._dbc.config
 
     @property
     def root(self) -> Path:

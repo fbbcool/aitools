@@ -1,7 +1,8 @@
 import sys
+import os
 
 from ait.tools.files import is_img_or_vid
-from aidb import SceneManager
+from aidb import SceneManager, SceneConfig
 
 if __name__ == '__main__':
     urls = sys.argv[1:]
@@ -12,7 +13,10 @@ if __name__ == '__main__':
     else:
         print(urls_img)
 
-    iscm = SceneManager(verbose=0).scene_image_manager()
-    # iscm = SceneManager(verbose=0, config='test').scene_image_manager()
+    config_str = os.environ['AIDB_SCENE_CONFIG']
+    if not config_str:
+        config_str = 'default'
+    config: SceneConfig = config_str
+    iscm = SceneManager(config=config, verbose=0).scene_image_manager()
     for url in urls_img:
         iscm.register_from_url(url)

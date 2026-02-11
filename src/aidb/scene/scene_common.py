@@ -1,12 +1,10 @@
 from pathlib import Path
-from typing import Any, Final, Optional
+from typing import Any, Final, Literal, Optional
+
+SceneConfig = Literal['test', 'prod', 'default']
 
 
 class SceneDef:
-    CONFIG_PROD: Final = 'scenes_prod'
-    CONFIG_TEST: Final = 'scenes_test'
-    CONFIG_DEFAULT: Final = CONFIG_PROD
-
     COLLECTION_IMAGES: Final = 'images'
     COLLECTION_SCENES: Final = 'scenes'
     COLLECTION_SETS: Final = 'sets'

@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Any
+from typing import Optional, Any
 import json
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -9,6 +9,7 @@ from pymongo.errors import OperationFailure
 import datetime
 
 from .config_reader import ConfigReader
+from .scene_common import SceneConfig
 
 
 # Define the DBManager class for handling metadata operations
@@ -21,7 +22,7 @@ class DBConnection:
 
     def __init__(
         self,
-        config: Literal['test', 'prod', 'default'] = 'default',
+        config: SceneConfig = 'default',
         verbose=1,
     ) -> None:
         """

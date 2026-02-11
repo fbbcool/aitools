@@ -1,6 +1,7 @@
 set -xg WORKSPACE $HOME/Workspace
 set -xg AIT_TMP $HOME/Downloads/000_tmp/
 set -xg AIDB_SCENE_DEFAULT 0000
+set -xg AIDB_SCENE_CONFIG prod
 
 function ait_update
     echo "update aitools ..."

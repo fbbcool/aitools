@@ -1,27 +1,36 @@
 from pathlib import Path
-from typing import Any, Generator, Literal, Optional
+from typing import Any, Generator, Optional
 import json
 
 from bson import ObjectId
 
 from .db_connect import DBConnection
-from .scene_common import SceneDef
+from .scene_common import SceneDef, SceneConfig
 
 
 class SceneSetManager:
     def __init__(
         self,
         dbc: DBConnection | None = None,
-        config: Literal['test', 'prod', 'default'] = 'default',
+        config: SceneConfig = 'default',
         verbose: int = 1,
     ) -> None:
-        self._verbose = verbose
         if dbc is None:
+            self._verbose = verbose
             self._dbc = DBConnection(config=config, verbose=self._verbose)
         else:
             self._dbc = dbc
+            self._verbose = self._dbc._verbose
 
         self._collection = SceneDef.COLLECTION_SETS
+
+    @property
+    def config(self):
+        return self._dbc.config
+
+    @property
+    def root(self) -> Path:
+        return self._dbc.config.root
 
     def _oid_from_name(self, name: str) -> Optional[ObjectId]:
         data = self.data_from_name(name)

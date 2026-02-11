@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Any, Generator, Literal
+from typing import Any, Generator
 import json
 
 from .db_connect import DBConnection
-from .scene_common import SceneDef
+from .scene_common import SceneDef, SceneConfig
 
 from ait.tools.files import is_img_or_vid, url_move_to_new_parent
 from ait.tools.images import image_info_from_url
@@ -13,20 +13,25 @@ class SceneImageManager:
     def __init__(
         self,
         dbc: DBConnection | None = None,
-        config: Literal['test', 'prod', 'default'] = 'default',
+        config: SceneConfig = 'default',
         verbose: int = 1,
     ) -> None:
-        self._verbose = verbose
         if dbc is None:
+            self._verbose = verbose
             self._dbc = DBConnection(config=config, verbose=self._verbose)
         else:
             self._dbc = dbc
+            self._verbose = self._dbc._verbose
 
         self._collection = SceneDef.COLLECTION_IMAGES
 
     @property
+    def config(self):
+        return self._dbc.config
+
+    @property
     def root(self) -> Path:
-        return Path(self._dbc.config.root)
+        return self._dbc.config.root
 
     def id_from_url(self, url: str | Path) -> None | str:
         data = self.data_from_url_db(url)

@@ -100,16 +100,16 @@ class Scene:
 
     def update(self) -> None:
         if self._url_sync():
-            self._log(f'synced url[{self._url_called}]', level='message')
+            self._log(f'synced url[{self._url_called}]', level='info')
         if self._update_thumbnail():
-            self._log('thumbnail update.', level='message')
+            self._log('thumbnail update.', level='info')
 
         # add init data, if not present
         self._init_data()
 
         # store
         if self._dbstore():
-            self._log('data update.', level='message')
+            self._log('data update.', level='info')
 
     def _update_thumbnail(self) -> bool:
         latest = img_latest_from_url(self.url)
@@ -120,7 +120,7 @@ class Scene:
             ts_thumbnail = self.url_thumbnail.stat().st_ctime
             if ts_thumbnail > ts_latest:
                 return False
-        thumbnail_to_url(latest, self.url_thumbnail, size=self._scm._dbc._default_thumbnail_size[0])
+        thumbnail_to_url(latest, self.url_thumbnail, size=self._scm.config.thumbs_size)
         return True
 
     def _init_data(self) -> None:

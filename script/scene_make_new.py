@@ -3,7 +3,7 @@ import sys
 
 # from pprint import pprint
 from ait.tools.files import is_dir, is_img_or_vid
-from aidb import SceneManager, SceneDef
+from aidb import SceneManager, SceneConfig
 
 if __name__ == '__main__':
     urls = sys.argv[1:]
@@ -16,6 +16,9 @@ if __name__ == '__main__':
         print(urls_img_vid)
 
     scenes_subdir_default = os.environ['AIDB_SCENE_DEFAULT']
+    config_str = os.environ['AIDB_SCENE_CONFIG']
+    if not config_str:
+        config_str = 'default'
     scenes_subdir = input(f'enter scenes subdir [{scenes_subdir_default}]: ')
     if not scenes_subdir:
         scenes_subdir = scenes_subdir_default
@@ -26,8 +29,8 @@ if __name__ == '__main__':
     if not scenes_subdir:
         scenes_subdir = None
 
-    # scm = SceneManager(config='test', subdir_scenes=scenes_subdir, verbose=0)
-    scm = SceneManager(subdir_scenes=scenes_subdir, verbose=0)
+    config: SceneConfig = config_str
+    scm = SceneManager(config=config, subdir_scenes=scenes_subdir, verbose=0)
 
     scm.new_scene_from_urls(urls_img_vid)
     scm.new_scene_from_urls(urls_dir)
