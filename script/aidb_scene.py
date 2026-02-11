@@ -5,6 +5,8 @@ import pyperclip
 
 from aidb import SceneConfig, SceneManager
 
+from aidb.app.scene.app import AIDBSceneApp
+
 from ait.tools.files import is_img_or_vid, is_dir
 
 
@@ -40,15 +42,48 @@ def scene_new(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     scm.new_scene_from_urls(urls_dir)
 
 
+def scenes_update(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+    scm = SceneManager(verbose=0, config=config)
+    scm.scenes_update()
+
+
+def start_app(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+    scm = SceneManager(config=config)  # type: ignore
+    scm.scenes_update()
+    app = AIDBSceneApp(scm)
+    app.launch(server_port=7861)
+
+
+def _keyval(params: list[str]) -> dict:
+    ret = {}
+    for param in params:
+        split = param.split('=')
+        if len(split) >= 2:
+            ret |= {split[0]: split[1]}
+    return ret
+
+
 if __name__ == '__main__':
     cmd = None
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
+
     params = None
     if len(sys.argv) > 2:
         params = sys.argv[2:]
 
+    keyval = {}
+    if params is not None:
+        keyval = _keyval(params)
+
     clipspace = pyperclip.paste().split('\n')
+
+    map_cmd = {
+        'move': imgs_or_vids_move_to_scene_id,
+        'new': scene_new,
+        'update': scenes_update,
+        'app': start_app,
+    }
 
     if cmd is None:  # help
         print('help ... TODO')
@@ -58,10 +93,9 @@ if __name__ == '__main__':
     config = os.environ['AIDB_SCENE_CONFIG']
     if not config:
         config = 'default'
-    map_cmd = {
-        'move': imgs_or_vids_move_to_scene_id,
-        'new': scene_new,
-    }
+    param_config = keyval.get('config', None)
+    if param_config is not None:
+        config = param_config
 
     print(f'config[{config}] cmd[{cmd}] params[{params}] clipspace[{clipspace}]')
 
