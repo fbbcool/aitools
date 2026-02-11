@@ -326,6 +326,6 @@ class DBConnection:
         self.db = new_db
         self._db_name = db_name
 
-    def _log(self, msg: str, level: str = 'message') -> None:
+    def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:
             print(f'[dbc:{level}] {msg}')

@@ -198,5 +198,5 @@ class Scene:
         ret += 'data: ' + pprint.pformat(self._data)
         return ret
 
-    def _log(self, msg: str, level: str = 'message') -> None:
+    def _log(self, msg: str, level: str = 'info') -> None:
         print(f'[scene id({self.id}):{level}] {msg}')

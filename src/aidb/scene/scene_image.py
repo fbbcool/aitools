@@ -11,8 +11,9 @@ from .scene_image_manager import SceneImageManager
 
 
 class SceneImage:
-    def __init__(self, im: SceneImageManager, id_or_url: Any) -> None:
+    def __init__(self, im: SceneImageManager, id_or_url: Any, verbose=1) -> None:
         self._im = im
+        self._verbose = verbose
 
         data = None
         url = None
@@ -86,3 +87,7 @@ class SceneImage:
         ret = f'url: {self.url}\n'
         ret += 'data: ' + pprint.pformat(self.data)
         return ret
+
+    def _log(self, msg: str, level: str = 'info') -> None:
+        if self._verbose > 0:
+            print(f'[simg:{level}] {msg}')

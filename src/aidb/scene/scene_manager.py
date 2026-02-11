@@ -349,6 +349,6 @@ class SceneManager:
         with url.open('w') as f:
             json.dump(data, f)
 
-    def _log(self, msg: str, level: str = 'warning') -> None:
+    def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:
             print(f'[scm:{level}] {msg}')
