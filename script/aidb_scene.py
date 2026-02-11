@@ -47,6 +47,14 @@ def scenes_update(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     scm.scenes_update()
 
 
+def scene_url(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+    scm = SceneManager(verbose=0, config=config)
+    url_reg_file = clipsapce[0]
+    url = scm.url_from_registered_file(url_reg_file)
+    print(str(url))
+    pyperclip.copy(str(url))
+
+
 def images_register(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     urls_img = [url for url in clipsapce if is_img_or_vid(url)]
 
@@ -97,6 +105,7 @@ if __name__ == '__main__':
         'update': scenes_update,
         'app': start_app,
         'images': images_register,
+        'url': scene_url,
     }
 
     if cmd is None:  # help
