@@ -47,6 +47,19 @@ def scenes_update(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     scm.scenes_update()
 
 
+def images_register(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+    urls_img = [url for url in clipsapce if is_img_or_vid(url)]
+
+    if not urls_img:
+        print('no imgs found!')
+    else:
+        print(urls_img)
+
+    iscm = SceneManager(config=config, verbose=0).scene_image_manager()
+    for url in urls_img:
+        iscm.register_from_url(url)
+
+
 def start_app(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     scm = SceneManager(config=config)  # type: ignore
     scm.scenes_update()
@@ -83,6 +96,7 @@ if __name__ == '__main__':
         'new': scene_new,
         'update': scenes_update,
         'app': start_app,
+        'images': images_register,
     }
 
     if cmd is None:  # help

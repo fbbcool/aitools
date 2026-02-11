@@ -102,9 +102,6 @@ end
 function aidb_scene
     python3 $HOME_AIT/script/aidb_scene.py $argv
 end
-function aidb_scene_update_clipspace
-    python3 $HOME_AIT/script/scene_update.py (wl-paste)
-end
 function aidb_scene_images_register_clipspace
     python3 $HOME_AIT/script/scene_images_register.py (wl-paste)
 end
