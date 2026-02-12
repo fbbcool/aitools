@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import pprint
 from typing import Any, Optional
@@ -55,6 +56,17 @@ class SceneImage:
         return parent / filename
 
     @property
+    def filename_train_from_data(self) -> Optional[str]:
+        """
+        returns the filename as a string with the collections name ("images/") as a subfolder
+        """
+        id = self.id
+        filename = SceneDef.filename_train_from_id(id, suffix=SceneDef.SUFFIX_IMG_STD)
+        if filename is None:
+            return None
+        return f'{self._im._collection}/{filename}'
+
+    @property
     def pil(self) -> Optional[PILImage.Image]:
         url = self.url_from_data
         if url is None:
@@ -82,6 +94,24 @@ class SceneImage:
     def update(self) -> None:
         if self.url_sync():
             print(f'synced url[{self.url}]')
+
+    @property
+    def train_metadata_jsonl(self) -> Optional[str]:
+        filename = self.filename_train_from_data
+        if filename is None:
+            return None
+        jsonl = {'file_name': self.filename_train_from_data}
+        jsonl |= {'file_type': 'image/png'}
+
+        caption = self.data.get(SceneDef.FIELD_CAPTION, None)
+        if caption is not None:
+            jsonl |= {SceneDef.FIELD_CAPTION: caption}
+
+        prompt = self.data.get(SceneDef.FIELD_PROMPT, None)
+        if prompt is not None:
+            jsonl |= {SceneDef.FIELD_PROMPT: prompt}
+
+        return json.dumps(jsonl)
 
     def __str__(self) -> str:
         ret = f'url: {self.url}\n'

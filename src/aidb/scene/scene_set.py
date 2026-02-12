@@ -83,6 +83,15 @@ class SceneSet:
             for id_img in scene.ids_img_from_query(self.query_img):
                 yield id_img
 
+    @property
+    def imgs(self) -> Generator:
+        from .scene import Scene
+
+        scene: Scene
+        for scene in self.scenes:
+            for img in scene.imgs_from_query(self.query_img):
+                yield img
+
     def __str__(self) -> str:
         ret = 'data: ' + pprint.pformat(self.data)
         return ret

@@ -208,6 +208,18 @@ class SceneImageManager:
         res_ids = [str(doc.get(SceneDef.FIELD_OID, None)) for doc in res]
         return res_ids
 
+    def imgs_from_query(self, query: dict, ids: Optional[list[Any]]) -> Generator:
+        for id_img in self.ids_img_from_query(query, ids):
+            img = self.img_from_id(id_img)
+            if img is None:
+                continue
+            yield img
+
+    def img_from_id(self, id: Any) -> Optional[Any]:
+        from .scene_image import SceneImage
+
+        return SceneImage(self, id, self._verbose)
+
     @staticmethod
     def _json_read(url: Path) -> dict:
         if not url.exists():

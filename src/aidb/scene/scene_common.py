@@ -13,7 +13,8 @@ class SceneDef:
 
     PREFIX_ORIG: Final = 'orig'
     PREFIX_THUMBNAIL: Final = 'thumbnail'
-    PREFIXES: Final = [PREFIX_ORIG, PREFIX_THUMBNAIL]
+    PREFIX_TRAIN: Final = 'train'
+    PREFIXES: Final = [PREFIX_ORIG, PREFIX_THUMBNAIL, PREFIX_TRAIN]
 
     SUFFIX_IMG_STD = '.png'
 
@@ -23,6 +24,8 @@ class SceneDef:
     FIELD_URL_PARENT: Final = 'url_parent'
     FIELD_NAME: Final = 'name'
     FIELD_DESCRIPTION: Final = 'description'
+    FIELD_CAPTION: Final = 'caption'
+    FIELD_PROMPT: Final = 'prompt'
     FIELD_QUERY: Final = 'query'
     FIELD_QUERY_IMG: Final = 'query_img'
     FIELD_TRIGGER: Final = 'trigger'
@@ -56,6 +59,10 @@ class SceneDef:
     @classmethod
     def filename_thumbnail_from_id(cls, id: Any, suffix: str = SUFFIX_IMG_STD) -> str | None:
         return cls.filename_from_id(cls.PREFIX_THUMBNAIL, id, suffix=suffix)
+
+    @classmethod
+    def filename_train_from_id(cls, id: Any, suffix: str = SUFFIX_IMG_STD) -> str | None:
+        return cls.filename_from_id(cls.PREFIX_TRAIN, id, suffix=suffix)
 
     @classmethod
     def id_and_prefix_from_filename(cls, url: str | Path) -> tuple[str, str] | None:

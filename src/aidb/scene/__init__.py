@@ -5,6 +5,8 @@ from .scene_manager import SceneManager
 from .scene import Scene
 from .scene_set_manager import SceneSetManager
 from .scene_set import SceneSet
+from .scene_image_manager import SceneImageManager
+from .scene_image import SceneImage
 
 __all__ = [
     'ConfigReader',
@@ -15,4 +17,6 @@ __all__ = [
     'SceneManager',
     'SceneSetManager',
     'SceneSet',
+    'SceneImageManager',
+    'SceneImage',
 ]
