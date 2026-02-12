@@ -24,6 +24,8 @@ class SceneDef:
     FIELD_NAME: Final = 'name'
     FIELD_DESCRIPTION: Final = 'description'
     FIELD_QUERY: Final = 'query'
+    FIELD_QUERY_IMG: Final = 'query_img'
+    FIELD_TRIGGER: Final = 'trigger'
 
     DIR_THUMBNAILS: Final = f'{SEPERATOR_ID}thumbnails'
 

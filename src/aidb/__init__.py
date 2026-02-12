@@ -1,10 +1,9 @@
-from .scene import SceneDef, SceneConfig
-from .scene import SceneManager
-from .scene import Scene
+from .scene import SceneDef, SceneConfig, SceneManager, Scene, SceneSetManager
 
 __all__ = [
-    'Scene',
-    'SceneManager',
     'SceneDef',
     'SceneConfig',
+    'Scene',
+    'SceneManager',
+    'SceneSetManager',
 ]

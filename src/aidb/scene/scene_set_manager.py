@@ -6,6 +6,7 @@ from bson import ObjectId
 
 from .db_connect import DBConnection
 from .scene_common import SceneDef, SceneConfig
+from .scene_manager import SceneManager
 
 
 class SceneSetManager:
@@ -87,14 +88,20 @@ class SceneSetManager:
     def _dbc_sets(self):
         return self._dbc._get_collection(self._collection)
 
-    def make_new_set(
-        self, name: str, descr: Optional[str] = None, query: Optional[dict] = None
+    def make_new(
+        self,
+        name: str,
+        descr: Optional[str] = None,
+        query: Optional[dict] = None,
+        trigger: Optional[str] = None,
     ) -> Optional[str]:
         data = {SceneDef.FIELD_NAME: name}
         if descr is not None:
             data |= {SceneDef.FIELD_DESCRIPTION: descr}
         if query is not None:
             data |= {SceneDef.FIELD_QUERY: query}
+        if trigger is not None:
+            data |= {SceneDef.FIELD_TRIGGER: trigger}
 
         id = self._db_insert_set(data)
 
@@ -137,6 +144,9 @@ class SceneSetManager:
 
         self._log(f'make scene set from: [{str(id_or_name)}]', 'debug')
         return SceneSet(self, id_or_name)
+
+    def scene_manager(self) -> SceneManager:
+        return SceneManager(self._dbc, verbose=self._verbose)
 
     @staticmethod
     def _json_read(url: Path) -> dict:

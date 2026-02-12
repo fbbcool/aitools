@@ -69,6 +69,14 @@ class Scene:
             if id is not None:
                 yield id
 
+    def ids_img_from_query(self, query: dict) -> Generator:
+        from .scene_image_manager import SceneImageManager
+
+        sim = SceneImageManager(self._scm._dbc, verbose=self._scm._verbose)
+
+        for id_img in sim.ids_img_from_query(query, ids=self.ids_img):
+            yield id_img
+
     @property
     def url_thumbnail(self) -> Path:
         filename_thumbnail = SceneDef.filename_thumbnail_from_id(self.id)
