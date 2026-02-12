@@ -222,13 +222,22 @@ def train_from_image(pil: PILImage.Image) -> Optional[PILImage.Image]:
 
     # resize
     resolution_target = RESOLUTIONS[0]
-    width, height = pil_train.size
-    maxwh = max(width, height)
-    minwh = min(width, height)
+    width_crop, height_crop = pil_train.size
+    maxwh_crop = max(width_crop, height_crop)
     for resolution_check in RESOLUTIONS:
-        if maxwh == resolution_check:
+        if maxwh_crop > resolution_check:
             resolution_target = resolution_check
-            break
-        elif maxwh < resolution_check:
-            resolution_target = resolution_check
-    pil_train = pil_train.resize((scale_width, scale_height), Image.Resampling.LANCZOS)
+
+    train_max = resolution_target
+    train_min = int(float(resolution_target) * ratio_target)
+    if width_crop == maxwh_crop:
+        width_train = train_max
+        height_train = train_min
+    else:
+        width_train = train_min
+        height_train = train_max
+
+    print(f'train img resize: [{width},{height}] -> [{width_train},{height_train}]')
+    # pil_train = pil_train.resize((width_train, height_train), PILImage.Resampling.LANCZOS)
+
+    return None
