@@ -28,15 +28,15 @@ from trainer import Trainer
 # }
 config_trainer = {
     'epochs': 1000,
-    'micro_batch_size_per_gpu': 4,
+    'micro_batch_size_per_gpu': 8,
     'warmup_steps': 20,
     'save_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 32,
+    'adapter___rank': 16,
     'optimizer___lr': 2e-4,
 }
-config_dataset = {'num_repeats': 8, 'resolutions': [1024]}
+config_dataset = {'num_repeats': 8, 'resolutions': [512]}
 
 
 # dataset_repo_ids = [('fbbcool/1gts-xlasm-01', 0)]
