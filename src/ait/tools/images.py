@@ -1,12 +1,15 @@
 import json
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal, Optional
 from PIL import Image as PILImage
 import time
 
 from ait.tools.files import is_img
 
 THUMBNAIL_SIZE: Final = 256
+RESOLUTIONS: Final = [256, 512, 768, 1024]
+RATIOS: Final = [1.0, 3.0 / 4.0, 2.0 / 3.0]
+THRESHOLD_RATIO_SQUARE: Final = 0.25
 
 
 def image_from_url(url: str | Path) -> PILImage.Image | None:
@@ -176,3 +179,56 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
             print('prompt is empty')
         return None
     return prompt
+
+
+def train_from_image(pil: PILImage.Image) -> Optional[PILImage.Image]:
+    width, height = pil.size  # Get dimensions
+    minwh = min(width, height)
+    maxwh = max(width, height)
+
+    ratio = float(minwh) / float(maxwh)
+    ratio_target = 1.0
+    loss_ratio = 1.0
+    for ratio_check in RATIOS:
+        if ratio < ratio_check:
+            loss = ratio_check / ratio - ratio_check
+        else:
+            loss = ratio - ratio_check
+        if loss < loss_ratio:
+            loss_ratio = loss
+            ratio_target = ratio_check
+
+    if ratio < ratio_target:
+        new_min = minwh
+        new_max = int(float(minwh) / ratio_target)
+    else:
+        new_min = int(float(maxwh) * ratio_target)
+        new_max = maxwh
+
+    if width == maxwh:
+        new_width = new_max
+        new_height = new_min
+    else:
+        new_width = new_min
+        new_height = new_max
+
+    left = (width - new_width) / 2
+    top = (height - new_height) / 2
+    right = (width + new_width) / 2
+    bottom = (height + new_height) / 2
+
+    # make square by crop around center
+    pil_train = pil.crop((left, top, right, bottom))
+
+    # resize
+    resolution_target = RESOLUTIONS[0]
+    width, height = pil_train.size
+    maxwh = max(width, height)
+    minwh = min(width, height)
+    for resolution_check in RESOLUTIONS:
+        if maxwh == resolution_check:
+            resolution_target = resolution_check
+            break
+        elif maxwh < resolution_check:
+            resolution_target = resolution_check
+    pil_train = pil_train.resize((scale_width, scale_height), Image.Resampling.LANCZOS)
