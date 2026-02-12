@@ -1,7 +1,5 @@
 import sys
 
-# from pprint import pprint
-from ait.tools.files import is_dir, is_img_or_vid
 from aidb import SceneManager
 
 if __name__ == '__main__':

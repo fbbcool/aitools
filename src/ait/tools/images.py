@@ -1,34 +1,39 @@
 import json
 from pathlib import Path
-from typing import Final, Literal, Optional
+from typing import Final, Optional
 from PIL import Image as PILImage
-import time
 
 from ait.tools.files import is_img
 
 THUMBNAIL_SIZE: Final = 256
-RESOLUTIONS: Final = [256, 512, 768, 1024]
+RESOLUTIONS: Final = [512, 768, 1024]
 RATIOS: Final = [1.0, 3.0 / 4.0, 2.0 / 3.0]
 THRESHOLD_RATIO_SQUARE: Final = 0.25
 
 
-def image_from_url(url: str | Path) -> PILImage.Image | None:
+def image_from_url(url: str | Path, verbose: bool = False) -> PILImage.Image | None:
     url = Path(url)
     if not is_img(url):
+        if verbose:
+            print(f"'{url}' is not an image.")
         return None
 
     try:
         pil_image = PILImage.open(url)
-        # print(f"Successfully opened image '{full_path}' as PIL image.") # Too verbose
+        if verbose:
+            print(f"Successfully opened image '{url}' as PIL image.")
         return pil_image
     except FileNotFoundError:
-        # print(f"Error: Image file not found at '{url}'.")
+        if verbose:
+            print(f"Error: Image file not found at '{url}'.")
         return None
     except IOError:
-        # print(f"Error opening image file '{url}': {e}")
+        if verbose:
+            print(f"Error opening image file '{url}'.")
         return None
-    except Exception:
-        # print(f"An unexpected error occurred while getting PIL image for '{url}': {e}")
+    except Exception as e:
+        if verbose:
+            print(f"An unexpected error occurred while getting PIL image for '{url}': {e}")
         return None
 
 
@@ -181,7 +186,9 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
     return prompt
 
 
-def train_from_image(pil: PILImage.Image) -> Optional[PILImage.Image]:
+def train_from_image(
+    pil: PILImage.Image, ratios: list[float] = RATIOS, resolutions: list[int] = RESOLUTIONS
+) -> Optional[PILImage.Image]:
     width, height = pil.size  # Get dimensions
     minwh = min(width, height)
     maxwh = max(width, height)
@@ -189,7 +196,7 @@ def train_from_image(pil: PILImage.Image) -> Optional[PILImage.Image]:
     ratio = float(minwh) / float(maxwh)
     ratio_target = 1.0
     loss_ratio = 1.0
-    for ratio_check in RATIOS:
+    for ratio_check in ratios:
         if ratio < ratio_check:
             loss = ratio_check / ratio - ratio_check
         else:
@@ -221,10 +228,10 @@ def train_from_image(pil: PILImage.Image) -> Optional[PILImage.Image]:
     pil_train = pil.crop((left, top, right, bottom))
 
     # resize
-    resolution_target = RESOLUTIONS[0]
+    resolution_target = resolutions[0]
     width_crop, height_crop = pil_train.size
     maxwh_crop = max(width_crop, height_crop)
-    for resolution_check in RESOLUTIONS:
+    for resolution_check in resolutions:
         if maxwh_crop > resolution_check:
             resolution_target = resolution_check
 
@@ -237,7 +244,9 @@ def train_from_image(pil: PILImage.Image) -> Optional[PILImage.Image]:
         width_train = train_min
         height_train = train_max
 
-    print(f'train img resize: [{width},{height}] -> [{width_train},{height_train}]')
-    # pil_train = pil_train.resize((width_train, height_train), PILImage.Resampling.LANCZOS)
+    print(
+        f'train img resize: [{width},{height}] -> [{width_crop},{height_crop}] -> [{width_train},{height_train}]'
+    )
+    pil_train = pil_train.resize((width_train, height_train), PILImage.Resampling.LANCZOS)
 
-    return None
+    return pil_train

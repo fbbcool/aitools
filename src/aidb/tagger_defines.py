@@ -14,6 +14,7 @@ class TaggerDef:
                 'foot',
                 'leg',
                 'mouth',
+                'tongue',
                 'hand',
                 'thigh',
                 'insert',
