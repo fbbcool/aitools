@@ -29,6 +29,11 @@ class SceneDef:
     FIELD_QUERY: Final = 'query'
     FIELD_QUERY_IMG: Final = 'query_img'
     FIELD_TRIGGER: Final = 'trigger'
+    FIELD_RATIOS: Final = 'ratios'
+    FIELD_RESOLUTIONS: Final = 'resolutions'
+
+    DEFAULT_RATIOS: Final = [1.0, 2.0 / 3.0, 3.0 / 4.0]
+    DEFAULT_RESOLUTIONS: Final = [512, 768, 1024]
 
     DIR_THUMBNAILS: Final = f'{SEPERATOR_ID}thumbnails'
 

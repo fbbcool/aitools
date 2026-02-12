@@ -56,14 +56,12 @@ class SceneImage:
         return parent / filename
 
     @property
-    def filename_train_from_data(self) -> Optional[str]:
+    def filename_train_from_data(self) -> str:
         """
         returns the filename as a string with the collections name ("images/") as a subfolder
         """
         id = self.id
         filename = SceneDef.filename_train_from_id(id, suffix=SceneDef.SUFFIX_IMG_STD)
-        if filename is None:
-            return None
         return f'{self._im._collection}/{filename}'
 
     @property
@@ -96,7 +94,7 @@ class SceneImage:
             print(f'synced url[{self.url}]')
 
     @property
-    def train_metadata_jsonl(self) -> Optional[str]:
+    def train_metadata_jsonl(self) -> Optional[dict]:
         filename = self.filename_train_from_data
         if filename is None:
             return None
@@ -111,7 +109,7 @@ class SceneImage:
         if prompt is not None:
             jsonl |= {SceneDef.FIELD_PROMPT: prompt}
 
-        return json.dumps(jsonl)
+        return jsonl
 
     def __str__(self) -> str:
         ret = f'url: {self.url}\n'

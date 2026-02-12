@@ -92,9 +92,7 @@ class ConfigReader:
 
     @property
     def train_url(self) -> Path:
-        return (
-            self.root / f'{self.get_param_protected(self.SECTION_URL, "train")}_{self.train_size}'
-        )
+        return self.root / f'{self.get_param_protected(self.SECTION_URL, "train")}'
 
     def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:

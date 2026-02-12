@@ -1,6 +1,11 @@
 import pprint
 from typing import Final, Generator
 
+from jsonlines import jsonlines
+
+from ait.tools.files import url_clean
+from ait.tools.images import train_from_image
+
 
 from .scene_common import SceneDef
 from .scene_set_manager import SceneSetManager
@@ -91,6 +96,34 @@ class SceneSet:
         for scene in self.scenes:
             for img in scene.imgs_from_query(self.query_img):
                 yield img
+
+    def compile(self) -> None:
+        from .scene_image import SceneImage
+
+        # first, make a clean saving location
+        root_train = self._ssm.config.train_url / self.name
+        url_clean(root_train)
+        metadata = []
+        ratios = self.data.get(SceneDef.FIELD_RATIOS, SceneDef.DEFAULT_RATIOS)
+        ratios = [float(ratio) for ratio in ratios]
+        resolutions = self.data.get(SceneDef.FIELD_RESOLUTIONS, SceneDef.DEFAULT_RESOLUTIONS)
+
+        for img in self.imgs:
+            img: SceneImage
+            pil = img.pil
+            if pil is None:
+                continue
+            metadata.append(img.train_metadata_jsonl)
+            pil_train = train_from_image(pil, ratios=ratios, resolutions=resolutions)
+            if pil_train is None:
+                continue
+            url_trainfile = root_train / img.filename_train_from_data
+            url_trainfile.parent.mkdir(parents=True, exist_ok=True)
+            pil_train.save(url_trainfile)
+
+        url_metafile = root_train / 'metadata.jsonl'
+        with jsonlines.open(url_metafile, mode='w') as writer:
+            writer.write_all(metadata)
 
     def __str__(self) -> str:
         ret = 'data: ' + pprint.pformat(self.data)

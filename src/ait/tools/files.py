@@ -52,6 +52,17 @@ def is_vid(url: str | Path) -> bool:
     return False
 
 
+def is_dotfile(url: str | Path) -> bool:
+    url = Path(url)
+    if not url.exists():
+        return False
+    elif url.is_dir():
+        return False
+    elif url.stem[0] == '.':
+        return True
+    return False
+
+
 def is_dir(url: str | Path) -> bool:
     url = Path(url)
     if not url.exists():
@@ -123,6 +134,11 @@ def imgs_from_url(url: str | Path) -> list[Path]:
     return urls
 
 
+def dotfiles_from_url(url: str | Path) -> list[Path]:
+    urls = [Path(f.path) for f in os.scandir(url) if is_dotfile(f.path)]
+    return urls
+
+
 def img_latest_from_url(url: str | Path) -> Path | None:
     urls_img = imgs_from_url(url)
     if urls_img:
@@ -166,3 +182,16 @@ def url_move_to_new_parent(
 
     if delete_src:
         os.remove(str(url_src))
+
+
+def url_clean(url: str | Path) -> None:
+    """
+    cleans up a dir given by a url by removing its content files (vids,imgs,etc) and all dotfiles
+    """
+    if not is_dir(url):
+        return
+    for file in imgs_and_vids_from_url(url):
+        file.unlink(missing_ok=True)
+    for file in dotfiles_from_url(url):
+        file.unlink(missing_ok=True)
+    return
