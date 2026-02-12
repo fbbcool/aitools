@@ -74,7 +74,8 @@ class Scene:
 
         sim = SceneImageManager(self._scm._dbc, verbose=self._scm._verbose)
 
-        for id_img in sim.ids_img_from_query(query, ids=self.ids_img):
+        ids_img = [id_img for id_img in self.ids_img]
+        for id_img in sim.ids_img_from_query(query, ids=ids_img):
             yield id_img
 
     @property

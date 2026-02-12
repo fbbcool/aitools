@@ -2,8 +2,9 @@ from .config_reader import ConfigReader
 from .db_connect import DBConnection
 from .scene_common import SceneDef, SceneConfig
 from .scene_manager import SceneManager
-from .scene_set_manager import SceneSetManager
 from .scene import Scene
+from .scene_set_manager import SceneSetManager
+from .scene_set import SceneSet
 
 __all__ = [
     'ConfigReader',
@@ -13,4 +14,5 @@ __all__ = [
     'Scene',
     'SceneManager',
     'SceneSetManager',
+    'SceneSet',
 ]

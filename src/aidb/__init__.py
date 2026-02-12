@@ -1,4 +1,4 @@
-from .scene import SceneDef, SceneConfig, SceneManager, Scene, SceneSetManager
+from .scene import SceneDef, SceneConfig, SceneManager, Scene, SceneSetManager, SceneSet
 
 __all__ = [
     'SceneDef',
@@ -6,4 +6,5 @@ __all__ = [
     'Scene',
     'SceneManager',
     'SceneSetManager',
+    'SceneSet',
 ]

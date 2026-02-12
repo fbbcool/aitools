@@ -1,6 +1,7 @@
 import pprint
 from typing import Final, Generator
 
+
 from .scene_common import SceneDef
 from .scene_set_manager import SceneSetManager
 
@@ -75,15 +76,12 @@ class SceneSet:
 
     @property
     def ids_img(self) -> Generator:
+        from .scene import Scene
+
+        scene: Scene
         for scene in self.scenes:
             for id_img in scene.ids_img_from_query(self.query_img):
                 yield id_img
-
-    @property
-    def imgs(self) -> Generator:
-        for scene in self.scenes:
-            for img in scene.imgs_from_query(self.query_img):
-                yield img
 
     def __str__(self) -> str:
         ret = 'data: ' + pprint.pformat(self.data)

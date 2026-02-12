@@ -99,6 +99,7 @@ class SceneImageManager:
         if data is None:
             return None
         data |= {SceneDef.FIELD_URL_SRC: str(url)}
+        data |= {SceneDef.FIELD_RATING: SceneDef.RATING_INIT}
         return data
 
     def _image_update(self, data: dict) -> dict | None:
@@ -131,9 +132,7 @@ class SceneImageManager:
         if url_src is None:
             return False
         url_src = str(url_src)
-        res = self._dbc.find_documents(
-            SceneDef.COLLECTION_IMAGES, query={SceneDef.FIELD_URL_SRC: url_src}
-        )
+        res = self._dbc.find_documents(self._collection, query={SceneDef.FIELD_URL_SRC: url_src})
         if not res:
             return False
         return True
