@@ -7,7 +7,7 @@ from .scene_set_manager import SceneSetManager
 
 
 class SceneSet:
-    QUERY_IMG_DEFAULT: Final = {SceneDef.FIELD_RATING: {'$gte': SceneDef.RATING_MIN}}
+    QUERY_IMG_DEFAULT: Final = {SceneDef.FIELD_RATING: {'$gte': SceneDef.RATING_INIT}}
 
     def __init__(
         self,
