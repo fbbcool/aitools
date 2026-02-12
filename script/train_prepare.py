@@ -57,25 +57,25 @@ config_dataset = {'num_repeats': 8, 'resolutions': [1024]}
 #    ('fbbcool/1fbb_02', 200),
 # ]
 dataset_repo_ids = [
-    ('fbbcool/1fem_alexandra', 0),
+    ('fbbcool/1tongue-v1', 0),
 ]
-# Trainer(
-#    'qwen',
-#    dataset_repo_ids,
-#    # variant='2512-1gts',
-#    variant='2512',
-#    config_trainer=config_trainer,
-#    config_dataset=config_dataset,
-#    multithread=True,
-# )
 Trainer(
-    'zimage',
+    'qwen',
     dataset_repo_ids,
-    variant='base-xlasm',
+    # variant='2512-1gts',
+    variant='2512',
     config_trainer=config_trainer,
     config_dataset=config_dataset,
     multithread=True,
 )
+# Trainer(
+#    'zimage',
+#    dataset_repo_ids,
+#    variant='base-xlasm',
+#    config_trainer=config_trainer,
+#    config_dataset=config_dataset,
+#    multithread=True,
+# )
 
 """
     NOTES ZIMAGE Base:

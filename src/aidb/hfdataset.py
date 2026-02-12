@@ -36,7 +36,8 @@ class HFDatasetImg:
         self._size = 0
         self._meta = self._load_meta(force_download=force_meta_dl)
         self._img_files = ['train/' + line['file_name'] for line in self._meta]
-        self._tags: list[dict] = [json.loads(line['tags']) for line in self._meta]
+        # self._tags: list[dict] = [json.loads(line['tags']) for line in self._meta]
+        self._tags: list[dict] = [{} for line in self._meta]
 
         self._prompts: list[str] = [line.get('prompt', '') for line in self._meta]
 
