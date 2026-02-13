@@ -36,7 +36,7 @@ config_trainer = {
     'adapter___rank': 16,
     'optimizer___lr': 2e-4,
 }
-config_dataset = {'num_repeats': 8, 'resolutions': [512]}
+config_dataset = {'num_repeats': 4, 'resolutions': [512]}
 
 
 # dataset_repo_ids = [('fbbcool/1gts-xlasm-01', 0)]
@@ -59,23 +59,24 @@ config_dataset = {'num_repeats': 8, 'resolutions': [512]}
 dataset_repo_ids = [
     ('fbbcool/1tongue-v1', 0),
 ]
-Trainer(
-    'qwen',
-    dataset_repo_ids,
-    # variant='2512-1gts',
-    variant='2512',
-    config_trainer=config_trainer,
-    config_dataset=config_dataset,
-    multithread=True,
-)
 # Trainer(
-#    'zimage',
+#    'qwen',
 #    dataset_repo_ids,
-#    variant='base-xlasm',
+#    # variant='2512-1gts',
+#    variant='2512',
 #    config_trainer=config_trainer,
 #    config_dataset=config_dataset,
 #    multithread=True,
 # )
+Trainer(
+    'zimage',
+    dataset_repo_ids,
+    # variant='base-xlasm',
+    variant='base',
+    config_trainer=config_trainer,
+    config_dataset=config_dataset,
+    multithread=True,
+)
 
 """
     NOTES ZIMAGE Base:
