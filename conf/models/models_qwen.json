@@ -44,7 +44,7 @@
           "link": "https://civitai.com/api/download/models/2626779?type=Model&format=SafeTensor&size=full&fp=fp8",
           "method_download": "civitai",
           "rename": "beauty-fool-v3",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2567280?type=Model&format=SafeTensor&size=full&fp=fp8",
@@ -56,7 +56,7 @@
           "link": "https://civitai.com/api/download/models/2398473?type=Model&format=SafeTensor&size=pruned&fp=fp8",
           "method_download": "civitai",
           "rename": "Hyphoria_fp8",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2398473?type=Model&format=SafeTensor&size=full&fp=bf16",
@@ -68,7 +68,7 @@
           "link": "https://civitai.com/api/download/models/2409636?type=Model&format=SafeTensor&size=pruned&fp=fp8",
           "method_download": "civitai",
           "rename": "JibMix_fp8",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2409636?type=Model&format=SafeTensor&size=full&fp=fp16",
@@ -80,19 +80,19 @@
           "link": "https://civitai.com/api/download/models/2590244?type=Model&format=SafeTensor&size=full&fp=fp8",
           "method_download": "civitai",
           "rename": "BeautyFool",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2610862?type=Model&format=SafeTensor&size=pruned&fp=fp8",
           "method_download": "civitai",
           "rename": "FasciumQWEN",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "fbbcool/qwen-gts",
           "file": "qwen-gts_001.safetensors",
           "rename": "1gts_v1",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
@@ -142,6 +142,18 @@
           "link": "https://civitai.com/api/download/models/2474488?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "nsfw-snofs-v13",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2432060?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "rename": "face-in-ass",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2432354?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "rename": "facesitting",
           "skip": false
         },
         {
