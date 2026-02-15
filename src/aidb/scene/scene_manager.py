@@ -3,6 +3,7 @@ from typing import Any, Final, Generator
 import json
 
 from aidb.scene.db_connect import DBConnection
+from aidb.scene.scene_image_manager import SceneImageManager
 from ait.tools.files import (
     imgs_and_vids_from_url,
     is_img_or_vid,
@@ -291,8 +292,8 @@ class SceneManager:
         oid = data.get(SceneDef.FIELD_OID, None)
         if oid is None:
             return False
-        update_data = data.copy()
-        update_data.pop(SceneDef.FIELD_OID, None)
+        update_data = SceneDef.prepare_data_for_update(data)
+
         filter = {SceneDef.FIELD_OID: oid}
         update = {'$set': update_data}
         result = dbc.update_one(filter, update)
@@ -326,9 +327,7 @@ class SceneManager:
                 continue
             scene.update()
 
-    def scene_image_manager(self) -> Any:
-        from .scene_image_manager import SceneImageManager
-
+    def scene_image_manager(self) -> SceneImageManager:
         return SceneImageManager(dbc=self._dbc)
 
     def scene_set_manager(self) -> Any:

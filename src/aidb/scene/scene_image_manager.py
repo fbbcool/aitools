@@ -23,7 +23,11 @@ class SceneImageManager:
             self._dbc = dbc
             self._verbose = self._dbc._verbose
 
-        self._collection = SceneDef.COLLECTION_IMAGES
+        self._collection_name = SceneDef.COLLECTION_IMAGES
+        _collection = self._dbc._get_collection(self._collection_name)
+        if _collection is None:
+            raise (ValueError('SceneImageManager DB collection is None!'))
+        self._collection = _collection
 
     @property
     def config(self):
@@ -43,7 +47,7 @@ class SceneImageManager:
     def ids(self) -> Generator:
         """Returns a generator of image oid's for all images in the db"""
 
-        docs = self._dbc.find_documents(self._collection, query={})
+        docs = self._dbc.find_documents(self._collection_name, query={})
         for doc in docs:
             yield str(doc['_id'])
 
@@ -51,14 +55,8 @@ class SceneImageManager:
         oid = self._dbc.to_oid(id)
         if oid is None:
             return None
-        docs = self._dbc.documents_from_oid(self._collection, oid)
-        if len(docs) == 0:
-            return None
-        elif len(docs) == 1:
-            return docs[0]
-
-        self._log(f'DATABASE INCONSISTENCY: id {id} is multiple', level='error')
-        return None
+        # docs = self._dbc.documents_from_oid(self._collection_name, oid)
+        return self._collection.find_one({SceneDef.FIELD_OID: oid})
 
     def register_from_url(self, url: Path | str) -> str | None:
         """
@@ -80,7 +78,7 @@ class SceneImageManager:
         return ret
 
     def data_from_url_db(self, url: str | Path) -> dict | None:
-        docs = self._dbc.find_documents(self._collection, query={SceneDef.FIELD_URL: str(url)})
+        docs = self._dbc.find_documents(self._collection_name, query={SceneDef.FIELD_URL: str(url)})
         if len(docs) == 0:
             return None
         elif len(docs) == 1:
@@ -111,7 +109,7 @@ class SceneImageManager:
         # does url already exist?
         oid = self.id_from_url(url)
         if oid is None:
-            oid = self._dbc.insert_document(self._collection, data)
+            oid = self._dbc.insert_document(self._collection_name, data)
             self._log('image added: {url}.', level='message')
         else:
             self._log(f'image not added, already exists: {url} oid={oid}.', level='debug')
@@ -123,7 +121,7 @@ class SceneImageManager:
 
     @property
     def _dbc_images(self):
-        return self._dbc._get_collection(self._collection)
+        return self._dbc._get_collection(self._collection_name)
 
     def _dbc_to_id(self, id: str):
         self._dbc.to_oid(id)
@@ -132,7 +130,9 @@ class SceneImageManager:
         if url_src is None:
             return False
         url_src = str(url_src)
-        res = self._dbc.find_documents(self._collection, query={SceneDef.FIELD_URL_SRC: url_src})
+        res = self._dbc.find_documents(
+            self._collection_name, query={SceneDef.FIELD_URL_SRC: url_src}
+        )
         if not res:
             return False
         return True
@@ -147,7 +147,7 @@ class SceneImageManager:
         set_data = data.copy()
         set_data.pop(SceneDef.FIELD_OID, None)
         set_data |= {SceneDef.FIELD_URL_PARENT: str(Path(url_src).parent)}
-        id = self._dbc.insert_document(self._collection, set_data)
+        id = self._dbc.insert_document(self._collection_name, set_data)
 
         self.image_move_src(id)
 
@@ -161,8 +161,10 @@ class SceneImageManager:
         oid = data.get(SceneDef.FIELD_OID, None)
         if oid is None:
             return False
-        update_data = data.copy()
-        update_data.pop(SceneDef.FIELD_OID, None)
+
+        # prepare data
+        update_data = SceneDef.prepare_data_for_update(data)
+
         filter = {SceneDef.FIELD_OID: oid}
         update = {'$set': update_data}
         result = dbc.update_one(filter, update)
@@ -204,7 +206,7 @@ class SceneImageManager:
             oids = [self._dbc.to_oid(id) for id in ids]
         if oids:
             query |= {SceneDef.FIELD_OID: {'$in': oids}}
-        res = self._dbc.find_documents(self._collection, query=query)
+        res = self._dbc.find_documents(self._collection_name, query=query)
         res_ids = [str(doc.get(SceneDef.FIELD_OID, None)) for doc in res]
         return res_ids
 

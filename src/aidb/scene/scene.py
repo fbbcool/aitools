@@ -7,6 +7,8 @@ from ait.tools.images import thumbnail_to_url
 
 from .scene_common import SceneDef
 from .scene_manager import SceneManager
+from .scene_image import SceneImage
+from .scene_image_manager import SceneImageManager
 
 
 class Scene:
@@ -69,21 +71,29 @@ class Scene:
             if id is not None:
                 yield id
 
-    def ids_img_from_query(self, query: dict) -> Generator:
-        from .scene_image_manager import SceneImageManager
+    @property
+    def imgs(self) -> list[SceneImage]:
+        im = self._scm.scene_image_manager()
+        imgs: list[SceneImage] = []
+        for id_img in self.ids_img:
+            img = im.img_from_id(id_img)
+            if img is None:
+                continue
+            imgs.append(img)
+        return imgs
 
-        sim = SceneImageManager(self._scm._dbc, verbose=self._scm._verbose)
+    def ids_img_from_query(self, query: dict) -> Generator:
+        im = self._scm.scene_image_manager()
 
         ids_img = [id_img for id_img in self.ids_img]
-        for id_img in sim.ids_img_from_query(query, ids=ids_img):
+        for id_img in im.ids_img_from_query(query, ids=ids_img):
             yield id_img
 
     def imgs_from_query(self, query: dict) -> Generator:
-        from .scene_image_manager import SceneImageManager
+        im = self._scm.scene_image_manager()
 
-        sim = SceneImageManager(self._scm._dbc, verbose=self._scm._verbose)
         ids_img = [id_img for id_img in self.ids_img]
-        return sim.imgs_from_query(query, ids=ids_img)
+        return im.imgs_from_query(query, ids=ids_img)
 
     @property
     def url_thumbnail(self) -> Path:
@@ -128,15 +138,31 @@ class Scene:
             self._log('data update.', level='info')
 
     def _update_thumbnail(self) -> bool:
-        latest = img_latest_from_url(self.url)
-        if latest is None:
-            return False
-        ts_latest = latest.stat().st_ctime
+        """
+        prio:
+        1. latest reg img
+        2. latest non reg img
+        """
+        url_latest: Path | None = None
+        ts_latest = 0.0
+        # 1. reg imgs
+        imgs = SceneDef.sort_by_timestamp_updated(SceneDef.reduce_by_rating_highest(self.imgs))
+        if imgs:
+            url_latest = imgs[0].url_from_data
+            ts_latest = SceneDef.get_timestamp_update_from_data(imgs[0])
+
+        # 2. non-reg imgs
+        if url_latest is None:
+            url_latest = img_latest_from_url(self.url)
+            if url_latest is None:
+                return False
+            ts_latest = url_latest.stat().st_ctime
+
         if self.url_thumbnail.exists():
             ts_thumbnail = self.url_thumbnail.stat().st_ctime
             if ts_thumbnail > ts_latest:
                 return False
-        thumbnail_to_url(latest, self.url_thumbnail, size=self._scm.config.thumbs_size)
+        thumbnail_to_url(url_latest, self.url_thumbnail, size=self._scm.config.thumbs_size)
         return True
 
     def _init_data(self) -> None:

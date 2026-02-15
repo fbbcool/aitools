@@ -1,3 +1,5 @@
+from copy import deepcopy
+import datetime
 from pathlib import Path
 from typing import Any, Final, Literal, Optional
 
@@ -11,10 +13,13 @@ class SceneDef:
 
     SEPERATOR_ID: Final = '___'
 
-    PREFIX_ORIG: Final = 'orig'
+    PREFIX_ORIG0: Final = '0rig'
+    PREFIX_ORIG1: Final = 'orig'
+    PREFIX_ORIG: Final = PREFIX_ORIG0
+    PREFIX_ORIGS: Final = [PREFIX_ORIG0, PREFIX_ORIG1]
     PREFIX_THUMBNAIL: Final = 'thumbnail'
     PREFIX_TRAIN: Final = 'train'
-    PREFIXES: Final = [PREFIX_ORIG, PREFIX_THUMBNAIL, PREFIX_TRAIN]
+    PREFIXES: Final = PREFIX_ORIGS + [PREFIX_THUMBNAIL, PREFIX_TRAIN]
 
     SUFFIX_IMG_STD = '.png'
 
@@ -31,6 +36,8 @@ class SceneDef:
     FIELD_TRIGGER: Final = 'trigger'
     FIELD_RATIOS: Final = 'ratios'
     FIELD_RESOLUTIONS: Final = 'resolutions'
+    FIELD_TIMESTAMP_CREATED: Final = 'timestamp_created'
+    FIELD_TIMESTAMP_UPDATED: Final = 'timestamp_updated'
 
     DEFAULT_RATIOS: Final = [1.0, 2.0 / 3.0, 3.0 / 4.0]
     DEFAULT_RESOLUTIONS: Final = [512, 768, 1024]
@@ -86,6 +93,51 @@ class SceneDef:
         id_and_prefix = cls.id_and_prefix_from_filename(url)
         if id_and_prefix is None:
             return None
-        if id_and_prefix[1] != cls.PREFIX_ORIG:
+        if id_and_prefix[1] not in cls.PREFIX_ORIGS:
             return None
         return id_and_prefix[0]
+
+    @classmethod
+    def sort_by_rating(cls, items: list[Any]) -> list[Any]:
+        items.sort(key=lambda x: x.data.get(cls.FIELD_RATING, cls.RATING_MIN), reverse=True)
+        return items
+
+    @classmethod
+    def sort_by_timestamp_updated(cls, items: list[Any]) -> list[Any]:
+        items.sort(key=lambda x: cls.get_timestamp_update_from_data(x), reverse=True)
+        return items
+
+    @classmethod
+    def reduce_by_rating_highest(cls, items: list[Any]) -> list[Any]:
+        cls.sort_by_rating(items)
+        if not items:
+            return []
+        rating_max = items[0].data.get(cls.FIELD_RATING, cls.RATING_MIN)
+        return [
+            item for item in items if item.data.get(cls.FIELD_RATING, cls.RATING_MIN) == rating_max
+        ]
+
+    @classmethod
+    def prepare_data_for_update(cls, data: dict) -> dict:
+        # copy
+        update_data = deepcopy(data)
+
+        # remove id
+        update_data.pop(cls.FIELD_OID, None)
+
+        # set update ts
+        ts = datetime.datetime.now().timestamp()
+        update_data |= {cls.FIELD_TIMESTAMP_UPDATED: ts}
+
+        return update_data
+
+    @classmethod
+    def get_timestamp_update_from_data(cls, item: Any) -> float:
+        if not hasattr(item, 'data'):
+            return 0.0
+
+        ts = item.data.get(cls.FIELD_TIMESTAMP_UPDATED, None)
+        if ts is not None:
+            return ts
+
+        return item.data.get(cls.FIELD_TIMESTAMP_CREATED, 0.0)

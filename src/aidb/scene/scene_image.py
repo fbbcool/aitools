@@ -1,10 +1,8 @@
-import json
 from pathlib import Path
 import pprint
 from typing import Any, Optional
 from PIL import Image as PILImage
 
-from ait.tools.files import is_img_or_vid
 from ait.tools.images import image_from_url
 
 from .scene_common import SceneDef
@@ -13,38 +11,35 @@ from .scene_image_manager import SceneImageManager
 
 class SceneImage:
     def __init__(self, im: SceneImageManager, id_or_url: Any, verbose=1) -> None:
+        """
+        Only gets constructed:
+            - when a given url contains an id
+            - when a given id (explicit or via url)  is a valid id in the database.
+        new image creation is done by the image manager!
+        """
         self._im = im
         self._verbose = verbose
 
         data = None
-        url = None
-
-        if is_img_or_vid(id_or_url):
-            self.url = Path(id_or_url)
-            data = im.init_data_from_url(self.url)
-
-        if isinstance(id_or_url, Path):
-            url = id_or_url
-        if isinstance(id_or_url, str):
-            try:
-                url = Path(id_or_url)
-            except Exception:
-                url = None
-
+        id = SceneDef.id_from_filename_orig(id_or_url)
+        if id is None:
+            id = id_or_url
+        data = im.data_from_id(id)
         if data is None:
-            url = None
-            data = im.data_from_id(id_or_url)
-
-        if data is None:
-            raise ValueError('Scene does not exist')
-
-        self.data = data
-        self.url = url
-        """the "called" url, not the db stored! should be None if data was loaded from id."""
+            raise ValueError(f'couldnt make scene image data from [{id_or_url}]!')
+        self._data = data
 
     @property
     def id(self) -> str:
-        return str(self.data.get(SceneDef.FIELD_OID, ''))
+        return str(self._data.get(SceneDef.FIELD_OID, ''))
+
+    @property
+    def data(self) -> dict:
+        return self._data
+
+    @property
+    def rating(self) -> Optional[int]:
+        return self._data.get(SceneDef.FIELD_RATING, None)
 
     @property
     def url_from_data(self) -> Optional[Path]:
@@ -52,7 +47,7 @@ class SceneImage:
         filename = SceneDef.filename_orig_from_id(id, suffix=SceneDef.SUFFIX_IMG_STD)
         if filename is None:
             return None
-        parent = Path(str(self.data.get(SceneDef.FIELD_URL_PARENT)))
+        parent = Path(str(self._data.get(SceneDef.FIELD_URL_PARENT)))
         return parent / filename
 
     @property
@@ -62,7 +57,7 @@ class SceneImage:
         """
         id = self.id
         filename = SceneDef.filename_train_from_id(id, suffix=SceneDef.SUFFIX_IMG_STD)
-        return f'{self._im._collection}/{filename}'
+        return f'{self._im._collection_name}/{filename}'
 
     @property
     def pil(self) -> Optional[PILImage.Image]:
@@ -71,27 +66,11 @@ class SceneImage:
             return None
         return image_from_url(url)
 
-    def url_sync(self) -> bool:
-        """
-        If scene was successfully instanciated from a specific url, this url
-        will be synced to the url in the database.
-        Warning: the url stored in the database will be overwritten and no checks
-        of physical existence will be applied!
-        """
-        if self.url is None:
-            return False
-        url = str(self.url)
-        if str(self.url_from_data) != url:
-            self.data |= {SceneDef.FIELD_URL: url}
-            return self._dbstore()
-        return False
-
     def _dbstore(self) -> bool:
-        return self._im._db_update_image(self.data)
+        return self._im._db_update_image(self._data)
 
     def update(self) -> None:
-        if self.url_sync():
-            print(f'synced url[{self.url}]')
+        pass
 
     @property
     def train_metadata_jsonl(self) -> Optional[dict]:
@@ -101,19 +80,26 @@ class SceneImage:
         jsonl = {'file_name': self.filename_train_from_data}
         jsonl |= {'file_type': 'image/png'}
 
-        caption = self.data.get(SceneDef.FIELD_CAPTION, None)
+        caption = self._data.get(SceneDef.FIELD_CAPTION, None)
         if caption is not None:
             jsonl |= {SceneDef.FIELD_CAPTION: caption}
 
-        prompt = self.data.get(SceneDef.FIELD_PROMPT, None)
+        prompt = self._data.get(SceneDef.FIELD_PROMPT, None)
         if prompt is not None:
             jsonl |= {SceneDef.FIELD_PROMPT: prompt}
 
         return jsonl
 
+    def rate(self, rating_new: int) -> None:
+        rating_new = int(rating_new)  # may throw which it shoulds!
+        rating_current = self._data.get(SceneDef.FIELD_RATING, None)
+        self._data |= {SceneDef.FIELD_RATING: rating_new}
+        self._dbstore()
+        self._log(f'{self.id}: [TEST] new rating [{rating_current}]->[{rating_new}]', level='info')
+        return
+
     def __str__(self) -> str:
-        ret = f'url: {self.url}\n'
-        ret += 'data: ' + pprint.pformat(self.data)
+        ret = 'data: ' + pprint.pformat(self._data)
         return ret
 
     def _log(self, msg: str, level: str = 'info') -> None:

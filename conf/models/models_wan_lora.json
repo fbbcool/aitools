@@ -56,102 +56,144 @@
     "i2v": {
       "lora": [
         {
+          "link": "",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "",
+          "skip": true
+        },
+        {
+          "link": "",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "",
+          "skip": true
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2277578?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "tongue-out",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2277597?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "tongue-out",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2272024?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "high",
+          "rename": "pussy-fingering",
+          "skip": false
+        },
+        {
+          "link": "https://civitai.com/api/download/models/2272102?type=Model&format=SafeTensor",
+          "method_download": "civitai",
+          "subdir": "low",
+          "rename": "pussy-fingering",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2509620?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
           "rename": "slap-v2",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2509701?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
           "rename": "slap-v2",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2310796?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
           "rename": "body-growth-v1",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2310872?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
           "rename": "body-growth-v1",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2261902?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
           "rename": "bouncy-walk-v2",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2261896?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
           "rename": "bouncy-walk-v2",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2265575?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
           "rename": "macromastia-v1",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2266727?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
           "rename": "macromastia-v1",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2439503?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
           "rename": "muscle_growth",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2439474?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
           "rename": "muscle_growth",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2470961?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
           "rename": "abscrunch-v1",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2470824?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
           "rename": "abscrunch-v1",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2152516?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "high",
           "rename": "deepthroat-v1",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2152583?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
           "rename": "deepthroat-v1",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2365856?type=Model&format=SafeTensor",
@@ -172,14 +214,14 @@
           "method_download": "civitai",
           "subdir": "high",
           "rename": "dreamplay-v1",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2303113?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "subdir": "low",
           "rename": "dreamplay-v1",
-          "skip": false
+          "skip": true
         }
       ]
     }

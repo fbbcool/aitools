@@ -3,10 +3,11 @@ import sys
 from typing import Any
 import pyperclip
 
-from aidb import SceneConfig, SceneManager
+from aidb import SceneConfig, SceneManager, SceneImageManager, SceneImage
 
 from aidb.app.scene.app import AIDBSceneApp
 
+from aidb.scene.scene_common import SceneDef
 from ait.tools.files import is_img_or_vid, is_dir
 
 
@@ -55,6 +56,21 @@ def scene_url(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     pyperclip.copy(str(url))
 
 
+def images_info(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+    urls_img = [url for url in clipsapce if is_img_or_vid(url)]
+
+    if not urls_img:
+        print('no imgs found!')
+    else:
+        print(urls_img)
+
+    im: SceneImageManager = SceneManager(config=config, verbose=0).scene_image_manager()
+    for url in urls_img:
+        img: SceneImage = im.image_from_id_or_url(url)
+        if img is not None:
+            print(img)
+
+
 def images_register(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     urls_img = [url for url in clipsapce if is_img_or_vid(url)]
 
@@ -63,9 +79,25 @@ def images_register(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     else:
         print(urls_img)
 
-    iscm = SceneManager(config=config, verbose=0).scene_image_manager()
+    im: SceneImageManager = SceneManager(config=config, verbose=0).scene_image_manager()
     for url in urls_img:
-        iscm.register_from_url(url)
+        im.register_from_url(url)
+
+
+def images_rate(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+    urls_img = [url for url in clipsapce if is_img_or_vid(url)]
+
+    if not urls_img:
+        print('no imgs found!')
+    else:
+        print(urls_img)
+
+    im: SceneImageManager = SceneManager(config=config, verbose=0).scene_image_manager()
+    rating = params[0]
+    for url in urls_img:
+        img: SceneImage = im.image_from_id_or_url(url)
+        if img is not None:
+            img.rate(rating)
 
 
 def start_app(params: Any, clipsapce: Any, config: SceneConfig) -> None:
@@ -75,13 +107,16 @@ def start_app(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     app.launch(server_port=7861)
 
 
-def _keyval(params: list[str]) -> dict:
-    ret = {}
+def _keyval(params: list[str]) -> tuple[dict, list[str]]:
+    keyvals = {}
+    params_reduced = []
     for param in params:
         split = param.split('=')
         if len(split) >= 2:
-            ret |= {split[0]: split[1]}
-    return ret
+            keyvals |= {split[0]: split[1]}
+        else:
+            params_reduced.append(param)
+    return keyvals, params_reduced
 
 
 if __name__ == '__main__':
@@ -95,17 +130,19 @@ if __name__ == '__main__':
 
     keyval = {}
     if params is not None:
-        keyval = _keyval(params)
+        keyval, params = _keyval(params)
 
     clipspace = pyperclip.paste().split('\n')
 
     map_cmd = {
+        'app': start_app,
         'move': imgs_or_vids_move_to_scene_id,
+        'url': scene_url,
         'new': scene_new,
         'update': scenes_update,
-        'app': start_app,
-        'images': images_register,
-        'url': scene_url,
+        'imgs_info': images_info,
+        'imgs_register': images_register,
+        'imgs_rate': images_rate,
     }
 
     if cmd is None:  # help
