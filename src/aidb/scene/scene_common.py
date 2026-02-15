@@ -13,10 +13,8 @@ class SceneDef:
 
     SEPERATOR_ID: Final = '___'
 
-    PREFIX_ORIG0: Final = '0rig'
-    PREFIX_ORIG1: Final = 'orig'
-    PREFIX_ORIG: Final = PREFIX_ORIG0
-    PREFIX_ORIGS: Final = [PREFIX_ORIG0, PREFIX_ORIG1]
+    PREFIX_ORIG: Final = '0rig'
+    PREFIX_ORIGS: Final = [PREFIX_ORIG]
     PREFIX_THUMBNAIL: Final = 'thumbnail'
     PREFIX_TRAIN: Final = 'train'
     PREFIXES: Final = PREFIX_ORIGS + [PREFIX_THUMBNAIL, PREFIX_TRAIN]
