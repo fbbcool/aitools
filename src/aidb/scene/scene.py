@@ -82,6 +82,10 @@ class Scene:
             imgs.append(img)
         return imgs
 
+    @property
+    def imgs_sorted(self) -> list[SceneImage]:
+        return SceneDef.sort_by_rating(self.imgs)
+
     def ids_img_from_query(self, query: dict) -> Generator:
         im = self._scm.scene_image_manager()
 
@@ -125,13 +129,31 @@ class Scene:
         return self._scm._db_update_scene(self._data)
 
     def update(self) -> None:
+        # add init data, if not present
+        self._init_data()
+
+        # scene url sync
         if self._url_sync():
             self._log(f'synced url[{self._url_called}]', level='info')
+
+        # imgs sync
+        # looks reg imgs in the scene root and syncs their:
+        #   - urls
+        for img in self.imgs:
+            img_parent = img.data.get(SceneDef.FIELD_URL_PARENT, None)
+            if img_parent != self.url:
+                img._data |= {SceneDef.FIELD_URL_PARENT: str(self.url)}
+                # img._dbstore()
+
         if self._update_thumbnail():
             self._log('thumbnail update.', level='info')
 
-        # add init data, if not present
-        self._init_data()
+        # rating
+        # if scene has reg imgs, set rating at least to img_reg
+        if len([id_reg for id_reg in self.ids_img]) > 0:
+            rating = self.data.get(SceneDef.FIELD_RATING, SceneDef.RATING_INIT)
+            if rating < SceneDef.RATING_IMG_REG:
+                self._data |= {SceneDef.FIELD_RATING: SceneDef.RATING_IMG_REG}
 
         # store
         if self._dbstore():

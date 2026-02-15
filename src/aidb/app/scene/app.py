@@ -446,6 +446,7 @@ class AIDBSceneApp:
             self._scm.scene_from_id_or_url(id)
             for id in self._scm.ids_from_rating(r_min, r_max, labels=labels)
         ]
+        SceneDef.sort_by_rating(scenes)
         print(f'Found {len(scenes)} scenes matching advanced search criteria.')
 
         if mode is None:

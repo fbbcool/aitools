@@ -46,6 +46,7 @@ class SceneDef:
     RATING_MIN: Final = -2
     RATING_MAX: Final = 5
     RATING_INIT: Final = -1
+    RATING_IMG_REG: Final = 1
 
     FIELD_LABELS: Final = 'labels'
 
