@@ -1,5 +1,6 @@
 import base64
 from io import BytesIO
+import json
 from PIL import Image as PILImage
 
 # import html
@@ -75,112 +76,92 @@ class AppSceneCell:
         scene: Scene,
         mode: AppOpMmode,
     ) -> str:
+        html = ''
         if mode == 'none':
-            return ''
+            pass
         elif mode == 'info':
-            return AppSceneCell._html_op_info(scene)
+            html = AppSceneCell._html_op_info(scene)
         elif mode == 'rate':
-            return AppSceneCell._html_op_rate(scene)
+            html = AppSceneCell._html_op_rate(scene)
         elif mode == 'label':
-            return AppSceneCell._html_op_label(scene)
-
-    @staticmethod
-    def _html_op_info(scene: Scene) -> str:
-        # bus.value = '{AppHtml.make_payload_scene_cmd(scene.id, field)}';
-        # bus.value = '{scene.id},{field}';
-        fields = ['id', 'url', 'prompt', 'caption']
-
-        operation_html = ''
-        for field in fields:
-            checked = ''
-            onclick_js = f"""
-            event.stopPropagation();
-            const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('cmd')} textarea');
-            bus.value = '{AppHtml.cmd_make_data('scene', scene.id, 'to_clipspace', payload=field)}';
-            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            document.getElementById('{AppHtml.make_elem_id_button_update('cmd')}').click();""".replace(
-                '\n', ' '
-            ).replace('"', '&quot;')
-            operation_html += f"""
-                <input type="radio" id="rating-{scene.id}-{field}" name="rating-{scene.id}" value="{field}" {checked}
-                       onclick="{onclick_js}">
-                <label for="rating-{scene.id}-{field}" class="rating-label-btn">{field}</label>
-                """
+            html = AppSceneCell._html_op_label(scene)
 
         return f"""
                 <div class="operation-radio-group">
-                    {operation_html}
+                    {html}
                 </div>
                 """
+
+    @staticmethod
+    def _html_op_info(scene: Scene) -> str:
+        fields = ['id', 'url', 'prompt', 'caption']
+
+        html = ''
+        for field in fields:
+            html += AppHtml.cmd_make_button(
+                AppHtml.cmd_make_data(
+                    'scene',
+                    scene.id,
+                    'to_clipspace',
+                    payload=field,
+                    label=field,
+                )
+            )
+        return html
 
     @staticmethod
     def _html_op_rate(scene: Scene) -> str:
         current_rating = scene.get_rating
 
-        operation_html = ''
+        html = ''
         for r in range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1):
-            checked = 'checked' if current_rating == r else ''
-            # if clicked it should immediatly highlight
-            # The onclick event now uses a more robust pattern:
-            # 1. Find the hidden 'data bus' textbox.
-            # 2. Set its value to the 'image_id,rating' string.
-            # 3. Dispatch an 'input' event so Gradio recognizes the change.
-            # 4. Programmatically click the hidden trigger button.
-            onclick_js = f"""
-            event.stopPropagation();
-            const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('rate')} textarea');
-            bus.value = '{scene.id},{r}';
-            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            document.getElementById('{AppHtml.make_elem_id_button_update('rate')}').click();""".replace(
-                '\n', ' '
-            ).replace('"', '&quot;')
-            operation_html += f"""
-                <input type="radio" id="rating-{scene.id}-{r}" name="rating-{scene.id}" value="{r}" {checked}
-                       onclick="{onclick_js}">
-                <label for="rating-{scene.id}-{r}" class="rating-label-btn">{r}</label>
-                """
+            # new code
+            checked = True if current_rating == r else False
+            html += AppHtml.cmd_make_button(
+                AppHtml.cmd_make_data('scene', scene.id, 'rating', payload=r, label=str(r)),
+                checked=checked,
+            )
 
-        return f"""
-                <div class="rating-label">Rating:</div>
-                <div class="operation-radio-group">
-                    {operation_html}
-                </div>
-                """
+            # orig code
+            # checked = 'checked' if current_rating == r else ''
+            # onclick_js = f"""
+            # event.stopPropagation();
+            # const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('rate')} textarea');
+            # bus.value = '{scene.id},{r}';
+            # bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            # document.getElementById('{AppHtml.make_elem_id_button_update('rate')}').click();""".replace(
+            #    '\n', ' '
+            # ).replace('"', '&quot;')
+            # operation_html += f"""
+            #   <input type="radio" id="rating-{scene.id}-{r}" name="rating-{scene.id}" value="{r}" {checked}
+            #          onclick="{onclick_js}">
+            #   <label for="rating-{scene.id}-{r}" class="rating-label-btn">{r}</label>
+            # """
+
+        html += '<br>'
+        html += AppHtml.cmd_make_button(
+            AppHtml.cmd_make_data('scene', scene.id, 'to_clipspace', payload='url', label='url')
+        )
+        return html
 
     @staticmethod
     def _html_op_label(scene: Scene) -> str:
         current_labels = scene.get_labels
 
-        operation_html = ''
+        html = ''
         for label in TaggerDef.LABELS['label']:
-            checked = 'checked' if label in current_labels else ''
-            add_del = '-' if label in current_labels else '+'
-            # if clicked it should immediatly highlight
-            # The onclick event now uses a more robust pattern:
-            # 1. Find the hidden 'data bus' textbox.
-            # 2. Set its value to the 'image_id,rating' string.
-            # 3. Dispatch an 'input' event so Gradio recognizes the change.
-            # 4. Programmatically click the hidden trigger button.
-            onclick_js = f"""
-            event.stopPropagation();
-            const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('label')} textarea');
-            bus.value = '{scene.id},{add_del}{label}';
-            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            document.getElementById('{AppHtml.make_elem_id_button_update('label')}').click();""".replace(
-                '\n', ' '
-            ).replace('"', '&quot;')
-            operation_html += f"""
-                <input type="checkbox" id="scene-{scene.id}-{label}" name="scene-{scene.id}" value="{label}" {checked}
-                       onclick="{onclick_js}">
-                <label for="scene-{scene.id}-{label}" class="scene-label-btn">{label}</label>
-                """
-
-        return f"""
-                <div class="scene-label">Scene:</div>
-                <div class="operation-checkbox-group">
-                    {operation_html}
-                </div>
-                """
+            checked = True if label in current_labels else False
+            html += AppHtml.cmd_make_button(
+                AppHtml.cmd_make_data(
+                    'scene',
+                    scene.id,
+                    'label_swap',
+                    payload=label,
+                    label=label,
+                ),
+                checked=checked,
+            )
+        return html
 
     @staticmethod
     def _pil_to_base64(pil_image: PILImage.Image) -> str:

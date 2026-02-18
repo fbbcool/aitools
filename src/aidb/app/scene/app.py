@@ -49,15 +49,10 @@ class AIDBSceneApp:
                 visible=False,
                 elem_id=AppHtml.make_elem_id_button_get('data'),
             )
-            cmd_update_trigger = gr.Button(
+            button_hidden_cmd = gr.Button(
                 'Hidden Cmd Update Trigger',
                 visible=False,
                 elem_id=AppHtml.make_elem_id_button_update('cmd'),  # has to be a mode
-            )
-            rate_update_trigger = gr.Button(
-                'Hidden Rating Update Trigger',
-                visible=False,
-                elem_id=AppHtml.make_elem_id_button_update('rate'),  # has to be a mode
             )
             label_update_trigger = gr.Button(
                 'Hidden Label Update Trigger',
@@ -66,11 +61,8 @@ class AIDBSceneApp:
             )
 
             # Data bus textboxes (hold data passed from JS to Python)
-            cmd_databus = gr.Textbox(
+            databus_cmd = gr.Textbox(
                 visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('cmd')
-            )  # has to be a mode
-            rate_data_bus = gr.Textbox(
-                visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('rate')
             )  # has to be a mode
             label_data_bus = gr.Textbox(
                 visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('label')
@@ -196,14 +188,9 @@ class AIDBSceneApp:
                 """,
             )
 
-            cmd_update_trigger.click(
+            button_hidden_cmd.click(
                 self._apphelper.cmd_run,  # Call the update function first
-                inputs=[cmd_databus],  # Input is the data bus textbox
-                outputs=[],  # This function doesn't update UI directly
-            )
-            rate_update_trigger.click(
-                self._update_scene_rating,  # Call the update function first
-                inputs=[rate_data_bus],  # Input is the data bus textbox
+                inputs=[databus_cmd],  # Input is the data bus textbox
                 outputs=[],  # This function doesn't update UI directly
             )
             label_update_trigger.click(
@@ -480,44 +467,6 @@ class AIDBSceneApp:
         full_img_base64 = AppSceneCell._pil_to_base64(pil_img)
 
         return full_img_base64, json.dumps(scene.data)
-
-    def _update_scene_rating(
-        self,
-        data_str: str,
-    ) -> None:  # No outputs from this function
-        """
-        Updates an scene's rating in the database.
-        This function is triggered by a hidden button and receives its data from a hidden 'data bus' textbox.
-        """
-        print(f"DEBUG: _update_scene_rating called with data from bus: '{data_str}'")
-
-        if not data_str or not isinstance(data_str, str):
-            print(f'ERROR: Invalid or empty data [{data_str}]')
-            gr.Warning('Could not update rating: Invalid data received from frontend.')
-            return None
-
-        # We expect a string like "scene_id_val,new_rating_val"
-        parts = data_str.split(',')
-        if len(parts) != 2:
-            print(f'ERROR: Invalid data format for _update_scene_rating: {data_str}')
-            gr.Warning(f"Could not update rating: Malformed data '{data_str}'.")
-            return None
-
-        scene_id = parts[0].strip()
-        try:
-            new_rating = int(parts[1].strip())
-        except ValueError:
-            print(f'ERROR: Invalid rating value received in data: {data_str}')
-            gr.Warning(f"Could not update rating: Invalid rating value in '{data_str}'.")
-            return None
-        print(f'DEBUG: _update_scene_rating called for scene {scene_id} with rating {new_rating}')
-        # Update the database
-        scene: Scene = self._scm.scene_from_id_or_url(scene_id)
-        scene.set_rating(new_rating)
-        scene._dbstore()
-        gr.Info(f'Tried: rating for scene {scene_id} updated to {new_rating}.', duration=0.5)
-
-        return None
 
     def _update_scene_label(
         self,

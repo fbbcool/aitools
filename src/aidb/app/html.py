@@ -44,11 +44,51 @@ class AppHtml:
         id: str,
         cmd: str,
         payload: Optional[Any] = None,
-    ) -> str:
+        label: Optional[str] = None,
+    ) -> dict:
         data = {'type': type_obj, 'id': id, 'cmd': cmd}
         if payload is not None:
             data |= {'payload': payload}
-        return json.dumps(data)
+        if label is None:
+            label = cmd
+        data |= {'label': label}
+        return data
+
+    @classmethod
+    def cmd_make_data_str(
+        cls,
+        type_obj: str,
+        id: str,
+        cmd: str,
+        payload: Optional[Any] = None,
+        label: Optional[str] = None,
+    ) -> str:
+        return json.dumps(cls.cmd_make_data(type_obj, id, cmd, payload=payload, label=label))
+
+    @classmethod
+    def cmd_make_button(cls, data_cmd: dict, checked: bool = False) -> str:
+        type_obj = data_cmd.get('type', None)
+        id = data_cmd.get('id', None)
+        cmd = data_cmd.get('cmd', None)
+        label = data_cmd.get('label', None)
+        payload = str(data_cmd.get('payload', None))
+
+        checked_html = ''
+        if checked:
+            checked_html = 'checked'
+        onclick_js = f"""
+        event.stopPropagation();
+        const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('cmd')} textarea');
+        bus.value = '{json.dumps(data_cmd)}';
+        bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        document.getElementById('{AppHtml.make_elem_id_button_update('cmd')}').click();""".replace(
+            '\n', ' '
+        ).replace('"', '&quot;')
+        output_html = f"""
+            <input type="radio" id="{cmd}-{type_obj}-{id}-{payload}" {checked_html} onclick="{onclick_js}">
+            <label for="{cmd}-{type_obj}-{id}-{payload}">{label}</label>
+            """
+        return output_html
 
 
 class AppHelper:
