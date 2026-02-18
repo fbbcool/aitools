@@ -128,7 +128,7 @@ class Scene:
     def _dbstore(self) -> bool:
         return self._scm._db_update_scene(self._data)
 
-    def update(self) -> None:
+    def update(self, force: bool = False) -> None:
         # add init data, if not present
         self._init_data()
 
@@ -145,7 +145,7 @@ class Scene:
                 img._data |= {SceneDef.FIELD_URL_PARENT: str(self.url)}
                 # img._dbstore()
 
-        if self._update_thumbnail():
+        if self._update_thumbnail(force):
             self._log('thumbnail update.', level='info')
 
         # rating
@@ -159,7 +159,7 @@ class Scene:
         if self._dbstore():
             self._log('data update.', level='info')
 
-    def _update_thumbnail(self) -> bool:
+    def _update_thumbnail(self, force: bool = False) -> bool:
         """
         prio:
         1. latest reg img
@@ -183,7 +183,8 @@ class Scene:
         if self.url_thumbnail.exists():
             ts_thumbnail = self.url_thumbnail.stat().st_ctime
             if ts_thumbnail > ts_latest:
-                return False
+                if not force:
+                    return False
         thumbnail_to_url(url_latest, self.url_thumbnail, size=self._scm.config.thumbs_size)
         return True
 

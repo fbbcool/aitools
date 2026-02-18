@@ -1,9 +1,10 @@
 import os
+from pathlib import Path
 import sys
 from typing import Any
 import pyperclip
 
-from aidb import SceneConfig, SceneManager, SceneImageManager, SceneImage
+from aidb import SceneConfig, SceneManager, SceneImageManager, SceneImage, Scene
 
 from aidb.app.scene.app import AIDBSceneApp
 
@@ -79,9 +80,23 @@ def images_register(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     else:
         print(urls_img)
 
-    im: SceneImageManager = SceneManager(config=config, verbose=0).scene_image_manager()
+    sm = SceneManager(config=config, verbose=0)
+    im: SceneImageManager = sm.scene_image_manager()
+
+    urls_scene_to_update = []
     for url in urls_img:
-        im.register_from_url(url)
+        ret = im.register_from_url(url)
+        if ret is not None:
+            # remember potential scene url
+            urls_scene_to_update.append(Path(url).parent)
+
+    urls_scene_to_update = list(set(urls_scene_to_update))
+    for url_scene in urls_scene_to_update:
+        sid = sm.id_from_dotfile(url_scene)
+        if sid is None:
+            continue
+        scene: Scene = sm.scene_from_id_or_url(sid)
+        scene.update(force=True)
 
 
 def images_rate(params: Any, clipsapce: Any, config: SceneConfig) -> None:

@@ -2,12 +2,11 @@ import os
 import gradio as gr
 from typing import Optional
 import json
-import pyperclip
 
 from aidb import SceneManager, SceneDef, Scene
 from aidb.tagger_defines import TaggerDef
 from aidb.app.cell_scene import AppSceneCell
-from aidb.app.html import AppHtml, AppOpMmode
+from aidb.app.html import AppHtml, AppOpMmode, AppHelper
 
 from ait.tools.images import image_from_url  # Import json for robust string escaping
 
@@ -25,7 +24,8 @@ class AIDBSceneApp:
         """
 
         self._scm = scm
-        self._dbm = self._scm._dbc
+        self._dbc = self._scm._dbc
+        self._apphelper = AppHelper(self._dbc)
 
         self.interface = self._create_interface()
 
@@ -49,10 +49,10 @@ class AIDBSceneApp:
                 visible=False,
                 elem_id=AppHtml.make_elem_id_button_get('data'),
             )
-            info_update_trigger = gr.Button(
-                'Hidden Info Update Trigger',
+            cmd_update_trigger = gr.Button(
+                'Hidden Cmd Update Trigger',
                 visible=False,
-                elem_id=AppHtml.make_elem_id_button_update('info'),  # has to be a mode
+                elem_id=AppHtml.make_elem_id_button_update('cmd'),  # has to be a mode
             )
             rate_update_trigger = gr.Button(
                 'Hidden Rating Update Trigger',
@@ -66,8 +66,8 @@ class AIDBSceneApp:
             )
 
             # Data bus textboxes (hold data passed from JS to Python)
-            info_data_bus = gr.Textbox(
-                visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('info')
+            cmd_databus = gr.Textbox(
+                visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('cmd')
             )  # has to be a mode
             rate_data_bus = gr.Textbox(
                 visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('rate')
@@ -196,9 +196,9 @@ class AIDBSceneApp:
                 """,
             )
 
-            info_update_trigger.click(
-                self._update_scene_info,  # Call the update function first
-                inputs=[info_data_bus],  # Input is the data bus textbox
+            cmd_update_trigger.click(
+                self._apphelper.cmd_run,  # Call the update function first
+                inputs=[cmd_databus],  # Input is the data bus textbox
                 outputs=[],  # This function doesn't update UI directly
             )
             rate_update_trigger.click(
@@ -480,47 +480,6 @@ class AIDBSceneApp:
         full_img_base64 = AppSceneCell._pil_to_base64(pil_img)
 
         return full_img_base64, json.dumps(scene.data)
-
-    def _update_scene_info(
-        self,
-        data_str: str,
-    ) -> None:  # No outputs from this function
-        """
-        Updates an scene's info in the database.
-        This function is triggered by a hidden button and receives its data from a hidden 'data bus' textbox.
-        """
-        print(f"DEBUG: _update_scene_info called with data from bus: '{data_str}'")
-
-        if not data_str or not isinstance(data_str, str):
-            print(f'ERROR: Invalid or empty data [{data_str}]')
-            gr.Warning('Could not update info: Invalid data received from frontend.')
-            return None
-
-        # We expect a string like "scene_id_val,new_info_val"
-        parts = data_str.split(',')
-        if len(parts) != 2:
-            print(f'ERROR: Invalid data format for _update_scene_info: {data_str}')
-            gr.Warning(f"Could not update info: Malformed data '{data_str}'.")
-            return None
-
-        scene_id = parts[0].strip()
-        try:
-            new_info = str(parts[1].strip())
-        except ValueError:
-            print(f'ERROR: Invalid info value received in data: {data_str}')
-            gr.Warning(f"Could not update info: Invalid info value in '{data_str}'.")
-            return None
-        print(f'DEBUG: _update_scene_rating called for scene {scene_id} with info {new_info}')
-        scene: Scene = self._scm.scene_from_id_or_url(scene_id)
-
-        clipspace = ''
-        if new_info == 'id':
-            clipspace = str(scene.id)
-        elif new_info == 'url':
-            clipspace = str(scene.url)
-
-        pyperclip.copy(clipspace)
-        return None
 
     def _update_scene_rating(
         self,

@@ -47,24 +47,7 @@ class AppSceneCell:
 
         # Format contributing tags for display
         contributing_tags_html = ''
-        # if scene.contributing_tags:
-        #    contributing_tags_html = "<div class='tag-contribution'><strong>Tags:</strong><br>"
-        #    for tag, prob in sorted(
-        #        scene.contributing_tags, key=lambda x: x[1], reverse=True
-        #    ):  # Sort contributing tags by probability
-        #        contributing_tags_html += f'{html.escape(tag)}: {prob:.2f}<br>'
-        #    contributing_tags_html += '</div>'
-
-        # n0 = img.neighbor0
-        # caption = f"Score: {img.score:.2f} ({img.image_id}, {n0[1]:.2f}->{n0[0]}) "
         caption = ''
-        # tiny_info = []
-        # if scene.caption is not None:
-        #    tiny_info.append('C')
-        # if scene.prompt is not None:
-        #    tiny_info.append('P')
-        # caption = f'Score: {scene.score:.2f} ({scene.id}) {"/".join(tiny_info)}'
-
         # The onclick for the image now also uses the data bus pattern.
         class_img = 'image-item'
 
@@ -103,6 +86,8 @@ class AppSceneCell:
 
     @staticmethod
     def _html_op_info(scene: Scene) -> str:
+        # bus.value = '{AppHtml.make_payload_scene_cmd(scene.id, field)}';
+        # bus.value = '{scene.id},{field}';
         fields = ['id', 'url', 'prompt', 'caption']
 
         operation_html = ''
@@ -110,10 +95,10 @@ class AppSceneCell:
             checked = ''
             onclick_js = f"""
             event.stopPropagation();
-            const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('info')} textarea');
-            bus.value = '{scene.id},{field}';
+            const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('cmd')} textarea');
+            bus.value = '{AppHtml.cmd_make_data('scene', scene.id, 'to_clipspace', payload=field)}';
             bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            document.getElementById('{AppHtml.make_elem_id_button_update('info')}').click();""".replace(
+            document.getElementById('{AppHtml.make_elem_id_button_update('cmd')}').click();""".replace(
                 '\n', ' '
             ).replace('"', '&quot;')
             operation_html += f"""
