@@ -2,7 +2,7 @@ import os
 import gradio as gr
 from typing import Optional
 
-from aidb import SceneManager, SceneDef, Scene
+from aidb import SceneManager, SceneDef
 from aidb.tagger_defines import TaggerDef
 from aidb.app.cell_scene import AppSceneCell
 from aidb.app.html import AppHtml, AppOpMmode, AppHelper
@@ -24,7 +24,7 @@ class AIDBSceneApp:
         self._dbc = self._scm._dbc
         self._apphelper = AppHelper(self._dbc)
 
-        self.interface = self._create_interface()
+        self._interface = self._create_interface()
 
     def _create_interface(self):
         """
@@ -32,12 +32,9 @@ class AIDBSceneApp:
         This method will define the UI components and their associated functions.
         """
 
-        with gr.Blocks() as demo:
+        with gr.Blocks() as if_app:
             gr.Markdown('# AIDB Scene Metadata Manager')
             gr.Markdown('Welcome to the AIDB frontend. Use the search options below.')
-
-            # State variable for search obj lists
-            html_search_obj_list = gr.State(value=[])
 
             # --- Hidden Components for Robust Event Handling ---
             button_hidden_cmd = gr.Button(
@@ -103,17 +100,14 @@ class AIDBSceneApp:
                     advanced_search_html_display = gr.HTML(label=curr_label)
 
                 search_button.click(
-                    self._scenes_search_and_op,
+                    self._html_scenes_search_and_op,
                     inputs=[
                         rating_min,
                         rating_max,
                         mode,
                         label_dropdown,
                     ],
-                    outputs=[
-                        advanced_search_html_display,
-                        html_search_obj_list,
-                    ],
+                    outputs=[advanced_search_html_display],
                 )
 
             # Link hidden triggers to functions
@@ -122,33 +116,18 @@ class AIDBSceneApp:
                 inputs=[databus_cmd],  # Input is the data bus textbox
                 outputs=[],  # This function doesn't update UI directly
             )
-        return demo
+        return if_app
 
-    def _generate_scene_html(self, scenes_on_page_data: list[Scene], mode: AppOpMmode) -> str:
-        """
-        Generates HTML for a two-column grid of scenes with captions, rating controls,
-        and contributing tags.
-        Includes client-side JavaScript for scene click to show full-size overlay.
-        """
-        html_scenes = ''
-        for scene in scenes_on_page_data:
-            # Call AppImageCell.make to get the HTML for each cell
-            html_scenes += AppSceneCell.html(
-                scene,
-                mode,
-            )
-        return AppHtml.html_styled_cells_grid(html_scenes)
-
-    def _scenes_search_and_op(
+    def _html_scenes_search_and_op(
         self,
         rating_min: Optional[str],
         rating_max: Optional[str],
         mode: Optional[AppOpMmode],
         opt_label: Optional[str],
-    ) -> tuple[str, list[Scene]]:
+    ) -> str:
         """
         Performs an advanced search and initializes pagination.
-        Returns (html_content, image_cache, current_page, page_info_text).
+        Returns the html for the result grid of scene cells.
         """
         # add chosen operation to images
         r_min = SceneDef.RATING_MIN
@@ -174,13 +153,18 @@ class AIDBSceneApp:
 
         if mode is None:
             mode = 'none'
-        html_output = self._generate_scene_html(scenes, mode=mode)
 
-        return html_output, scenes
+        html_scenes = ''
+        for scene in scenes:
+            html_scenes += AppSceneCell.html(
+                scene,
+                mode,
+            )
+        return AppHtml.html_styled_cells_grid(html_scenes)
 
     def launch(self, **kwargs):
         print('Launching Gradio application...')
-        self.interface.launch(**kwargs)
+        self._interface.launch(**kwargs)
 
 
 if __name__ == '__main__':
