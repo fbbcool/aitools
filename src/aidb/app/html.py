@@ -42,7 +42,7 @@ class AppHtml:
         return cls.make_elem_id(obj, html_obj='databus')
 
     @classmethod
-    def cmd_make_data(
+    def make_cmd_data(
         cls,
         type_obj: str,
         id: str,
@@ -59,7 +59,7 @@ class AppHtml:
         return data
 
     @classmethod
-    def cmd_make_data_str(
+    def make_cmd_data_str(
         cls,
         type_obj: str,
         id: str,
@@ -67,10 +67,10 @@ class AppHtml:
         payload: Optional[Any] = None,
         label: Optional[str] = None,
     ) -> str:
-        return json.dumps(cls.cmd_make_data(type_obj, id, cmd, payload=payload, label=label))
+        return json.dumps(cls.make_cmd_data(type_obj, id, cmd, payload=payload, label=label))
 
     @classmethod
-    def cmd_make_button(cls, data_cmd: dict, checked: bool = False) -> str:
+    def html_make_cmd_button(cls, data_cmd: dict, checked: bool = False) -> str:
         type_obj = data_cmd.get('type', None)
         id = data_cmd.get('id', None)
         cmd = data_cmd.get('cmd', None)

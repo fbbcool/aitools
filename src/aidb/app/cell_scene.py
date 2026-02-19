@@ -69,8 +69,8 @@ class AppSceneCell:
 
         html = ''
         for field in fields:
-            html += AppHtml.cmd_make_button(
-                AppHtml.cmd_make_data(
+            html += AppHtml.html_make_cmd_button(
+                AppHtml.make_cmd_data(
                     'scene',
                     scene.id,
                     'to_clipspace',
@@ -88,13 +88,13 @@ class AppSceneCell:
         for r in range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1):
             # new code
             checked = True if current_rating == r else False
-            html += AppHtml.cmd_make_button(
-                AppHtml.cmd_make_data('scene', scene.id, 'rating', payload=r, label=str(r)),
+            html += AppHtml.html_make_cmd_button(
+                AppHtml.make_cmd_data('scene', scene.id, 'rating', payload=r, label=str(r)),
                 checked=checked,
             )
         html += '<br>'
-        html += AppHtml.cmd_make_button(
-            AppHtml.cmd_make_data('scene', scene.id, 'to_clipspace', payload='url', label='url')
+        html += AppHtml.html_make_cmd_button(
+            AppHtml.make_cmd_data('scene', scene.id, 'to_clipspace', payload='url', label='url')
         )
         return html
 
@@ -105,8 +105,8 @@ class AppSceneCell:
         html = ''
         for label in TaggerDef.LABELS['label']:
             checked = True if label in current_labels else False
-            html += AppHtml.cmd_make_button(
-                AppHtml.cmd_make_data(
+            html += AppHtml.html_make_cmd_button(
+                AppHtml.make_cmd_data(
                     'scene',
                     scene.id,
                     'label_swap',
