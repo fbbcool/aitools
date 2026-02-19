@@ -90,6 +90,164 @@ class AppHtml:
             """
         return output_html
 
+    @classmethod
+    def html_styled_cells_grid(cls, inner_html: str, img_width: int = 250) -> str:
+        html = f"""
+        <style>
+            .image-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax({img_width}px, 1fr));
+                gap: 15px;
+                padding: 10px;
+            }}
+            .image-item {{
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                overflow: hidden;
+                text-align: center;
+                background-color: #333333; /* Dark grey background */
+                padding-bottom: 10px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                height: 100%;
+            }}
+            .image-item img {{
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 0 auto;
+                border-bottom: 1px solid #eee;
+                padding: 5px;
+                cursor: pointer; /* Indicate clickable only on image itself */
+            }}
+            .image-item-warning {{
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                overflow: hidden;
+                text-align: center;
+                background-color: #aaaa33; /* Dark grey background */
+                padding-bottom: 10px;
+                doperationisplay: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                height: 100%;
+            }}
+            .image-item-error img {{
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 0 auto;
+                border-bottom: 1px solid #eee;
+                padding: 5px;
+                cursor: pointer; /* Indicate clickable only on image itself */
+            }}
+            .image-item-error {{
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                overflow: hidden;
+                text-align: center;
+                background-color: #ff3333; /* Dark grey background */
+                padding-bottom: 10px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                height: 100%;
+            }}
+            .image-item-warning img {{
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 0 auto;
+                border-bottom: 1px solid #eee;
+                padding: 5px;
+                cursor: pointer; /* Indicate clickable only on image itself */
+            }}
+            .image-caption {{
+                font-size: 0.9em;
+                color: #ffffff; /* White font for caption */
+                margin-top: 5px;
+                padding: 0 10px;
+                word-wrap: break-word;
+            }}
+            .image-controls {{
+                margin-top: 10px;
+                padding: 0 10px;
+                color: #ffffff; /* White font for controls */
+            }}
+            .operation-radio-group {{
+                display: flex;
+                justify-content: center;
+                gap: 5px;
+                flex-wrap: wrap; /* Allow wrapping for smaller screens */
+            }}
+            .operation-radio-group input[type="radio"] {{
+                display: none; /* Hide default radio button */
+            }}
+            .operation-radio-group label {{
+                padding: 5px 8px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 0.8em;
+                transition: all 0.2s ease;
+                background-color: #555555; /* Slightly lighter grey for radio buttons */
+                color: #ffffff; /* White font for radio button labels */
+            }}
+            .operation-radio-group input[type="radio"]:checked + label {{
+                background-color: #4CAF50; /* Green for selected */
+                color: white;
+                border-color: #4CAF50;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            }}
+            .operation-radio-group label:hover {{
+                background-color: #777777; /* Darker hover for radio buttons */
+            }}
+            .operation-checkbox-group {{
+                display: flex;
+                justify-content: center;
+                gap: 5px;
+                flex-wrap: wrap; /* Allow wrapping for smaller screens */
+            }}
+            .operation-checkbox-group input[type="checkbox"] {{
+                display: none; /* Hide default checkbox button */
+            }}
+            .operation-checkbox-group label {{
+                padding: 5px 8px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 0.8em;
+                transition: all 0.2s ease;
+                background-color: #555555; /* Slightly lighter grey for checkbox buttons */
+                color: #ffffff; /* White font for checkbox button labels */
+            }}
+            .operation-checkbox-group input[type="checkbox"]:checked + label {{
+                background-color: #4CAF50; /* Green for selected */
+                color: white;
+                border-color: #4CAF50;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            }}
+            .operation-checkbox-group label:hover {{
+                background-color: #777777; /* Darker hover for checkbox buttons */
+            }}
+            .tag-contribution {{
+                font-size: 0.8em;
+                color: #cccccc; /* Light grey for tag contribution text */
+                margin-top: 5px;
+                padding: 0 10px;
+                text-align: left;
+            }}
+            .tag-contribution strong {{
+                color: #ffffff; /* White font for strong tags */
+            }}
+        </style>
+        <div class="image-grid">
+        {inner_html}
+        </div>
+        """
+        return html
+
 
 class AppHelper:
     def __init__(self, dbc: DBConnection) -> None:

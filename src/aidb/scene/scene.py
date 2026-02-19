@@ -8,7 +8,6 @@ from ait.tools.images import thumbnail_to_url
 from .scene_common import SceneDef
 from .scene_manager import SceneManager
 from .scene_image import SceneImage
-from .scene_image_manager import SceneImageManager
 
 
 class Scene:

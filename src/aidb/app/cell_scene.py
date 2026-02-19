@@ -21,7 +21,7 @@ class AppSceneCell:
     """
 
     @staticmethod
-    def make(
+    def html(
         scene: Scene,
         mode: AppOpMmode,
     ) -> str:
