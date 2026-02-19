@@ -8,9 +8,8 @@ from PIL import Image as PILImage
 import pyperclip
 import gradio as gr
 
-from aidb.scene.db_connect import DBConnection
-from aidb.scene.scene import Scene
-from aidb.scene.scene_manager import SceneManager
+from aidb.scene import DBConnection
+from aidb import Scene, SceneImageManager, SceneManager, SceneSetManager
 
 
 AppOpMmode = Literal['info', 'rate', 'label', 'none']
@@ -264,9 +263,6 @@ class AppHelper:
         """
         print(f"DEBUG: cmd_run called with data from bus: '{data_cmd}'")
 
-        # TODO: only inst when there is a scene cmd
-        scm = SceneManager(dbc=self._dbc)
-
         if not data_cmd or not isinstance(data_cmd, str):
             print(f'ERROR: Invalid or empty data [{data_cmd}]')
             gr.Warning('[cmd_run]: Invalid data received from frontend.')
@@ -302,8 +298,25 @@ class AppHelper:
             gr.Warning('[cmd_run]: obj type is none.')
             return None
         elif obj_type == 'scene':
+            mgr = SceneManager(dbc=self._dbc)
             try:
-                obj = scm.scene_from_id_or_url(id)
+                obj = mgr.scene_from_id_or_url(id)
+            except Exception:
+                print(f'ERROR: couldnt make scene [{str(data)}]')
+                gr.Warning('[cmd_run]: couldnt make scene.')
+                return None
+        elif obj_type == 'image':
+            mgr = SceneImageManager(dbc=self._dbc)
+            try:
+                obj = mgr.image_from_id_or_url(id)
+            except Exception:
+                print(f'ERROR: couldnt make scene [{str(data)}]')
+                gr.Warning('[cmd_run]: couldnt make scene.')
+                return None
+        elif obj_type == 'set':
+            mgr = SceneSetManager(dbc=self._dbc)
+            try:
+                obj = mgr.set_from_id_or_name(id)
             except Exception:
                 print(f'ERROR: couldnt make scene [{str(data)}]')
                 gr.Warning('[cmd_run]: couldnt make scene.')

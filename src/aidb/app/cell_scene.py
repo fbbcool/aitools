@@ -13,7 +13,7 @@ class AppSceneCell:
 
     @staticmethod
     def html(
-        scene: Scene,
+        obj: Scene,
         mode: AppOpMmode,
     ) -> str:
         """
@@ -26,36 +26,36 @@ class AppSceneCell:
         Returns:
             str: The HTML string for the scene cell.
         """
-        grid_img_base64 = HtmlHelper.pil_to_base64(image_from_url(scene.url_thumbnail))
+        grid_img_base64 = HtmlHelper.pil_to_base64(image_from_url(obj.url_thumbnail))
         if grid_img_base64 is None:
-            grid_img_base64 = ''  # Or a base64 encoded placeholder image
+            grid_img_base64 = ''
             print(
-                f'Warning: No thumbnail available for image ID: {scene.id}. Displaying empty image.'
+                f'Warning: No thumbnail available for image ID: {obj.id}. Displaying empty image.'
             )
 
         return f"""
-        <div class="image-item" id="cell-scene-{scene.id}">
+        <div class="image-item" id="cell-scene-{obj.id}">
             <img src="data:image/png;base64,{grid_img_base64}">
             <div class="image-controls">
-                {AppSceneCell.html_operation(scene, mode)}
+                {AppSceneCell.html_operation(obj, mode)}
             </div>
         </div>
         """
 
     @staticmethod
     def html_operation(
-        scene: Scene,
+        obj: Scene,
         mode: AppOpMmode,
     ) -> str:
         html = ''
         if mode == 'none':
             pass
         elif mode == 'info':
-            html = AppSceneCell._html_op_info(scene)
+            html = AppSceneCell._html_op_info(obj)
         elif mode == 'rate':
-            html = AppSceneCell._html_op_rate(scene)
+            html = AppSceneCell._html_op_rate(obj)
         elif mode == 'label':
-            html = AppSceneCell._html_op_label(scene)
+            html = AppSceneCell._html_op_label(obj)
 
         return f"""
                 <div class="operation-radio-group">
@@ -64,7 +64,7 @@ class AppSceneCell:
                 """
 
     @staticmethod
-    def _html_op_info(scene: Scene) -> str:
+    def _html_op_info(obj: Scene) -> str:
         fields = ['id', 'url', 'prompt', 'caption']
 
         html = ''
@@ -72,7 +72,7 @@ class AppSceneCell:
             html += AppHtml.html_make_cmd_button(
                 AppHtml.make_cmd_data(
                     'scene',
-                    scene.id,
+                    obj.id,
                     'to_clipspace',
                     payload=field,
                     label=field,
@@ -81,26 +81,26 @@ class AppSceneCell:
         return html
 
     @staticmethod
-    def _html_op_rate(scene: Scene) -> str:
-        current_rating = scene.get_rating
+    def _html_op_rate(obj: Scene) -> str:
+        current_rating = obj.get_rating
 
         html = ''
         for r in range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1):
             # new code
             checked = True if current_rating == r else False
             html += AppHtml.html_make_cmd_button(
-                AppHtml.make_cmd_data('scene', scene.id, 'rating', payload=r, label=str(r)),
+                AppHtml.make_cmd_data('scene', obj.id, 'rating', payload=r, label=str(r)),
                 checked=checked,
             )
         html += '<br>'
         html += AppHtml.html_make_cmd_button(
-            AppHtml.make_cmd_data('scene', scene.id, 'to_clipspace', payload='url', label='url')
+            AppHtml.make_cmd_data('scene', obj.id, 'to_clipspace', payload='url', label='url')
         )
         return html
 
     @staticmethod
-    def _html_op_label(scene: Scene) -> str:
-        current_labels = scene.get_labels
+    def _html_op_label(obj: Scene) -> str:
+        current_labels = obj.get_labels
 
         html = ''
         for label in TaggerDef.LABELS['label']:
@@ -108,7 +108,7 @@ class AppSceneCell:
             html += AppHtml.html_make_cmd_button(
                 AppHtml.make_cmd_data(
                     'scene',
-                    scene.id,
+                    obj.id,
                     'label_swap',
                     payload=label,
                     label=label,
