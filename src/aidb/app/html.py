@@ -1,6 +1,10 @@
 import json
 from typing import Any, Final, Literal, Optional
 
+import base64
+from io import BytesIO
+from PIL import Image as PILImage
+
 import pyperclip
 import gradio as gr
 
@@ -328,3 +332,14 @@ class AppHelper:
         if clipspace:
             pyperclip.copy(clipspace)
         return None
+
+
+class HtmlHelper:
+    @staticmethod
+    def pil_to_base64(pil: Optional[PILImage.Image]) -> Optional[str]:
+        """Converts a PIL Image to a base64 encoded string."""
+        if pil is None:
+            return None
+        buffered = BytesIO()
+        pil.save(buffered, format='PNG')
+        return base64.b64encode(buffered.getvalue()).decode()
