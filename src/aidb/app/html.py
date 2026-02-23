@@ -10,6 +10,7 @@ import gradio as gr
 
 from aidb.scene import DBConnection
 from aidb import Scene, SceneImageManager, SceneManager, SceneSetManager
+from aidb.scene.scene_common import Sceneical
 
 
 AppOpMmode = Literal['info', 'rate', 'label', 'none']
@@ -291,7 +292,7 @@ class AppHelper:
             gr.Warning('[cmd_run]: id is none.')
             return None
 
-        obj = None
+        obj: Optional[Sceneical] = None
         obj_type = data.get('type', None)
         if obj_type is None:
             print(f'ERROR: obj type is none [{str(data)}]')
@@ -329,21 +330,44 @@ class AppHelper:
 
         payload = data.get('payload', None)
         if cmd == 'to_clipspace':
-            self._attr_to_clipspace(obj, payload)
+            self._cmd_attr_to_clipspace(obj, payload)
+        if cmd == 'db_query':
+            self._cmd_db_query(obj, payload)
 
         return None
 
     @classmethod
-    def _attr_to_clipspace(cls, obj: Any, attr: Any) -> None:
-        if not isinstance(attr, str):
+    def _cmd_attr_to_clipspace(cls, obj: Sceneical, payload: Any) -> None:
+        if not isinstance(payload, str):
             raise ValueError('attr not str!')
-
-        if not isinstance(obj, (Scene)):
-            raise ValueError('obj not correct instance type!')
+        attr = payload
 
         clipspace = str(getattr(obj, attr))
         if clipspace:
             pyperclip.copy(clipspace)
+        return None
+
+    @classmethod
+    def _cmd_db_query(cls, obj: Sceneical, payload: Any) -> None:
+        if not isinstance(payload, dict):
+            raise ValueError('payload not dict!')
+
+        # only look at the first key/val
+        attr = next(iter(payload))
+        val = payload.get(attr, None)
+        if attr is None or val is None:
+            raise ValueError('None attr or val')
+
+        if not isinstance(obj, (Scene)):
+            raise ValueError('obj not correct instance type!')
+        if not hasattr(obj, attr):
+            raise ValueError(f'obj has no attr {attr}')
+
+        func = getattr(obj, attr)
+        func(val)
+
+        obj.db_store()
+
         return None
 
 

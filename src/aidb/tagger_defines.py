@@ -27,6 +27,7 @@ class TaggerDef:
                 'hanging',
                 'sitting',
                 'sex',
+                'heap',
             ]
         )
         + [LABEL_TBR],

@@ -1,5 +1,6 @@
 from .scene import (
     SceneDef,
+    Sceneical,
     SceneConfig,
     SceneManager,
     Scene,
@@ -11,6 +12,7 @@ from .scene import (
 
 __all__ = [
     'SceneDef',
+    'Sceneical',
     'SceneConfig',
     'Scene',
     'SceneManager',

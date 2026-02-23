@@ -121,11 +121,8 @@ class Scene:
         url = str(self._url_called)
         if str(self.url_from_data) != url:
             self._data |= {SceneDef.FIELD_URL: url}
-            return self._dbstore()
+            return self.db_store()
         return False
-
-    def _dbstore(self) -> bool:
-        return self._scm._db_update_scene(self._data)
 
     def update(self, force: bool = False) -> None:
         # add init data, if not present
@@ -155,7 +152,7 @@ class Scene:
                 self._data |= {SceneDef.FIELD_RATING: SceneDef.RATING_IMG_REG}
 
         # store
-        if self._dbstore():
+        if self.db_store():
             self._log('data update.', level='info')
 
     def _update_thumbnail(self, force: bool = False) -> bool:
@@ -190,13 +187,30 @@ class Scene:
     def _init_data(self) -> None:
         # rating
         if self._data.get(SceneDef.FIELD_RATING, None) is None:
-            self.set_rating(self.get_rating)
+            self.set_rating(self.rating)
         # labels
         if self._data.get(SceneDef.FIELD_LABELS, None) is None:
-            self.set_labels(self.get_labels)
+            self.set_labels(self.labels)
 
+    # @property
+    # def rating(self) -> int: ...
+    # def set_rating(self, val: int | str) -> None: ...
+    # @property
+    # def labels(self) -> list[str]: ...
+    # def set_labels(self, val: list[str]) -> None: ...
+    # def push_label(self, val: str) -> None: ...
+    # def pop_label(self, val: str) -> None: ...
+    # def switch_label(self, val: str) -> None: ...
+    # @property
+    # def super_labels(self) -> list[str]: ...
+    # def push_super_label(self, val: str) -> None: ...
+    # def pop_super_label(self, val: str) -> None: ...
+    # def switch_super_label(self, val: str) -> None: ...
+    # def db_store(self) -> bool: ...
+
+    # Sceneical
     @property
-    def get_rating(self) -> int:
+    def rating(self) -> int:
         """
         Returns the rating as int.
 
@@ -205,9 +219,8 @@ class Scene:
         get_data = self._data.get(SceneDef.FIELD_RATING, SceneDef.RATING_INIT)
         return get_data
 
-    def set_rating(self, value: int) -> None:
-        if not isinstance(value, int):
-            return
+    def set_rating(self, value: int | str) -> None:
+        value = int(value)
         if value < SceneDef.RATING_MIN:
             value = SceneDef.RATING_MIN
         if value > SceneDef.RATING_MAX:
@@ -217,16 +230,8 @@ class Scene:
         self._data |= set_data
         return
 
-    def set_labels(self, value: list[str]) -> None:
-        if not isinstance(value, list):
-            return
-
-        set_data = {SceneDef.FIELD_LABELS: list(set(value))}
-        self._data |= set_data
-        return
-
     @property
-    def get_labels(self) -> list[str]:
+    def labels(self) -> list[str]:
         """
         Returns the labels as a list of strings.
 
@@ -235,27 +240,46 @@ class Scene:
         get_data = self._data.get(SceneDef.FIELD_LABELS, [])
         return get_data
 
-    def update_label(self, label: str) -> None:
-        """
-        Updates the labels by adding or removing the given label.
-
-        a subsequent + or - given in the label string indicates adding or removing.
-        if no +|- is given, adding is asumed.
-        """
-        if len(label) <= 2:  # at least 2 chars!
+    def set_labels(self, value: list[str]) -> None:
+        if not isinstance(value, list):
             return
-        labels = self.get_labels.copy()
-        op = label[0]
 
-        if op == '-':
-            labels.remove(label[1:])
-        elif op == '+':
-            labels.append(label[1:])
-        else:
-            labels.append(label)
+        set_data = {SceneDef.FIELD_LABELS: list(set(value))}
+        self._data |= set_data
+        return
 
+    def push_label(self, label: str) -> None:
+        """
+        pushes a label to the labels.
+        """
+        labels = self.labels
+        labels.append(label)
+        labels = list(set(labels))
         self.set_labels(labels)
         return
+
+    def pop_label(self, label: str) -> None:
+        """
+        pops a label from the labels.
+        """
+        labels = set(self.labels)
+        labels.discard(label)
+        labels = list(labels)
+        self.set_labels(labels)
+        return
+
+    def switch_label(self, label: str) -> None:
+        """
+        switches a label from the labels.
+        """
+        if label in self.labels:
+            self.pop_label(label)
+        else:
+            self.push_label(label)
+        return
+
+    def db_store(self) -> bool:
+        return self._scm._db_update_scene(self._data)
 
     def __str__(self) -> str:
         ret = f'url: {self._url_called}\n'

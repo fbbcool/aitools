@@ -82,14 +82,16 @@ class AppSceneCell:
 
     @staticmethod
     def _html_op_rate(obj: Scene) -> str:
-        current_rating = obj.get_rating
+        current_rating = obj.rating
 
         html = ''
         for r in range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1):
             # new code
             checked = True if current_rating == r else False
             html += AppHtml.html_make_cmd_button(
-                AppHtml.make_cmd_data('scene', obj.id, 'rating', payload=r, label=str(r)),
+                AppHtml.make_cmd_data(
+                    'scene', obj.id, 'db_query', payload={'set_rating': r}, label=str(r)
+                ),
                 checked=checked,
             )
         html += '<br>'
@@ -100,7 +102,7 @@ class AppSceneCell:
 
     @staticmethod
     def _html_op_label(obj: Scene) -> str:
-        current_labels = obj.get_labels
+        current_labels = obj.labels
 
         html = ''
         for label in TaggerDef.LABELS['label']:
@@ -109,8 +111,8 @@ class AppSceneCell:
                 AppHtml.make_cmd_data(
                     'scene',
                     obj.id,
-                    'label_swap',
-                    payload=label,
+                    'db_query',
+                    payload={'switch_label': label},
                     label=label,
                 ),
                 checked=checked,

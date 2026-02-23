@@ -1,6 +1,6 @@
 from .config_reader import ConfigReader
 from .db_connect import DBConnection
-from .scene_common import SceneDef, SceneConfig
+from .scene_common import SceneDef, SceneConfig, Sceneical
 from .scene_manager import SceneManager
 from .scene import Scene
 from .scene_set_manager import SceneSetManager
@@ -13,6 +13,7 @@ __all__ = [
     'DBConnection',
     'SceneDef',
     'SceneConfig',
+    'Sceneical',
     'Scene',
     'SceneManager',
     'SceneSetManager',

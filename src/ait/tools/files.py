@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Final
 
-SUFFIX_IMG: Final = ['png', 'webp', 'jpg', 'jpeg']
+SUFFIX_IMG: Final = ['png', 'webp', 'jpg', 'jpeg', 'gif']
 SUFFIX_VID: Final = ['mov', 'mp4']
 
 
