@@ -1,22 +1,23 @@
 import os
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Optional
 import pyperclip
 
 from aidb import SceneConfig, SceneManager, SceneImageManager, SceneImage, Scene
 
 from aidb.app.scene.app import AIDBSceneApp
 
-from aidb.scene.scene_common import SceneDef
 from ait.tools.files import is_img_or_vid, is_dir
 
 
 def imgs_or_vids_move_to_scene_id(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     print(f'move: params[{params}] clipspace[{clipspace}]')
 
+    return None
 
-def scene_new(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+
+def scene_new(params: Any, clipsapce: Any, config: SceneConfig) -> Optional[Path]:
     urls_img_vid = [url for url in clipspace if is_img_or_vid(url)]
     urls_dir = [url for url in clipspace if is_dir(url)]
 
@@ -40,21 +41,34 @@ def scene_new(params: Any, clipsapce: Any, config: SceneConfig) -> None:
 
     scm = SceneManager(config=config, subdir_scenes=scenes_subdir, verbose=0)  # type: ignore
 
-    scm.new_scene_from_urls(urls_img_vid)
-    scm.new_scene_from_urls(urls_dir)
+    oids_imgs = scm.new_scene_from_urls(urls_img_vid)
+    oids_urls = scm.new_scene_from_urls(urls_dir)
+    oids = []
+    if oids_imgs is not None:
+        oids += oids_imgs
+    if oids_urls is not None:
+        oids += oids_urls
+    if oids:
+        scene: Scene
+        scene = scm.scene_from_id_or_url(oids[0])
+        if scene is not None:
+            return scene.url
+    return None
 
 
 def scenes_update(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     scm = SceneManager(verbose=0, config=config)
     scm.scenes_update()
 
+    return None
 
-def scene_url(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+
+def scene_url(params: Any, clipsapce: Any, config: SceneConfig) -> Optional[Path]:
     scm = SceneManager(verbose=0, config=config)
     url_reg_file = clipsapce[0]
     url = scm.url_from_registered_file(url_reg_file)
-    print(str(url))
-    pyperclip.copy(str(url))
+
+    return url
 
 
 def images_info(params: Any, clipsapce: Any, config: SceneConfig) -> None:
@@ -70,6 +84,7 @@ def images_info(params: Any, clipsapce: Any, config: SceneConfig) -> None:
         img: SceneImage = im.image_from_id_or_url(url)
         if img is not None:
             print(img)
+    return None
 
 
 def images_register(params: Any, clipsapce: Any, config: SceneConfig) -> None:
@@ -98,6 +113,8 @@ def images_register(params: Any, clipsapce: Any, config: SceneConfig) -> None:
         scene: Scene = sm.scene_from_id_or_url(sid)
         scene.update(force=True)
 
+    return None
+
 
 def images_rate(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     urls_img = [url for url in clipsapce if is_img_or_vid(url)]
@@ -113,6 +130,7 @@ def images_rate(params: Any, clipsapce: Any, config: SceneConfig) -> None:
         img: SceneImage = im.image_from_id_or_url(url)
         if img is not None:
             img.rate(rating)
+    return None
 
 
 def start_app(params: Any, clipsapce: Any, config: SceneConfig) -> None:
@@ -120,6 +138,7 @@ def start_app(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     scm.scenes_update()
     app = AIDBSceneApp(scm)
     app.launch(server_port=7861)
+    return None
 
 
 def _keyval(params: list[str]) -> tuple[dict, list[str]]:
@@ -178,4 +197,11 @@ if __name__ == '__main__':
     if func is None:
         print(f'cmd [{cmd}] unknown!')
         exit()
-    func(params, clipspace, config)  # type: ignore
+    ret = func(params, clipspace, config)  # type: ignore
+    if ret is not None:
+        try:
+            new_clipspace = str(ret)
+        except Exception:
+            exit()
+        print(new_clipspace)
+        pyperclip.copy(new_clipspace)

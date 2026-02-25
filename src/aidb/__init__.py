@@ -8,6 +8,7 @@ from .scene import (
     SceneSet,
     SceneImageManager,
     SceneImage,
+    HFDataset,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     'SceneSet',
     'SceneImageManager',
     'SceneImage',
+    'HFDataset',
 ]

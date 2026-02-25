@@ -1,29 +1,99 @@
 import json
 from pathlib import Path
 import shutil
-from typing import Final
+from typing import Final, Optional
 import jsonlines
 from huggingface_hub import hf_hub_download, snapshot_download
 from datasets import load_dataset
 from PIL import Image
 
 map_bodypart: Final = {
-    'body': 'body',
-    'pussy': 'pussy',
-    'ass': 'ass',
-    'breast': 'breast',
-    'face': 'face',
-    'foot': 'foot',
-    'leg': 'leg',
-    'mouth': 'mouth',
-    'hand': 'hand',
-    'thigh': 'thigh',
-    '_step': 'stepping on small man',
-    '_penis': 'penis',
-    '+penis': 'penis',
     '_1gts0': '',
     '__tbr': '',
 }
+
+
+class HFDataset:
+    def __init__(
+        self, repo_id: str, file_meta: str = 'metadata.jsonl', force_meta_dl: bool = False
+    ):
+        self._repo_id = repo_id
+        self._file_meta = file_meta
+        self._url_cache: Optional[Path] = None
+        self._meta = self._load_meta(force_download=force_meta_dl)
+
+    def _load_meta(self, force_download: bool = False) -> list[dict]:
+        file_path = hf_hub_download(
+            repo_id=self._repo_id,
+            filename='train/' + self._file_meta,
+            repo_type='dataset',
+            force_download=force_download,
+        )
+        if self._file_meta.endswith('.jsonl'):
+            meta = []
+            with jsonlines.open(file_path) as reader:
+                for obj in reader:
+                    meta.append(obj)
+            return meta
+        else:
+            raise FileNotFoundError('Unsupported file format. Only .json and .jsonl are supported.')
+
+    def __len__(self):
+        return len(self._meta)
+
+    def __getitem__(self, idx):
+        return self._meta[idx]
+
+    def __iter__(self):
+        for item in self._meta:
+            yield item
+
+    def cache(self) -> Path:
+        if self._url_cache is None:
+            url_cache = snapshot_download(repo_id=self._repo_id, repo_type='dataset')
+            self._url_cache = Path(url_cache)
+        return self._url_cache
+
+    @property
+    def meta(self):
+        return self._meta
+
+    def make_dir_train(self, to_url: Path | str, trigger: Optional[str] = None) -> None:
+        """
+        to_url is gonna be overwritten!
+        """
+        # create folder
+        to_url = Path(to_url)
+        shutil.rmtree(to_url)
+        to_url.mkdir(parents=True, exist_ok=True)
+
+        # idxs = range(len(self))
+        # if ids:
+        #    idxs = []
+        #    for id in ids:
+        #        idx = self.id2idx(id)
+        #        if idx:
+        #            idxs.append(idx)
+
+        # for idx in idxs:
+        #    # caption
+        #    caption = ''
+        #    if trigger:
+        #        caption = f'{trigger}, '
+        #    caption += self.captions[idx]
+        #    if caption:
+        #        caption_path = Path(to_url) / Path(self.img_files[idx]).with_suffix('.txt').name
+        #        # write caption string to file
+        #        with caption_path.open('w', encoding='utf-8') as f:
+        #            f.write(caption)
+
+        #    # image
+        #    img_path = Path(to_url) / Path(self.img_files[idx]).name
+        #    img_path_download = hf_hub_download(
+        #        repo_id=self.repo_id, filename=self.img_files[idx], repo_type='dataset'
+        #    )
+        #    # move downloaded img file to target folder
+        #         shutil.move(img_path_download, img_path)
 
 
 class HFDatasetImg:

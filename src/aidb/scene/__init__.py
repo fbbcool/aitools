@@ -7,6 +7,7 @@ from .scene_set_manager import SceneSetManager
 from .scene_set import SceneSet
 from .scene_image_manager import SceneImageManager
 from .scene_image import SceneImage
+from .hfdataset import HFDataset
 
 __all__ = [
     'ConfigReader',
@@ -20,4 +21,5 @@ __all__ = [
     'SceneSet',
     'SceneImageManager',
     'SceneImage',
+    'HFDataset',
 ]
