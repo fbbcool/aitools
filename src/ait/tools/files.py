@@ -36,7 +36,7 @@ def is_img(url: str | Path) -> bool:
         return False
     elif url.is_dir():
         return False
-    elif url.suffix in suffix_img():
+    if url.suffix in suffix_img():
         return True
     return False
 

@@ -77,8 +77,8 @@ class SceneImage:
         filename = self.filename_train_from_data
         if filename is None:
             return None
-        jsonl = {'file_name': self.filename_train_from_data}
-        jsonl |= {'file_type': 'image/png'}
+        jsonl = {SceneDef.FIELD_FILE_NAME: self.filename_train_from_data}
+        jsonl |= {SceneDef.FIELD_FILE_TYPE: 'image/png'}
 
         caption = self._data.get(SceneDef.FIELD_CAPTION, None)
         if caption is not None:

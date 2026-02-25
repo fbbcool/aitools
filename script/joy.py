@@ -1,31 +1,38 @@
 from ait.caption import Joy
-from aidb.hfdataset import HFDatasetImg
+
+from aidb import HFDataset
+from ait.tools.images import image_from_url
 
 caper = Joy('1tongue')
 force = True
 
-# hfd = HFDatasetImg(repo_id="fbbcool/gts01_r35")
-hfd = HFDatasetImg(repo_id='fbbcool/1tongue-v1', force_meta_dl=True)
+hfd = HFDataset('fbbcool/test')
 hfd.cache()
 
-n = len(hfd)
-error = 0
-for idx in range(n):
-    print(f'{idx}:\n')
-    try:
-        if hfd.captions_joy[idx]:
-            print('already captionized.')
-            if not force:
-                continue
-        img = hfd.pil(idx)
-        caption = caper.img_caption(img)
-        print(f'{caption}\n')
-        hfd.img_set_caption_joy(idx, caption)
-        if idx % 100 == 0:
-            hfd.save_to_jsonl(force=True)
-    except Exception as e:
-        error += 1
-        print(f'oops! something went wrong:\n{e}')
+num_skip = 0
+for id in hfd.ids:
+    if id is None:
+        print('[skip] id none.')
+        num_skip += 1
+        continue
+    url_img = hfd.url_file_from_id(id)
+    if url_img is None:
+        print('[skip] url_img none.')
+        num_skip += 1
+        continue
+    caption = hfd.caption_from_id(id)
+    if caption is not None and not force:
+        print('[skip] caption not forced.')
+        num_skip += 1
+        continue
+    img = image_from_url(url_img, verbose=True)
+    if img is None:
+        print('[skip] img not loaded.')
+        num_skip += 1
+        continue
+    caption = caper.img_caption(img)
+    print(f'{caption}\n')
+    hfd.set_caption(id, caption)
 
-print(f'\n\tDONE with {error} errors.')
-hfd.save_to_jsonl(force=True)
+print(f'\n\tDONE with {num_skip} skips.')
+hfd.save()

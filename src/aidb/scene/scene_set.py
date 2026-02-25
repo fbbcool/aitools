@@ -99,9 +99,10 @@ class SceneSet:
 
     def compile(self) -> None:
         from .scene_image import SceneImage
+        from .hfdataset import HFDataset
 
         # first, make a clean saving location
-        root_train = self._ssm.config.train_url / self.name
+        root_train = self._ssm.config.train_url / self.name / SceneDef.DIR_TRAIN
         url_clean(root_train)
         metadata = []
         ratios = self.data.get(SceneDef.FIELD_RATIOS, SceneDef.DEFAULT_RATIOS)
@@ -121,7 +122,7 @@ class SceneSet:
             url_trainfile.parent.mkdir(parents=True, exist_ok=True)
             pil_train.save(url_trainfile)
 
-        url_metafile = root_train / 'metadata.jsonl'
+        url_metafile = root_train / HFDataset.FILE_META
         with jsonlines.open(url_metafile, mode='w') as writer:
             writer.write_all(metadata)
 

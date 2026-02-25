@@ -43,6 +43,7 @@ class SceneDef:
     DEFAULT_RATIOS: Final = [1.0, 2.0 / 3.0, 3.0 / 4.0]
     DEFAULT_RESOLUTIONS: Final = [512, 768, 1024]
 
+    DIR_TRAIN: Final = 'train'
     DIR_THUMBNAILS: Final = f'{SEPERATOR_ID}thumbnails'
 
     FIELD_RATING: Final = 'rating'
