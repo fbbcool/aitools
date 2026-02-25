@@ -147,6 +147,35 @@ def img_latest_from_url(url: str | Path) -> Path | None:
         return None
 
 
+def url_symlink_to(
+    url_src: str | Path,
+    url_dst: str | Path,
+    directory: bool = False,
+    force: bool = True,
+) -> None:
+    """
+    links an url.
+
+    if the destination url is a directory and the src url a file, then the filename is preserved.
+    The dst parent will be created.
+    """
+    url_src = Path(url_src)
+    url_dst = Path(url_dst)
+
+    url_dst.parent.mkdir(parents=True, exist_ok=True)
+
+    if url_dst.exists():
+        if not url_dst.is_symlink():
+            print(f'[symlink] dst ({url_dst}) exists and is not a symlink, abort!')
+            return None
+        elif not force:
+            print(f'[symlink] dst ({url_dst}) exists, abort!')
+            return None
+        else:
+            os.unlink(str(url_dst))
+    os.symlink(str(url_src), str(url_dst), target_is_directory=directory)
+
+
 def url_move_to_new_parent(
     url_src: str | Path,
     to_parent: str | Path,

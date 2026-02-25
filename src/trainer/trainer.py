@@ -1,15 +1,15 @@
 import os
 from pathlib import Path
-import shutil
 from typing import Final
 import threading
 import random
 
 from more_itertools import chunked_even
 
-from aidb.hfdataset import HFDatasetImg
+from aidb import HFDataset
 from ait.install import AInstaller
 from templater import Templater
+from ait.tools.files import url_symlink_to
 
 
 class Trainer:
@@ -110,24 +110,24 @@ class Trainer:
             elif isinstance(item, tuple):
                 repo_id = item[0]
                 max_imgs = item[1]
-            hfd = HFDatasetImg(repo_id, force_meta_dl=True)
+            hfd = HFDataset(repo_id, force_meta_dl=True)
             hfd.cache()
-            if hfd.size < 60:
+            if len(hfd) < 60:
                 multithread = False
 
             self._make_dataset_hfd(hfd, multithread=multithread, max_imgs=max_imgs)
 
     def _make_dataset_hfd(
-        self, hfd: HFDatasetImg, multithread: bool = False, max_imgs: int = 0
+        self, hfd: HFDataset, multithread: bool = False, max_imgs: int = 0
     ) -> None:
         # non multi-threaded
-        ids_img = hfd.ids
+        ids_img = [id for id in hfd.ids]
         if not multithread:
             self._process_imgs(ids_img, hfd, max_imgs=max_imgs)
         else:
             # multi-threaded
             n = 8
-            m = len(ids_img)
+            m = len(hfd)
             ids = []
             for batch in chunked_even(ids_img, (m // n) + 1):
                 ids.append(batch)
@@ -151,12 +151,12 @@ class Trainer:
                 threads[i].join()
                 print(f' dataset thread[{i}]: joined.')
 
-    def _process_imgs(self, ids: list[str], hfd: HFDatasetImg, max_imgs: int = 0) -> None:
+    def _process_imgs(self, ids: list[str], hfd: HFDataset, max_imgs: int = 0) -> None:
         if not ids:
             return
         pick_chance = 1.10
         if max_imgs > 0:
-            pick_chance = float(max_imgs) / float(hfd.size)
+            pick_chance = float(max_imgs) / float(len(hfd))
 
         lost = 0
         success = 0
@@ -170,48 +170,38 @@ class Trainer:
                 continue
             if not id:
                 continue
-            idx = hfd.id2idx(id)
-            if not idx:
+
+            #
+            # image
+            #
+            url_img = hfd.url_file_from_id(id)
+            if url_img is None:
                 continue
 
-            # caption or prompt fetch
-            # prompt = hfd.prompts[idx]
-            caption = hfd.captions_joy[idx]
-            # if not caption:
-            #    caption = prompt
-            # if not prompt:
-            #    prompt = caption
+            # symlink file to dataset folder
+            img_file = self.dir_dataset / url_img.name
+            url_symlink_to(url_img, img_file)
 
+            #
+            # caption
+            #
+            caption = hfd.caption_from_id(id)
             if not caption:
                 lost += 1
                 print(f'caption missing for {id}!')
                 continue
 
-            # TODO more generic, and take care that the dataset isnt polluted with trigger words
-            caption = caption.replace('1gts,', '')
-            caption = caption.replace('1woman,', '')
-
             if self._trigger is not None:
                 caption = f'{self._trigger},' + caption
-
-            # img file
-            try:
-                img_file_dl = hfd.img_download(idx)
-            except Exception as e:
-                lost += 1
-                print(f'{e}\n{id} not downloadable!')
-                continue
-
-            # copy file to dataset folder
-            img_file = self.dir_dataset / img_file_dl.name
-            shutil.copy(str(img_file_dl), str(img_file))
 
             # write caption to file
             cap_file = img_file.with_suffix('.txt')
             with cap_file.open('w', encoding='utf-8') as f:
                 f.write(caption)
 
+            #
             # ok
+            #
             success += 1
         print(
             f'dataset thread finished: {success} successes, {lost} losses, {not_picked} not picked'
