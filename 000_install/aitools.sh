@@ -37,6 +37,9 @@ train_run() {
   cd $HOME_TRAINER
   ./train.sh
 }
+train_clean() {
+  rm -rf $WORKSPACE/train
+}
 
 alias t='vi $HOME_AIT/script/train_prepare.py'
 
