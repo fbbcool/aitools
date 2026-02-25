@@ -79,7 +79,7 @@ class AIDBSceneApp:
                 with gr.Row():
                     mode = gr.Dropdown(
                         label='Mode Operation',
-                        choices=['info', 'rate', 'label'],
+                        choices=['info', 'rate', 'label', 'set'],
                         value='info',
                         allow_custom_value=False,
                         interactive=True,

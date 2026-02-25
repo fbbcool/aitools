@@ -3,6 +3,8 @@ import datetime
 from pathlib import Path
 from typing import Any, Final, Literal, Optional, Protocol
 
+from aidb.dbdefines import TAGS_TRIGGER
+
 SceneConfig = Literal['test', 'prod', 'default']
 
 
@@ -53,6 +55,13 @@ class SceneDef:
     RATING_IMG_REG: Final = 1
 
     FIELD_LABELS: Final = 'labels'
+
+    TAG_PREFIX_SET: Final = f'set{SEPERATOR_ID}'
+    TAG_SETS: Final = ['test', 'gts_v3']
+
+    @classmethod
+    def label_sets(cls) -> list[str]:
+        return [f'{cls.TAG_PREFIX_SET}{tag}' for tag in cls.TAG_SETS]
 
     @classmethod
     def filename_from_id(cls, prefix: str, id: Any, suffix: str | None = None) -> str | None:

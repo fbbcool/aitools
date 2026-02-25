@@ -13,7 +13,7 @@ from aidb import Scene, SceneImageManager, SceneManager, SceneSetManager
 from aidb.scene.scene_common import Sceneical
 
 
-AppOpMmode = Literal['info', 'rate', 'label', 'none']
+AppOpMmode = Literal['info', 'rate', 'label', 'set', 'none']
 
 
 class AppHtml:

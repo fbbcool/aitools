@@ -56,6 +56,8 @@ class AppSceneCell:
             html = AppSceneCell._html_op_rate(obj)
         elif mode == 'label':
             html = AppSceneCell._html_op_label(obj)
+        elif mode == 'set':
+            html = AppSceneCell._html_op_set(obj)
 
         return f"""
                 <div class="operation-radio-group">
@@ -106,6 +108,25 @@ class AppSceneCell:
 
         html = ''
         for label in TaggerDef.LABELS['label']:
+            checked = True if label in current_labels else False
+            html += AppHtml.html_make_cmd_button(
+                AppHtml.make_cmd_data(
+                    'scene',
+                    obj.id,
+                    'db_query',
+                    payload={'switch_label': label},
+                    label=label,
+                ),
+                checked=checked,
+            )
+        return html
+
+    @staticmethod
+    def _html_op_set(obj: Scene) -> str:
+        current_labels = obj.labels
+
+        html = ''
+        for label in SceneDef.label_sets():
             checked = True if label in current_labels else False
             html += AppHtml.html_make_cmd_button(
                 AppHtml.make_cmd_data(
