@@ -3,6 +3,7 @@ export REPOS_AIT='https://github.com/fbbcool/aitools.git'
 export REPOS_TRAINER='https://github.com/tdrussell/diffusion-pipe'
 #export REPOS_TRAINER='https://github.com/fbbcool/diffusion-pipe'
 export WORKSPACE='/workspace'
+export DIR_TRAIN=$WORKSPACE/train
 export HOME_TRAINER=$WORKSPACE/diffusion-pipe
 export HOME_AIT=$WORKSPACE/aitools
 export CONF_AIT=$HOME_AIT/conf
@@ -30,7 +31,7 @@ train_install() {
 }
 train_prepare() {
   python $HOME_AIT/script/train_prepare.py
-  cp $WORKSPACE/train/train.sh $HOME_TRAINER
+  cp $DIR_TRAIN/train.sh $HOME_TRAINER
 }
 train_run() {
   train_prepare
@@ -38,7 +39,7 @@ train_run() {
   ./train.sh
 }
 train_clean() {
-  rm -rf $WORKSPACE/train
+  rm -rf $DIR_TRAIN
 }
 
 alias t='vi $HOME_AIT/script/train_prepare.py'
