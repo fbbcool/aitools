@@ -50,6 +50,7 @@ class AppHtml:
         payload: Optional[Any] = None,
         label: Optional[str] = None,
     ) -> dict:
+        # print(f'[make cmd]: type[{type_obj}] id[{id}] cmd[{cmd}] payload[{payload}] label[{label}]')
         data = {'type': type_obj, 'id': id, 'cmd': cmd}
         if payload is not None:
             data |= {'payload': payload}
@@ -262,7 +263,7 @@ class AppHelper:
         Executes a command from the comand databus.
         This function is triggered by a hidden button and receives its data from a hidden 'cmd_databus' textbox.
         """
-        print(f"DEBUG: cmd_run called with data from bus: '{data_cmd}'")
+        print(f"[DEBUG:run cmd]: '{data_cmd}'")
 
         if not data_cmd or not isinstance(data_cmd, str):
             print(f'ERROR: Invalid or empty data [{data_cmd}]')

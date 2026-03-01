@@ -9,6 +9,7 @@ from .scene import (
     SceneImageManager,
     SceneImage,
     HFDataset,
+    DBConnection,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     'SceneImageManager',
     'SceneImage',
     'HFDataset',
+    'DBConnection',
 ]
