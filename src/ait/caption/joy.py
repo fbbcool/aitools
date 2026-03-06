@@ -83,7 +83,7 @@ class Joy:
             self.repo_id, torch_dtype='bfloat16', device_map=0
         )
         self.model.eval()
-        self.processor = AutoProcessor.from_pretrained(self.repo_id)
+        self.processor = AutoProcessor.from_pretrained(self.repo_id, use_fast=False)
 
     # the public interface
     def img_caption(self, img: Image.Image) -> str:
