@@ -19,31 +19,36 @@ AppOpMmode = Literal['info', 'rate', 'label', 'set', 'none']
 class AppHtml:
     ELEM_ID: Final = 'elem_id'
 
-    @classmethod
-    def make_elem_id(
-        cls, obj: str, action: Optional[str] = None, html_obj: Optional[str] = None
-    ) -> str:
+    @staticmethod
+    def make_elem_id(obj: str, action: Optional[str] = None, html_obj: Optional[str] = None) -> str:
         if action is None:
             action = ''
         if html_obj is None:
             html_obj = ''
-        return '_'.join([cls.ELEM_ID, obj, action, html_obj])
+        return '_'.join([AppHtml.ELEM_ID, obj, action, html_obj])
 
-    @classmethod
-    def make_elem_id_button_update(cls, obj: str) -> str:
-        return cls.make_elem_id(obj, action='update', html_obj='button')
+    @staticmethod
+    def make_elem_id_hidden_button(obj: str) -> str:
+        return AppHtml.make_elem_id(obj, action='hidden', html_obj='button')
 
-    @classmethod
-    def make_elem_id_button_get(cls, obj: str) -> str:
-        return cls.make_elem_id(obj, action='get', html_obj='button')
+    @staticmethod
+    def make_elem_id_button_get(obj: str) -> str:
+        return AppHtml.make_elem_id(obj, action='get', html_obj='button')
 
-    @classmethod
-    def make_elem_id_databus_textbox(cls, obj: str) -> str:
-        return cls.make_elem_id(obj, html_obj='databus')
+    @staticmethod
+    def make_elem_id_databus_textbox(obj: str) -> str:
+        return AppHtml.make_elem_id(obj, action='hidden', html_obj='databus')
 
-    @classmethod
+    @staticmethod
+    def elem_id_cmd_button() -> str:
+        return AppHtml.make_elem_id_hidden_button('cmd')
+
+    @staticmethod
+    def elem_id_cmd_databus() -> str:
+        return AppHtml.make_elem_id_databus_textbox('cmd')
+
+    @staticmethod
     def make_cmd_data(
-        cls,
         type_obj: str,
         id: str,
         cmd: str,
@@ -59,19 +64,18 @@ class AppHtml:
         data |= {'label': label}
         return data
 
-    @classmethod
+    @staticmethod
     def make_cmd_data_str(
-        cls,
         type_obj: str,
         id: str,
         cmd: str,
         payload: Optional[Any] = None,
         label: Optional[str] = None,
     ) -> str:
-        return json.dumps(cls.make_cmd_data(type_obj, id, cmd, payload=payload, label=label))
+        return json.dumps(AppHtml.make_cmd_data(type_obj, id, cmd, payload=payload, label=label))
 
-    @classmethod
-    def html_make_cmd_button(cls, data_cmd: dict, checked: bool = False) -> str:
+    @staticmethod
+    def html_make_cmd_button(data_cmd: dict, checked: bool = False) -> str:
         type_obj = data_cmd.get('type', None)
         id = data_cmd.get('id', None)
         cmd = data_cmd.get('cmd', None)
@@ -82,11 +86,20 @@ class AppHtml:
         if checked:
             checked_html = 'checked'
         onclick_js = f"""
+        console.log("cmd button clicked!");
         event.stopPropagation();
-        const bus = document.querySelector('#{AppHtml.make_elem_id_databus_textbox('cmd')} textarea');
+        elem_id_btn = '{AppHtml.elem_id_cmd_button()}';
+        btn_elem = document.getElementById(elem_id_btn);
+        console.log(elem_id_btn);
+        console.log(btn_elem);
+        elem_id_bus = '{AppHtml.elem_id_cmd_databus()}';
+        bus_elem = document.getElementById(elem_id_bus);
+        console.log(elem_id_bus);
+        console.log(bus_elem);
+        const bus = document.querySelector('#{AppHtml.elem_id_cmd_databus()} textarea');
         bus.value = '{json.dumps(data_cmd)}';
         bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        document.getElementById('{AppHtml.make_elem_id_button_update('cmd')}').click();""".replace(
+        document.getElementById('{AppHtml.elem_id_cmd_button()}').click();""".replace(
             '\n', ' '
         ).replace('"', '&quot;')
         output_html = f"""
@@ -95,8 +108,8 @@ class AppHtml:
             """
         return output_html
 
-    @classmethod
-    def html_styled_cells_grid(cls, inner_html: str, img_width: int = 250) -> str:
+    @staticmethod
+    def html_styled_cells_grid(inner_html: str, img_width: int = 250) -> str:
         html = f"""
         <style>
             .image-grid {{

@@ -1,4 +1,5 @@
 import os
+import re
 import gradio as gr
 from typing import Optional
 
@@ -36,16 +37,16 @@ class AIDBSceneApp:
             gr.Markdown('# AIDB Scene Metadata Manager')
             gr.Markdown('Welcome to the AIDB frontend. Use the search options below.')
 
-            # --- Hidden Components for Robust Event Handling ---
             button_hidden_cmd = gr.Button(
-                'Hidden Cmd Update Trigger',
-                visible=False,
-                elem_id=AppHtml.make_elem_id_button_update('cmd'),  # has to be a mode
+                'Hidden Cmd Button',
+                visible='hidden',
+                elem_id=AppHtml.elem_id_cmd_button(),
             )
 
             # Data bus textboxes (hold data passed from JS to Python)
             databus_cmd = gr.Textbox(
-                visible=False, elem_id=AppHtml.make_elem_id_databus_textbox('cmd')
+                visible='hidden',
+                elem_id=AppHtml.elem_id_cmd_databus(),
             )  # has to be a mode
             # --- End Hidden Components ---
 
@@ -116,6 +117,7 @@ class AIDBSceneApp:
                 inputs=[databus_cmd],  # Input is the data bus textbox
                 outputs=[],  # This function doesn't update UI directly
             )
+
         return if_app
 
     def _html_scenes_search_and_op(
