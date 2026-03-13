@@ -14,8 +14,11 @@
       ],
       "custom_node": [
         {
-          "repo_id": "yolain/ComfyUI-Easy-Use",
+          "repo_id": "fbbcool/comfyui-fbbcool-suite",
           "method_download": "github"
+        },
+        {
+          "repo_id": "yolain/ComfyUI-Easy-Use"
         },
         {
           "repo_id": "cubiq/ComfyUI_essentials"
