@@ -22,6 +22,13 @@
           "skip": false
         }
       ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/ltx-2",
+          "file": "split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors",
+          "skip": false
+        }
+      ],
       "vocoder": [
         {
           "repo_id": "Lightricks/LTX-2",
@@ -48,13 +55,6 @@
         {
           "file": "vae/diffusion_pytorch_model.safetensors",
           "rename": "vae"
-        }
-      ],
-      "text_encoder": [
-        {
-          "repo_id": "Lightricks/LTX-2",
-          "file": "",
-          "rename": ""
         }
       ],
       "vocoder": [
