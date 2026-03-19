@@ -121,40 +121,63 @@
           "skip": false
         },
         {
+          "link": "https://civitai.com/api/download/models/2474488?type=Model&format=SafeTensor",
+          "rename": "nsfw-snofs-v13",
+          "skip": true
+        },
+        {
+          "id": 2108245,
+          "rename": "realism-nice-girls-v1",
+          "method_download": "civitai2",
+          "skip": false
+        },
+        {
+          "id": 2106185,
+          "rename": "realism-lenovo-v1",
+          "method_download": "civitai2",
+          "skip": false
+        },
+        {
+          "id": 2289403,
+          "rename": "realism-smartphone-v1",
+          "method_download": "civitai2",
+          "skip": false
+        },
+        {
+          "id": 2270374,
+          "rename": "realism-samsung-cam-v1",
+          "method_download": "civitai2",
+          "skip": false
+        },
+        {
           "link": "https://civitai.com/api/download/models/2510724?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "penis-lora-v2",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2369080?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "skinfix-v2",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2363467?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "amateur-photo-v1",
-          "skip": false
-        },
-        {
-          "link": "https://civitai.com/api/download/models/2474488?type=Model&format=SafeTensor",
-          "method_download": "civitai",
-          "rename": "nsfw-snofs-v13",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2432060?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "face-in-ass",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2432354?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "facesitting",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "fbbcool/qwen-image_lora",

@@ -3,6 +3,8 @@ import sys
 from typing import Final, Generator, Literal, Any
 import json
 from huggingface_hub import hf_hub_download, snapshot_download
+from civitai_downloader import login as civitai_login
+from civitai_downloader import civitai_download
 import requests
 from tqdm import tqdm
 from git import Repo  # pip install gitpython
@@ -260,6 +262,8 @@ class AInstaller:
             item = self._install_item_git(item)
         elif method == 'civitai':
             item = self._install_item_civitai(item)
+        elif method == 'civitai2':
+            item = self._install_item_civitai2(item)
         elif method == 'wget':
             item = self._install_item_wget(item)
 
@@ -517,6 +521,22 @@ class AInstaller:
             os.unlink(str(target))
         os.symlink(str(src), str(target), target_is_directory=directory)
 
+    def _install_item_civitai2(self, item: dict) -> dict:
+        civitai_login()
+        id = item['config'].get('id', None)
+        if id is None:
+            url = item['config'].get('link', None)
+            if url is None:
+                return item
+
+        civitai_download(
+            id,
+            cache_dir=str(self._cache),
+            use_cache=True,
+            local_dir=str(item['target_dir']),
+        )
+        return item
+
     def _install_item_civitai(self, item: dict) -> dict:
         url = item['config'].get('link', '')
         if not url:
@@ -554,6 +574,8 @@ class AInstaller:
             parsed_url = urlparse(redirect_url)
             query_params = parse_qs(parsed_url.query)
             content_disposition = query_params.get('response-content-disposition', [None])[0]
+
+            print(content_disposition)
 
             if content_disposition:
                 filename_cai = unquote(content_disposition.split('filename=')[1].strip('"'))
