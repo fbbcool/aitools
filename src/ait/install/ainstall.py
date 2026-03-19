@@ -286,6 +286,7 @@ class AInstaller:
             'diffusor': 'models/diffusion_models',
             'transformer': 'models/diffusion_models',
             'text_encoder': 'models/text_encoders',
+            'latent_upscale': 'models/latent_upscale_models',
         }
         target_dir = map_target_dirs.get(item.get('target', 'unknown'), '')
         if not target_dir:

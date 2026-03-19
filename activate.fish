@@ -48,6 +48,11 @@ function ait_setup_zimage_edit
     python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY zimage:edit
 end
 
+function ait_setup_ltx
+    ait_update
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY ltx:23
+end
+
 function ait_setup_train_zimage_turbo
     ait_update
     python3 $HOME_AIT/script/ainstall_diffpipe.py $WORKSPACE train_zimage:turbo
