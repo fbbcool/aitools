@@ -17,6 +17,48 @@
       ],
       "lora": [
         {
+          "id": 2783583,
+          "method_download": "civitai2",
+          "rename": "mp-sex-05-07",
+          "skip": false
+        },
+        {
+          "id": 2778606,
+          "method_download": "civitai2",
+          "rename": "female-nudity-v2",
+          "skip": false
+        },
+        {
+          "id": 2775233,
+          "method_download": "civitai2",
+          "rename": "cumshot",
+          "skip": false
+        },
+        {
+          "id": 2755189,
+          "method_download": "civitai2",
+          "rename": "penis-lora",
+          "skip": false
+        },
+        {
+          "id": 2729936,
+          "method_download": "civitai2",
+          "rename": "beeg-breasts-v11",
+          "skip": false
+        },
+        {
+          "id": 2772932,
+          "method_download": "civitai2",
+          "rename": "penile-praxis-v40",
+          "skip": false
+        },
+        {
+          "id": 2668170,
+          "method_download": "civitai2",
+          "rename": "tit-daddy-v20",
+          "skip": false
+        },
+        {
           "repo_id": "Comfy-Org/ltx-2",
           "file": "split_files/loras/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors",
           "skip": false
