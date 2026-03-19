@@ -273,6 +273,7 @@ class AInstaller:
         # build target url
         map_target_dirs = {
             'ckpt': 'models/ckpt',
+            'checkpoint': 'models/checkpoints',
             'vae': 'models/vae',
             'controlnet': 'models/controlnet',
             'custom_node': 'custom_nodes',
@@ -288,11 +289,12 @@ class AInstaller:
             'text_encoder': 'models/text_encoders',
             'latent_upscale': 'models/latent_upscale_models',
         }
-        target_dir = map_target_dirs.get(item.get('target', 'unknown'), '')
+        target = item.get('target', 'unknown')
+        target_dir = map_target_dirs.get(target, '')
         if not target_dir:
+            print(f'warning: target [{target}] -> target_dir [{target_dir}] is invalid!')
             item['invalid'] = True
             return item
-        target = item.get('target')
         if target == 'custom_node':
             repo_id = item['config'].get('repo_id')
             split = repo_id.split('/')
