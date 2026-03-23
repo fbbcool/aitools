@@ -17,6 +17,12 @@
       ],
       "lora": [
         {
+          "id": 2747549,
+          "method_download": "civitai2",
+          "rename": "dreamplay-v1",
+          "skip": false
+        },
+        {
           "id": 2783583,
           "method_download": "civitai2",
           "rename": "mp-sex-05-07",
@@ -65,6 +71,11 @@
         }
       ],
       "text_encoder": [
+        {
+          "repo_id": "DreamFast/gemma-3-12b-it-heretic",
+          "file": "comfyui/gemma_3_12B_it_heretic_fp8_e4m3fn.safetensors",
+          "skip": false
+        },
         {
           "repo_id": "Comfy-Org/ltx-2",
           "file": "split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors",
