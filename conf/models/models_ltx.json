@@ -3,6 +3,12 @@
     "23": {
       "checkpoint": [
         {
+          "id": 2752410,
+          "method_download": "civitai2",
+          "rename": "fp8-eros10",
+          "skip": false
+        },
+        {
           "repo_id": "Lightricks/LTX-2.3-fp8",
           "file": "ltx-2.3-22b-dev-fp8.safetensors",
           "rename": "dev-fp8",
@@ -16,6 +22,12 @@
         }
       ],
       "lora": [
+        {
+          "repo_id": "LiconStudio/Ltx2.3-VBVR-lora-I2V",
+          "file": "Ltx2.3-Licon-VBVR-I2V-96000-R32.safetensors",
+          "rename": "vbvr-96-reasoning",
+          "skip": false
+        },
         {
           "id": 2747549,
           "method_download": "civitai2",
@@ -62,6 +74,18 @@
           "id": 2668170,
           "method_download": "civitai2",
           "rename": "tit-daddy-v20",
+          "skip": false
+        },
+        {
+          "id": 2816262,
+          "method_download": "civitai2",
+          "rename": "sexgod_hairy",
+          "skip": false
+        },
+        {
+          "repo_id": "Lightricks/LTX-2.3",
+          "file": "ltx-2.3-22b-distilled-lora-384.safetensors",
+          "rename": "distilled-lora",
           "skip": false
         },
         {

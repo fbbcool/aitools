@@ -120,6 +120,11 @@ function comfy_clean_gen
     rm -rf $HOME_COMFY/temp/*
 end
 
+function comfy_save_latest_vid
+    set dir $HOME_COMFY/output/video/save
+    lslast 2 $dir | xargs -t -i cp $dir/{} $HOME/Downloads
+end
+
 function comfy_save_latest_vid_prores
     set dir $HOME_COMFY/output/video/prores
     lslast 2 $dir | xargs -t -i cp $dir/{} $HOME/Downloads

@@ -180,7 +180,7 @@
           "skip": true
         },
         {
-          "repo_id": "fbbcool/qwen-image_lora",
+          "repo_id": "fbbcool/qwen-2512-lora",
           "skip": false
         }
       ]
