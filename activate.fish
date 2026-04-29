@@ -74,7 +74,7 @@ function ait_img_caption_clipspace
     echo (wl-paste)
     #python3 $HOME_AIT/script/img_caption.py (wl-paste) | sed 's/\(<prompt>\|<\/prompt>\)//g' | wl-copy
     set output (python3 $HOME_AIT/script/img_caption.py (wl-paste))
-    set out2 (echo $output | grep -o '<prompt>.*</prompt>' | sed 's/\(<prompt>\|<\/prompt>\)//g')
+    set out2 (echo $output | grep -o '<caption>.*</caption>' | sed 's/\(<caption>\|<\/caption>\)//g')
     echo $out2 | wl-copy
     echo -n (wl-paste)
 end

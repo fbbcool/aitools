@@ -1,20 +1,27 @@
 import sys
 from pathlib import Path
-from ait.caption import Joy
+from typing import Optional
+
+from aidb import SceneDef
+from ait.caption import Joy, JoySceneDB
+from ait.tools.files import is_img
 
 if __name__ == '__main__':
+    trigger = 'gts_prompter'
     url_img = Path(sys.argv[1])
-    if not url_img.exists():
+    if not is_img(url_img):
         exit(1)
-    if url_img.suffix.lower() not in ['.jpg', '.jpeg', '.png', '.webp']:
-        exit(1)
-
     print(f'-> {url_img.name}')
 
-    joy = Joy('gts_prompter')
-    # joy = Joy('1xlasm')
-    # joy = Joy('1hairy')
-    # joy = Joy('1fbb')
-    caption = joy.imgurl_caption(str(url_img))
+    caption: Optional[str] = None
+    prompt: Optional[str] = None
+    id = SceneDef.id_from_filename_orig(url_img)
+    if id is not None:
+        joy = JoySceneDB('prod', trigger=trigger)
+        prompt, caption = joy._id_caption(id)
 
-    print(f'<prompt>\n{caption}\n </prompt>')
+    if caption is None:
+        joy = Joy(trigger)
+        prompt, caption = joy.imgurl_caption(str(url_img))
+
+    print(f'<caption>\n{caption}\n </caption>')

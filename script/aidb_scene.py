@@ -11,13 +11,13 @@ from aidb.app.scene.app import AIDBSceneApp
 from ait.tools.files import is_img_or_vid, is_dir
 
 
-def imgs_or_vids_move_to_scene_id(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+def imgs_or_vids_move_to_scene_id(params: Any, clipspace: Any, config: SceneConfig) -> None:
     print(f'move: params[{params}] clipspace[{clipspace}]')
 
     return None
 
 
-def scene_new(params: Any, clipsapce: Any, config: SceneConfig) -> Optional[Path]:
+def scene_new(params: Any, clipspace: Any, config: SceneConfig) -> Optional[Path]:
     urls_img_vid = [url for url in clipspace if is_img_or_vid(url)]
     urls_dir = [url for url in clipspace if is_dir(url)]
 
@@ -56,16 +56,16 @@ def scene_new(params: Any, clipsapce: Any, config: SceneConfig) -> Optional[Path
     return None
 
 
-def scenes_update(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+def scenes_update(params: Any, clipspace: Any, config: SceneConfig) -> None:
     scm = SceneManager(verbose=0, config=config)
     scm.scenes_update()
 
     return None
 
 
-def scene_url(params: Any, clipsapce: Any, config: SceneConfig) -> Optional[Path]:
+def scene_url(params: Any, clipspace: Any, config: SceneConfig) -> Optional[Path]:
     scm = SceneManager(verbose=0, config=config)
-    url_reg_file = clipsapce[0]
+    url_reg_file = clipspace[0]
     url = scm.url_from_registered_file(url_reg_file)
 
     return url
@@ -87,8 +87,8 @@ def images_info(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     return None
 
 
-def images_register(params: Any, clipsapce: Any, config: SceneConfig) -> None:
-    urls_img = [url for url in clipsapce if is_img_or_vid(url)]
+def images_register(params: Any, clipspace: Any, config: SceneConfig) -> None:
+    urls_img = [url for url in clipspace if is_img_or_vid(url)]
 
     if not urls_img:
         print('no imgs found!')
@@ -116,8 +116,8 @@ def images_register(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     return None
 
 
-def images_rate(params: Any, clipsapce: Any, config: SceneConfig) -> None:
-    urls_img = [url for url in clipsapce if is_img_or_vid(url)]
+def images_rate(params: Any, clipspace: Any, config: SceneConfig) -> None:
+    urls_img = [url for url in clipspace if is_img_or_vid(url)]
 
     if not urls_img:
         print('no imgs found!')
@@ -133,7 +133,7 @@ def images_rate(params: Any, clipsapce: Any, config: SceneConfig) -> None:
     return None
 
 
-def start_app(params: Any, clipsapce: Any, config: SceneConfig) -> None:
+def start_app(params: Any, clipspace: Any, config: SceneConfig) -> None:
     scm = SceneManager(config=config)  # type: ignore
     scm.scenes_update()
     app = AIDBSceneApp(scm)

@@ -101,8 +101,8 @@ class Joy:
             model_repo_id = AInstallerDB().repo_ids(
                 group='capjoy', variant='common', target='model'
             )[0]
-        except IndexError:
-            raise IndexError('AInstallerDB: no model configured!')
+        except IndexError as idxe:
+            raise IndexError('AInstallerDB: no model configured!') from idxe
         self.repo_id = model_repo_id
 
         self.model = LlavaForConditionalGeneration.from_pretrained(
@@ -116,12 +116,14 @@ class Joy:
         self,
         img: Image.Image,
         trigger: Optional[str] = None,
-        labels: list[str] = [],
+        labels: Optional[list[str]] = None,
         hint: str = '',
-    ) -> str:
+    ) -> tuple[str, Optional[str]]:
         if trigger is None:
             trigger = self._trigger
 
+        if labels is None:
+            labels = []
         for label in labels:
             add_hint = LABEL_PROMPT.get(label, None)
             if add_hint is not None:
@@ -131,16 +133,18 @@ class Joy:
         if hint:
             prompt += hint
         prompt += POST_PROMPT
-        print(f'using prompt [{prompt}]')
-        return self._process(img, prompt)
 
-    def imgurl_caption(self, url: str) -> str:
+        caption = self._process(img, prompt)
+
+        return prompt, caption
+
+    def imgurl_caption(self, url: str) -> tuple[str, Optional[str]]:
         pil = Image.open(url)
         return self.img_caption(pil)
 
     def _process(self, img: Image.Image, prompt: str) -> str:
         # Format the conversation
-        # WARNING: HF's handling of chat's on Llava models is very fragile.  This specific combination of processor.apply_chat_template(), and processor() works
+        # NOTE:  HF's handling of chat's on Llava models is very fragile.  This specific combination of processor.apply_chat_template(), and processor() works
         # but if using other combinations always inspect the final input_ids to ensure they are correct.  Often times you will end up with multiple <bos> tokens
         # if not careful, which can make the model perform poorly.
         convo = self._convo.copy()
