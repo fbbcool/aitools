@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Final, Generator
+from typing import Any, Generator
 import json
 
 from aidb.scene.db_connect import DBConnection
@@ -16,8 +16,6 @@ from .scene_common import SceneDef, SceneConfig
 
 
 class SceneManager:
-    DOTFILE: Final = '.scenemanager'
-
     def __init__(
         self,
         dbc: DBConnection | None = None,
@@ -53,10 +51,10 @@ class SceneManager:
     def url_thumbs(self) -> Path:
         return self._dbc.config.thumbs_url
 
-    @classmethod
-    def _url_dotfile_path(cls, url: str | Path) -> Path:
+    @staticmethod
+    def _url_dotfile_path(url: str | Path) -> Path:
         url = Path(url)
-        return url / cls.DOTFILE
+        return url / SceneDef.DOTFILE_SCENE
 
     @classmethod
     def _url_dotfile_load(cls, url: str | Path) -> None | dict:
@@ -200,7 +198,7 @@ class SceneManager:
             self._log(f'url {url} not exists for dotfile: {up_data}', level='warning')
             return None
 
-        dotfile = url / self.DOTFILE
+        dotfile = url / SceneDef.DOTFILE_SCENE
         data = self._json_read(dotfile)
         data |= up_data
         self._json_write(dotfile, data)

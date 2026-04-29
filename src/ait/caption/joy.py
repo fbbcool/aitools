@@ -3,7 +3,7 @@ from PIL import Image
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 
 
-from typing import Final
+from typing import Final, Optional
 
 from ait.install import AInstallerDB
 
@@ -47,6 +47,32 @@ CONTENT_PROMPT: Final = {
     '1tongue': 'This is a real image of a woman with close-up on her face.she shows off her long tongue. do not describe the size of her tongue since this is already known.',
 }
 
+LABEL_PROMPT: Final = {
+    'all4': 'The giantess woman is on her all fours.',
+    'ass': 'The xlasm man interacts with the giantess womans ass.',
+    'body': 'The xlasm man interacts with the giantess womans body.',
+    'breast': 'The xlasm man interacts with the giantess womans breasts.',
+    'face': 'The xlasm man interacts with the giantess womans face.',
+    'foot': 'The xlasm man interacts with the giantess womans foot.',
+    'hand': 'The xlasm man interacts with the giantess womans hand.',
+    'hanging': 'The xlasm man is in a hanging position.',
+    'heap': '',
+    'holding': 'The xlasm man is held by the giantess woman.',
+    'insert': 'the xlasm man is definitly partly inserted into the giantess womans vagina, ass or mouth.  mention, when his head, upper body or lower body is inserted into her vagina, otherwise do not mention.',
+    'job': 'The giantess woman is giving the xlasm man either a handjob or a blowjob.',
+    'leg': 'The xlasm man interacts with the giantess womans leg.',
+    'mouth': 'The xlasm man interacts with the giantess womans mouth.',
+    'panties': 'The xlasm man is inserted into the giantess womans panties.',
+    'pussy': 'The xlasm man interacts with the giantess womans vagina.',
+    'sex': 'The xlasm man has sex with the giantess woman, inserting his erect penis into her vagina.',
+    'sitting': 'The xlasm man is in a sitting position. Most likely he sits on a bodypart of the giantess woman.',
+    'step': 'The giantess woman is stepping on the xlasm man with her foot.',
+    'thigh': 'The xlasm man is positioned between the thighs of the giantess woman.',
+    'tongue': 'The xlasm man interacts with the giantess womans tongue.',
+    'tower': 'The giantess woman is towering over the xlasm man.',
+    'none': '',
+}
+
 POST_PROMPT: Final = ''
 
 
@@ -86,8 +112,26 @@ class Joy:
         self.processor = AutoProcessor.from_pretrained(self.repo_id, use_fast=False)
 
     # the public interface
-    def img_caption(self, img: Image.Image) -> str:
-        prompt = DEFAULT_PROMPT + CONTENT_PROMPT.get(self._trigger, '') + POST_PROMPT
+    def img_caption(
+        self,
+        img: Image.Image,
+        trigger: Optional[str] = None,
+        labels: list[str] = [],
+        hint: str = '',
+    ) -> str:
+        if trigger is None:
+            trigger = self._trigger
+
+        for label in labels:
+            add_hint = LABEL_PROMPT.get(label, None)
+            if add_hint is not None:
+                hint += add_hint
+        prompt = DEFAULT_PROMPT
+        prompt += CONTENT_PROMPT.get(trigger, '')
+        if hint:
+            prompt += hint
+        prompt += POST_PROMPT
+        print(f'using prompt [{prompt}]')
         return self._process(img, prompt)
 
     def imgurl_caption(self, url: str) -> str:

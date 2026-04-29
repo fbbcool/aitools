@@ -72,6 +72,15 @@ def is_dir(url: str | Path) -> bool:
     return False
 
 
+def is_file(url: str | Path) -> bool:
+    url = Path(url)
+    if not url.exists():
+        return False
+    elif url.is_file():
+        return True
+    return False
+
+
 def subdirs(url: str | Path) -> list[Path]:
     url = str(url)
     fu = [Path(f.path) for f in os.scandir(url) if f.is_dir()]

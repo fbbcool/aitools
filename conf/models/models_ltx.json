@@ -29,6 +29,18 @@
           "skip": false
         },
         {
+          "id": 2857106,
+          "method_download": "civitai2",
+          "rename": "sexgod-hj-v1",
+          "skip": false
+        },
+        {
+          "id": 2848299,
+          "method_download": "civitai2",
+          "rename": "VBVR-NSFW",
+          "skip": false
+        },
+        {
           "id": 2747549,
           "method_download": "civitai2",
           "rename": "dreamplay-v1",
