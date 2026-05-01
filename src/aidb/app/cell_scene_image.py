@@ -10,7 +10,7 @@ from aidb.scene import Scene, SceneDef
 from aidb.scene.scene_image import SceneImage
 from aidb.tagger_defines import TaggerDef
 
-from ait.tools.images import image_from_url
+from ait.tools.images import image_from_url, _image_extract_prompt_from_info_ext
 
 
 class AppSceneImageCell:
@@ -56,6 +56,7 @@ class AppSceneImageCell:
             label='prompt',
             value=obj.prompt,
             multiline=True,
+            with_save=False,
         )
 
         url = obj.url_from_data
@@ -148,6 +149,7 @@ class AppSceneImageCell:
         label: str,
         value: Optional[str],
         multiline: bool = True,
+        with_save: bool = True,
     ) -> str:
         """
         Renders a full editable text-field block:
@@ -156,71 +158,105 @@ class AppSceneImageCell:
                 <div class="simg-edit-field-header">
                     <label>{label}</label>
                     <button class="simg-copy-btn">copy</button>
+                    <button class="simg-save-btn">save</button>
                 </div>
                 <textarea/input>
             </div>
 
-        The copy button copies the textarea's *current* value (i.e. what the
-        user sees, not necessarily what's saved) to the clipboard via the
-        browser's clipboard API.
+        - copy: copies the input's current visible value to clipboard
+        - save: explicitly stores the input's current value to the DB via
+                the cmd-bus (overwriting whatever was there before)
         """
         if value is None:
             value = ''
 
-        # We use a simple JS hook on `change` (fires on blur for textareas/inputs).
-        # The JS reads the current value, packages a cmd-data payload and dispatches
-        # the cmd_run via the existing hidden cmd-button + databus.
+        safe_value = html_lib.escape(value, quote=True)
+        elem_id = f'simg-{attr_setter}-{obj.id}'
+
+        if multiline:
+            input_html = (
+                f'<textarea id="{elem_id}" class="simg-edit-textarea" rows="3">'
+                f'{safe_value}</textarea>'
+            )
+        else:
+            input_html = (
+                f'<input type="text" id="{elem_id}" class="simg-edit-input" '
+                f'value="{safe_value}">'
+            )
+
+        copy_btn_html = AppSceneImageCell._html_copy_button(elem_id)
+        save_btn_html = ''
+        if with_save:
+            save_btn_html = AppSceneImageCell._html_save_button(
+                target_elem_id=elem_id,
+                obj_id=obj.id,
+                attr_setter=attr_setter,
+                label=label,
+            )
+
+        return f"""
+        <div class="simg-edit-field">
+            <div class="simg-edit-field-header">
+                <label class="simg-edit-label" for="{elem_id}">{label}</label>
+                <div class="simg-edit-field-actions">
+                    {copy_btn_html}
+                    {save_btn_html}
+                </div>
+            </div>
+            {input_html}
+        </div>
+        """
+
+    @staticmethod
+    def _html_save_button(
+        target_elem_id: str,
+        obj_id: str,
+        attr_setter: str,
+        label: str,
+    ) -> str:
+        """
+        Save button for an editable text field. When clicked it reads the
+        current value of the linked input/textarea, packages a cmd-bus
+        `db_query` cmd with `{attr_setter: value}` payload, and triggers the
+        existing hidden cmd-button so the server stores the value
+        (overwriting any previous value).
+        """
         elem_id_btn = AppHtml.elem_id_cmd_button()
         elem_id_bus = AppHtml.elem_id_cmd_databus()
 
-        # cmd skeleton; the actual value is filled in via JS at runtime.
         cmd_skeleton = {
             'type': 'image',
-            'id': obj.id,
+            'id': obj_id,
             'cmd': 'db_query',
             'payload': {attr_setter: '__VALUE__'},
             'label': label,
         }
         skeleton_json = json.dumps(cmd_skeleton)
 
-        # Build JS that updates the cmd payload with the textarea's current value,
-        # writes the JSON into the cmd databus, and clicks the hidden cmd button.
-        onchange_js = (
-            f"const v = this.value;"
-            f"const skel = JSON.parse('{skeleton_json}');"
-            f"skel.payload['{attr_setter}'] = v;"
-            f"const bus = document.querySelector('#{elem_id_bus} textarea');"
-            f"bus.value = JSON.stringify(skel);"
-            f"bus.dispatchEvent(new Event('input', {{ bubbles: true }}));"
-            f"document.getElementById('{elem_id_btn}').click();"
-        ).replace('"', '&quot;')
-
-        # Escape value for safe HTML embedding
-        safe_value = html_lib.escape(value, quote=True)
-        elem_id = f'simg-{attr_setter}-{obj.id}'
-
-        if multiline:
-            input_html = (
-                f'<textarea id="{elem_id}" class="simg-edit-textarea" rows="3" '
-                f'onchange="{onchange_js}">{safe_value}</textarea>'
-            )
-        else:
-            input_html = (
-                f'<input type="text" id="{elem_id}" class="simg-edit-input" '
-                f'value="{safe_value}" onchange="{onchange_js}">'
-            )
-
-        copy_btn_html = AppSceneImageCell._html_copy_button(elem_id)
-
-        return f"""
-        <div class="simg-edit-field">
-            <div class="simg-edit-field-header">
-                <label class="simg-edit-label" for="{elem_id}">{label}</label>
-                {copy_btn_html}
-            </div>
-            {input_html}
-        </div>
-        """
+        js = f"""
+        event.stopPropagation();
+        const el = document.getElementById('{target_elem_id}');
+        if (!el) {{ return; }}
+        const v = el.value;
+        const skel = JSON.parse('{skeleton_json}');
+        skel.payload['{attr_setter}'] = v;
+        const bus = document.querySelector('#{elem_id_bus} textarea');
+        if (bus) {{
+            bus.value = JSON.stringify(skel);
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+        const trig = document.getElementById('{elem_id_btn}');
+        if (trig) {{ trig.click(); }}
+        const btn = event.currentTarget;
+        const orig = btn.textContent;
+        btn.textContent = 'saved';
+        btn.classList.add('simg-copy-btn-ok');
+        setTimeout(function() {{
+            btn.textContent = orig;
+            btn.classList.remove('simg-copy-btn-ok');
+        }}, 800);
+        """.replace('\n', ' ').replace('"', '&quot;')
+        return f'<button type="button" class="simg-save-btn" onclick="{js}">save</button>'
 
     @staticmethod
     def _html_copy_button(target_elem_id: str, label: str = 'copy') -> str:
@@ -390,6 +426,14 @@ class AppSceneImageCell:
         safe_name = html_lib.escape(url.name, quote=True)
         safe_path = html_lib.escape(url_str, quote=True)
         url_copy_btn = AppSceneImageCell._html_copy_static_button(url_str, label='url')
+
+        # Extract the embedded prompt from the image (if any). When no prompt
+        # can be extracted, fall back to the file url as the value to copy.
+        prompt = AppSceneImageCell._extract_prompt_from_url(url)
+        prompt_value = prompt if prompt else url_str
+        prompt_copy_btn = AppSceneImageCell._html_copy_static_button(
+            prompt_value, label='prompt'
+        )
         return f"""
         <div class="image-item simg-unreg-cell">
             <img src="data:image/png;base64,{img_b64}">
@@ -398,12 +442,32 @@ class AppSceneImageCell:
                     <div class="simg-edit-id" title="{safe_path}">{safe_name}</div>
                     {url_copy_btn}
                 </div>
-                <button type="button" class="simg-register-btn" onclick="{onclick_js}">
-                    register
-                </button>
+                <div class="simg-unreg-actions">
+                    {prompt_copy_btn}
+                    <button type="button" class="simg-register-btn" onclick="{onclick_js}">
+                        register
+                    </button>
+                </div>
             </div>
         </div>
         """
+
+    @staticmethod
+    def _extract_prompt_from_url(url: Path) -> Optional[str]:
+        """
+        Tries to extract the generation prompt embedded in the image's PNG
+        metadata. Returns None when no prompt could be recovered.
+        """
+        try:
+            pil = image_from_url(url)
+            if pil is None:
+                return None
+            pil.load()
+            info_ext = getattr(pil, 'info', {}) or {}
+            return _image_extract_prompt_from_info_ext(info_ext, verbose=False)
+        except Exception as e:
+            print(f'WARN: prompt extract from {url} failed: {e}')
+            return None
 
     @staticmethod
     def _load_thumb_from_url(url: Path) -> Optional[PILImage.Image]:
@@ -441,6 +505,13 @@ class AppSceneImageCell:
                 justify-content: space-between;
                 gap: 6px;
                 margin-bottom: 4px;
+            }
+            .simg-unreg-actions {
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+                justify-content: center;
+                margin-top: 4px;
             }
             .simg-edit-field {
                 margin-top: 8px;
@@ -480,9 +551,10 @@ class AppSceneImageCell:
                 margin: 8px 0;
                 color: #ffffff;
             }
-            /* Copy + register buttons share the look-and-feel of the
-               selectable labels in `.operation-radio-group label`. */
+            /* Copy / save / register buttons share the look-and-feel of
+               the selectable labels in `.operation-radio-group label`. */
             .simg-copy-btn,
+            .simg-save-btn,
             .simg-register-btn {
                 padding: 5px 8px;
                 border: 1px solid #ccc;
@@ -496,6 +568,7 @@ class AppSceneImageCell:
                 line-height: 1;
             }
             .simg-copy-btn:hover,
+            .simg-save-btn:hover,
             .simg-register-btn:hover {
                 background-color: #777777;
             }
@@ -515,6 +588,11 @@ class AppSceneImageCell:
             }
             .simg-edit-field-header .simg-edit-label {
                 margin-bottom: 0;
+            }
+            .simg-edit-field-actions {
+                display: flex;
+                gap: 4px;
+                align-items: center;
             }
         </style>
         """
