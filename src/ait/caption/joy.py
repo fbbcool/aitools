@@ -73,6 +73,7 @@ LABEL_PROMPT: Final = {
     'sex': 'The xlasm man has sex with the giantess woman, inserting his erect penis into her vagina.',
     'sitting': 'The xlasm man is in a sitting position. Most likely he sits on a bodypart of the giantess woman.',
     'step': 'The giantess woman is stepping on the xlasm man with her foot.',
+    'teasing_hj': 'The giantess woman gives the xlasm man a teasing handjob (mention "giving a teasing handjob" right at the beginning as a focus information) by stimulation and stroking his penis delicately with her fingers.',
     'thigh': 'The xlasm man is positioned between the thighs of the giantess woman.',
     'tongue': 'The xlasm man interacts with the giantess womans tongue.',
     'tower': 'The giantess woman is towering over the xlasm man.',
