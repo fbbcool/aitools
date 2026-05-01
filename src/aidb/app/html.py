@@ -11,6 +11,7 @@ import gradio as gr
 from aidb.scene import DBConnection
 from aidb import Scene, SceneImageManager, SceneManager, SceneSetManager
 from aidb.scene.scene_common import Sceneical
+from aidb.scene.scene_image import SceneImage
 
 
 AppOpMmode = Literal['info', 'rate', 'label', 'set', 'none']
@@ -46,6 +47,18 @@ class AppHtml:
     @staticmethod
     def elem_id_cmd_databus() -> str:
         return AppHtml.make_elem_id_databus_textbox('cmd')
+
+    @staticmethod
+    def elem_id_simg_editor_open_button() -> str:
+        return AppHtml.make_elem_id_hidden_button('simg_editor_open')
+
+    @staticmethod
+    def elem_id_simg_editor_databus() -> str:
+        return AppHtml.make_elem_id_databus_textbox('simg_editor')
+
+    @staticmethod
+    def elem_id_simg_editor_tab() -> str:
+        return AppHtml.make_elem_id('simg_editor', html_obj='tab')
 
     @staticmethod
     def make_cmd_data(
@@ -372,7 +385,7 @@ class AppHelper:
         if attr is None or val is None:
             raise ValueError('None attr or val')
 
-        if not isinstance(obj, (Scene)):
+        if not isinstance(obj, (Scene, SceneImage)):
             raise ValueError('obj not correct instance type!')
         if not hasattr(obj, attr):
             raise ValueError(f'obj has no attr {attr}')

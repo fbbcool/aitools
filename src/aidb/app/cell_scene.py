@@ -33,14 +33,48 @@ class AppSceneCell:
                 f'Warning: No thumbnail available for image ID: {obj.id}. Displaying empty image.'
             )
 
+        onclick_js = AppSceneCell._html_thumb_onclick_js(obj.id)
         return f"""
         <div class="image-item" id="cell-scene-{obj.id}">
-            <img src="data:image/png;base64,{grid_img_base64}">
+            <img src="data:image/png;base64,{grid_img_base64}" onclick="{onclick_js}">
             <div class="image-controls">
                 {AppSceneCell.html_operation(obj, mode)}
             </div>
         </div>
         """
+
+    @staticmethod
+    def _html_thumb_onclick_js(scene_id: str) -> str:
+        """
+        JS run when a scene thumbnail is clicked: writes the scene id into the
+        SceneImage editor databus, fires the hidden trigger button (which makes
+        the backend render the editor cells), and switches to the editor tab.
+        """
+        elem_id_btn = AppHtml.elem_id_simg_editor_open_button()
+        elem_id_bus = AppHtml.elem_id_simg_editor_databus()
+        # Use single-quoted JS strings so we don't have to escape double quotes
+        # for the surrounding HTML attribute. Newlines get squashed at the end.
+        js = f"""
+        event.stopPropagation();
+        const bus = document.querySelector('#{elem_id_bus} textarea');
+        if (bus) {{
+            bus.value = '{scene_id}';
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+        const btn = document.getElementById('{elem_id_btn}');
+        if (btn) {{ btn.click(); }}
+        const tabBtns = document.querySelectorAll('button[role=&quot;tab&quot;]');
+        for (let i = 0; i < tabBtns.length; i++) {{
+            const t = tabBtns[i];
+            if (t.textContent) {{
+                if (t.textContent.trim() === 'Scene Image Editor') {{
+                    t.click();
+                    break;
+                }}
+            }}
+        }}
+        """.replace('\n', ' ').replace('"', '&quot;')
+        return js
 
     @staticmethod
     def html_operation(

@@ -42,6 +42,38 @@ class SceneImage:
         return self._data.get(SceneDef.FIELD_RATING, None)
 
     @property
+    def caption(self) -> Optional[str]:
+        return self._data.get(SceneDef.FIELD_CAPTION, None)
+
+    @property
+    def prompt(self) -> Optional[str]:
+        return self._data.get(SceneDef.FIELD_PROMPT, None)
+
+    def set_rating(self, value: int | str) -> None:
+        try:
+            value = int(value)
+        except Exception:
+            return
+        if value < SceneDef.RATING_MIN:
+            value = SceneDef.RATING_MIN
+        if value > SceneDef.RATING_MAX:
+            value = SceneDef.RATING_MAX
+        self._data |= {SceneDef.FIELD_RATING: value}
+
+    def set_caption(self, value: str) -> None:
+        if value is None:
+            return
+        self._data |= {SceneDef.FIELD_CAPTION: str(value)}
+
+    def set_prompt(self, value: str) -> None:
+        if value is None:
+            return
+        self._data |= {SceneDef.FIELD_PROMPT: str(value)}
+
+    def db_store(self) -> bool:
+        return self._dbstore()
+
+    @property
     def url_from_data(self) -> Optional[Path]:
         id = self.id
         filename = SceneDef.filename_orig_from_id(id, suffix=SceneDef.SUFFIX_IMG_STD)

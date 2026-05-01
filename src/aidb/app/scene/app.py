@@ -6,6 +6,7 @@ from typing import Optional
 from aidb import SceneManager, SceneDef
 from aidb.tagger_defines import TaggerDef
 from aidb.app.cell_scene import AppSceneCell
+from aidb.app.cell_scene_image import AppSceneImageCell
 from aidb.app.html import AppHtml, AppOpMmode, AppHelper
 
 
@@ -48,6 +49,17 @@ class AIDBSceneApp:
                 visible='hidden',
                 elem_id=AppHtml.elem_id_cmd_databus(),
             )  # has to be a mode
+
+            # Hidden trigger + databus for opening the SceneImage editor
+            button_hidden_simg_editor_open = gr.Button(
+                'Hidden SceneImage Editor Open',
+                visible='hidden',
+                elem_id=AppHtml.elem_id_simg_editor_open_button(),
+            )
+            databus_simg_editor = gr.Textbox(
+                visible='hidden',
+                elem_id=AppHtml.elem_id_simg_editor_databus(),
+            )
             # --- End Hidden Components ---
 
             with gr.Tab('Scene Search'):  # Renamed tab for clarity
@@ -111,11 +123,42 @@ class AIDBSceneApp:
                     outputs=[advanced_search_html_display],
                 )
 
+            with gr.Tab(
+                'Scene Image Editor',
+                elem_id=AppHtml.elem_id_simg_editor_tab(),
+            ):
+                gr.Markdown('## Scene Image Editor')
+                gr.Markdown(
+                    'Click a thumbnail in the **Scene Search** tab to load that '
+                    "scene's images here for editing (rating, caption, prompt)."
+                )
+                with gr.Row():
+                    simg_editor_scene_id = gr.Textbox(
+                        label='Scene ID',
+                        interactive=False,
+                    )
+                    simg_editor_refresh_button = gr.Button('Refresh')
+                simg_editor_html = gr.HTML(label='Scene Images')
+
             # Link hidden triggers to functions
             button_hidden_cmd.click(
                 self._apphelper.cmd_run,  # Call the update function first
                 inputs=[databus_cmd],  # Input is the data bus textbox
                 outputs=[],  # This function doesn't update UI directly
+            )
+
+            # SceneImage editor: opening triggered from a scene-cell thumbnail click.
+            button_hidden_simg_editor_open.click(
+                self._html_simg_editor_open,
+                inputs=[databus_simg_editor],
+                outputs=[simg_editor_scene_id, simg_editor_html],
+            )
+
+            # Manual refresh of the editor view (uses the currently-loaded scene id).
+            simg_editor_refresh_button.click(
+                self._html_simg_editor_open,
+                inputs=[simg_editor_scene_id],
+                outputs=[simg_editor_scene_id, simg_editor_html],
             )
 
         return if_app
@@ -163,6 +206,40 @@ class AIDBSceneApp:
                 mode,
             )
         return AppHtml.html_styled_cells_grid(html_scenes)
+
+    def _html_simg_editor_open(self, scene_id: Optional[str]) -> tuple[str, str]:
+        """
+        Renders the SceneImage editor cells for all images of the given scene.
+
+        Returns (scene_id, html). The scene id is echoed back so the editor
+        tab shows which scene is currently loaded (and so the refresh button
+        knows which scene to re-render).
+        """
+        if not scene_id or not isinstance(scene_id, str):
+            return '', '<p>No scene selected. Click a scene thumbnail to load it.</p>'
+
+        scene_id = scene_id.strip()
+        try:
+            scene = self._scm.scene_from_id_or_url(scene_id)
+        except Exception as e:
+            print(f'ERROR: couldnt load scene [{scene_id}]: {e}')
+            return scene_id, f'<p>Failed to load scene <code>{scene_id}</code>: {e}</p>'
+
+        try:
+            imgs = scene.imgs_sorted
+        except Exception as e:
+            print(f'ERROR: couldnt list imgs for scene [{scene_id}]: {e}')
+            return scene_id, f'<p>Failed to list images for scene <code>{scene_id}</code>: {e}</p>'
+
+        if not imgs:
+            return (
+                scene_id,
+                f'<p>No SceneImages found for scene <code>{scene_id}</code>.</p>',
+            )
+
+        cells = ''.join(AppSceneImageCell.html(img) for img in imgs)
+        html = AppSceneImageCell.html_styles() + AppHtml.html_styled_cells_grid(cells)
+        return scene_id, html
 
     def launch(self, **kwargs):
         print('Launching Gradio application...')
