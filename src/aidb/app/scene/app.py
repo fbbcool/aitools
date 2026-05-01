@@ -202,6 +202,7 @@ class AIDBSceneApp:
                     simg_editor_url_button = gr.Button('url')
                 simg_editor_scene_info_html = gr.HTML(label='Scene')
                 with gr.Row():
+                    simg_editor_caption_empty_button = gr.Button('caption')
                     simg_editor_refresh_button = gr.Button('Refresh')
                 gr.Markdown('### Registered Images')
                 simg_editor_html = gr.HTML(label='Scene Images')
@@ -231,8 +232,10 @@ class AIDBSceneApp:
             # click. We FIRST wipe the editor outputs (so DOM state from the
             # previously-loaded scene is fully gone before the new scene is
             # rendered), THEN load + render the new scene from a fresh DB read.
+            # The new scene id arrives via `databus_simg_editor`, not from
+            # the textbox, so it's safe to wipe the textbox in the clear step.
             button_hidden_simg_editor_open.click(
-                self._editor_clear,
+                self._editor_clear_all,
                 inputs=[],
                 outputs=editor_outputs,
             ).then(
@@ -249,13 +252,29 @@ class AIDBSceneApp:
             )
 
             # Manual refresh of the editor view (uses the currently-loaded
-            # scene id). Same clear-then-load pattern.
+            # scene id). Same clear-then-load pattern but the clear step
+            # PRESERVES the scene-id textbox so the .then() step can read
+            # it back as input.
             simg_editor_refresh_button.click(
-                self._editor_clear,
-                inputs=[],
+                self._editor_clear_content,
+                inputs=[simg_editor_scene_id],
                 outputs=editor_outputs,
             ).then(
                 self._html_simg_editor_open,
+                inputs=[simg_editor_scene_id],
+                outputs=editor_outputs,
+            )
+
+            # Batch caption: for the currently-loaded scene, run JoySceneDB
+            # ('1xlasm') on every registered image whose caption_joy is
+            # empty, store each result to the DB, then refresh. Preserves
+            # the scene-id textbox during the clear step (same reason).
+            simg_editor_caption_empty_button.click(
+                self._editor_clear_content,
+                inputs=[simg_editor_scene_id],
+                outputs=editor_outputs,
+            ).then(
+                self._html_simg_editor_caption_empty,
                 inputs=[simg_editor_scene_id],
                 outputs=editor_outputs,
             )
@@ -305,7 +324,9 @@ class AIDBSceneApp:
             )
 
             # Lightbox: thumbnail click -> server reads the full image and
-            # returns base64; JS .then() callback sets the modal img and
+            # returns a JSON payload `{b64, type, image_id?, caption?}`.
+            # The JS .then() callback decodes it, sets the modal image,
+            # populates the editable caption textarea (registered only) and
             # shows the overlay (fit-to-screen via CSS).
             button_hidden_simg_editor_lightbox.click(
                 self._lightbox_load,
@@ -316,12 +337,32 @@ class AIDBSceneApp:
                 inputs=[databus_simg_editor_lightbox_out],
                 outputs=None,
                 js="""
-                (b64) => {
-                    if (!b64) return;
-                    const img = document.getElementById('simg-lightbox-img');
-                    const overlay = document.getElementById('simg-lightbox-overlay');
+                (resultStr) => {
+                    if (!resultStr) return;
+                    let data;
+                    try { data = JSON.parse(resultStr); } catch (e) { return; }
+                    if (!data || !data.b64) return;
+
+                    const img      = document.getElementById('simg-lightbox-img');
+                    const overlay  = document.getElementById('simg-lightbox-overlay');
+                    const caption  = document.getElementById('simg-lightbox-caption');
                     if (!img || !overlay) return;
-                    img.src = 'data:image/png;base64,' + b64;
+
+                    img.src = 'data:image/png;base64,' + data.b64;
+
+                    const content = overlay.querySelector('.simg-lightbox-content');
+                    if (data.type === 'registered' && data.image_id) {
+                        overlay.dataset.targetType = 'registered';
+                        overlay.dataset.imageId = data.image_id;
+                        if (caption) { caption.value = data.caption || ''; }
+                        if (content) { content.classList.add('simg-lightbox-with-caption'); }
+                    } else {
+                        overlay.dataset.targetType = data.type || '';
+                        overlay.dataset.imageId = '';
+                        if (caption) { caption.value = ''; }
+                        if (content) { content.classList.remove('simg-lightbox-with-caption'); }
+                    }
+
                     overlay.style.display = 'flex';
                 }
                 """,
@@ -398,14 +439,28 @@ class AIDBSceneApp:
         return None
 
     @staticmethod
-    def _editor_clear() -> tuple[str, str, str, str]:
+    def _editor_clear_all() -> tuple[str, str, str, str]:
         """
-        Wipes every editor output to a clean placeholder. Used as the first
-        step of any editor (re-)load so no stale DOM state from the
-        previously-displayed scene can survive into the next one.
+        Wipes EVERY editor output to a clean placeholder, including the
+        scene-id textbox. Used as the first step of the thumbnail-click
+        load path: the new scene id arrives via the editor's hidden
+        in-databus, NOT from the textbox, so wiping the textbox is fine
+        and ensures no stale state survives.
         """
         loading = '<p><em>loading...</em></p>'
         return '', '', loading, ''
+
+    @staticmethod
+    def _editor_clear_content(scene_id: Optional[str]) -> tuple[str, str, str, str]:
+        """
+        Wipes only the content panes (scene-info / registered / unregistered
+        HTMLs) and PRESERVES the scene-id textbox. Used as the first step
+        of refresh / batch-caption paths whose `.then()` step reads the
+        scene id back from the textbox - if we cleared it, the load step
+        would get an empty string and lose the scene context.
+        """
+        loading = '<p><em>loading...</em></p>'
+        return (scene_id or ''), '', loading, ''
 
     @staticmethod
     def _flush_state() -> None:
@@ -550,6 +605,134 @@ class AIDBSceneApp:
         return self._html_simg_editor_open(scene_id)
 
     # ------------------------------------------------------------------
+    # batch captioning of registered images
+    # ------------------------------------------------------------------
+
+    def _html_simg_editor_caption_empty(
+        self, scene_id: Optional[str]
+    ) -> tuple[str, str, str, str]:
+        """
+        Scene-level batch caption.
+
+        Pipeline:
+          1. Query the DB for all SceneImage ids belonging to this scene
+             whose `caption_joy` field is missing / null / empty string.
+          2. Construct a single JoySceneDB(trigger='1xlasm', force=False);
+             its underlying Joy model is loaded lazily once and reused for
+             the whole loop.
+          3. For every id, call `jdb._id_caption(id)` -> (prompt, caption)
+             and persist the caption EXPLICITLY to FIELD_CAPTION_JOY via
+             `simg.set_caption_joy(caption)` + `simg.db_store()`. We never
+             touch FIELD_CAPTION - only the empty caption_joy column is
+             written.
+          4. Release the GPU (`_release_gpu(jdb)` in `finally`) and re-render
+             the editor with fresh DB data.
+        """
+        if not scene_id or not isinstance(scene_id, str):
+            gr.Warning('No scene loaded.')
+            return self._html_simg_editor_open(scene_id)
+
+        scene_id = scene_id.strip()
+        try:
+            scene = self._scm.scene_from_id_or_url(scene_id)
+        except Exception as e:
+            print(f'ERROR: caption-empty load scene [{scene_id}]: {e}')
+            gr.Warning(f'Failed to load scene: {e}')
+            return self._html_simg_editor_open(scene_id)
+
+        # 1. Find ids of registered scene images whose caption_joy is empty.
+        empty_query = {
+            '$or': [
+                {SceneDef.FIELD_CAPTION_JOY: {'$exists': False}},
+                {SceneDef.FIELD_CAPTION_JOY: None},
+                {SceneDef.FIELD_CAPTION_JOY: ''},
+            ]
+        }
+        try:
+            ids_empty = list(scene.ids_img_from_query(empty_query))
+        except Exception as e:
+            print(f'ERROR: caption-empty query [{scene_id}]: {e}')
+            gr.Warning(f'Failed to query empty captions: {e}')
+            return self._html_simg_editor_open(scene_id)
+
+        if not ids_empty:
+            gr.Info('All registered images already have a caption_joy.')
+            return self._html_simg_editor_open(scene_id)
+
+        # 2. Caption the ids with a single JoySceneDB run.
+        try:
+            from ait.caption.joy_scenedb import JoySceneDB
+        except Exception as e:
+            print(f'ERROR: JoySceneDB import failed: {e}')
+            gr.Warning(f'Caption init failed: {e}')
+            return self._html_simg_editor_open(scene_id)
+
+        gr.Info(
+            f"Batch captioning {len(ids_empty)} image(s) with trigger '1xlasm'...",
+            duration=3.0,
+        )
+
+        cfg_name = self._scm._dbc.config.config
+        sim = self._scm.scene_image_manager()
+        jdb = None
+        n_done = 0
+        n_failed = 0
+        try:
+            # force=False: JoySceneDB skips images that already have a
+            # caption_joy. Our query already filtered, but force=False is
+            # defensive in case something changed in the meantime.
+            jdb = JoySceneDB(
+                config=cfg_name,
+                trigger='1xlasm',
+                verbose=1,
+                force=False,
+            )
+            # 3. For every id, run a single inference (the underlying Joy
+            #    model is lazy-loaded once on the JoySceneDB instance and
+            #    reused for the rest of the loop) and persist the result
+            #    EXPLICITLY to caption_joy via set_caption_joy + db_store.
+            for img_id in ids_empty:
+                try:
+                    _prompt, caption = jdb._id_caption(img_id)
+                except Exception as e:
+                    print(f'ERROR: caption-empty inference [{img_id}]: {e}')
+                    n_failed += 1
+                    continue
+                if not caption:
+                    # JoySceneDB returns (None, None) for skipped or failed.
+                    continue
+                try:
+                    simg = sim.image_from_id_or_url(img_id)
+                    simg.set_caption_joy(caption)  # writes FIELD_CAPTION_JOY
+                    simg.db_store()
+                    n_done += 1
+                except Exception as e:
+                    print(f'ERROR: caption-empty store [{img_id}]: {e}')
+                    n_failed += 1
+        except Exception as e:
+            print(f'ERROR: caption-empty batch run: {e}')
+            gr.Warning(f'Batch caption failed: {e}')
+        finally:
+            if jdb is not None:
+                self._release_gpu(jdb)
+
+        n_skipped = len(ids_empty) - n_done - n_failed
+        msg_parts = [f'Captioned {n_done}']
+        if n_skipped > 0:
+            msg_parts.append(f'skipped {n_skipped}')
+        if n_failed > 0:
+            msg_parts.append(f'failed {n_failed}')
+        msg = ', '.join(msg_parts) + '.'
+        if n_done > 0:
+            gr.Info(msg, duration=3.0)
+        elif n_failed > 0:
+            gr.Warning(msg)
+        else:
+            gr.Info(msg)
+
+        return self._html_simg_editor_open(scene_id)
+
+    # ------------------------------------------------------------------
     # captioning
     # ------------------------------------------------------------------
     #
@@ -685,11 +868,17 @@ class AIDBSceneApp:
     def _lightbox_load(self, data_str: Optional[str]) -> str:
         """
         Loads the full-size image for a registered SceneImage (by id) or an
-        unregistered file (by url) and returns it as a base64 string. The
-        JS `.then()` callback wired to this handler injects the result into
-        the shared lightbox modal.
+        unregistered file (by url) and returns a JSON-serialised payload
+        consumed by the lightbox JS .then() callback:
 
-        Returns '' on failure (the JS callback then no-ops).
+            {
+              "b64":      "<image bytes base64>",
+              "type":     "registered" | "unregistered",
+              "image_id": "<oid>",        # only for registered targets
+              "caption":  "<current caption>"  # only for registered targets
+            }
+
+        Returns '' on failure (the JS callback no-ops).
 
         Always runs `_flush_state()` afterwards so any temporary PIL bytes
         / large strings used for the encode are released.
@@ -709,6 +898,7 @@ class AIDBSceneApp:
 
         pil = None
         b64: Optional[str] = None
+        caption_text: Optional[str] = None
         try:
             if target_type == 'registered':
                 try:
@@ -718,6 +908,7 @@ class AIDBSceneApp:
                     gr.Warning(f'Lightbox load failed: {e}')
                     return ''
                 pil = simg.pil
+                caption_text = simg.caption or ''
             elif target_type == 'unregistered':
                 url = Path(str(target).strip())
                 if not url.exists():
@@ -751,7 +942,12 @@ class AIDBSceneApp:
 
         if not b64:
             return ''
-        return b64
+
+        result: dict = {'b64': b64, 'type': target_type}
+        if target_type == 'registered':
+            result['image_id'] = str(target)
+            result['caption'] = caption_text or ''
+        return json.dumps(result)
 
     def _caption_set_generate(self, image_id_str: Optional[str]) -> str:
         """

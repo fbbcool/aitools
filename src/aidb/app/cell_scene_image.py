@@ -450,34 +450,77 @@ class AppSceneImageCell:
 
     LIGHTBOX_OVERLAY_ID: str = 'simg-lightbox-overlay'
     LIGHTBOX_IMG_ID: str = 'simg-lightbox-img'
+    LIGHTBOX_CAPTION_ID: str = 'simg-lightbox-caption'
+    LIGHTBOX_CONTENT_CLASS: str = 'simg-lightbox-content'
 
     @staticmethod
     def html_lightbox_modal() -> str:
         """
-        Returns the HTML (style + overlay div + close button) for the
-        single shared full-size image lightbox. Embed once per editor view.
+        Returns the HTML for the single shared full-size image lightbox.
+        Embed once per editor view.
 
         Behaviour:
-          - The overlay is hidden by default and is shown by setting display
-            to 'flex' (the JS .then() callback in app.py handles that after
-            the server returns the base64 image).
-          - Clicking the overlay background OR the close button hides it
-            and clears the img src to free memory.
-          - Clicks on the image itself do NOT propagate (so the modal
-            stays open while the user looks at it).
+          - Hidden by default; shown by JS callback after the server returns
+            the image base64 (and, for registered targets, the current
+            caption + image id stored on the overlay's dataset).
+          - Click on the overlay BACKGROUND -> if the overlay holds a
+            registered image and the caption was edited, the value is
+            persisted via the cmd-bus (`db_query` / set_caption) and then
+            the modal closes.
+          - Click on the 'X' close button -> closes WITHOUT saving.
+          - Clicks on the image / textarea do NOT propagate so the modal
+            stays open while the user views/edits.
         """
         overlay_id = AppSceneImageCell.LIGHTBOX_OVERLAY_ID
         img_id = AppSceneImageCell.LIGHTBOX_IMG_ID
-        # Inline JS string lives in onclick="..." so single quotes only.
-        hide_js = (
+        caption_id = AppSceneImageCell.LIGHTBOX_CAPTION_ID
+        content_cls = AppSceneImageCell.LIGHTBOX_CONTENT_CLASS
+
+        cmd_btn_id = AppHtml.elem_id_cmd_button()
+        cmd_bus_id = AppHtml.elem_id_cmd_databus()
+
+        # ---- close-only: X button ----------------------------------------
+        # Just hide and clear all state, no DB write.
+        close_js = (
             f"event.stopPropagation();"
             f"const o = document.getElementById('{overlay_id}');"
             f"const i = document.getElementById('{img_id}');"
-            f"if (o) o.style.display = 'none';"
-            f"if (i) i.src = '';"
+            f"const c = document.getElementById('{caption_id}');"
+            f"if (o) {{ o.style.display = 'none'; "
+            f"o.dataset.targetType = ''; o.dataset.imageId = ''; }}"
+            f"if (i) {{ i.src = ''; }}"
+            f"if (c) {{ c.value = ''; }}"
         )
-        # The img's onclick stops propagation so clicks on the image don't
-        # close the overlay. The overlay's onclick (background) closes.
+
+        # ---- save-and-close: clicking the overlay background -------------
+        # When the modal currently shows a registered image, push a
+        # cmd-bus payload to persist caption (set_caption + db_store) before
+        # hiding. For unregistered images we just close.
+        save_close_js = (
+            f"event.stopPropagation();"
+            f"const o = document.getElementById('{overlay_id}');"
+            f"const i = document.getElementById('{img_id}');"
+            f"const c = document.getElementById('{caption_id}');"
+            f"if (o && o.dataset.targetType === 'registered' && o.dataset.imageId) {{"
+            f"  const v = c ? c.value : '';"
+            f"  const data = {{ type: 'image', id: o.dataset.imageId,"
+            f"    cmd: 'db_query', payload: {{ set_caption: v }}, label: 'caption' }};"
+            f"  const cbus = document.querySelector('#{cmd_bus_id} textarea');"
+            f"  if (cbus) {{ cbus.value = JSON.stringify(data);"
+            f"    cbus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
+            f"  const cbtn = document.getElementById('{cmd_btn_id}');"
+            f"  if (cbtn) {{ cbtn.click(); }}"
+            f"}}"
+            f"if (o) {{ o.style.display = 'none'; "
+            f"o.dataset.targetType = ''; o.dataset.imageId = ''; }}"
+            f"if (i) {{ i.src = ''; }}"
+            f"if (c) {{ c.value = ''; }}"
+        )
+
+        # The textarea also gets stopPropagation on keystrokes so e.g. Esc
+        # / arrow keys typed during editing don't bubble up unexpectedly.
+        textarea_keydown_js = "event.stopPropagation();"
+
         return f"""
         <style>
             #{overlay_id} {{
@@ -492,11 +535,45 @@ class AppSceneImageCell:
                 justify-content: center;
                 align-items: center;
             }}
-            #{overlay_id} img {{
+            .{content_cls} {{
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                gap: 16px;
+                max-width: 100vw;
+                max-height: 100vh;
+            }}
+            #{img_id} {{
                 max-width: 100vw;
                 max-height: 100vh;
                 object-fit: contain;
-                cursor: default;
+                cursor: zoom-out;
+            }}
+            .{content_cls}.simg-lightbox-with-caption #{img_id} {{
+                /* leave room to the right for the caption textarea */
+                max-width: calc(100vw - 540px);
+                max-height: 100vh;
+            }}
+            #{caption_id} {{
+                display: none;
+                width: 500px;
+                height: min(80vh, 700px);
+                padding: 8px 12px;
+                background-color: #1f1f1f;
+                color: #ffffff;
+                border: 1px solid #555555;
+                border-radius: 4px;
+                font-family: inherit;
+                font-size: 0.95em;
+                resize: none;
+            }}
+            #{caption_id}:focus {{
+                outline: none;
+                border-color: #4CAF50;
+                box-shadow: 0 0 0 1px #4CAF50;
+            }}
+            .{content_cls}.simg-lightbox-with-caption #{caption_id} {{
+                display: block;
             }}
             #simg-lightbox-close {{
                 position: absolute;
@@ -518,10 +595,14 @@ class AppSceneImageCell:
                 cursor: zoom-in;
             }}
         </style>
-        <div id="{overlay_id}" onclick="{hide_js}">
-            <span id="simg-lightbox-close" onclick="{hide_js}">&times;</span>
-            <img id="{img_id}" src="" alt="Full Size Image"
-                 onclick="event.stopPropagation();">
+        <div id="{overlay_id}" onclick="{save_close_js}">
+            <span id="simg-lightbox-close" onclick="{close_js}">&times;</span>
+            <div class="{content_cls}">
+                <img id="{img_id}" src="" alt="Full Size Image">
+                <textarea id="{caption_id}" placeholder="caption"
+                          onclick="event.stopPropagation();"
+                          onkeydown="{textarea_keydown_js}"></textarea>
+            </div>
         </div>
         """
 
