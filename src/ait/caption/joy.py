@@ -64,6 +64,7 @@ LABEL_PROMPT: Final = {
     'insert': 'the xlasm man is definitly partly inserted into the giantess womans vagina, ass or mouth.  mention, when his head, upper body or lower body is inserted into her vagina, otherwise do not mention.',
     'job': 'The giantess woman is giving the xlasm man either a handjob or a blowjob.',
     'leg': 'The xlasm man interacts with the giantess womans leg.',
+    'masturbating': 'The xlasm man is masturbating and gripping and stroking his penis. mention "masturbating and stroking his erect penis" right at the beginning of the image description because it is a central information',
     'mouth': 'The xlasm man interacts with the giantess womans mouth.',
     'panties': 'The xlasm man is inserted into the giantess womans panties.',
     'penis': 'The xlasm man has an erect penis.',
