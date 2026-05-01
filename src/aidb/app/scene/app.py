@@ -617,9 +617,12 @@ class AIDBSceneApp:
         Pipeline:
           1. Query the DB for all SceneImage ids belonging to this scene
              whose `caption_joy` field is missing / null / empty string.
-          2. Construct a single JoySceneDB(trigger='1xlasm', force=False);
+          2. Construct a single JoySceneDB(trigger='1xlasm', force=True);
              its underlying Joy model is loaded lazily once and reused for
-             the whole loop.
+             the whole loop. force=True is required because our query
+             already filtered the ids; JoySceneDB's own skip check would
+             otherwise refuse to caption images whose caption_joy is the
+             empty string ('' is not None -> skip).
           3. For every id, call `jdb._id_caption(id)` -> (prompt, caption)
              and persist the caption EXPLICITLY to FIELD_CAPTION_JOY via
              `simg.set_caption_joy(caption)` + `simg.db_store()`. We never
@@ -678,14 +681,17 @@ class AIDBSceneApp:
         n_done = 0
         n_failed = 0
         try:
-            # force=False: JoySceneDB skips images that already have a
-            # caption_joy. Our query already filtered, but force=False is
-            # defensive in case something changed in the meantime.
+            # IMPORTANT: force=True. Our query already filtered for empty
+            # caption_joy. JoySceneDB._id_caption's internal skip check
+            # ("caption_joy_current is not None") would otherwise skip
+            # images whose caption_joy is the empty string '' (because
+            # `'' is not None` is True), so we tell it to ignore that
+            # check and trust our own filter.
             jdb = JoySceneDB(
                 config=cfg_name,
                 trigger='1xlasm',
                 verbose=1,
-                force=False,
+                force=True,
             )
             # 3. For every id, run a single inference (the underlying Joy
             #    model is lazy-loaded once on the JoySceneDB instance and
@@ -699,7 +705,11 @@ class AIDBSceneApp:
                     n_failed += 1
                     continue
                 if not caption:
-                    # JoySceneDB returns (None, None) for skipped or failed.
+                    # JoySceneDB returns (None, None) when it could not
+                    # open the image (`simg.pil` was None) or when the
+                    # model produced nothing.
+                    print(f'WARN: caption-empty produced no caption for [{img_id}]')
+                    n_failed += 1
                     continue
                 try:
                     simg = sim.image_from_id_or_url(img_id)
