@@ -63,6 +63,7 @@ LABEL_PROMPT: Final = {
     'leg': 'The xlasm man interacts with the giantess womans leg.',
     'mouth': 'The xlasm man interacts with the giantess womans mouth.',
     'panties': 'The xlasm man is inserted into the giantess womans panties.',
+    'penis': 'The xlasm man has an erect penis.',
     'pussy': 'The xlasm man interacts with the giantess womans vagina.',
     'sex': 'The xlasm man has sex with the giantess woman, inserting his erect penis into her vagina.',
     'sitting': 'The xlasm man is in a sitting position. Most likely he sits on a bodypart of the giantess woman.',

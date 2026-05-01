@@ -8,9 +8,18 @@ from PIL import Image as PILImage
 from aidb.app.html import AppHtml, HtmlHelper
 from aidb.scene import Scene, SceneDef
 from aidb.scene.scene_image import SceneImage
-from aidb.tagger_defines import TaggerDef
 
+from ait.caption.joy import LABEL_PROMPT
 from ait.tools.images import image_from_url, _image_extract_prompt_from_info_ext
+
+
+def editor_labels() -> list[str]:
+    """
+    Returns the canonical list of labels available in the editor UI:
+    the keys of `LABEL_PROMPT` from the captioner, with 'none' removed.
+    Dict insertion order is preserved.
+    """
+    return [k for k in LABEL_PROMPT.keys() if k != 'none']
 
 
 class AppSceneImageCell:
@@ -36,11 +45,24 @@ class AppSceneImageCell:
 
         rating_html = AppSceneImageCell._html_rating(obj)
         labels_html = AppSceneImageCell._html_labels(obj)
+        # The caption field gets a 'set' button (in addition to copy + save)
+        # which copies caption_joy into the caption textarea (DOM-only).
+        # If caption_joy is empty the backend generates a caption that is
+        # then written into both fields.
         caption_field = AppSceneImageCell._html_text_field(
             obj,
             attr_setter='set_caption',
             label='caption',
             value=obj.caption,
+            multiline=True,
+            extra_header_buttons=[AppSceneImageCell._html_set_button(obj.id)],
+            rows=9,
+        )
+        hints_field = AppSceneImageCell._html_text_field(
+            obj,
+            attr_setter='set_hints',
+            label='hints',
+            value=obj.hints,
             multiline=True,
         )
         caption_joy_field = AppSceneImageCell._html_text_field(
@@ -63,10 +85,30 @@ class AppSceneImageCell:
         url_str = str(url) if url is not None else ''
         url_copy_btn = AppSceneImageCell._html_copy_static_button(url_str, label='url')
 
+        caption_btn_1xlasm = AppSceneImageCell._html_caption_button(
+            target_type='registered',
+            target=obj.id,
+            trigger='1xlasm',
+            label='caption 1xlasm',
+        )
+        caption_btn_gts = AppSceneImageCell._html_caption_button(
+            target_type='registered',
+            target=obj.id,
+            trigger='gts_prompter',
+            label='caption gts_prompter',
+        )
+
+        save_image_btn = AppSceneImageCell._html_save_image_button(obj)
+
+        thumb_onclick = AppSceneImageCell._html_lightbox_onclick(
+            target_type='registered', target=obj.id
+        )
+
         return f"""
         <div class="image-item simg-edit-cell" id="cell-simg-{obj.id}">
-            <img src="data:image/png;base64,{img_b64}">
+            <img src="data:image/png;base64,{img_b64}" onclick="{thumb_onclick}">
             <div class="image-controls">
+                {caption_field}
                 <div class="simg-edit-id-row">
                     <div class="simg-edit-id">id: {obj.id}</div>
                     {url_copy_btn}
@@ -80,9 +122,16 @@ class AppSceneImageCell:
                         {labels_html}
                     </div>
                 </div>
-                {caption_field}
+                {hints_field}
                 {caption_joy_field}
                 {prompt_field}
+                <div class="simg-cell-actions">
+                    {caption_btn_1xlasm}
+                    {caption_btn_gts}
+                </div>
+                <div class="simg-cell-save">
+                    {save_image_btn}
+                </div>
             </div>
         </div>
         """
@@ -128,7 +177,7 @@ class AppSceneImageCell:
         """
         current_labels = obj.labels
         html = ''
-        for label in TaggerDef.LABELS['label']:
+        for label in editor_labels():
             checked = label in current_labels
             html += AppHtml.html_make_cmd_button(
                 AppHtml.make_cmd_data(
@@ -150,6 +199,8 @@ class AppSceneImageCell:
         value: Optional[str],
         multiline: bool = True,
         with_save: bool = True,
+        extra_header_buttons: Optional[list[str]] = None,
+        rows: int = 3,
     ) -> str:
         """
         Renders a full editable text-field block:
@@ -175,7 +226,7 @@ class AppSceneImageCell:
 
         if multiline:
             input_html = (
-                f'<textarea id="{elem_id}" class="simg-edit-textarea" rows="3">'
+                f'<textarea id="{elem_id}" class="simg-edit-textarea" rows="{rows}">'
                 f'{safe_value}</textarea>'
             )
         else:
@@ -193,12 +244,14 @@ class AppSceneImageCell:
                 attr_setter=attr_setter,
                 label=label,
             )
+        extras = ''.join(extra_header_buttons or [])
 
         return f"""
         <div class="simg-edit-field">
             <div class="simg-edit-field-header">
                 <label class="simg-edit-label" for="{elem_id}">{label}</label>
                 <div class="simg-edit-field-actions">
+                    {extras}
                     {copy_btn_html}
                     {save_btn_html}
                 </div>
@@ -365,7 +418,7 @@ class AppSceneImageCell:
 
         labels_html = ''
         current_labels = scene.labels
-        for label in TaggerDef.LABELS['label']:
+        for label in editor_labels():
             checked = label in current_labels
             labels_html += AppHtml.html_make_cmd_button(
                 AppHtml.make_cmd_data(
@@ -394,6 +447,249 @@ class AppSceneImageCell:
             </div>
         </div>
         """
+
+    LIGHTBOX_OVERLAY_ID: str = 'simg-lightbox-overlay'
+    LIGHTBOX_IMG_ID: str = 'simg-lightbox-img'
+
+    @staticmethod
+    def html_lightbox_modal() -> str:
+        """
+        Returns the HTML (style + overlay div + close button) for the
+        single shared full-size image lightbox. Embed once per editor view.
+
+        Behaviour:
+          - The overlay is hidden by default and is shown by setting display
+            to 'flex' (the JS .then() callback in app.py handles that after
+            the server returns the base64 image).
+          - Clicking the overlay background OR the close button hides it
+            and clears the img src to free memory.
+          - Clicks on the image itself do NOT propagate (so the modal
+            stays open while the user looks at it).
+        """
+        overlay_id = AppSceneImageCell.LIGHTBOX_OVERLAY_ID
+        img_id = AppSceneImageCell.LIGHTBOX_IMG_ID
+        # Inline JS string lives in onclick="..." so single quotes only.
+        hide_js = (
+            f"event.stopPropagation();"
+            f"const o = document.getElementById('{overlay_id}');"
+            f"const i = document.getElementById('{img_id}');"
+            f"if (o) o.style.display = 'none';"
+            f"if (i) i.src = '';"
+        )
+        # The img's onclick stops propagation so clicks on the image don't
+        # close the overlay. The overlay's onclick (background) closes.
+        return f"""
+        <style>
+            #{overlay_id} {{
+                display: none;
+                position: fixed;
+                z-index: 10000;
+                left: 0;
+                top: 0;
+                width: 100vw;
+                height: 100vh;
+                background-color: rgba(0,0,0,0.92);
+                justify-content: center;
+                align-items: center;
+            }}
+            #{overlay_id} img {{
+                max-width: 100vw;
+                max-height: 100vh;
+                object-fit: contain;
+                cursor: default;
+            }}
+            #simg-lightbox-close {{
+                position: absolute;
+                top: 12px;
+                right: 24px;
+                color: #f1f1f1;
+                font-size: 36px;
+                font-weight: bold;
+                cursor: pointer;
+                user-select: none;
+                z-index: 10001;
+                line-height: 1;
+            }}
+            #simg-lightbox-close:hover {{
+                color: #bbb;
+            }}
+            .simg-edit-cell img,
+            .simg-unreg-cell img {{
+                cursor: zoom-in;
+            }}
+        </style>
+        <div id="{overlay_id}" onclick="{hide_js}">
+            <span id="simg-lightbox-close" onclick="{hide_js}">&times;</span>
+            <img id="{img_id}" src="" alt="Full Size Image"
+                 onclick="event.stopPropagation();">
+        </div>
+        """
+
+    @staticmethod
+    def _html_lightbox_onclick(target_type: str, target: str) -> str:
+        """
+        Returns a JS snippet (suitable for embedding in an HTML attribute)
+        that pushes a JSON `{type, target}` payload into the lightbox in-bus
+        and clicks the hidden lightbox trigger button. The Python handler +
+        JS .then() callback will populate and show the lightbox modal.
+        """
+        elem_id_btn = AppHtml.elem_id_simg_editor_lightbox_button()
+        elem_id_bus = AppHtml.elem_id_simg_editor_lightbox_databus()
+
+        payload = json.dumps({'type': target_type, 'target': target})
+        # Escape for embedding in a single-quoted JS string literal
+        # (\ -> \\ , ' -> \').
+        payload_js = payload.replace('\\', '\\\\').replace("'", "\\'")
+
+        js = (
+            f"event.stopPropagation();"
+            f"const bus = document.querySelector('#{elem_id_bus} textarea');"
+            f"if (bus) {{ bus.value = '{payload_js}';"
+            f"bus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
+            f"const btn = document.getElementById('{elem_id_btn}');"
+            f"if (btn) {{ btn.click(); }}"
+        ).replace('"', '&quot;')
+        return js
+
+    @staticmethod
+    def _html_set_button(obj_id: str) -> str:
+        """
+        'set' button (lives in the caption field's header).
+
+        Behaviour:
+          - If the caption_joy textarea has non-empty content, copy it into
+            the caption textarea (DOM-only, not persisted).
+          - Otherwise, ask the backend to generate a caption via JoySceneDB
+            (default trigger). The result is then written into BOTH the
+            caption_joy and caption textareas. The user can save explicitly.
+        """
+        elem_id_btn = AppHtml.elem_id_simg_editor_set_button()
+        elem_id_bus_in = AppHtml.elem_id_simg_editor_set_databus()
+        cj_id = f'simg-set_caption_joy-{obj_id}'
+        c_id = f'simg-set_caption-{obj_id}'
+
+        js = f"""
+        event.stopPropagation();
+        const cj = document.getElementById('{cj_id}');
+        const c = document.getElementById('{c_id}');
+        if (!c) {{ return; }}
+        const cjVal = cj ? cj.value : '';
+        if (cjVal && cjVal.trim().length > 0) {{
+            c.value = cjVal;
+            const btn = event.currentTarget;
+            const orig = btn.textContent;
+            btn.textContent = 'set';
+            btn.classList.add('simg-copy-btn-ok');
+            setTimeout(function() {{
+                btn.textContent = orig;
+                btn.classList.remove('simg-copy-btn-ok');
+            }}, 800);
+            return;
+        }}
+        const bus = document.querySelector('#{elem_id_bus_in} textarea');
+        if (bus) {{
+            bus.value = '{obj_id}';
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+        const trig = document.getElementById('{elem_id_btn}');
+        if (trig) {{ trig.click(); }}
+        """.replace('\n', ' ').replace('"', '&quot;')
+        return f'<button type="button" class="simg-set-btn" onclick="{js}">set</button>'
+
+    @staticmethod
+    def _html_save_image_button(obj: SceneImage) -> str:
+        """
+        Major 'save image' button. Reads the current values of all editable
+        text fields on this cell (hints, caption, caption_joy) and persists
+        them in a single DB update via the cmd-bus 'db_query_multi' cmd.
+        """
+        elem_id_btn = AppHtml.elem_id_cmd_button()
+        elem_id_bus = AppHtml.elem_id_cmd_databus()
+
+        h_id = f'simg-set_hints-{obj.id}'
+        c_id = f'simg-set_caption-{obj.id}'
+        cj_id = f'simg-set_caption_joy-{obj.id}'
+
+        cmd_skeleton = {
+            'type': 'image',
+            'id': obj.id,
+            'cmd': 'db_query_multi',
+            'payload': {
+                'set_hints': '__H__',
+                'set_caption': '__C__',
+                'set_caption_joy': '__CJ__',
+            },
+            'label': 'save',
+        }
+        skeleton_json = json.dumps(cmd_skeleton)
+
+        js = f"""
+        event.stopPropagation();
+        const eh = document.getElementById('{h_id}');
+        const ec = document.getElementById('{c_id}');
+        const ecj = document.getElementById('{cj_id}');
+        const skel = JSON.parse('{skeleton_json}');
+        skel.payload['set_hints'] = eh ? eh.value : '';
+        skel.payload['set_caption'] = ec ? ec.value : '';
+        skel.payload['set_caption_joy'] = ecj ? ecj.value : '';
+        const bus = document.querySelector('#{elem_id_bus} textarea');
+        if (bus) {{
+            bus.value = JSON.stringify(skel);
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+        const trig = document.getElementById('{elem_id_btn}');
+        if (trig) {{ trig.click(); }}
+        const btn = event.currentTarget;
+        const orig = btn.textContent;
+        btn.textContent = 'saved';
+        btn.classList.add('simg-copy-btn-ok');
+        setTimeout(function() {{
+            btn.textContent = orig;
+            btn.classList.remove('simg-copy-btn-ok');
+        }}, 1000);
+        """.replace('\n', ' ').replace('"', '&quot;')
+        return f'<button type="button" class="simg-save-image-btn" onclick="{js}">save image</button>'
+
+    @staticmethod
+    def _html_caption_button(
+        target_type: str,
+        target: str,
+        trigger: str,
+        label: Optional[str] = None,
+    ) -> str:
+        """
+        Renders a button which, when clicked, asks the backend to caption the
+        given target (registered SceneImage id or unregistered file url) using
+        the given trigger.
+
+        The JS pushes a JSON payload `{type, target, trigger}` into the caption
+        databus and triggers the hidden caption button. The backend handler
+        runs the captioning, optionally stores results, and refreshes the
+        editor.
+        """
+        if not label:
+            label = f'caption {trigger}'
+
+        elem_id_btn = AppHtml.elem_id_simg_editor_caption_button()
+        elem_id_bus = AppHtml.elem_id_simg_editor_caption_databus()
+        skeleton_json = json.dumps(
+            {'type': target_type, 'target': target, 'trigger': trigger}
+        )
+
+        js = f"""
+        event.stopPropagation();
+        const skel = JSON.parse('{skeleton_json}');
+        const bus = document.querySelector('#{elem_id_bus} textarea');
+        if (bus) {{
+            bus.value = JSON.stringify(skel);
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+        const trig = document.getElementById('{elem_id_btn}');
+        if (trig) {{ trig.click(); }}
+        """.replace('\n', ' ').replace('"', '&quot;')
+
+        safe_label = html_lib.escape(label, quote=True)
+        return f'<button type="button" class="simg-caption-btn" onclick="{js}">{safe_label}</button>'
 
     @staticmethod
     def html_unregistered_cell(url: Path) -> str:
@@ -434,9 +730,19 @@ class AppSceneImageCell:
         prompt_copy_btn = AppSceneImageCell._html_copy_static_button(
             prompt_value, label='prompt'
         )
+
+        caption_btn = AppSceneImageCell._html_caption_button(
+            target_type='unregistered',
+            target=url_str,
+            trigger='gts_prompter',
+            label='caption gts_prompter',
+        )
+        thumb_onclick = AppSceneImageCell._html_lightbox_onclick(
+            target_type='unregistered', target=url_str
+        )
         return f"""
         <div class="image-item simg-unreg-cell">
-            <img src="data:image/png;base64,{img_b64}">
+            <img src="data:image/png;base64,{img_b64}" onclick="{thumb_onclick}">
             <div class="image-controls">
                 <div class="simg-edit-id-row">
                     <div class="simg-edit-id" title="{safe_path}">{safe_name}</div>
@@ -444,6 +750,7 @@ class AppSceneImageCell:
                 </div>
                 <div class="simg-unreg-actions">
                     {prompt_copy_btn}
+                    {caption_btn}
                     <button type="button" class="simg-register-btn" onclick="{onclick_js}">
                         register
                     </button>
@@ -551,11 +858,14 @@ class AppSceneImageCell:
                 margin: 8px 0;
                 color: #ffffff;
             }
-            /* Copy / save / register buttons share the look-and-feel of
-               the selectable labels in `.operation-radio-group label`. */
+            /* Copy / save / register / caption / set buttons share the
+               look-and-feel of selectable labels in
+               `.operation-radio-group label`. */
             .simg-copy-btn,
             .simg-save-btn,
-            .simg-register-btn {
+            .simg-register-btn,
+            .simg-caption-btn,
+            .simg-set-btn {
                 padding: 5px 8px;
                 border: 1px solid #ccc;
                 border-radius: 5px;
@@ -569,8 +879,43 @@ class AppSceneImageCell:
             }
             .simg-copy-btn:hover,
             .simg-save-btn:hover,
-            .simg-register-btn:hover {
+            .simg-register-btn:hover,
+            .simg-caption-btn:hover,
+            .simg-set-btn:hover {
                 background-color: #777777;
+            }
+            .simg-cell-save {
+                display: flex;
+                justify-content: center;
+                margin-top: 10px;
+            }
+            .simg-save-image-btn {
+                padding: 8px 16px;
+                border: 1px solid #4CAF50;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 0.95em;
+                font-weight: 600;
+                background-color: #4CAF50;
+                color: #ffffff;
+                font-family: inherit;
+                width: 100%;
+                line-height: 1.2;
+                transition: all 0.2s ease;
+            }
+            .simg-save-image-btn:hover {
+                background-color: #5fbd62;
+            }
+            .simg-save-image-btn.simg-copy-btn-ok {
+                background-color: #2e7d32 !important;
+                border-color: #2e7d32 !important;
+            }
+            .simg-cell-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                justify-content: center;
+                margin-top: 8px;
             }
             .simg-copy-btn-ok,
             .simg-copy-btn-ok:hover {

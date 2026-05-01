@@ -33,6 +33,7 @@ class SceneDef:
     FIELD_DESCRIPTION: Final = 'description'
     FIELD_CAPTION: Final = 'caption'
     FIELD_CAPTION_JOY: Final = 'caption_joy'
+    FIELD_HINTS: Final = 'hints'
     FIELD_PROMPT: Final = 'prompt'
     FIELD_QUERY: Final = 'query'
     FIELD_QUERY_IMG: Final = 'query_img'

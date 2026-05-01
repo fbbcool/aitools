@@ -69,6 +69,38 @@ class AppHtml:
         return AppHtml.make_elem_id_databus_textbox('simg_editor_register')
 
     @staticmethod
+    def elem_id_simg_editor_caption_button() -> str:
+        return AppHtml.make_elem_id_hidden_button('simg_editor_caption')
+
+    @staticmethod
+    def elem_id_simg_editor_caption_databus() -> str:
+        return AppHtml.make_elem_id_databus_textbox('simg_editor_caption')
+
+    @staticmethod
+    def elem_id_simg_editor_set_button() -> str:
+        return AppHtml.make_elem_id_hidden_button('simg_editor_set')
+
+    @staticmethod
+    def elem_id_simg_editor_set_databus() -> str:
+        return AppHtml.make_elem_id_databus_textbox('simg_editor_set_in')
+
+    @staticmethod
+    def elem_id_simg_editor_set_result_databus() -> str:
+        return AppHtml.make_elem_id_databus_textbox('simg_editor_set_out')
+
+    @staticmethod
+    def elem_id_simg_editor_lightbox_button() -> str:
+        return AppHtml.make_elem_id_hidden_button('simg_editor_lightbox')
+
+    @staticmethod
+    def elem_id_simg_editor_lightbox_databus() -> str:
+        return AppHtml.make_elem_id_databus_textbox('simg_editor_lightbox_in')
+
+    @staticmethod
+    def elem_id_simg_editor_lightbox_result_databus() -> str:
+        return AppHtml.make_elem_id_databus_textbox('simg_editor_lightbox_out')
+
+    @staticmethod
     def make_cmd_data(
         type_obj: str,
         id: str,
@@ -130,7 +162,20 @@ class AppHtml:
         return output_html
 
     @staticmethod
-    def html_styled_cells_grid(inner_html: str, img_width: int = 250) -> str:
+    def html_styled_cells_grid(
+        inner_html: str,
+        img_width: int = 250,
+        columns: Optional[int] = None,
+    ) -> str:
+        # When `columns` is given, force a fixed N-column grid via an inline
+        # style on the container (overrides the auto-fit template defined in
+        # the .image-grid CSS rule).
+        if columns is not None and columns > 0:
+            grid_inline_style = (
+                f' style="grid-template-columns: repeat({columns}, 1fr);"'
+            )
+        else:
+            grid_inline_style = ''
         html = f"""
         <style>
             .image-grid {{
@@ -281,7 +326,7 @@ class AppHtml:
                 color: #ffffff; /* White font for strong tags */
             }}
         </style>
-        <div class="image-grid">
+        <div class="image-grid"{grid_inline_style}>
         {inner_html}
         </div>
         """
@@ -368,6 +413,8 @@ class AppHelper:
             self._cmd_attr_to_clipspace(obj, payload)
         if cmd == 'db_query':
             self._cmd_db_query(obj, payload)
+        if cmd == 'db_query_multi':
+            self._cmd_db_query_multi(obj, payload)
 
         return None
 
@@ -403,6 +450,34 @@ class AppHelper:
 
         obj.db_store()
 
+        return None
+
+    @classmethod
+    def _cmd_db_query_multi(cls, obj: Sceneical, payload: Any) -> None:
+        """
+        Apply multiple setter calls and persist once.
+
+        Payload is a flat dict mapping setter-method-name -> value, e.g.
+            {"set_caption": "...", "set_caption_joy": "...", "set_hints": "..."}
+        Unknown attrs are ignored with a warning.
+        """
+        if not isinstance(payload, dict):
+            raise ValueError('payload not dict!')
+        if not isinstance(obj, (Scene, SceneImage)):
+            raise ValueError('obj not correct instance type!')
+
+        applied = 0
+        for attr, val in payload.items():
+            if not hasattr(obj, attr):
+                print(f'WARN: obj has no attr {attr}, skipping.')
+                continue
+            try:
+                getattr(obj, attr)(val)
+                applied += 1
+            except Exception as e:
+                print(f'WARN: setter {attr} failed: {e}')
+        if applied > 0:
+            obj.db_store()
         return None
 
 

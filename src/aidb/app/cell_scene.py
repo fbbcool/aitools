@@ -1,6 +1,6 @@
+from aidb.app.cell_scene_image import editor_labels
 from aidb.app.html import AppHtml, AppOpMmode, HtmlHelper
 from aidb.scene import Scene, SceneDef
-from aidb.tagger_defines import TaggerDef
 
 from ait.tools.images import image_from_url
 
@@ -141,7 +141,7 @@ class AppSceneCell:
         current_labels = obj.labels
 
         html = ''
-        for label in TaggerDef.LABELS['label']:
+        for label in editor_labels():
             checked = True if label in current_labels else False
             html += AppHtml.html_make_cmd_button(
                 AppHtml.make_cmd_data(

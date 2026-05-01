@@ -57,10 +57,22 @@ class JoySceneDB:
         if id_scene is None:
             return None, None
 
-        scene: Scene = self._scm.scene_from_id_or_url(id_scene)
+        # Prefer the SceneImage's own labels; only fall back to the scene's
+        # labels when the image itself has none.
+        labels = simg.data.get(SceneDef.FIELD_LABELS, []) or []
+        if not labels:
+            scene: Scene = self._scm.scene_from_id_or_url(id_scene)
+            labels = scene.data.get(SceneDef.FIELD_LABELS, []) or []
+            self._log(
+                f'id [{id}]: no image labels, falling back to scene labels {labels}.'
+            )
+        else:
+            self._log(f'id [{id}]: using image labels {labels}.')
 
-        labels = scene.data.get(SceneDef.FIELD_LABELS, [])
-        hint = ''
+        # User-provided hints stored on the SceneImage are forwarded verbatim.
+        hint = simg.data.get(SceneDef.FIELD_HINTS, '') or ''
+        if hint:
+            self._log(f'id [{id}]: using image hints [{hint}].')
 
         prompt, caption = self._joy.img_caption(img, labels=labels, hint=hint)
         return prompt, caption

@@ -50,6 +50,10 @@ class SceneImage:
         return self._data.get(SceneDef.FIELD_CAPTION_JOY, None)
 
     @property
+    def hints(self) -> Optional[str]:
+        return self._data.get(SceneDef.FIELD_HINTS, None)
+
+    @property
     def prompt(self) -> Optional[str]:
         return self._data.get(SceneDef.FIELD_PROMPT, None)
 
@@ -82,6 +86,11 @@ class SceneImage:
         if value is None:
             return
         self._data |= {SceneDef.FIELD_CAPTION_JOY: str(value)}
+
+    def set_hints(self, value: str) -> None:
+        if value is None:
+            return
+        self._data |= {SceneDef.FIELD_HINTS: str(value)}
 
     def set_prompt(self, value: str) -> None:
         if value is None:
