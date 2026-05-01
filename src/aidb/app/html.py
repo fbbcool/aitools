@@ -61,6 +61,14 @@ class AppHtml:
         return AppHtml.make_elem_id('simg_editor', html_obj='tab')
 
     @staticmethod
+    def elem_id_simg_editor_register_button() -> str:
+        return AppHtml.make_elem_id_hidden_button('simg_editor_register')
+
+    @staticmethod
+    def elem_id_simg_editor_register_databus() -> str:
+        return AppHtml.make_elem_id_databus_textbox('simg_editor_register')
+
+    @staticmethod
     def make_cmd_data(
         type_obj: str,
         id: str,

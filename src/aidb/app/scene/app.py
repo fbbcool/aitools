@@ -1,6 +1,8 @@
 import os
 import re
 import gradio as gr
+import pyperclip
+from pathlib import Path
 from typing import Optional
 
 from aidb import SceneManager, SceneDef
@@ -8,6 +10,8 @@ from aidb.tagger_defines import TaggerDef
 from aidb.app.cell_scene import AppSceneCell
 from aidb.app.cell_scene_image import AppSceneImageCell
 from aidb.app.html import AppHtml, AppOpMmode, AppHelper
+
+from ait.tools.files import imgs_from_url
 
 
 class AIDBSceneApp:
@@ -59,6 +63,17 @@ class AIDBSceneApp:
             databus_simg_editor = gr.Textbox(
                 visible='hidden',
                 elem_id=AppHtml.elem_id_simg_editor_databus(),
+            )
+
+            # Hidden trigger + databus for registering an unregistered image
+            button_hidden_simg_editor_register = gr.Button(
+                'Hidden SceneImage Editor Register',
+                visible='hidden',
+                elem_id=AppHtml.elem_id_simg_editor_register_button(),
+            )
+            databus_simg_editor_register = gr.Textbox(
+                visible='hidden',
+                elem_id=AppHtml.elem_id_simg_editor_register_databus(),
             )
             # --- End Hidden Components ---
 
@@ -137,8 +152,15 @@ class AIDBSceneApp:
                         label='Scene ID',
                         interactive=False,
                     )
+                with gr.Row():
+                    simg_editor_url_button = gr.Button('url')
+                simg_editor_scene_info_html = gr.HTML(label='Scene')
+                with gr.Row():
                     simg_editor_refresh_button = gr.Button('Refresh')
+                gr.Markdown('### Registered Images')
                 simg_editor_html = gr.HTML(label='Scene Images')
+                gr.Markdown('### Unregistered Images')
+                simg_editor_unregistered_html = gr.HTML(label='Unregistered Images')
 
             # Link hidden triggers to functions
             button_hidden_cmd.click(
@@ -147,18 +169,41 @@ class AIDBSceneApp:
                 outputs=[],  # This function doesn't update UI directly
             )
 
+            # Outputs that all editor renders update.
+            editor_outputs = [
+                simg_editor_scene_id,
+                simg_editor_scene_info_html,
+                simg_editor_html,
+                simg_editor_unregistered_html,
+            ]
+
             # SceneImage editor: opening triggered from a scene-cell thumbnail click.
             button_hidden_simg_editor_open.click(
                 self._html_simg_editor_open,
                 inputs=[databus_simg_editor],
-                outputs=[simg_editor_scene_id, simg_editor_html],
+                outputs=editor_outputs,
+            )
+
+            # Copy the currently-loaded scene's url to the clipboard.
+            simg_editor_url_button.click(
+                self._simg_editor_copy_scene_url,
+                inputs=[simg_editor_scene_id],
+                outputs=[],
             )
 
             # Manual refresh of the editor view (uses the currently-loaded scene id).
             simg_editor_refresh_button.click(
                 self._html_simg_editor_open,
                 inputs=[simg_editor_scene_id],
-                outputs=[simg_editor_scene_id, simg_editor_html],
+                outputs=editor_outputs,
+            )
+
+            # Register an unregistered image (driven by per-image register button
+            # in the unregistered-images section). Refreshes the editor afterwards.
+            button_hidden_simg_editor_register.click(
+                self._html_simg_editor_register,
+                inputs=[databus_simg_editor_register, simg_editor_scene_id],
+                outputs=editor_outputs,
             )
 
         return if_app
@@ -207,39 +252,140 @@ class AIDBSceneApp:
             )
         return AppHtml.html_styled_cells_grid(html_scenes)
 
-    def _html_simg_editor_open(self, scene_id: Optional[str]) -> tuple[str, str]:
+    def _simg_editor_copy_scene_url(self, scene_id: Optional[str]) -> None:
         """
-        Renders the SceneImage editor cells for all images of the given scene.
-
-        Returns (scene_id, html). The scene id is echoed back so the editor
-        tab shows which scene is currently loaded (and so the refresh button
-        knows which scene to re-render).
+        Copies the scene's url (filesystem path) of the currently-loaded scene
+        to the clipboard via pyperclip (matches the behaviour of the existing
+        scene 'url' to_clipspace cmd).
         """
         if not scene_id or not isinstance(scene_id, str):
-            return '', '<p>No scene selected. Click a scene thumbnail to load it.</p>'
+            gr.Warning('No scene loaded.')
+            return None
+        scene_id = scene_id.strip()
+        try:
+            scene = self._scm.scene_from_id_or_url(scene_id)
+        except Exception as e:
+            print(f'ERROR: couldnt load scene [{scene_id}]: {e}')
+            gr.Warning(f'Failed to load scene {scene_id}: {e}')
+            return None
+        url = str(scene.url)
+        if not url:
+            gr.Warning('Scene has no url.')
+            return None
+        pyperclip.copy(url)
+        gr.Info(f'Copied scene url: {url}', duration=1.5)
+        return None
+
+    def _html_simg_editor_open(
+        self, scene_id: Optional[str]
+    ) -> tuple[str, str, str, str]:
+        """
+        Renders the editor for the given scene. Returns:
+            (scene_id, scene_info_html, registered_imgs_html, unregistered_imgs_html)
+        """
+        empty_msg = '<p>No scene selected. Click a scene thumbnail to load it.</p>'
+        if not scene_id or not isinstance(scene_id, str):
+            return '', '', empty_msg, ''
 
         scene_id = scene_id.strip()
         try:
             scene = self._scm.scene_from_id_or_url(scene_id)
         except Exception as e:
             print(f'ERROR: couldnt load scene [{scene_id}]: {e}')
-            return scene_id, f'<p>Failed to load scene <code>{scene_id}</code>: {e}</p>'
+            err = f'<p>Failed to load scene <code>{scene_id}</code>: {e}</p>'
+            return scene_id, '', err, ''
 
+        styles = AppSceneImageCell.html_styles()
+        scene_info_html = styles + AppSceneImageCell.html_scene_info(scene)
+
+        # registered images
         try:
             imgs = scene.imgs_sorted
         except Exception as e:
             print(f'ERROR: couldnt list imgs for scene [{scene_id}]: {e}')
-            return scene_id, f'<p>Failed to list images for scene <code>{scene_id}</code>: {e}</p>'
+            imgs = []
+            registered_html = (
+                f'<p>Failed to list images for scene <code>{scene_id}</code>: {e}</p>'
+            )
+        else:
+            if imgs:
+                cells = ''.join(AppSceneImageCell.html(img) for img in imgs)
+                registered_html = AppHtml.html_styled_cells_grid(cells)
+            else:
+                registered_html = (
+                    f'<p>No SceneImages registered for scene <code>{scene_id}</code>.</p>'
+                )
 
-        if not imgs:
-            return (
-                scene_id,
-                f'<p>No SceneImages found for scene <code>{scene_id}</code>.</p>',
+        # unregistered images
+        unregistered_urls = self._unregistered_urls_in_scene(scene)
+        if unregistered_urls:
+            cells = ''.join(
+                AppSceneImageCell.html_unregistered_cell(u) for u in unregistered_urls
+            )
+            unregistered_html = AppHtml.html_styled_cells_grid(cells)
+        else:
+            unregistered_html = (
+                f'<p>No unregistered images in scene <code>{scene.url}</code>.</p>'
             )
 
-        cells = ''.join(AppSceneImageCell.html(img) for img in imgs)
-        html = AppSceneImageCell.html_styles() + AppHtml.html_styled_cells_grid(cells)
-        return scene_id, html
+        return scene_id, scene_info_html, registered_html, unregistered_html
+
+    def _unregistered_urls_in_scene(self, scene) -> list[Path]:
+        """
+        Returns image files in the scene's directory that are not yet
+        registered (i.e. their filename has no orig/thumbnail/train prefix).
+        """
+        try:
+            urls = imgs_from_url(scene.url)
+        except Exception as e:
+            print(f'ERROR: couldnt list dir [{scene.url}]: {e}')
+            return []
+        out: list[Path] = []
+        for url in urls:
+            if SceneDef.id_and_prefix_from_filename(url) is not None:
+                # already managed (orig / thumbnail / train) - skip
+                continue
+            out.append(url)
+        out.sort()
+        return out
+
+    def _html_simg_editor_register(
+        self, url_str: Optional[str], scene_id: Optional[str]
+    ) -> tuple[str, str, str, str]:
+        """
+        Registers an unregistered image file by url and refreshes the editor.
+        """
+        if not url_str or not isinstance(url_str, str):
+            gr.Warning('Register: invalid url.')
+            return self._html_simg_editor_open(scene_id)
+
+        url = Path(url_str.strip())
+        if not url.exists():
+            gr.Warning(f'Register: file does not exist: {url}')
+            return self._html_simg_editor_open(scene_id)
+
+        try:
+            im = self._scm.scene_image_manager()
+            new_id = im.register_from_url(url)
+        except Exception as e:
+            print(f'ERROR: register_from_url [{url}]: {e}')
+            gr.Warning(f'Register failed: {e}')
+            return self._html_simg_editor_open(scene_id)
+
+        if new_id is None:
+            gr.Warning(f'Register: could not register {url} (not an img/vid or already managed).')
+        else:
+            gr.Info(f'Registered {url.name} as id {new_id}.', duration=1.5)
+
+        # Re-sync the scene so its imgs list picks up the new SceneImage.
+        try:
+            scene = self._scm.scene_from_id_or_url(scene_id) if scene_id else None
+            if scene is not None:
+                scene.update()
+        except Exception as e:
+            print(f'WARN: scene.update after register failed: {e}')
+
+        return self._html_simg_editor_open(scene_id)
 
     def launch(self, **kwargs):
         print('Launching Gradio application...')

@@ -46,8 +46,21 @@ class SceneImage:
         return self._data.get(SceneDef.FIELD_CAPTION, None)
 
     @property
+    def caption_joy(self) -> Optional[str]:
+        return self._data.get(SceneDef.FIELD_CAPTION_JOY, None)
+
+    @property
     def prompt(self) -> Optional[str]:
         return self._data.get(SceneDef.FIELD_PROMPT, None)
+
+    @property
+    def labels(self) -> list[str]:
+        """
+        Returns the labels as a list of strings.
+
+        If labels aren't set, an empty list is given.
+        """
+        return self._data.get(SceneDef.FIELD_LABELS, []) or []
 
     def set_rating(self, value: int | str) -> None:
         try:
@@ -65,10 +78,36 @@ class SceneImage:
             return
         self._data |= {SceneDef.FIELD_CAPTION: str(value)}
 
+    def set_caption_joy(self, value: str) -> None:
+        if value is None:
+            return
+        self._data |= {SceneDef.FIELD_CAPTION_JOY: str(value)}
+
     def set_prompt(self, value: str) -> None:
         if value is None:
             return
         self._data |= {SceneDef.FIELD_PROMPT: str(value)}
+
+    def set_labels(self, value: list[str]) -> None:
+        if not isinstance(value, list):
+            return
+        self._data |= {SceneDef.FIELD_LABELS: list(set(value))}
+
+    def push_label(self, label: str) -> None:
+        labels = self.labels
+        labels.append(label)
+        self.set_labels(list(set(labels)))
+
+    def pop_label(self, label: str) -> None:
+        labels = set(self.labels)
+        labels.discard(label)
+        self.set_labels(list(labels))
+
+    def switch_label(self, label: str) -> None:
+        if label in self.labels:
+            self.pop_label(label)
+        else:
+            self.push_label(label)
 
     def db_store(self) -> bool:
         return self._dbstore()
