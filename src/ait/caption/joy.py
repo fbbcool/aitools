@@ -112,7 +112,7 @@ CONTENT_SYSTEM: Final = {
 
 # Tightened from "very long detailed description" - shorter captions concentrate
 # trigger weight and train cleaner LoRAs.
-DEFAULT_PROMPT: Final = 'Write a detailed description of this image in 60 to 90 words.'
+DEFAULT_PROMPT: Final = 'Write a detailed description of this image.'
 
 CONTENT_PROMPT: Final = {
     'gts_prompter': 'The users are interested propmts for image generation of femdom giantess scenarios. in femdom giantess scenarios, women are always bigger, stronger and super sexy and superior. so always exaggerate any of such aspects to make men the weak, vulnerable and dominated part (the more the better!). always describe a man as a "xlasm man".dont describe styles, they do not matter.',
@@ -180,22 +180,6 @@ LABEL_PROMPT: Final = {
     'b_busty': f'The {TRIGGER_WOMAN} has prominently large breasts. Describe her breasts directly.',
     'b_slim': f'The {TRIGGER_WOMAN} has a slim athletic build. Describe her build directly.',
     'b_curvy': f'The {TRIGGER_WOMAN} has curvy hourglass proportions. Describe her proportions directly.',
-
-    # --- POSITION labels ---
-    # Use when the image shows them together but no specific action is
-    # occurring. Encodes vertical compositional position.
-    'pos_at_feet': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s feet, beside her ankle or shin.',
-    'pos_at_thigh': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s thigh level.',
-    'pos_at_hip': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s hip level.',
-    'pos_at_waist': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s waist level.',
-    'pos_at_chest': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s chest level.',
-    'pos_at_shoulder': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s shoulder level.',
-    'pos_in_palm': f'The {TRIGGER_MAN} stands in the {TRIGGER_WOMAN}s open palm.',
-    'pos_on_shoulder': f'The {TRIGGER_MAN} sits on the {TRIGGER_WOMAN}s shoulder.',
-    'pos_held': f'The {TRIGGER_WOMAN} holds the {TRIGGER_MAN} in her hand.',
-    'pos_pocket': f'The {TRIGGER_MAN} is inside a pocket of the {TRIGGER_WOMAN}s clothing.',
-
-    # --- ORIGINAL ACTION labels (preserved structurally, updated to use trigger phrases) ---
     'all4': f'The {TRIGGER_WOMAN} is on her all fours.',
     'ass': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s ass.',
     'blowjob': f'The {TRIGGER_WOMAN} gives the {TRIGGER_MAN} a blowjob (mention "giving a blowjob" along with oral stimulation right at the beginning as a focus information) with his erect penis inserted into her mouth and her lips closed on his penis.',
@@ -215,7 +199,7 @@ LABEL_PROMPT: Final = {
     'masturbating': f'The {TRIGGER_MAN} is masturbating and gripping and stroking his penis. mention "masturbating and stroking his erect penis" right at the beginning of the image description because it is a central information',
     'mouth': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s mouth.',
     'panties': f'The {TRIGGER_MAN} is inserted into the {TRIGGER_WOMAN}s panties.',
-    'penis': f'The {TRIGGER_MAN} has an erect penis.',
+    'penis': f'Include explicitly the phrase: "The {TRIGGER_MAN} has an erect penis."',
     'penis_no': f'The {TRIGGER_MAN}s penis is not visible so avoid mentioning it.',
     'pussy': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s vagina.',
     'sex': f'The {TRIGGER_MAN} has sex with the {TRIGGER_WOMAN}, inserting his erect penis into her vagina.',
@@ -223,17 +207,10 @@ LABEL_PROMPT: Final = {
     'step': f'The {TRIGGER_WOMAN} is stepping on the {TRIGGER_MAN} with her foot.',
     'teasing_hj': f'The {TRIGGER_WOMAN} gives the {TRIGGER_MAN} a teasing handjob (mention "giving a teasing handjob" right at the beginning as a focus information) by stimulation and stroking his penis delicately with her fingers.',
     'thigh': f'The {TRIGGER_MAN} is positioned between the thighs of the {TRIGGER_WOMAN}.',
-    # Reworked: removed "towering" since size words contradict _XLASM_DIRECTIVE.
-    # Same spatial meaning, no leaked scale vocabulary.
     'tower': f'The {TRIGGER_WOMAN} stands directly above the {TRIGGER_MAN}, with him positioned at her feet or lower leg level.',
     'tongue': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s tongue.',
     'none': '',
 }
-
-# Scale tag names recognized in the CSV. NOT used by JoyCaption - kept as
-# metadata for dataset balance auditing (count images per scale tier to
-# ensure each is represented enough to train cleanly).
-SCALE_TAGS: Final = ('s_small_gts', 's_mid_gts', 's_large_gts', 's_mega_gts')
 
 POST_PROMPT: Final = ''
 
@@ -257,24 +234,63 @@ POST_PROMPT: Final = ''
 # would compete with the trigger's learned meaning.
 _FORBIDDEN_IN_XLASM: Final = (
     # Diminutive size words
-    'tiny', 'little', 'small man', 'miniature', 'mini', 'minute',
+    'tiny',
+    'little',
+    'small man',
+    'miniature',
+    'mini',
+    'minute',
     # Object/toy reductions
-    'figurine', 'figure', 'doll', 'action figure', 'toy', 'puppet',
-    'mannequin', 'statuette',
+    'figurine',
+    'figure',
+    'doll',
+    'action figure',
+    'toy',
+    'puppet',
+    'mannequin',
+    'statuette',
     # Age reductions
-    'child', 'kid', 'boy', 'young man', 'youth', 'youngster', 'teenager',
-    'teen', 'adolescent', 'juvenile',
+    'child',
+    'kid',
+    'boy',
+    'young man',
+    'youth',
+    'youngster',
+    'teenager',
+    'teen',
+    'adolescent',
+    'juvenile',
     # Other person-size reductions
-    'dwarf', 'midget', 'pygmy', 'gnome', 'imp',
+    'dwarf',
+    'midget',
+    'pygmy',
+    'gnome',
+    'imp',
     # Magnitude vocabulary (woman-side)
-    'towering', 'huge woman', 'giant woman', 'enormous', 'massive woman',
-    'colossal', 'gigantic', 'titanic', 'monstrous', 'immense',
-    'extremely tall', 'super tall', 'incredibly tall',
+    'towering',
+    'huge woman',
+    'giant woman',
+    'enormous',
+    'massive woman',
+    'colossal',
+    'gigantic',
+    'titanic',
+    'monstrous',
+    'immense',
+    'extremely tall',
+    'super tall',
+    'incredibly tall',
     # Base-vocabulary collisions with TRIGGER_WOMAN - these compete with the
     # trigger's learned meaning if they appear in captions
-    'giantess', 'tall woman', 'large woman', 'big woman', 'amazon',
+    'giantess',
+    'tall woman',
+    'large woman',
+    'big woman',
+    'amazon',
     # Base-vocabulary collisions with TRIGGER_MAN
-    'shrunken man', 'shrunk man', 'shrunken person',
+    'shrunken man',
+    'shrunk man',
+    'shrunken person',
 )
 
 
@@ -308,9 +324,7 @@ def validate_body_type_consistency(caption: str, labels: list[str]) -> list[str]
             continue  # this label authorizes its body-type words
         for word in words:
             if word in lowered:
-                warnings.append(
-                    f'caption contains "{word}" but {label} label was not set'
-                )
+                warnings.append(f'caption contains "{word}" but {label} label was not set')
     return warnings
 
 

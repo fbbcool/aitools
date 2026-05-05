@@ -63,9 +63,7 @@ class JoySceneDB:
         if not labels:
             scene: Scene = self._scm.scene_from_id_or_url(id_scene)
             labels = scene.data.get(SceneDef.FIELD_LABELS, []) or []
-            self._log(
-                f'id [{id}]: no image labels, falling back to scene labels {labels}.'
-            )
+            self._log(f'id [{id}]: no image labels, falling back to scene labels {labels}.')
         else:
             self._log(f'id [{id}]: using image labels {labels}.')
 
@@ -75,6 +73,7 @@ class JoySceneDB:
             self._log(f'id [{id}]: using image hints [{hint}].')
 
         prompt, caption = self._joy.img_caption(img, labels=labels, hint=hint)
+        self._log(f'prompt[{prompt}] caption[{caption}]')
         return prompt, caption
 
     @property
