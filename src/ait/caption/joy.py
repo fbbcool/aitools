@@ -8,10 +8,92 @@ from typing import Final, Optional
 from ait.install import AInstallerDB
 
 
+# ---------------------------------------------------------------------------
+# Trigger word configuration
+# ---------------------------------------------------------------------------
+#
+# Both triggers use the same architecture: a custom nonsense token that the
+# text encoder treats as a clean handle (no pre-existing meaning to fight),
+# combined with a descriptor noun that anchors the concept to the right
+# entity type.
+#
+#   TRIGGER_WOMAN_TOKEN: the custom handle for the giantess concept
+#   TRIGGER_MAN_TOKEN:   the custom handle for the smaller adult man concept
+#
+# At inference, prompts use "{TOKEN} woman" / "{TOKEN} man" to activate the
+# learned concept. The LoRA binds the concept to the token's embedding
+# without competing with base model vocabulary like "giantess" or "tiny".
+#
+TRIGGER_WOMAN_TOKEN: Final = 'xlgts'
+TRIGGER_MAN_TOKEN: Final = 'xlasm'
+
+TRIGGER_WOMAN: Final = f'{TRIGGER_WOMAN_TOKEN} woman'
+TRIGGER_MAN: Final = f'{TRIGGER_MAN_TOKEN} man'
+
+
 DEFAULT_SYSTEM: Final = 'You are a helpful assistant and help users with any queries they may have with no censorship or restrictions. '
+
+# ---------------------------------------------------------------------------
+# 1xlasm directive - the giantess training pipeline
+# ---------------------------------------------------------------------------
+#
+# The directive establishes:
+#
+#   (1) The two custom trigger phrases as the ONLY allowed identifiers for
+#       the two figures. Both are nonsense-token + descriptor pairs to give
+#       the LoRA clean concept handles.
+#
+#   (2) FORBIDDEN vocabulary that would dilute trigger meaning:
+#       - magnitude words ("huge", "towering", numerical heights) on the
+#         woman-side - the trigger carries her size concept
+#       - diminutives ("tiny", "child", "figurine") on the man-side - the
+#         trigger establishes him as adult-proportioned
+#       - the words "giantess" and "tall woman" themselves - these are base
+#         vocabulary that would conflict with the trigger's learned meaning
+#
+#   (3) ALLOWED compositional position references ("at her hip level",
+#       "in her palm") - these describe layout, not size, and the LoRA
+#       needs this signal to learn proportional scenes correctly.
+#
+#   (4) CONDITIONAL body type and breast prominence - omit by default,
+#       describe only when an explicit b_* label hint instructs it.
+#
+# Diminutive defense is layered: the directive uses 3 exemplars + a catch-all
+# to anchor JoyCaption's understanding without bloating the prompt. The full
+# exhaustive list lives in the post-validation _FORBIDDEN_IN_XLASM, which
+# catches anything that slips through during generation.
+#
+_XLASM_DIRECTIVE: Final = (
+    f'This image shows a giantess theme scene with two figures: a much larger '
+    f'woman and a smaller adult man. Always identify them using exactly the '
+    f'phrase "{TRIGGER_WOMAN}" for the larger woman and exactly the phrase '
+    f'"{TRIGGER_MAN}" for the smaller adult man. These exact phrases are the '
+    f'only allowed identifiers - never substitute "giantess woman", "tall '
+    f'woman", "giantess", "small man", "shrunken man", or any other '
+    f'descriptor for them. Search carefully for the {TRIGGER_MAN} as he can '
+    f'be hard to spot. '
+    f'Never use size or magnitude words such as "huge", "towering", '
+    f'"extremely tall", "giant", "enormous", "massive", or any numerical '
+    f'heights anywhere in the caption - the trigger phrases carry the size '
+    f'concept on their own. Never describe the {TRIGGER_MAN} using '
+    f'diminutives like "tiny", "child", "figurine", or any similar reductive '
+    f'term - he is always an adult man. '
+    f'You may and should describe where the {TRIGGER_MAN} is positioned '
+    f'relative to the {TRIGGER_WOMAN}s body using compositional references '
+    f'such as "at her ankle", "at her hip level", "in her palm", "on her '
+    f'shoulder" - this is composition, not size. '
+    f'Only describe the {TRIGGER_WOMAN}s body type (such as muscular, slim, '
+    f'curvy) or breast prominence if explicitly instructed to do so by an '
+    f'additional hint - otherwise omit body type and breast descriptions '
+    f'entirely. '
+    f'Describe what each person is wearing, their poses, expressions, what '
+    f'they are doing, the environment, lighting, and camera angle. Do not '
+    f'invent details that are not visible.'
+)
+
 CONTENT_SYSTEM: Final = {
     'gts_prompter': 'The users are interested propmts for image generation of femdom giantess scenarios. in femdom giantess scenarios, women are always bigger, stronger and super sexy and superior. so always exaggerate any of such aspects to make men the weak, vulnerable and dominated part (the more the better!). always describe a man as a "xlasm man".dont describe styles, they do not matter.',
-    '1xlasm': 'This is a giantess theme image but avoid any size difference description between the woman and the man. just use "giantess woman" and "xlasm man", both are present in the image, so always try to find especially the xlasm. definitly avoid any  "child", "figurine", "small", "tiny" captions since this is always an interaction between a giantess woman and a xlasm man. normally, the giantess woman is extremely tall, often very muscular and has large breasts. this is also already known, so do not describe any of her attributes concerning her muscularity or breasts size (like "large breasts").',
+    '1xlasm': _XLASM_DIRECTIVE,
     '1gts': 'The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.',
     '1woman': 'The users are interested in women with big breasts and hairy women and how they present their bodies.',
     '1fem': "The users are interested in body and face characteristics of this female character. always call the female character 'giantess woman'",
@@ -27,10 +109,14 @@ CONTENT_SYSTEM: Final = {
     '1face': 'This is a real image of a woman with focus on her face.do not describe her face or her facial features since this is already known. describe everything else but her face!',
     '1tongue': 'This is a real image of a woman with close-up on her face.she shows off her long tongue. do not describe the size of her tongue since this is already known.',
 }
-DEFAULT_PROMPT: Final = 'Write a very long detailed description for this image.'
+
+# Tightened from "very long detailed description" - shorter captions concentrate
+# trigger weight and train cleaner LoRAs.
+DEFAULT_PROMPT: Final = 'Write a detailed description of this image in 60 to 90 words.'
+
 CONTENT_PROMPT: Final = {
     'gts_prompter': 'The users are interested propmts for image generation of femdom giantess scenarios. in femdom giantess scenarios, women are always bigger, stronger and super sexy and superior. so always exaggerate any of such aspects to make men the weak, vulnerable and dominated part (the more the better!). always describe a man as a "xlasm man".dont describe styles, they do not matter.',
-    '1xlasm': 'This is a giantess theme image but avoid any size difference description between the woman and the man. just use "giantess woman" and "xlasm man", both are present in the image, so always try to find especially the xlasm. definitly avoid any  "child", "figurine", "small", "tiny" captions since this is always an interaction between a giantess woman and a xlasm man. normally, the giantess woman is extremely tall, often very muscular and has large breasts. this is also already known, so do not describe any of her attributes concerning her muscularity or breasts size (like "large breasts").',
+    '1xlasm': _XLASM_DIRECTIVE,
     '1gts': 'The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess and a man with a massive size difference. the giantess woman is always much taller. avoid child,figurine,small,tiny captions as this is always an interaction between a giantess woman and a xsmall man. the aspect of size difference and the xsmall man itself is always described as xsmall man.',
     '1woman': 'The users are interested in women with big breasts and hairy women and how they present their bodies.',
     '1fem': "The users are interested in body and face characteristics of this female character. always call the female character 'giantess woman'",
@@ -47,40 +133,201 @@ CONTENT_PROMPT: Final = {
     '1tongue': 'This is a real image of a woman with close-up on her face.she shows off her long tongue. do not describe the size of her tongue since this is already known.',
 }
 
+# ---------------------------------------------------------------------------
+# Labels - compose orthogonally with the trigger
+# ---------------------------------------------------------------------------
+#
+# For 1xlasm training, three orthogonal label dimensions in the captioner:
+#
+#   - BODY TYPE (b_*): muscular / busty / slim / curvy. Opt-in only - apply
+#     when the trait is unmistakable, omit when ambiguous.
+#   - POSITION (pos_*): where the {TRIGGER_MAN} is located relative to her body
+#     for non-interaction images.
+#   - ACTION (the originals): what is happening between them.
+#
+# NOTE on SCALE: scale tags (s_small_gts, s_mid_gts, s_large_gts, s_mega_gts)
+# are NOT in LABEL_PROMPT. They are CSV-only metadata used for dataset
+# balance auditing - making sure you have enough training images at each
+# scale tier. They deliberately do not feed into JoyCaption because:
+#
+#   - Any caption-time scale description either uses forbidden magnitude
+#     words ("many times larger") or anchors to body parts ("his head reaches
+#     her knee"), which contradicts the actual visible posture in many
+#     images (man in palm, sitting on shoulder, etc.).
+#   - The LoRA learns scale from the visual statistics across training
+#     images. A mid-scale dataset image looks proportionally different from
+#     a large-scale one in many subtle visual ways that the model picks up
+#     directly from pixels.
+#   - At inference, scale is controlled implicitly through position phrasing
+#     ("at her ankle" implies large scale), camera angle ("low-angle shot
+#     looking up"), and scene context ("walking past skyscrapers").
+#
+# Pick at most one from POSITION, any number from BODY TYPE, and one ACTION
+# (or none). Combinations that contradict (e.g. pos_at_feet + pos_in_palm)
+# should be avoided in tagging.
+#
+# All label strings reference the trigger phrases via f-string interpolation
+# so changing TRIGGER_WOMAN_TOKEN / TRIGGER_MAN_TOKEN updates every label
+# consistently.
+#
 LABEL_PROMPT: Final = {
-    'all4': 'The giantess woman is on her all fours.',
-    'ass': 'The xlasm man interacts with the giantess womans ass.',
-    'blowjob': 'The giantess woman gives the xlasm man a blowjob (mention "giving a blowjob" along with oral stimulation right at the beginning as a focus information) with his erect penis inserted into her mouth and her lips closed on his penis.',
-    'body': 'The xlasm man interacts with the giantess womans body.',
-    'breast': 'The xlasm man interacts with the giantess womans breasts.',
-    'cum': 'The xlasm man ejaculates and cums.',
-    'face': 'The xlasm man interacts with the giantess womans face.',
-    'foot': 'The xlasm man interacts with the giantess womans foot.',
-    'hand': 'The xlasm man interacts with the giantess womans hand.',
-    'handjob': 'The giantess woman gives the xlasm man a handjob (mention "giving a handjob" right at the beginning as a focus information) by stimulation and stroking his penis with her hand.',
-    'hanging': 'The xlasm man is in a hanging position.',
+    # --- BODY TYPE labels ---
+    # Opt-in only. The directive omits these by default; these labels enable
+    # description. Apply only when the trait is unmistakable in the image.
+    # Multiple body type labels can apply to the same image (e.g. muscular
+    # AND busty).
+    'b_muscular': f'The {TRIGGER_WOMAN} has a muscular bodybuilder physique with visible muscle definition. Describe her muscles directly.',
+    'b_busty': f'The {TRIGGER_WOMAN} has prominently large breasts. Describe her breasts directly.',
+    'b_slim': f'The {TRIGGER_WOMAN} has a slim athletic build. Describe her build directly.',
+    'b_curvy': f'The {TRIGGER_WOMAN} has curvy hourglass proportions. Describe her proportions directly.',
+
+    # --- POSITION labels ---
+    # Use when the image shows them together but no specific action is
+    # occurring. Encodes vertical compositional position.
+    'pos_at_feet': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s feet, beside her ankle or shin.',
+    'pos_at_thigh': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s thigh level.',
+    'pos_at_hip': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s hip level.',
+    'pos_at_waist': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s waist level.',
+    'pos_at_chest': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s chest level.',
+    'pos_at_shoulder': f'The {TRIGGER_MAN} stands at the {TRIGGER_WOMAN}s shoulder level.',
+    'pos_in_palm': f'The {TRIGGER_MAN} stands in the {TRIGGER_WOMAN}s open palm.',
+    'pos_on_shoulder': f'The {TRIGGER_MAN} sits on the {TRIGGER_WOMAN}s shoulder.',
+    'pos_held': f'The {TRIGGER_WOMAN} holds the {TRIGGER_MAN} in her hand.',
+    'pos_pocket': f'The {TRIGGER_MAN} is inside a pocket of the {TRIGGER_WOMAN}s clothing.',
+
+    # --- ORIGINAL ACTION labels (preserved structurally, updated to use trigger phrases) ---
+    'all4': f'The {TRIGGER_WOMAN} is on her all fours.',
+    'ass': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s ass.',
+    'blowjob': f'The {TRIGGER_WOMAN} gives the {TRIGGER_MAN} a blowjob (mention "giving a blowjob" along with oral stimulation right at the beginning as a focus information) with his erect penis inserted into her mouth and her lips closed on his penis.',
+    'body': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s body.',
+    'breast': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s breasts.',
+    'cum': f'The {TRIGGER_MAN} ejaculates and cums.',
+    'face': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s face.',
+    'foot': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s foot.',
+    'hand': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s hand.',
+    'handjob': f'The {TRIGGER_WOMAN} gives the {TRIGGER_MAN} a handjob (mention "giving a handjob" right at the beginning as a focus information) by stimulation and stroking his penis with her hand.',
+    'hanging': f'The {TRIGGER_MAN} is in a hanging position.',
     'heap': '',
-    'holding': 'The xlasm man is held by the giantess woman.',
-    'insert': 'the xlasm man is definitly partly inserted into the giantess womans vagina, ass or mouth.  mention, when his head, upper body or lower body is inserted into her vagina, otherwise do not mention.',
-    'job': 'The giantess woman is giving the xlasm man either a handjob or a blowjob.',
-    'leg': 'The xlasm man interacts with the giantess womans leg.',
-    'masturbating': 'The xlasm man is masturbating and gripping and stroking his penis. mention "masturbating and stroking his erect penis" right at the beginning of the image description because it is a central information',
-    'mouth': 'The xlasm man interacts with the giantess womans mouth.',
-    'panties': 'The xlasm man is inserted into the giantess womans panties.',
-    'penis': 'The xlasm man has an erect penis.',
-    'penis_no': 'The xlasm mans penis is not visible so avoid mentioning it.',
-    'pussy': 'The xlasm man interacts with the giantess womans vagina.',
-    'sex': 'The xlasm man has sex with the giantess woman, inserting his erect penis into her vagina.',
-    'sitting': 'The xlasm man is in a sitting position. Most likely he sits on a bodypart of the giantess woman.',
-    'step': 'The giantess woman is stepping on the xlasm man with her foot.',
-    'teasing_hj': 'The giantess woman gives the xlasm man a teasing handjob (mention "giving a teasing handjob" right at the beginning as a focus information) by stimulation and stroking his penis delicately with her fingers.',
-    'thigh': 'The xlasm man is positioned between the thighs of the giantess woman.',
-    'tongue': 'The xlasm man interacts with the giantess womans tongue.',
-    'tower': 'The giantess woman is towering over the xlasm man.',
+    'holding': f'The {TRIGGER_MAN} is held by the {TRIGGER_WOMAN}.',
+    'insert': f'the {TRIGGER_MAN} is definitly partly inserted into the {TRIGGER_WOMAN}s vagina, ass or mouth.  mention, when his head, upper body or lower body is inserted into her vagina, otherwise do not mention.',
+    'job': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} either a handjob or a blowjob.',
+    'leg': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s leg.',
+    'masturbating': f'The {TRIGGER_MAN} is masturbating and gripping and stroking his penis. mention "masturbating and stroking his erect penis" right at the beginning of the image description because it is a central information',
+    'mouth': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s mouth.',
+    'panties': f'The {TRIGGER_MAN} is inserted into the {TRIGGER_WOMAN}s panties.',
+    'penis': f'The {TRIGGER_MAN} has an erect penis.',
+    'penis_no': f'The {TRIGGER_MAN}s penis is not visible so avoid mentioning it.',
+    'pussy': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s vagina.',
+    'sex': f'The {TRIGGER_MAN} has sex with the {TRIGGER_WOMAN}, inserting his erect penis into her vagina.',
+    'sitting': f'The {TRIGGER_MAN} is in a sitting position. Most likely he sits on a bodypart of the {TRIGGER_WOMAN}.',
+    'step': f'The {TRIGGER_WOMAN} is stepping on the {TRIGGER_MAN} with her foot.',
+    'teasing_hj': f'The {TRIGGER_WOMAN} gives the {TRIGGER_MAN} a teasing handjob (mention "giving a teasing handjob" right at the beginning as a focus information) by stimulation and stroking his penis delicately with her fingers.',
+    'thigh': f'The {TRIGGER_MAN} is positioned between the thighs of the {TRIGGER_WOMAN}.',
+    # Reworked: removed "towering" since size words contradict _XLASM_DIRECTIVE.
+    # Same spatial meaning, no leaked scale vocabulary.
+    'tower': f'The {TRIGGER_WOMAN} stands directly above the {TRIGGER_MAN}, with him positioned at her feet or lower leg level.',
+    'tongue': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s tongue.',
     'none': '',
 }
 
+# Scale tag names recognized in the CSV. NOT used by JoyCaption - kept as
+# metadata for dataset balance auditing (count images per scale tier to
+# ensure each is represented enough to train cleanly).
+SCALE_TAGS: Final = ('s_small_gts', 's_mid_gts', 's_large_gts', 's_mega_gts')
+
 POST_PROMPT: Final = ''
+
+
+# ---------------------------------------------------------------------------
+# Caption validation helpers
+# ---------------------------------------------------------------------------
+#
+# Two-layer defense strategy:
+#   - The directive uses a SHORT diminutive list (3 exemplars + catch-all) to
+#     anchor JoyCaption's understanding without bloating the prompt.
+#   - This validator uses an EXHAUSTIVE list to catch anything that slips
+#     through during generation. Reject or hand-fix flagged captions before
+#     they enter LoRA training.
+
+# Magnitude vocabulary, diminutives, and base-vocabulary collisions - exhaustive
+# list. Always forbidden in 1xlasm captions regardless of labels.
+#
+# Includes "giantess" and "tall woman" themselves, since the trigger phrase
+# TRIGGER_WOMAN replaces them - any leakage of these base-vocabulary terms
+# would compete with the trigger's learned meaning.
+_FORBIDDEN_IN_XLASM: Final = (
+    # Diminutive size words
+    'tiny', 'little', 'small man', 'miniature', 'mini', 'minute',
+    # Object/toy reductions
+    'figurine', 'figure', 'doll', 'action figure', 'toy', 'puppet',
+    'mannequin', 'statuette',
+    # Age reductions
+    'child', 'kid', 'boy', 'young man', 'youth', 'youngster', 'teenager',
+    'teen', 'adolescent', 'juvenile',
+    # Other person-size reductions
+    'dwarf', 'midget', 'pygmy', 'gnome', 'imp',
+    # Magnitude vocabulary (woman-side)
+    'towering', 'huge woman', 'giant woman', 'enormous', 'massive woman',
+    'colossal', 'gigantic', 'titanic', 'monstrous', 'immense',
+    'extremely tall', 'super tall', 'incredibly tall',
+    # Base-vocabulary collisions with TRIGGER_WOMAN - these compete with the
+    # trigger's learned meaning if they appear in captions
+    'giantess', 'tall woman', 'large woman', 'big woman', 'amazon',
+    # Base-vocabulary collisions with TRIGGER_MAN
+    'shrunken man', 'shrunk man', 'shrunken person',
+)
+
+
+def caption_has_xlasm_violations(caption: str) -> list[str]:
+    """Return forbidden phrases found in the caption (empty list = clean)."""
+    lowered = caption.lower()
+    return [phrase for phrase in _FORBIDDEN_IN_XLASM if phrase in lowered]
+
+
+# Body-type words that should ONLY appear in captions when the corresponding
+# b_* label was provided. Used by validate_body_type_consistency() to catch
+# JoyCaption hallucinating body-type descriptions without label authorization.
+_BODY_TYPE_WORDS: Final = {
+    'b_muscular': ('muscular', 'muscle', 'bodybuilder', 'ripped', 'defined'),
+    'b_busty': ('busty', 'large breasts', 'big breasts', 'voluptuous'),
+    'b_slim': ('slim', 'slender', 'athletic build', 'lean'),
+    'b_curvy': ('curvy', 'hourglass', 'voluptuous'),
+}
+
+
+def validate_body_type_consistency(caption: str, labels: list[str]) -> list[str]:
+    """Flag body-type words appearing in caption without their authorizing label.
+
+    Returns one warning per unauthorized body-type word found. Empty list
+    means the caption is consistent with the provided labels.
+    """
+    lowered = caption.lower()
+    warnings = []
+    for label, words in _BODY_TYPE_WORDS.items():
+        if label in labels:
+            continue  # this label authorizes its body-type words
+        for word in words:
+            if word in lowered:
+                warnings.append(
+                    f'caption contains "{word}" but {label} label was not set'
+                )
+    return warnings
+
+
+def validate_trigger_presence(caption: str) -> list[str]:
+    """Flag captions that don't use the required trigger phrases.
+
+    A clean 1xlasm caption must mention both TRIGGER_WOMAN and TRIGGER_MAN
+    at least once, since they are the LoRA's concept anchors. Returns a
+    list of missing triggers (empty list = both present).
+    """
+    lowered = caption.lower()
+    missing = []
+    if TRIGGER_WOMAN.lower() not in lowered:
+        missing.append(TRIGGER_WOMAN)
+    if TRIGGER_MAN.lower() not in lowered:
+        missing.append(TRIGGER_MAN)
+    return missing
 
 
 class Joy:
