@@ -282,6 +282,37 @@ class AIDBSceneApp:
                         'Load',
                         elem_id='set-editor-load-button',
                     )
+                with gr.Row():
+                    set_editor_hints = gr.Dropdown(
+                        label='Hints',
+                        choices=['ignore', 'empty', 'set'],
+                        value='ignore',
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    set_editor_caption = gr.Dropdown(
+                        label='Caption',
+                        choices=['ignore', 'empty', 'set'],
+                        value='ignore',
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    set_editor_caption_joy = gr.Dropdown(
+                        label='Caption Joy',
+                        choices=['ignore', 'empty', 'set'],
+                        value='ignore',
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    set_editor_labels = gr.Dropdown(
+                        label='Labels',
+                        choices=['ignore', 'empty', 'set'],
+                        value='ignore',
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                with gr.Row():
+                    set_editor_caption_empty_button = gr.Button('caption')
                 set_editor_html = gr.HTML(label='Set Images')
 
             # Link hidden triggers to functions
@@ -449,9 +480,25 @@ class AIDBSceneApp:
                 """,
             )
 
+            set_editor_filter_inputs = [
+                set_editor_name,
+                set_editor_rating_min,
+                set_editor_rating_max,
+                set_editor_hints,
+                set_editor_caption,
+                set_editor_caption_joy,
+                set_editor_labels,
+            ]
+
             set_editor_load_button.click(
                 self._html_set_editor_open,
-                inputs=[set_editor_name, set_editor_rating_min, set_editor_rating_max],
+                inputs=set_editor_filter_inputs,
+                outputs=[set_editor_html],
+            )
+
+            set_editor_caption_empty_button.click(
+                self._html_set_editor_caption_empty,
+                inputs=set_editor_filter_inputs,
                 outputs=[set_editor_html],
             )
 
@@ -469,11 +516,55 @@ class AIDBSceneApp:
         names.sort()
         return names
 
+    def _set_editor_filter_imgs(
+        self,
+        scene_set,
+        rating_min: Optional[str],
+        rating_max: Optional[str],
+        hints_mode: Optional[str],
+        caption_mode: Optional[str],
+        caption_joy_mode: Optional[str],
+        labels_mode: Optional[str],
+    ) -> list:
+        r_min = int(rating_min) if rating_min is not None else SceneDef.RATING_MIN
+        r_max = int(rating_max) if rating_max is not None else SceneDef.RATING_MAX
+
+        field_modes = [
+            (SceneDef.FIELD_HINTS, hints_mode),
+            (SceneDef.FIELD_CAPTION, caption_mode),
+            (SceneDef.FIELD_CAPTION_JOY, caption_joy_mode),
+            (SceneDef.FIELD_LABELS, labels_mode),
+        ]
+
+        out = []
+        for img in scene_set.imgs:
+            rating = img.data.get(SceneDef.FIELD_RATING, SceneDef.RATING_MIN)
+            if not (r_min <= rating <= r_max):
+                continue
+            ok = True
+            for field, mode in field_modes:
+                if mode is None or mode == 'ignore':
+                    continue
+                is_empty = not img.data.get(field)
+                if mode == 'empty' and not is_empty:
+                    ok = False
+                    break
+                if mode == 'set' and is_empty:
+                    ok = False
+                    break
+            if ok:
+                out.append(img)
+        return out
+
     def _html_set_editor_open(
         self,
         name: Optional[str],
         rating_min: Optional[str],
         rating_max: Optional[str],
+        hints_mode: Optional[str] = 'ignore',
+        caption_mode: Optional[str] = 'ignore',
+        caption_joy_mode: Optional[str] = 'ignore',
+        labels_mode: Optional[str] = 'ignore',
     ) -> str:
         if not name or not isinstance(name, str):
             return '<p>No set selected.</p>'
@@ -482,27 +573,136 @@ class AIDBSceneApp:
         except Exception as e:
             return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
 
-        r_min = int(rating_min) if rating_min is not None else SceneDef.RATING_MIN
-        r_max = int(rating_max) if rating_max is not None else SceneDef.RATING_MAX
-
         try:
-            imgs = [
-                img
-                for img in scene_set.imgs
-                if r_min <= img.data.get(SceneDef.FIELD_RATING, SceneDef.RATING_MIN) <= r_max
-            ]
+            imgs = self._set_editor_filter_imgs(
+                scene_set, rating_min, rating_max,
+                hints_mode, caption_mode, caption_joy_mode, labels_mode,
+            )
         except Exception as e:
             return f'<p>Failed to list images for set <code>{name}</code>: {e}</p>'
 
         if not imgs:
             return (
-                f'<p>Set <code>{name}</code> contains no images '
-                f'with rating in [{r_min}, {r_max}].</p>'
+                f'<p>Set <code>{name}</code> contains no images matching the current filter.</p>'
             )
 
         styles = AppSceneImageCell.html_styles()
         cells = ''.join(AppSceneImageCell.html(img) for img in imgs)
         return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+
+    def _html_set_editor_caption_empty(
+        self,
+        name: Optional[str],
+        rating_min: Optional[str],
+        rating_max: Optional[str],
+        hints_mode: Optional[str] = 'ignore',
+        caption_mode: Optional[str] = 'ignore',
+        caption_joy_mode: Optional[str] = 'ignore',
+        labels_mode: Optional[str] = 'ignore',
+    ) -> str:
+        """
+        Set-level batch caption restricted to the currently filtered images
+        of the selected set (rating range + hints/caption/caption_joy/labels
+        modes) whose `caption_joy` is empty. Mirrors
+        `_html_simg_editor_caption_empty` but iterates a SceneSet's images.
+        """
+        refresh_args = (
+            name, rating_min, rating_max,
+            hints_mode, caption_mode, caption_joy_mode, labels_mode,
+        )
+        if not name or not isinstance(name, str):
+            gr.Warning('No set selected.')
+            return self._html_set_editor_open(*refresh_args)
+
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            print(f'ERROR: caption-empty load set [{name}]: {e}')
+            gr.Warning(f'Failed to load set: {e}')
+            return self._html_set_editor_open(*refresh_args)
+
+        try:
+            imgs_filtered = self._set_editor_filter_imgs(
+                scene_set, rating_min, rating_max,
+                hints_mode, caption_mode, caption_joy_mode, labels_mode,
+            )
+            ids_empty = [
+                img.id for img in imgs_filtered if not img.data.get(SceneDef.FIELD_CAPTION_JOY)
+            ]
+        except Exception as e:
+            print(f'ERROR: caption-empty filter set [{name}]: {e}')
+            gr.Warning(f'Failed to filter images: {e}')
+            return self._html_set_editor_open(*refresh_args)
+
+        if not ids_empty:
+            gr.Info('No selected images with empty caption_joy.')
+            return self._html_set_editor_open(*refresh_args)
+
+        try:
+            from ait.caption.joy_scenedb import JoySceneDB
+        except Exception as e:
+            print(f'ERROR: JoySceneDB import failed: {e}')
+            gr.Warning(f'Caption init failed: {e}')
+            return self._html_set_editor_open(*refresh_args)
+
+        gr.Info(
+            f"Batch captioning {len(ids_empty)} image(s) with trigger '1xlasm'...",
+            duration=3.0,
+        )
+
+        cfg_name = self._scm._dbc.config.config
+        sim = self._scm.scene_image_manager()
+        jdb = None
+        n_done = 0
+        n_failed = 0
+        try:
+            jdb = JoySceneDB(
+                config=cfg_name,
+                trigger='1xlasm',
+                verbose=1,
+                force=True,
+            )
+            for img_id in ids_empty:
+                try:
+                    _prompt, caption = jdb._id_caption(img_id)
+                except Exception as e:
+                    print(f'ERROR: caption-empty inference [{img_id}]: {e}')
+                    n_failed += 1
+                    continue
+                if not caption:
+                    print(f'WARN: caption-empty produced no caption for [{img_id}]')
+                    n_failed += 1
+                    continue
+                try:
+                    simg = sim.image_from_id_or_url(img_id)
+                    simg.set_caption_joy(caption)
+                    simg.db_store()
+                    n_done += 1
+                except Exception as e:
+                    print(f'ERROR: caption-empty store [{img_id}]: {e}')
+                    n_failed += 1
+        except Exception as e:
+            print(f'ERROR: caption-empty batch run: {e}')
+            gr.Warning(f'Batch caption failed: {e}')
+        finally:
+            if jdb is not None:
+                self._release_gpu(jdb)
+
+        n_skipped = len(ids_empty) - n_done - n_failed
+        msg_parts = [f'Captioned {n_done}']
+        if n_skipped > 0:
+            msg_parts.append(f'skipped {n_skipped}')
+        if n_failed > 0:
+            msg_parts.append(f'failed {n_failed}')
+        msg = ', '.join(msg_parts) + '.'
+        if n_done > 0:
+            gr.Info(msg, duration=3.0)
+        elif n_failed > 0:
+            gr.Warning(msg)
+        else:
+            gr.Info(msg)
+
+        return self._html_set_editor_open(*refresh_args)
 
     def _html_scenes_search_and_op(
         self,
