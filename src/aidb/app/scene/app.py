@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from aidb import SceneManager, SceneDef
+from aidb.scene.scene_set_manager import SceneSetManager
 from aidb.app.cell_scene import AppSceneCell
 from aidb.app.cell_scene_image import AppSceneImageCell, editor_labels
 from aidb.app.html import AppHtml, AppOpMmode, AppHelper, HtmlHelper
@@ -29,6 +30,7 @@ class AIDBSceneApp:
 
         self._scm = scm
         self._dbc = self._scm._dbc
+        self._ssm = SceneSetManager(dbc=self._dbc, verbose=0)
         self._apphelper = AppHelper(self._dbc)
 
         self._interface = self._create_interface()
@@ -123,6 +125,10 @@ class AIDBSceneApp:
             )
             # --- End Hidden Components ---
 
+            # Single shared full-size image lightbox, mounted once at the top
+            # level so it overlays correctly regardless of which tab is active.
+            gr.HTML(value=AppSceneImageCell.html_lightbox_modal())
+
             with gr.Tab('Scene Search'):  # Renamed tab for clarity
                 gr.Markdown('## Advanced Scene Search with Mandatory and Optional Tags')
                 gr.Markdown(
@@ -201,14 +207,34 @@ class AIDBSceneApp:
                     'Click a thumbnail in the **Scene Search** tab to load that '
                     "scene's images here for editing (rating, caption, prompt)."
                 )
+                gr.HTML(
+                    value=(
+                        '<style>'
+                        '#simg-editor-go-button button, '
+                        '#set-editor-load-button button { '
+                        'background-color: #2ea043; '
+                        'color: white; '
+                        'border-color: #2ea043; '
+                        '}'
+                        '#simg-editor-go-button button:hover, '
+                        '#set-editor-load-button button:hover { '
+                        'background-color: #2c974b; '
+                        'border-color: #2c974b; '
+                        '}'
+                        '</style>'
+                    ),
+                )
                 with gr.Row():
                     simg_editor_scene_id = gr.Textbox(
                         label='Scene ID',
                         interactive=True,
                     )
-                    simg_editor_go_button = gr.Button('Go')
-                with gr.Row():
-                    simg_editor_url_button = gr.Button('url')
+                    with gr.Column():
+                        simg_editor_go_button = gr.Button(
+                            'Go',
+                            elem_id='simg-editor-go-button',
+                        )
+                        simg_editor_url_button = gr.Button('url')
                 simg_editor_scene_info_html = gr.HTML(label='Scene')
                 with gr.Row():
                     simg_editor_caption_empty_button = gr.Button('caption')
@@ -218,9 +244,45 @@ class AIDBSceneApp:
                 gr.Markdown('### Unregistered Images')
                 simg_editor_unregistered_html = gr.HTML(label='Unregistered Images')
 
-                # Single shared full-size image lightbox. position:fixed so
-                # it overlays everything regardless of where it's placed.
-                gr.HTML(value=AppSceneImageCell.html_lightbox_modal())
+            with gr.Tab('Set Editor'):
+                gr.Markdown('## Set Editor')
+                gr.Markdown(
+                    'Select a set to edit all images contained in it '
+                    '(per-image rating, caption, prompt, labels).'
+                )
+                with gr.Row():
+                    set_editor_name = gr.Dropdown(
+                        label='Set',
+                        choices=self._set_names(),
+                        value=None,
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    set_editor_rating_min = gr.Dropdown(
+                        label='Rating Min',
+                        choices=[
+                            str(x)
+                            for x in list(range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1))
+                        ],
+                        value=f'{SceneDef.RATING_INIT}',
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    set_editor_rating_max = gr.Dropdown(
+                        label='Rating Max',
+                        choices=[
+                            str(x)
+                            for x in list(range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1))
+                        ],
+                        value=f'{SceneDef.RATING_MAX}',
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    set_editor_load_button = gr.Button(
+                        'Load',
+                        elem_id='set-editor-load-button',
+                    )
+                set_editor_html = gr.HTML(label='Set Images')
 
             # Link hidden triggers to functions
             button_hidden_cmd.click(
@@ -387,7 +449,60 @@ class AIDBSceneApp:
                 """,
             )
 
+            set_editor_load_button.click(
+                self._html_set_editor_open,
+                inputs=[set_editor_name, set_editor_rating_min, set_editor_rating_max],
+                outputs=[set_editor_html],
+            )
+
         return if_app
+
+    def _set_names(self) -> list[str]:
+        names: list[str] = []
+        for sid in self._ssm.ids:
+            data = self._ssm.data_from_id(sid)
+            if not data:
+                continue
+            name = data.get(SceneDef.FIELD_NAME)
+            if isinstance(name, str) and name:
+                names.append(name)
+        names.sort()
+        return names
+
+    def _html_set_editor_open(
+        self,
+        name: Optional[str],
+        rating_min: Optional[str],
+        rating_max: Optional[str],
+    ) -> str:
+        if not name or not isinstance(name, str):
+            return '<p>No set selected.</p>'
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
+
+        r_min = int(rating_min) if rating_min is not None else SceneDef.RATING_MIN
+        r_max = int(rating_max) if rating_max is not None else SceneDef.RATING_MAX
+
+        try:
+            imgs = [
+                img
+                for img in scene_set.imgs
+                if r_min <= img.data.get(SceneDef.FIELD_RATING, SceneDef.RATING_MIN) <= r_max
+            ]
+        except Exception as e:
+            return f'<p>Failed to list images for set <code>{name}</code>: {e}</p>'
+
+        if not imgs:
+            return (
+                f'<p>Set <code>{name}</code> contains no images '
+                f'with rating in [{r_min}, {r_max}].</p>'
+            )
+
+        styles = AppSceneImageCell.html_styles()
+        cells = ''.join(AppSceneImageCell.html(img) for img in imgs)
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
 
     def _html_scenes_search_and_op(
         self,
