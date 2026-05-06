@@ -85,6 +85,12 @@ class AppSceneImageCell:
         url_str = str(url) if url is not None else ''
         url_copy_btn = AppSceneImageCell._html_copy_static_button(url_str, label='url')
 
+        scene_url = obj.data.get(SceneDef.FIELD_URL_PARENT)
+        scene_url_str = str(scene_url) if scene_url else ''
+        url_scene_copy_btn = AppSceneImageCell._html_copy_static_button(
+            scene_url_str, label='url scene'
+        )
+
         caption_btn_1xlasm = AppSceneImageCell._html_caption_button(
             target_type='registered',
             target=obj.id,
@@ -112,6 +118,7 @@ class AppSceneImageCell:
                 <div class="simg-edit-id-row">
                     <div class="simg-edit-id">id: {obj.id}</div>
                     {url_copy_btn}
+                    {url_scene_copy_btn}
                 </div>
                 <div class="operation-radio-group">
                     {rating_html}
