@@ -142,6 +142,47 @@ class DBConnection:
     def documents_from_oid(self, collection_name: str, oid: ObjectId) -> list[dict[str, Any]]:
         return self.find_documents(collection_name, query={'_id': oid})
 
+    def filter_oids_by_query(
+        self,
+        collection_name: str,
+        oids: Optional[list[Any]],
+        queries: list[dict[str, Any]],
+    ) -> list[ObjectId]:
+        """
+        Reduces a list of oids to a subset by applying a sequence of MongoDB queries.
+        Each query narrows the surviving oid set; the next query only sees documents
+        that passed all previous ones. Input ids may be str or ObjectId. If `oids`
+        is None or empty, the entire collection is used as the starting set.
+        """
+        collection = self._get_collection(collection_name)
+        if collection is None:
+            return []
+
+        if not oids:
+            current: list[ObjectId] = [doc['_id'] for doc in collection.find({}, {'_id': 1})]
+        else:
+            current = [oid for oid in (self.to_oid(o) for o in oids) if oid is not None]
+
+        for query in queries:
+            if not current:
+                return []
+            try:
+                cursor = collection.find(
+                    {'$and': [{'_id': {'$in': current}}, query]},
+                    {'_id': 1},
+                )
+                current = [doc['_id'] for doc in cursor]
+            except OperationFailure as e:
+                self._log(f"Failed to filter oids in '{collection_name}': {e}")
+                return []
+            except Exception as e:
+                self._log(
+                    f"An unexpected error occurred during oid filtering in '{collection_name}': {e}"
+                )
+                return []
+
+        return current
+
     def update_document(
         self, collection_name: str, query: dict[str, Any], new_values: dict[str, Any]
     ) -> Optional[int]:

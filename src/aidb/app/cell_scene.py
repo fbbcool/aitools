@@ -67,7 +67,7 @@ class AppSceneCell:
         for (let i = 0; i < tabBtns.length; i++) {{
             const t = tabBtns[i];
             if (t.textContent) {{
-                if (t.textContent.trim() === 'Scene Image Editor') {{
+                if (t.textContent.trim() === 'Scene Editor') {{
                     t.click();
                     break;
                 }}

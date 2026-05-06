@@ -165,6 +165,13 @@ class AIDBSceneApp:
                         allow_custom_value=False,
                         interactive=True,
                     )
+                    set_dropdown = gr.Dropdown(
+                        label='Set',
+                        choices=['Ignore', 'Empty'] + list(SceneDef.TAG_SETS),
+                        value='Ignore',
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
 
                 search_button = gr.Button('Search Scenes')
 
@@ -180,15 +187,16 @@ class AIDBSceneApp:
                         rating_max,
                         mode,
                         label_dropdown,
+                        set_dropdown,
                     ],
                     outputs=[advanced_search_html_display],
                 )
 
             with gr.Tab(
-                'Scene Image Editor',
+                'Scene Editor',
                 elem_id=AppHtml.elem_id_simg_editor_tab(),
             ):
-                gr.Markdown('## Scene Image Editor')
+                gr.Markdown('## Scene Editor')
                 gr.Markdown(
                     'Click a thumbnail in the **Scene Search** tab to load that '
                     "scene's images here for editing (rating, caption, prompt)."
@@ -196,8 +204,9 @@ class AIDBSceneApp:
                 with gr.Row():
                     simg_editor_scene_id = gr.Textbox(
                         label='Scene ID',
-                        interactive=False,
+                        interactive=True,
                     )
+                    simg_editor_go_button = gr.Button('Go')
                 with gr.Row():
                     simg_editor_url_button = gr.Button('url')
                 simg_editor_scene_info_html = gr.HTML(label='Scene')
@@ -256,6 +265,16 @@ class AIDBSceneApp:
             # PRESERVES the scene-id textbox so the .then() step can read
             # it back as input.
             simg_editor_refresh_button.click(
+                self._editor_clear_content,
+                inputs=[simg_editor_scene_id],
+                outputs=editor_outputs,
+            ).then(
+                self._html_simg_editor_open,
+                inputs=[simg_editor_scene_id],
+                outputs=editor_outputs,
+            )
+
+            simg_editor_go_button.click(
                 self._editor_clear_content,
                 inputs=[simg_editor_scene_id],
                 outputs=editor_outputs,
@@ -376,6 +395,7 @@ class AIDBSceneApp:
         rating_max: Optional[str],
         mode: Optional[AppOpMmode],
         opt_label: Optional[str],
+        opt_set: Optional[str],
     ) -> str:
         """
         Performs an advanced search and initializes pagination.
@@ -396,10 +416,29 @@ class AIDBSceneApp:
             labels = []
         else:
             labels = [opt_label]
-        scenes = [
-            self._scm.scene_from_id_or_url(id)
-            for id in self._scm.ids_from_rating(r_min, r_max, labels=labels)
-        ]
+
+        if opt_set is None or opt_set in ['Ignore', 'None']:
+            set_query = None
+        elif opt_set == 'Empty':
+            set_query = {
+                SceneDef.FIELD_LABELS: {
+                    '$not': {'$regex': f'^{SceneDef.TAG_PREFIX_SET}'}
+                }
+            }
+        else:
+            set_query = {
+                SceneDef.FIELD_LABELS: f'{SceneDef.TAG_PREFIX_SET}{opt_set}'
+            }
+
+        ids = list(self._scm.ids_from_rating(r_min, r_max, labels=labels))
+        if set_query is not None:
+            ids = [
+                str(oid)
+                for oid in self._dbc.filter_oids_by_query(
+                    SceneDef.COLLECTION_SCENES, ids, [set_query]
+                )
+            ]
+        scenes = [self._scm.scene_from_id_or_url(id) for id in ids]
         SceneDef.sort_by_rating(scenes)
         print(f'Found {len(scenes)} scenes matching advanced search criteria.')
 

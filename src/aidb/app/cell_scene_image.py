@@ -431,6 +431,20 @@ class AppSceneImageCell:
                 checked=checked,
             )
 
+        sets_html = ''
+        for label in SceneDef.label_sets():
+            checked = label in current_labels
+            sets_html += AppHtml.html_make_cmd_button(
+                AppHtml.make_cmd_data(
+                    'scene',
+                    scene.id,
+                    'db_query',
+                    payload={'switch_label': label},
+                    label=label,
+                ),
+                checked=checked,
+            )
+
         return f"""
         <div class="simg-scene-info">
             <div class="simg-edit-field">
@@ -443,6 +457,12 @@ class AppSceneImageCell:
                 <label class="simg-edit-label">scene labels</label>
                 <div class="operation-radio-group">
                     {labels_html}
+                </div>
+            </div>
+            <div class="simg-edit-field">
+                <label class="simg-edit-label">scene sets</label>
+                <div class="operation-radio-group">
+                    {sets_html}
                 </div>
             </div>
         </div>
