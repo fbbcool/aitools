@@ -148,8 +148,8 @@ class Scene:
         # if scene has reg imgs, set rating at least to img_reg
         if len([id_reg for id_reg in self.ids_img]) > 0:
             rating = self.data.get(SceneDef.FIELD_RATING, SceneDef.RATING_INIT)
-            if rating < SceneDef.RATING_IMG_REG:
-                self._data |= {SceneDef.FIELD_RATING: SceneDef.RATING_IMG_REG}
+            if rating < SceneDef.RATING_MIN_IMG_REG:
+                self._data |= {SceneDef.FIELD_RATING: SceneDef.RATING_MIN_IMG_REG}
 
         # store
         if self.db_store():

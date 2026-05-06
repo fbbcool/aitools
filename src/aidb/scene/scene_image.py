@@ -80,7 +80,12 @@ class SceneImage:
     def set_caption(self, value: str) -> None:
         if value is None:
             return
-        self._data |= {SceneDef.FIELD_CAPTION: str(value)}
+        caption = str(value)
+        self._data |= {SceneDef.FIELD_CAPTION: caption}
+        if caption:
+            rating = self._data.get(SceneDef.FIELD_RATING, SceneDef.RATING_INIT)
+            if rating < SceneDef.RATING_MIN_IMG_CAP:
+                self._data |= {SceneDef.FIELD_RATING: SceneDef.RATING_MIN_IMG_CAP}
 
     def set_caption_joy(self, value: str) -> None:
         if value is None:
