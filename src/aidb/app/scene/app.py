@@ -627,7 +627,11 @@ class AIDBSceneApp:
                 hints_mode, caption_mode, caption_joy_mode, labels_mode,
             )
             ids_empty = [
-                img.id for img in imgs_filtered if not img.data.get(SceneDef.FIELD_CAPTION_JOY)
+                img.id
+                for img in imgs_filtered
+                if not img.data.get(SceneDef.FIELD_CAPTION_JOY)
+                and img.data.get(SceneDef.FIELD_LABELS)
+                and img.data.get(SceneDef.FIELD_HINTS)
             ]
         except Exception as e:
             print(f'ERROR: caption-empty filter set [{name}]: {e}')
@@ -635,7 +639,10 @@ class AIDBSceneApp:
             return self._html_set_editor_open(*refresh_args)
 
         if not ids_empty:
-            gr.Info('No selected images with empty caption_joy.')
+            gr.Info(
+                'No selected images with empty caption_joy that also have at '
+                'least one label and non-empty hints.'
+            )
             return self._html_set_editor_open(*refresh_args)
 
         try:
