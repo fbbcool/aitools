@@ -91,6 +91,23 @@ class SceneSet:
                     found.add(id_img)
         return list(found)
 
+    @property
+    def ids_scene_surpressed(self) -> list[str]:
+        from .scene import Scene
+
+        excluded = set(self.imgs_exclude)
+        if not excluded:
+            return []
+        out: list[str] = []
+        scene: Scene
+        for scene in self.scenes:
+            ids = list(scene.ids_img_from_query(self.query_img))
+            if not ids:
+                continue
+            if all(iid in excluded for iid in ids):
+                out.append(scene.id)
+        return out
+
     def update(self) -> None:
         self._ssm._db_update_set(self.data)
         return
