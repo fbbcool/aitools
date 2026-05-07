@@ -77,6 +77,22 @@ class SceneSet:
         self._data |= {SceneDef.FIELD_IMGS_EXCLUDE: list(remaining)}
 
     @property
+    def scenes_exclude(self) -> list[str]:
+        return self._data.get(SceneDef.FIELD_SCENES_EXCLUDE, []) or []
+
+    def scenes_exclude_add(self, ids: list[str]) -> None:
+        if not isinstance(ids, list):
+            return
+        merged = set(self.scenes_exclude) | {str(i) for i in ids}
+        self._data |= {SceneDef.FIELD_SCENES_EXCLUDE: list(merged)}
+
+    def scenes_exclude_del(self, ids: list[str]) -> None:
+        if not isinstance(ids, list):
+            return
+        remaining = set(self.scenes_exclude) - {str(i) for i in ids}
+        self._data |= {SceneDef.FIELD_SCENES_EXCLUDE: list(remaining)}
+
+    @property
     def imgs_surpressed(self) -> list[str]:
         from .scene import Scene
 
@@ -117,14 +133,20 @@ class SceneSet:
 
     @property
     def ids_scene(self) -> Generator:
+        excluded = set(self.scenes_exclude)
         scm = self._ssm.scene_manager()
         for id_scene in scm.ids_from_query(self.query):
+            if id_scene in excluded:
+                continue
             yield id_scene
 
     @property
     def scenes(self) -> Generator:
+        excluded = set(self.scenes_exclude)
         scm = self._ssm.scene_manager()
         for id_scene in scm.ids_from_query(self.query):
+            if id_scene in excluded:
+                continue
             scene = scm.scene_from_id_or_url(id_scene)
             if scene is None:
                 continue

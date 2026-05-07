@@ -15,6 +15,7 @@ class AppSceneCell:
     def html(
         obj: Scene,
         mode: AppOpMmode,
+        extras_below_image: str = '',
     ) -> str:
         """
         Generates the HTML string for a single scene cell.
@@ -22,6 +23,8 @@ class AppSceneCell:
         Args:
             scene: The Scene object for which to generate the cell.
             mode: e.g info, rate, label ...
+            extras_below_image: optional HTML inserted directly below the
+                thumbnail (centered) and above the operation block.
 
         Returns:
             str: The HTML string for the scene cell.
@@ -34,9 +37,17 @@ class AppSceneCell:
             )
 
         onclick_js = AppSceneCell._html_thumb_onclick_js(obj.id)
+        extras_html = ''
+        if extras_below_image:
+            extras_html = (
+                f'<div class="scene-cell-extras">{extras_below_image}</div>'
+            )
         return f"""
         <div class="image-item" id="cell-scene-{obj.id}">
-            <img src="data:image/png;base64,{grid_img_base64}" onclick="{onclick_js}">
+            <div class="scene-cell-top">
+                <img src="data:image/png;base64,{grid_img_base64}" onclick="{onclick_js}">
+                {extras_html}
+            </div>
             <div class="image-controls">
                 {AppSceneCell.html_operation(obj, mode)}
             </div>

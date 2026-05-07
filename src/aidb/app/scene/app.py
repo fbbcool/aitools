@@ -258,67 +258,81 @@ class AIDBSceneApp:
                         allow_custom_value=False,
                         interactive=True,
                     )
-                    set_editor_rating_min = gr.Dropdown(
-                        label='Rating Min',
-                        choices=[
-                            str(x)
-                            for x in list(range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1))
-                        ],
-                        value=f'{SceneDef.RATING_INIT}',
-                        allow_custom_value=False,
-                        interactive=True,
-                    )
-                    set_editor_rating_max = gr.Dropdown(
-                        label='Rating Max',
-                        choices=[
-                            str(x)
-                            for x in list(range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1))
-                        ],
-                        value=f'{SceneDef.RATING_MAX}',
-                        allow_custom_value=False,
-                        interactive=True,
-                    )
-                    set_editor_load_button = gr.Button(
-                        'Load',
-                        elem_id='set-editor-load-button',
-                    )
-                with gr.Row():
-                    set_editor_hints = gr.Dropdown(
-                        label='Hints',
-                        choices=['ignore', 'empty', 'set'],
-                        value='ignore',
-                        allow_custom_value=False,
-                        interactive=True,
-                    )
-                    set_editor_caption = gr.Dropdown(
-                        label='Caption',
-                        choices=['ignore', 'empty', 'set'],
-                        value='ignore',
-                        allow_custom_value=False,
-                        interactive=True,
-                    )
-                    set_editor_caption_joy = gr.Dropdown(
-                        label='Caption Joy',
-                        choices=['ignore', 'empty', 'set'],
-                        value='ignore',
-                        allow_custom_value=False,
-                        interactive=True,
-                    )
-                    set_editor_labels = gr.Dropdown(
-                        label='Labels',
-                        choices=['ignore', 'empty', 'set'],
-                        value='ignore',
-                        allow_custom_value=False,
-                        interactive=True,
-                    )
-                    set_editor_excluded = gr.Checkbox(
-                        label='excluded imgs',
-                        value=False,
-                        interactive=True,
-                    )
-                with gr.Row():
-                    set_editor_caption_empty_button = gr.Button('caption')
-                set_editor_html = gr.HTML(label='Set Images')
+                with gr.Tabs():
+                    with gr.Tab('Images'):
+                        with gr.Row():
+                            set_editor_rating_min = gr.Dropdown(
+                                label='Rating Min',
+                                choices=[
+                                    str(x)
+                                    for x in list(
+                                        range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1)
+                                    )
+                                ],
+                                value=f'{SceneDef.RATING_INIT}',
+                                allow_custom_value=False,
+                                interactive=True,
+                            )
+                            set_editor_rating_max = gr.Dropdown(
+                                label='Rating Max',
+                                choices=[
+                                    str(x)
+                                    for x in list(
+                                        range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1)
+                                    )
+                                ],
+                                value=f'{SceneDef.RATING_MAX}',
+                                allow_custom_value=False,
+                                interactive=True,
+                            )
+                            set_editor_load_button = gr.Button(
+                                'Load',
+                                elem_id='set-editor-load-button',
+                            )
+                        with gr.Row():
+                            set_editor_hints = gr.Dropdown(
+                                label='Hints',
+                                choices=['ignore', 'empty', 'set'],
+                                value='ignore',
+                                allow_custom_value=False,
+                                interactive=True,
+                            )
+                            set_editor_caption = gr.Dropdown(
+                                label='Caption',
+                                choices=['ignore', 'empty', 'set'],
+                                value='ignore',
+                                allow_custom_value=False,
+                                interactive=True,
+                            )
+                            set_editor_caption_joy = gr.Dropdown(
+                                label='Caption Joy',
+                                choices=['ignore', 'empty', 'set'],
+                                value='ignore',
+                                allow_custom_value=False,
+                                interactive=True,
+                            )
+                            set_editor_labels = gr.Dropdown(
+                                label='Labels',
+                                choices=['ignore', 'empty', 'set'],
+                                value='ignore',
+                                allow_custom_value=False,
+                                interactive=True,
+                            )
+                            set_editor_excluded = gr.Checkbox(
+                                label='excluded imgs',
+                                value=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            set_editor_caption_empty_button = gr.Button('caption')
+                        set_editor_html = gr.HTML(label='Set Images')
+                    with gr.Tab('Scenes'):
+                        with gr.Row():
+                            set_editor_scenes_load_button = gr.Button(
+                                'Load',
+                                elem_id='set-editor-scenes-load-button',
+                            )
+                        set_editor_scenes_html = gr.HTML(label='Set Scenes')
 
             # Link hidden triggers to functions
             button_hidden_cmd.click(
@@ -506,6 +520,12 @@ class AIDBSceneApp:
                 self._html_set_editor_caption_empty,
                 inputs=set_editor_filter_inputs,
                 outputs=[set_editor_html],
+            )
+
+            set_editor_scenes_load_button.click(
+                self._html_set_editor_open_scenes,
+                inputs=[set_editor_name],
+                outputs=[set_editor_scenes_html],
             )
 
         return if_app
@@ -739,6 +759,98 @@ class AIDBSceneApp:
             gr.Info(msg)
 
         return self._html_set_editor_open(*refresh_args)
+
+    def _html_set_editor_open_scenes(self, name: Optional[str]) -> str:
+        if not name or not isinstance(name, str):
+            return '<p>No set selected.</p>'
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
+
+        scm = self._scm
+        try:
+            all_ids = list(scm.ids_from_query(scene_set.query))
+        except Exception as e:
+            return f'<p>Failed to enumerate scenes for set <code>{name}</code>: {e}</p>'
+
+        scenes = []
+        for sid in all_ids:
+            try:
+                sc = scm.scene_from_id_or_url(sid)
+            except Exception:
+                continue
+            if sc is not None:
+                scenes.append(sc)
+
+        if not scenes:
+            return f'<p>Set <code>{name}</code> contains no scenes.</p>'
+
+        try:
+            suppressed = set(scene_set.ids_scene_surpressed)
+        except Exception:
+            suppressed = set()
+        removed = set(scene_set.scenes_exclude)
+
+        SceneDef.sort_by_rating(scenes)
+        top = [s for s in scenes if s.id not in suppressed and s.id not in removed]
+        supp = [s for s in scenes if s.id in suppressed and s.id not in removed]
+        excl = [s for s in scenes if s.id in removed]
+
+        def render(scene) -> str:
+            chk = AppSceneImageCell.html_scene_exclude_checkbox(
+                set_id=scene_set.id,
+                scene_id=scene.id,
+                checked=scene.id in removed,
+            )
+            cell = AppSceneCell.html(scene, 'info', extras_below_image=chk)
+            if scene.id in suppressed or scene.id in removed:
+                wrap_cls = 'set-editor-scene-wrap'
+                if scene.id in suppressed:
+                    wrap_cls += ' set-editor-scene-suppressed'
+                if scene.id in removed:
+                    wrap_cls += ' set-editor-scene-excluded'
+                return f'<div class="{wrap_cls}">{cell}</div>'
+            return cell
+
+        cells_non = ''.join(render(s) for s in top)
+        cells_supp = ''.join(render(s) for s in supp)
+        cells_excl = ''.join(render(s) for s in excl)
+
+        styles = AppSceneImageCell.html_styles() + """
+        <style>
+            .scene-cell-extras {
+                display: flex;
+                justify-content: center;
+                padding: 6px 4px 4px 4px;
+            }
+            .set-editor-scene-suppressed {
+                outline: 2px dashed #d97706;
+                outline-offset: -2px;
+                opacity: 0.65;
+            }
+            .set-editor-scene-excluded {
+                outline: 2px dashed #b91c1c;
+                outline-offset: -2px;
+                opacity: 0.55;
+            }
+        </style>
+        """
+
+        parts = [styles]
+        if cells_non:
+            parts.append(AppHtml.html_styled_cells_grid(cells_non))
+        if cells_supp:
+            parts.append(
+                '<h3 style="margin-top:24px;color:#d97706;">Suppressed</h3>'
+            )
+            parts.append(AppHtml.html_styled_cells_grid(cells_supp))
+        if cells_excl:
+            parts.append(
+                '<h3 style="margin-top:24px;color:#b91c1c;">Excluded</h3>'
+            )
+            parts.append(AppHtml.html_styled_cells_grid(cells_excl))
+        return ''.join(parts)
 
     def _html_scenes_search_and_op(
         self,

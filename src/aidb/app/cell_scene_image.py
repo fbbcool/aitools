@@ -459,6 +459,50 @@ class AppSceneImageCell:
         )
 
     @staticmethod
+    def html_scene_exclude_checkbox(set_id: str, scene_id: str, checked: bool) -> str:
+        """
+        Per-scene 'exclude' toggle for the Set Editor's Scenes tab.
+
+        Mirrors the per-image exclude toggle: same `simg-exclude-toggle`
+        styling, label `exclude`. Stores/removes the scene id from the set's
+        `scenes_exclude` list (no scene-label mutation).
+        """
+        elem_id_btn = AppHtml.elem_id_cmd_button()
+        elem_id_bus = AppHtml.elem_id_cmd_databus()
+
+        skel_add = json.dumps({
+            'type': 'set', 'id': set_id, 'cmd': 'db_query',
+            'payload': {'scenes_exclude_add': [scene_id]},
+            'label': 'exclude',
+        })
+        skel_del = json.dumps({
+            'type': 'set', 'id': set_id, 'cmd': 'db_query',
+            'payload': {'scenes_exclude_del': [scene_id]},
+            'label': 'exclude',
+        })
+
+        js = f"""
+        event.stopPropagation();
+        const isOn = event.currentTarget.checked;
+        const skel = JSON.parse(isOn ? '{skel_add}' : '{skel_del}');
+        const bus = document.querySelector('#{elem_id_bus} textarea');
+        if (bus) {{
+            bus.value = JSON.stringify(skel);
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+        const trig = document.getElementById('{elem_id_btn}');
+        if (trig) {{ trig.click(); }}
+        """.replace('\n', ' ').replace('"', '&quot;')
+
+        cb_id = f'simg-scene-exclude-{scene_id}'
+        checked_attr = ' checked' if checked else ''
+        return (
+            f'<label class="simg-exclude-toggle" for="{cb_id}">'
+            f'<input type="checkbox" id="{cb_id}"{checked_attr} onchange="{js}">'
+            f'exclude</label>'
+        )
+
+    @staticmethod
     def html_scene_info(scene: Scene) -> str:
         """
         Renders a small panel with scene-level rating + labels controls,
