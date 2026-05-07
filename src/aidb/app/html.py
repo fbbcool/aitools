@@ -333,6 +333,17 @@ class AppHtml:
             .tag-contribution strong {{
                 color: #ffffff; /* White font for strong tags */
             }}
+            .image-item.scene-cell-prototype {{
+                outline: 2px solid #2563eb;
+                outline-offset: -2px;
+            }}
+            .scene-cell-subdir {{
+                margin-top: 6px;
+                font-size: 0.75em;
+                color: #aaaaaa;
+                text-align: center;
+                word-break: break-all;
+            }}
         </style>
         <div class="image-grid"{grid_inline_style}>
         {inner_html}

@@ -1,3 +1,5 @@
+import html as html_lib
+
 from aidb.app.cell_scene_image import editor_labels
 from aidb.app.html import AppHtml, AppOpMmode, HtmlHelper
 from aidb.scene import Scene, SceneDef
@@ -42,8 +44,14 @@ class AppSceneCell:
             extras_html = (
                 f'<div class="scene-cell-extras">{extras_below_image}</div>'
             )
+        cell_classes = 'image-item'
+        try:
+            if obj.is_prototype:
+                cell_classes += ' scene-cell-prototype'
+        except Exception:
+            pass
         return f"""
-        <div class="image-item" id="cell-scene-{obj.id}">
+        <div class="{cell_classes}" id="cell-scene-{obj.id}">
             <div class="scene-cell-top">
                 <img src="data:image/png;base64,{grid_img_base64}" onclick="{onclick_js}">
                 {extras_html}
@@ -93,10 +101,18 @@ class AppSceneCell:
         mode: AppOpMmode,
     ) -> str:
         html = ''
+        extras = ''
         if mode == 'none':
             pass
         elif mode == 'info':
             html = AppSceneCell._html_op_info(obj)
+            try:
+                subdir = obj.url.parent.name
+            except Exception:
+                subdir = ''
+            if subdir:
+                safe = html_lib.escape(subdir, quote=True)
+                extras = f'<div class="scene-cell-subdir">{safe}</div>'
         elif mode == 'rate':
             html = AppSceneCell._html_op_rate(obj)
         elif mode == 'label':
@@ -108,6 +124,7 @@ class AppSceneCell:
                 <div class="operation-radio-group">
                     {html}
                 </div>
+                {extras}
                 """
 
     @staticmethod

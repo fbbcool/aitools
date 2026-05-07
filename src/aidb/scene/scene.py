@@ -86,6 +86,16 @@ class Scene:
         return SceneDef.sort_by_rating(self.imgs)
 
     @property
+    def imgs_active(self) -> list[SceneImage]:
+        """Registered images that are NOT flagged as prototype."""
+        return [img for img in self.imgs if not img.prototype]
+
+    @property
+    def imgs_prototype(self) -> list[SceneImage]:
+        """Registered images that ARE flagged as prototype."""
+        return [img for img in self.imgs if img.prototype]
+
+    @property
     def is_prototype(self) -> bool:
         """
         True iff the scene has at least one registered image and every

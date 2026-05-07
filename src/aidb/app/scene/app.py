@@ -194,12 +194,28 @@ class AIDBSceneApp:
 
                 search_button = gr.Button('Search Scenes')
 
+                with gr.Row():
+                    search_show_active = gr.Checkbox(
+                        label='show active',
+                        value=True,
+                        interactive=True,
+                    )
+                    search_show_prototype = gr.Checkbox(
+                        label='show prototype',
+                        value=True,
+                        interactive=True,
+                    )
+
                 with gr.Column(visible=True):
                     # in the title, the number of selected scenes should be shown
                     curr_label = 'Matching Scenes (Highest Score First)'
                     advanced_search_html_display = gr.HTML(label=curr_label)
 
                 search_button.click(
+                    lambda: '',
+                    inputs=[],
+                    outputs=[advanced_search_html_display],
+                ).then(
                     self._html_scenes_search_and_op,
                     inputs=[
                         rating_min,
@@ -207,6 +223,8 @@ class AIDBSceneApp:
                         mode,
                         label_dropdown,
                         set_dropdown,
+                        search_show_active,
+                        search_show_prototype,
                     ],
                     outputs=[advanced_search_html_display],
                 )
@@ -365,6 +383,11 @@ class AIDBSceneApp:
                             )
                             set_editor_scenes_show_excluded = gr.Checkbox(
                                 label='show excluded',
+                                value=False,
+                                interactive=True,
+                            )
+                            set_editor_scenes_show_prototype = gr.Checkbox(
+                                label='show prototypes',
                                 value=False,
                                 interactive=True,
                             )
@@ -610,6 +633,7 @@ class AIDBSceneApp:
                     set_editor_scenes_show_active,
                     set_editor_scenes_show_suppressed,
                     set_editor_scenes_show_excluded,
+                    set_editor_scenes_show_prototype,
                 ],
                 outputs=[set_editor_scenes_html],
             )
@@ -900,6 +924,7 @@ class AIDBSceneApp:
         show_active: bool = True,
         show_suppressed: bool = False,
         show_excluded: bool = False,
+        show_prototype: bool = False,
     ) -> str:
         if not name or not isinstance(name, str):
             return '<p>No set selected.</p>'
@@ -933,8 +958,29 @@ class AIDBSceneApp:
         removed = set(scene_set.scenes_exclude)
 
         SceneDef.sort_by_rating(scenes)
-        top = [s for s in scenes if s.id not in suppressed and s.id not in removed]
-        supp = [s for s in scenes if s.id in suppressed and s.id not in removed]
+        prototype_ids: set[str] = set()
+        for s in scenes:
+            try:
+                if s.is_prototype:
+                    prototype_ids.add(s.id)
+            except Exception:
+                pass
+        top = [
+            s for s in scenes
+            if s.id not in suppressed
+            and s.id not in removed
+            and s.id not in prototype_ids
+        ]
+        proto = [
+            s for s in scenes
+            if s.id in prototype_ids and s.id not in removed
+        ]
+        supp = [
+            s for s in scenes
+            if s.id in suppressed
+            and s.id not in removed
+            and s.id not in prototype_ids
+        ]
         excl = [s for s in scenes if s.id in removed]
 
         def render(scene) -> str:
@@ -954,6 +1000,7 @@ class AIDBSceneApp:
             return cell
 
         cells_non = ''.join(render(s) for s in top) if show_active else ''
+        cells_proto = ''.join(render(s) for s in proto) if show_prototype else ''
         cells_supp = ''.join(render(s) for s in supp) if show_suppressed else ''
         cells_excl = ''.join(render(s) for s in excl) if show_excluded else ''
 
@@ -980,6 +1027,11 @@ class AIDBSceneApp:
         parts = [styles]
         if cells_non:
             parts.append(AppHtml.html_styled_cells_grid(cells_non))
+        if cells_proto:
+            parts.append(
+                '<h3 style="margin-top:24px;color:#2563eb;">Prototype</h3>'
+            )
+            parts.append(AppHtml.html_styled_cells_grid(cells_proto))
         if cells_supp:
             parts.append(
                 '<h3 style="margin-top:24px;color:#d97706;">Suppressed</h3>'
@@ -999,6 +1051,8 @@ class AIDBSceneApp:
         mode: Optional[AppOpMmode],
         opt_label: Optional[str],
         opt_set: Optional[str],
+        show_active: bool = True,
+        show_prototype: bool = True,
     ) -> str:
         """
         Performs an advanced search and initializes pagination.
@@ -1048,12 +1102,18 @@ class AIDBSceneApp:
         if mode is None:
             mode = 'none'
 
+        scenes_active = [s for s in scenes if s is not None and not s.is_prototype]
+        scenes_proto = [s for s in scenes if s is not None and s.is_prototype]
+
+        ordered: list = []
+        if show_active:
+            ordered.extend(scenes_active)
+        if show_prototype:
+            ordered.extend(scenes_proto)
+
         html_scenes = ''
-        for scene in scenes:
-            html_scenes += AppSceneCell.html(
-                scene,
-                mode,
-            )
+        for scene in ordered:
+            html_scenes += AppSceneCell.html(scene, mode)
         return AppHtml.html_styled_cells_grid(html_scenes)
 
     def _simg_editor_copy_scene_url(self, scene_id: Optional[str]) -> None:
@@ -1159,21 +1219,47 @@ class AIDBSceneApp:
 
         # registered images
         try:
-            imgs = scene.imgs_sorted
+            imgs_active = SceneDef.sort_by_rating(scene.imgs_active)
+            imgs_prototype = SceneDef.sort_by_rating(scene.imgs_prototype)
         except Exception as e:
             print(f'ERROR: couldnt list imgs for scene [{scene_id}]: {e}')
-            imgs = []
+            imgs_active = []
+            imgs_prototype = []
             registered_html = (
                 f'<p>Failed to list images for scene <code>{scene_id}</code>: {e}</p>'
             )
         else:
-            if imgs:
-                cells = ''.join(AppSceneImageCell.html(img) for img in imgs)
-                registered_html = AppHtml.html_styled_cells_grid(cells, columns=2)
-            else:
+            if not imgs_active and not imgs_prototype:
                 registered_html = (
                     f'<p>No SceneImages registered for scene <code>{scene_id}</code>.</p>'
                 )
+            else:
+                proto_styles = """
+                <style>
+                    .simg-editor-img-prototype {
+                        outline: 2px dashed #2563eb;
+                        outline-offset: -2px;
+                    }
+                </style>
+                """
+                parts: list[str] = [proto_styles]
+                if imgs_active:
+                    cells_a = ''.join(
+                        AppSceneImageCell.html(img) for img in imgs_active
+                    )
+                    parts.append(AppHtml.html_styled_cells_grid(cells_a, columns=2))
+                if imgs_prototype:
+                    cells_p = ''.join(
+                        f'<div class="simg-editor-img-prototype">'
+                        f'{AppSceneImageCell.html(img)}'
+                        f'</div>'
+                        for img in imgs_prototype
+                    )
+                    parts.append(
+                        '<h3 style="margin-top:24px;color:#2563eb;">Prototype</h3>'
+                    )
+                    parts.append(AppHtml.html_styled_cells_grid(cells_p, columns=2))
+                registered_html = ''.join(parts)
 
         # unregistered images
         unregistered_urls = self._unregistered_urls_in_scene(scene)
