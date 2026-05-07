@@ -537,23 +537,26 @@ class AIDBSceneApp:
         ]
 
         out = []
-        for img in scene_set.imgs:
-            rating = img.data.get(SceneDef.FIELD_RATING, SceneDef.RATING_MIN)
-            if not (r_min <= rating <= r_max):
-                continue
-            ok = True
-            for field, mode in field_modes:
-                if mode is None or mode == 'ignore':
+        from aidb.scene import Scene as _Scene
+        scene: _Scene
+        for scene in scene_set.scenes:
+            for img in scene.imgs_from_query(scene_set.query_img):
+                rating = img.data.get(SceneDef.FIELD_RATING, SceneDef.RATING_MIN)
+                if not (r_min <= rating <= r_max):
                     continue
-                is_empty = not img.data.get(field)
-                if mode == 'empty' and not is_empty:
-                    ok = False
-                    break
-                if mode == 'set' and is_empty:
-                    ok = False
-                    break
-            if ok:
-                out.append(img)
+                ok = True
+                for field, mode in field_modes:
+                    if mode is None or mode == 'ignore':
+                        continue
+                    is_empty = not img.data.get(field)
+                    if mode == 'empty' and not is_empty:
+                        ok = False
+                        break
+                    if mode == 'set' and is_empty:
+                        ok = False
+                        break
+                if ok:
+                    out.append(img)
         return out
 
     def _html_set_editor_open(
@@ -587,7 +590,13 @@ class AIDBSceneApp:
             )
 
         styles = AppSceneImageCell.html_styles()
-        cells = ''.join(AppSceneImageCell.html(img) for img in imgs)
+        excluded = set(scene_set.imgs_exclude)
+        cells = ''.join(
+            AppSceneImageCell.html(
+                img, set_id=scene_set.id, excluded=img.id in excluded
+            )
+            for img in imgs
+        )
         return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
 
     def _html_set_editor_caption_empty(

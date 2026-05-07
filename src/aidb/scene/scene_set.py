@@ -60,9 +60,43 @@ class SceneSet:
     def id(self) -> str:
         return str(self._data.get(SceneDef.FIELD_OID, ''))
 
+    @property
+    def imgs_exclude(self) -> list[str]:
+        return self._data.get(SceneDef.FIELD_IMGS_EXCLUDE, []) or []
+
+    def imgs_exclude_add(self, ids: list[str]) -> None:
+        if not isinstance(ids, list):
+            return
+        merged = set(self.imgs_exclude) | {str(i) for i in ids}
+        self._data |= {SceneDef.FIELD_IMGS_EXCLUDE: list(merged)}
+
+    def imgs_exclude_del(self, ids: list[str]) -> None:
+        if not isinstance(ids, list):
+            return
+        remaining = set(self.imgs_exclude) - {str(i) for i in ids}
+        self._data |= {SceneDef.FIELD_IMGS_EXCLUDE: list(remaining)}
+
+    @property
+    def imgs_surpressed(self) -> list[str]:
+        from .scene import Scene
+
+        excluded = set(self.imgs_exclude)
+        if not excluded:
+            return []
+        found: set[str] = set()
+        scene: Scene
+        for scene in self.scenes:
+            for id_img in scene.ids_img_from_query(self.query_img):
+                if id_img in excluded:
+                    found.add(id_img)
+        return list(found)
+
     def update(self) -> None:
         self._ssm._db_update_set(self.data)
         return
+
+    def db_store(self) -> bool:
+        return self._ssm._db_update_set(self.data)
 
     @property
     def ids_scene(self) -> Generator:
@@ -83,18 +117,24 @@ class SceneSet:
     def ids_img(self) -> Generator:
         from .scene import Scene
 
+        excluded = set(self.imgs_exclude)
         scene: Scene
         for scene in self.scenes:
             for id_img in scene.ids_img_from_query(self.query_img):
+                if id_img in excluded:
+                    continue
                 yield id_img
 
     @property
     def imgs(self) -> Generator:
         from .scene import Scene
 
+        excluded = set(self.imgs_exclude)
         scene: Scene
         for scene in self.scenes:
             for img in scene.imgs_from_query(self.query_img):
+                if img.id in excluded:
+                    continue
                 yield img
 
     def compile(self) -> None:

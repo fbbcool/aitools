@@ -9,7 +9,7 @@ import pyperclip
 import gradio as gr
 
 from aidb.scene import DBConnection
-from aidb import Scene, SceneImageManager, SceneManager, SceneSetManager
+from aidb import Scene, SceneImageManager, SceneManager, SceneSet, SceneSetManager
 from aidb.scene.scene_common import Sceneical
 from aidb.scene.scene_image import SceneImage
 
@@ -440,7 +440,7 @@ class AppHelper:
         if attr is None or val is None:
             raise ValueError('None attr or val')
 
-        if not isinstance(obj, (Scene, SceneImage)):
+        if not isinstance(obj, (Scene, SceneImage, SceneSet)):
             raise ValueError('obj not correct instance type!')
         if not hasattr(obj, attr):
             raise ValueError(f'obj has no attr {attr}')

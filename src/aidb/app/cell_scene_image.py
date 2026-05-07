@@ -36,7 +36,11 @@ class AppSceneImageCell:
     THUMB_MAX_SIDE: int = 256
 
     @staticmethod
-    def html(obj: SceneImage) -> str:
+    def html(
+        obj: SceneImage,
+        set_id: Optional[str] = None,
+        excluded: bool = False,
+    ) -> str:
         pil = AppSceneImageCell._load_thumb(obj)
         img_b64: Optional[str] = HtmlHelper.pil_to_base64(pil)
         if img_b64 is None:
@@ -110,6 +114,12 @@ class AppSceneImageCell:
             target_type='registered', target=obj.id
         )
 
+        exclude_html = ''
+        if set_id:
+            exclude_html = AppSceneImageCell._html_exclude_checkbox(
+                set_id=set_id, img_id=obj.id, checked=excluded
+            )
+
         return f"""
         <div class="image-item simg-edit-cell" id="cell-simg-{obj.id}">
             <img src="data:image/png;base64,{img_b64}" onclick="{thumb_onclick}">
@@ -119,6 +129,7 @@ class AppSceneImageCell:
                     <div class="simg-edit-id">id: {obj.id}</div>
                     {url_copy_btn}
                     {url_scene_copy_btn}
+                    {exclude_html}
                 </div>
                 <div class="operation-radio-group">
                     {rating_html}
@@ -401,6 +412,50 @@ class AppSceneImageCell:
         safe_label = html_lib.escape(label, quote=True)
         return (
             f'<button type="button" class="simg-copy-btn" onclick="{js}">{safe_label}</button>'
+        )
+
+    @staticmethod
+    def _html_exclude_checkbox(set_id: str, img_id: str, checked: bool) -> str:
+        """
+        Per-image 'exclude' toggle for the Set Editor.
+
+        Toggling on  -> dispatches `imgs_exclude_add([img_id])` to the set.
+        Toggling off -> dispatches `imgs_exclude_del([img_id])` to the set.
+        Both go through the cmd-bus `db_query` path.
+        """
+        elem_id_btn = AppHtml.elem_id_cmd_button()
+        elem_id_bus = AppHtml.elem_id_cmd_databus()
+
+        skel_add = json.dumps({
+            'type': 'set', 'id': set_id, 'cmd': 'db_query',
+            'payload': {'imgs_exclude_add': [img_id]},
+            'label': 'exclude',
+        })
+        skel_del = json.dumps({
+            'type': 'set', 'id': set_id, 'cmd': 'db_query',
+            'payload': {'imgs_exclude_del': [img_id]},
+            'label': 'exclude',
+        })
+
+        js = f"""
+        event.stopPropagation();
+        const isOn = event.currentTarget.checked;
+        const skel = JSON.parse(isOn ? '{skel_add}' : '{skel_del}');
+        const bus = document.querySelector('#{elem_id_bus} textarea');
+        if (bus) {{
+            bus.value = JSON.stringify(skel);
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+        const trig = document.getElementById('{elem_id_btn}');
+        if (trig) {{ trig.click(); }}
+        """.replace('\n', ' ').replace('"', '&quot;')
+
+        cb_id = f'simg-exclude-{img_id}'
+        checked_attr = ' checked' if checked else ''
+        return (
+            f'<label class="simg-exclude-toggle" for="{cb_id}">'
+            f'<input type="checkbox" id="{cb_id}"{checked_attr} onchange="{js}">'
+            f'exclude</label>'
         )
 
     @staticmethod
@@ -1046,6 +1101,27 @@ class AppSceneImageCell:
                 display: flex;
                 gap: 4px;
                 align-items: center;
+            }
+            .simg-exclude-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 3px 6px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                font-size: 0.75em;
+                color: #ffffff;
+                background-color: #555555;
+                cursor: pointer;
+                user-select: none;
+                line-height: 1;
+            }
+            .simg-exclude-toggle:hover {
+                background-color: #777777;
+            }
+            .simg-exclude-toggle input[type="checkbox"] {
+                margin: 0;
+                cursor: pointer;
             }
         </style>
         """

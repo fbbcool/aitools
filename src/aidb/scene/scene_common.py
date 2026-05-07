@@ -43,6 +43,8 @@ class SceneDef:
     FIELD_TIMESTAMP_CREATED: Final = 'timestamp_created'
     FIELD_TIMESTAMP_UPDATED: Final = 'timestamp_updated'
 
+    FIELD_IMGS_EXCLUDE: Final = 'imgs_exclude'
+
     DEFAULT_RATIOS: Final = [1.0, 2.0 / 3.0, 3.0 / 4.0]
     DEFAULT_RESOLUTIONS: Final = [512, 768, 1024]
 
