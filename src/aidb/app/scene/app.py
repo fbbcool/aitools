@@ -811,7 +811,7 @@ class AIDBSceneApp:
             parts.append(
                 '<h3 style="margin-top:24px;color:#2563eb;">Prototype</h3>'
             )
-            parts.append(AppHtml.html_styled_cells_grid(cells_p, columns=2))
+            parts.append(AppHtml.html_styled_cells_grid(cells_p, columns=4))
         if imgs_excluded:
             cells_e = ''.join(
                 f'<div class="set-editor-img-excluded">'
@@ -822,7 +822,7 @@ class AIDBSceneApp:
             parts.append(
                 '<h3 style="margin-top:24px;color:#b91c1c;">Excluded</h3>'
             )
-            parts.append(AppHtml.html_styled_cells_grid(cells_e, columns=2))
+            parts.append(AppHtml.html_styled_cells_grid(cells_e, columns=4))
         return ''.join(parts)
 
     def _html_set_editor_caption_empty(
