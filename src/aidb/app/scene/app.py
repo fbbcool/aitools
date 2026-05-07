@@ -326,7 +326,7 @@ class AIDBSceneApp:
                                     'load todo 50'
                                 )
                                 set_editor_load_done_button = gr.Button(
-                                    'load done 50'
+                                    'load done'
                                 )
                                 set_editor_caption_empty_button = gr.Button('caption')
                         with gr.Row():
@@ -403,6 +403,13 @@ class AIDBSceneApp:
                                 interactive=True,
                             )
                         set_editor_scenes_html = gr.HTML(label='Set Scenes')
+                    with gr.Tab('Statistics'):
+                        with gr.Row():
+                            set_editor_stats_load_button = gr.Button(
+                                'Load',
+                                elem_id='set-editor-stats-load-button',
+                            )
+                        set_editor_stats_html = gr.HTML(label='Set Statistics')
 
             # Link hidden triggers to functions
             button_hidden_cmd.click(
@@ -688,6 +695,16 @@ class AIDBSceneApp:
                     set_editor_scenes_show_excluded,
                 ],
                 outputs=[set_editor_scenes_html],
+            )
+
+            set_editor_stats_load_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_stats_html],
+            ).then(
+                self._html_set_editor_open_stats,
+                inputs=[set_editor_name],
+                outputs=[set_editor_stats_html],
             )
 
         return if_app
@@ -1039,11 +1056,10 @@ class AIDBSceneApp:
 
     def _html_set_editor_open_done(self, name: Optional[str]) -> str:
         """
-        Loads up to 50 'done' active images of the selected set as edit
-        cells. Done = all four editable fields (hints, labels,
-        caption_joy, caption) are non-empty. Prototype and excluded
-        images are skipped. Sorted by latest update / creation timestamp
-        desc.
+        Loads ALL 'done' active images of the selected set as edit cells.
+        Done = all four editable fields (hints, labels, caption_joy,
+        caption) are non-empty. Prototype and excluded images are
+        skipped. Sorted by latest update / creation timestamp desc.
         """
         if not name or not isinstance(name, str):
             return '<p>No set selected.</p>'
@@ -1075,7 +1091,6 @@ class AIDBSceneApp:
             return f'<p>Set <code>{name}</code>: no done images.</p>'
 
         done.sort(key=lambda t: -t[0])
-        done = done[:50]
 
         styles = AppSceneImageCell.html_styles()
         excluded_ids = set(scene_set.imgs_exclude)
@@ -1216,6 +1231,123 @@ class AIDBSceneApp:
             )
             parts.append(AppHtml.html_styled_cells_grid(cells_excl))
         return ''.join(parts)
+
+    def _html_set_editor_open_stats(self, name: Optional[str]) -> str:
+        """
+        Renders aggregate counts for the selected set: scenes split by
+        bucket (active / prototype / suppressed / excluded) and images
+        split by bucket (active / prototype / excluded), plus a small
+        todoness breakdown across active images.
+        """
+        if not name or not isinstance(name, str):
+            return '<p>No set selected.</p>'
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
+
+        try:
+            removed_scene_ids = set(scene_set.scenes_exclude)
+            scm = self._scm
+            all_scene_ids = list(scm.ids_from_query(scene_set.query))
+        except Exception as e:
+            return f'<p>Failed to enumerate scenes for set <code>{name}</code>: {e}</p>'
+
+        n_scenes_total = len(all_scene_ids)
+        n_scenes_excluded = len(
+            [sid for sid in all_scene_ids if sid in removed_scene_ids]
+        )
+        try:
+            suppressed_ids = set(scene_set.ids_scene_surpressed)
+        except Exception:
+            suppressed_ids = set()
+        n_scenes_suppressed = len(suppressed_ids)
+
+        n_scenes_prototype = 0
+        for sid in all_scene_ids:
+            if sid in removed_scene_ids:
+                continue
+            try:
+                sc = scm.scene_from_id_or_url(sid)
+            except Exception:
+                continue
+            if sc is not None and sc.is_prototype:
+                n_scenes_prototype += 1
+
+        n_scenes_active = (
+            n_scenes_total - n_scenes_excluded - n_scenes_suppressed
+        )
+
+        # Image-level counts (driven by the set's iteration semantics).
+        n_imgs_excluded = len(scene_set.imgs_exclude)
+        n_imgs_active = 0
+        n_imgs_prototype = 0
+        n_imgs_total_in_scenes = 0
+        todoness_buckets = {
+            'caption': 0,
+            'caption_joy': 0,
+            'labels': 0,
+            'hints': 0,
+        }
+        for img in scene_set.imgs:
+            n_imgs_total_in_scenes += 1
+            if img.prototype:
+                n_imgs_prototype += 1
+                continue
+            n_imgs_active += 1
+            d = img.data
+            if not d.get(SceneDef.FIELD_HINTS):
+                todoness_buckets['hints'] += 1
+            if not d.get(SceneDef.FIELD_LABELS):
+                todoness_buckets['labels'] += 1
+            if not d.get(SceneDef.FIELD_CAPTION_JOY):
+                todoness_buckets['caption_joy'] += 1
+            if not d.get(SceneDef.FIELD_CAPTION):
+                todoness_buckets['caption'] += 1
+
+        def row(label: str, value, color: str = '#cccccc') -> str:
+            return (
+                f'<tr><td style="padding:4px 12px;color:{color};">{label}</td>'
+                f'<td style="padding:4px 12px;text-align:right;color:#fff;'
+                f'font-variant-numeric:tabular-nums;">{value}</td></tr>'
+            )
+
+        scenes_table = (
+            '<h3>Scenes</h3>'
+            '<table style="border-collapse:collapse;">'
+            + row('total (matching query)', n_scenes_total)
+            + row('active', n_scenes_active)
+            + row('prototype', n_scenes_prototype, color='#2563eb')
+            + row('suppressed', n_scenes_suppressed, color='#d97706')
+            + row('excluded', n_scenes_excluded, color='#b91c1c')
+            + '</table>'
+        )
+
+        imgs_table = (
+            '<h3 style="margin-top:18px;">Images</h3>'
+            '<table style="border-collapse:collapse;">'
+            + row('active', n_imgs_active)
+            + row('prototype', n_imgs_prototype, color='#2563eb')
+            + row('excluded', n_imgs_excluded, color='#b91c1c')
+            + '</table>'
+        )
+
+        todo_table = (
+            '<h3 style="margin-top:18px;">Active images: empty fields</h3>'
+            '<table style="border-collapse:collapse;">'
+            + row('hints empty', todoness_buckets['hints'])
+            + row('labels empty', todoness_buckets['labels'])
+            + row('caption_joy empty', todoness_buckets['caption_joy'])
+            + row('caption empty', todoness_buckets['caption'])
+            + '</table>'
+        )
+
+        return (
+            f'<div style="padding:8px 4px;">'
+            f'<h2>Set <code>{name}</code></h2>'
+            f'{scenes_table}{imgs_table}{todo_table}'
+            f'</div>'
+        )
 
     def _html_scenes_search_and_op(
         self,
