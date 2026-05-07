@@ -322,6 +322,9 @@ class AIDBSceneApp:
                                     'Load',
                                     elem_id='set-editor-load-button',
                                 )
+                                set_editor_load_todo_button = gr.Button(
+                                    'load todo 50'
+                                )
                                 set_editor_caption_empty_button = gr.Button('caption')
                         with gr.Row():
                             set_editor_show_active = gr.Checkbox(
@@ -648,6 +651,16 @@ class AIDBSceneApp:
                 outputs=[set_editor_html],
             )
 
+            set_editor_load_todo_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_html],
+            ).then(
+                self._html_set_editor_open_todo,
+                inputs=[set_editor_name],
+                outputs=[set_editor_html],
+            )
+
             set_editor_scenes_load_button.click(
                 lambda: '',
                 inputs=[],
@@ -951,6 +964,65 @@ class AIDBSceneApp:
             gr.Info(msg)
 
         return self._html_set_editor_open(*refresh_args)
+
+    def _html_set_editor_open_todo(self, name: Optional[str]) -> str:
+        """
+        Loads up to 50 'todo' images of the selected set as edit cells.
+
+        Todoness is a priority code derived from emptiness of the four
+        editable fields, weighted so the order is
+            hints (8) > labels (4) > caption_joy (2) > caption (1)
+        i.e. an image with empty hints always ranks above one whose hints
+        is set, regardless of the other three fields. Range 0..15; images
+        with todoness 0 are skipped. Within the same todoness, sort by
+        latest update / creation timestamp desc. Prototype and excluded
+        images are skipped.
+        """
+        if not name or not isinstance(name, str):
+            return '<p>No set selected.</p>'
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
+
+        try:
+            scored: list[tuple[int, float, object]] = []
+            for img in scene_set.imgs:
+                if img.prototype:
+                    continue
+                d = img.data
+                empty_hints = not d.get(SceneDef.FIELD_HINTS)
+                empty_labels = not d.get(SceneDef.FIELD_LABELS)
+                empty_caption_joy = not d.get(SceneDef.FIELD_CAPTION_JOY)
+                empty_caption = not d.get(SceneDef.FIELD_CAPTION)
+                todoness = (
+                    int(empty_hints) * 8
+                    + int(empty_labels) * 4
+                    + int(empty_caption_joy) * 2
+                    + int(empty_caption) * 1
+                )
+                if todoness == 0:
+                    continue
+                ts = SceneDef.get_timestamp_update_from_data(img)
+                scored.append((todoness, ts, img))
+        except Exception as e:
+            return f'<p>Failed to scan images for set <code>{name}</code>: {e}</p>'
+
+        if not scored:
+            return f'<p>Set <code>{name}</code>: no todo images.</p>'
+
+        scored.sort(key=lambda t: (-t[0], -t[1]))
+        scored = scored[:50]
+
+        styles = AppSceneImageCell.html_styles()
+        excluded_ids = set(scene_set.imgs_exclude)
+        cells = ''.join(
+            AppSceneImageCell.html(
+                img, set_id=scene_set.id, excluded=img.id in excluded_ids
+            )
+            for _, _, img in scored
+        )
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
 
     def _html_set_editor_open_scenes(
         self,
