@@ -143,6 +143,20 @@ class SceneImage:
         return parent / filename
 
     @property
+    def scene_id(self) -> Optional[str]:
+        """
+        Resolves the parent scene's id from the image's `url_parent`.
+        Returns None when no scene matches that path.
+        """
+        from .scene_manager import SceneManager
+
+        parent = self._data.get(SceneDef.FIELD_URL_PARENT)
+        if not parent:
+            return None
+        scm = SceneManager(self._im._dbc, verbose=0)
+        return scm.id_from_url(parent)
+
+    @property
     def filename_train_from_data(self) -> str:
         """
         returns the filename as a string with the collections name ("images/") as a subfolder

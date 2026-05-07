@@ -151,6 +151,7 @@ class AppSceneImageCell:
         url_scene_copy_btn = AppSceneImageCell._html_copy_static_button(
             scene_url_str, label='url scene'
         )
+        goto_scene_btn = AppSceneImageCell._html_goto_scene_button(obj.scene_id)
 
         caption_btn_1xlasm = AppSceneImageCell._html_caption_button(
             target_type='registered',
@@ -193,6 +194,7 @@ class AppSceneImageCell:
                     <div class="simg-edit-id">id: {obj.id}</div>
                     {url_copy_btn}
                     {url_scene_copy_btn}
+                    {goto_scene_btn}
                 </div>
                 <div class="operation-radio-group">
                     {rating_html}
@@ -518,6 +520,45 @@ class AppSceneImageCell:
             f'<label class="simg-prototype-toggle" for="{cb_id}">'
             f'<input type="checkbox" id="{cb_id}"{checked_attr} onchange="{js}">'
             f'prototype</label>'
+        )
+
+    @staticmethod
+    def _html_goto_scene_button(scene_id: Optional[str]) -> str:
+        """
+        Small button: navigates to the Scene Editor with the given scene
+        loaded. Mirrors `AppSceneCell._html_thumb_onclick_js` (writes
+        scene_id to the simg-editor databus, clicks the hidden trigger,
+        and switches the outer tab). Renders a disabled button when
+        `scene_id` is falsy.
+        """
+        elem_id_btn = AppHtml.elem_id_simg_editor_open_button()
+        elem_id_bus = AppHtml.elem_id_simg_editor_databus()
+
+        if not scene_id:
+            return (
+                '<button type="button" class="simg-copy-btn" disabled '
+                'title="no parent scene found">goto scene</button>'
+            )
+
+        sid_js = str(scene_id).replace('\\', '\\\\').replace("'", "\\'")
+        js = (
+            "event.stopPropagation();"
+            f"const bus = document.querySelector('#{elem_id_bus} textarea');"
+            f"if (bus) {{ bus.value = '{sid_js}';"
+            f"bus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
+            f"const btn = document.getElementById('{elem_id_btn}');"
+            "if (btn) { btn.click(); }"
+            "const tabBtns = document.querySelectorAll('button[role=&quot;tab&quot;]');"
+            "for (let i = 0; i < tabBtns.length; i++) {"
+            "  const t = tabBtns[i];"
+            "  if (t.textContent && t.textContent.trim() === 'Scene Editor') {"
+            "    t.click(); break;"
+            "  }"
+            "}"
+        ).replace('"', '&quot;')
+        return (
+            f'<button type="button" class="simg-copy-btn" onclick="{js}">'
+            f'goto scene</button>'
         )
 
     @staticmethod

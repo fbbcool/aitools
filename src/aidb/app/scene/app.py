@@ -325,6 +325,9 @@ class AIDBSceneApp:
                                 set_editor_load_todo_button = gr.Button(
                                     'load todo 50'
                                 )
+                                set_editor_load_done_button = gr.Button(
+                                    'load done 50'
+                                )
                                 set_editor_caption_empty_button = gr.Button('caption')
                         with gr.Row():
                             set_editor_show_active = gr.Checkbox(
@@ -657,6 +660,16 @@ class AIDBSceneApp:
                 outputs=[set_editor_html],
             ).then(
                 self._html_set_editor_open_todo,
+                inputs=[set_editor_name],
+                outputs=[set_editor_html],
+            )
+
+            set_editor_load_done_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_html],
+            ).then(
+                self._html_set_editor_open_done,
                 inputs=[set_editor_name],
                 outputs=[set_editor_html],
             )
@@ -1021,6 +1034,56 @@ class AIDBSceneApp:
                 img, set_id=scene_set.id, excluded=img.id in excluded_ids
             )
             for _, _, img in scored
+        )
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+
+    def _html_set_editor_open_done(self, name: Optional[str]) -> str:
+        """
+        Loads up to 50 'done' active images of the selected set as edit
+        cells. Done = all four editable fields (hints, labels,
+        caption_joy, caption) are non-empty. Prototype and excluded
+        images are skipped. Sorted by latest update / creation timestamp
+        desc.
+        """
+        if not name or not isinstance(name, str):
+            return '<p>No set selected.</p>'
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
+
+        try:
+            done: list[tuple[float, object]] = []
+            for img in scene_set.imgs:
+                if img.prototype:
+                    continue
+                d = img.data
+                if not d.get(SceneDef.FIELD_HINTS):
+                    continue
+                if not d.get(SceneDef.FIELD_LABELS):
+                    continue
+                if not d.get(SceneDef.FIELD_CAPTION_JOY):
+                    continue
+                if not d.get(SceneDef.FIELD_CAPTION):
+                    continue
+                ts = SceneDef.get_timestamp_update_from_data(img)
+                done.append((ts, img))
+        except Exception as e:
+            return f'<p>Failed to scan images for set <code>{name}</code>: {e}</p>'
+
+        if not done:
+            return f'<p>Set <code>{name}</code>: no done images.</p>'
+
+        done.sort(key=lambda t: -t[0])
+        done = done[:50]
+
+        styles = AppSceneImageCell.html_styles()
+        excluded_ids = set(scene_set.imgs_exclude)
+        cells = ''.join(
+            AppSceneImageCell.html(
+                img, set_id=scene_set.id, excluded=img.id in excluded_ids
+            )
+            for _, img in done
         )
         return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
 
