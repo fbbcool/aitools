@@ -36,6 +36,63 @@ class AppSceneImageCell:
     THUMB_MAX_SIDE: int = 256
 
     @staticmethod
+    def html_info(
+        obj: SceneImage,
+        set_id: Optional[str] = None,
+        excluded: bool = False,
+    ) -> str:
+        """
+        Compact read-only image cell for informational sections (e.g., the
+        Set Editor's Prototype / Excluded sections).
+
+        Shows only: thumbnail (clickable into the lightbox), id row with the
+        url copy buttons, and — when a `set_id` is provided — the per-image
+        exclude toggle. No caption / hints / labels editors.
+        """
+        pil = AppSceneImageCell._load_thumb(obj)
+        img_b64: Optional[str] = HtmlHelper.pil_to_base64(pil)
+        if img_b64 is None:
+            img_b64 = ''
+
+        thumb_onclick = AppSceneImageCell._html_lightbox_onclick(
+            target_type='registered', target=obj.id, set_id=set_id
+        )
+
+        url = obj.url_from_data
+        url_str = str(url) if url is not None else ''
+        url_copy_btn = AppSceneImageCell._html_copy_static_button(url_str, label='url')
+
+        scene_url = obj.data.get(SceneDef.FIELD_URL_PARENT)
+        scene_url_str = str(scene_url) if scene_url else ''
+        url_scene_copy_btn = AppSceneImageCell._html_copy_static_button(
+            scene_url_str, label='url scene'
+        )
+
+        exclude_html = ''
+        if set_id:
+            exclude_html = AppSceneImageCell._html_exclude_checkbox(
+                set_id=set_id, img_id=obj.id, checked=excluded
+            )
+        toggles_row = (
+            f'<div class="simg-edit-toggles">{exclude_html}</div>'
+            if exclude_html else ''
+        )
+
+        return f"""
+        <div class="image-item simg-info-cell" id="cell-simg-info-{obj.id}">
+            <img src="data:image/png;base64,{img_b64}" onclick="{thumb_onclick}">
+            {toggles_row}
+            <div class="image-controls">
+                <div class="simg-edit-id-row">
+                    <div class="simg-edit-id">id: {obj.id}</div>
+                    {url_copy_btn}
+                    {url_scene_copy_btn}
+                </div>
+            </div>
+        </div>
+        """
+
+    @staticmethod
     def html(
         obj: SceneImage,
         set_id: Optional[str] = None,
@@ -111,7 +168,7 @@ class AppSceneImageCell:
         save_image_btn = AppSceneImageCell._html_save_image_button(obj)
 
         thumb_onclick = AppSceneImageCell._html_lightbox_onclick(
-            target_type='registered', target=obj.id
+            target_type='registered', target=obj.id, set_id=set_id
         )
 
         exclude_html = ''
@@ -122,18 +179,20 @@ class AppSceneImageCell:
         prototype_html = AppSceneImageCell._html_prototype_checkbox(
             img_id=obj.id, checked=obj.prototype
         )
+        toggles_row = (
+            f'<div class="simg-edit-toggles">{prototype_html}{exclude_html}</div>'
+        )
 
         return f"""
         <div class="image-item simg-edit-cell" id="cell-simg-{obj.id}">
             <img src="data:image/png;base64,{img_b64}" onclick="{thumb_onclick}">
+            {toggles_row}
             <div class="image-controls">
                 {caption_field}
                 <div class="simg-edit-id-row">
                     <div class="simg-edit-id">id: {obj.id}</div>
                     {url_copy_btn}
                     {url_scene_copy_btn}
-                    {prototype_html}
-                    {exclude_html}
                 </div>
                 <div class="operation-radio-group">
                     {rating_html}
@@ -625,6 +684,7 @@ class AppSceneImageCell:
     LIGHTBOX_IMG_ID: str = 'simg-lightbox-img'
     LIGHTBOX_CAPTION_ID: str = 'simg-lightbox-caption'
     LIGHTBOX_PROTOTYPE_ID: str = 'simg-lightbox-prototype'
+    LIGHTBOX_EXCLUDE_ID: str = 'simg-lightbox-exclude'
     LIGHTBOX_CONTENT_CLASS: str = 'simg-lightbox-content'
 
     @staticmethod
@@ -649,6 +709,7 @@ class AppSceneImageCell:
         img_id = AppSceneImageCell.LIGHTBOX_IMG_ID
         caption_id = AppSceneImageCell.LIGHTBOX_CAPTION_ID
         prototype_id = AppSceneImageCell.LIGHTBOX_PROTOTYPE_ID
+        exclude_id = AppSceneImageCell.LIGHTBOX_EXCLUDE_ID
         content_cls = AppSceneImageCell.LIGHTBOX_CONTENT_CLASS
 
         cmd_btn_id = AppHtml.elem_id_cmd_button()
@@ -670,6 +731,23 @@ class AppSceneImageCell:
             f"if (cbtn) {{ cbtn.click(); }}"
         )
 
+        # ---- exclude toggle (only active when modal carries a setId) -----
+        exclude_change_js = (
+            f"event.stopPropagation();"
+            f"const o = document.getElementById('{overlay_id}');"
+            f"if (!o || !o.dataset.imageId || !o.dataset.setId) {{ return; }}"
+            f"const v = event.currentTarget.checked;"
+            f"const setter = v ? 'imgs_exclude_add' : 'imgs_exclude_del';"
+            f"const data = {{ type: 'set', id: o.dataset.setId,"
+            f"  cmd: 'db_query', payload: {{}}, label: 'exclude' }};"
+            f"data.payload[setter] = [o.dataset.imageId];"
+            f"const cbus = document.querySelector('#{cmd_bus_id} textarea');"
+            f"if (cbus) {{ cbus.value = JSON.stringify(data);"
+            f"  cbus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
+            f"const cbtn = document.getElementById('{cmd_btn_id}');"
+            f"if (cbtn) {{ cbtn.click(); }}"
+        )
+
         # ---- close-only: X button ----------------------------------------
         # Just hide and clear all state, no DB write.
         close_js = (
@@ -678,11 +756,14 @@ class AppSceneImageCell:
             f"const i = document.getElementById('{img_id}');"
             f"const c = document.getElementById('{caption_id}');"
             f"const p = document.getElementById('{prototype_id}');"
+            f"const x = document.getElementById('{exclude_id}');"
             f"if (o) {{ o.style.display = 'none'; "
-            f"o.dataset.targetType = ''; o.dataset.imageId = ''; }}"
+            f"o.dataset.targetType = ''; o.dataset.imageId = '';"
+            f"o.dataset.setId = ''; }}"
             f"if (i) {{ i.src = ''; }}"
             f"if (c) {{ c.value = ''; }}"
             f"if (p) {{ p.checked = false; }}"
+            f"if (x) {{ x.checked = false; }}"
         )
 
         # ---- save-and-close: clicking the overlay background -------------
@@ -705,11 +786,14 @@ class AppSceneImageCell:
             f"  if (cbtn) {{ cbtn.click(); }}"
             f"}}"
             f"if (o) {{ o.style.display = 'none'; "
-            f"o.dataset.targetType = ''; o.dataset.imageId = ''; }}"
+            f"o.dataset.targetType = ''; o.dataset.imageId = '';"
+            f"o.dataset.setId = ''; }}"
             f"if (i) {{ i.src = ''; }}"
             f"if (c) {{ c.value = ''; }}"
             f"const p2 = document.getElementById('{prototype_id}');"
             f"if (p2) {{ p2.checked = false; }}"
+            f"const x2 = document.getElementById('{exclude_id}');"
+            f"if (x2) {{ x2.checked = false; }}"
         )
 
         # The textarea also gets stopPropagation on keystrokes so e.g. Esc
@@ -785,11 +869,16 @@ class AppSceneImageCell:
             #simg-lightbox-close:hover {{
                 color: #bbb;
             }}
-            #{overlay_id} .simg-lightbox-prototype-toggle {{
+            #{overlay_id} .simg-lightbox-toggles {{
                 position: absolute;
                 top: 16px;
                 left: 24px;
                 z-index: 10001;
+                display: flex;
+                gap: 8px;
+            }}
+            #{overlay_id} .simg-lightbox-prototype-toggle,
+            #{overlay_id} .simg-lightbox-exclude-toggle {{
                 display: inline-flex;
                 align-items: center;
                 gap: 6px;
@@ -803,10 +892,12 @@ class AppSceneImageCell:
                 user-select: none;
                 line-height: 1;
             }}
-            #{overlay_id} .simg-lightbox-prototype-toggle:hover {{
+            #{overlay_id} .simg-lightbox-prototype-toggle:hover,
+            #{overlay_id} .simg-lightbox-exclude-toggle:hover {{
                 background-color: rgba(70,70,70,0.95);
             }}
-            #{overlay_id} .simg-lightbox-prototype-toggle input[type="checkbox"] {{
+            #{overlay_id} .simg-lightbox-prototype-toggle input[type="checkbox"],
+            #{overlay_id} .simg-lightbox-exclude-toggle input[type="checkbox"] {{
                 margin: 0;
                 cursor: pointer;
             }}
@@ -817,14 +908,25 @@ class AppSceneImageCell:
         </style>
         <div id="{overlay_id}" onclick="{save_close_js}">
             <span id="simg-lightbox-close" onclick="{close_js}">&times;</span>
-            <label class="simg-lightbox-prototype-toggle"
-                   for="{prototype_id}"
-                   onclick="event.stopPropagation();">
-                <input type="checkbox" id="{prototype_id}"
+            <div class="simg-lightbox-toggles" onclick="event.stopPropagation();">
+                <label class="simg-lightbox-prototype-toggle"
+                       for="{prototype_id}"
+                       onclick="event.stopPropagation();">
+                    <input type="checkbox" id="{prototype_id}"
+                           onclick="event.stopPropagation();"
+                           onchange="{prototype_change_js}">
+                    prototype
+                </label>
+                <label class="simg-lightbox-exclude-toggle"
+                       for="{exclude_id}"
                        onclick="event.stopPropagation();"
-                       onchange="{prototype_change_js}">
-                prototype
-            </label>
+                       style="display:none;">
+                    <input type="checkbox" id="{exclude_id}"
+                           onclick="event.stopPropagation();"
+                           onchange="{exclude_change_js}">
+                    exclude
+                </label>
+            </div>
             <div class="{content_cls}">
                 <img id="{img_id}" src="" alt="Full Size Image">
                 <textarea id="{caption_id}" placeholder="caption"
@@ -835,17 +937,25 @@ class AppSceneImageCell:
         """
 
     @staticmethod
-    def _html_lightbox_onclick(target_type: str, target: str) -> str:
+    def _html_lightbox_onclick(
+        target_type: str,
+        target: str,
+        set_id: Optional[str] = None,
+    ) -> str:
         """
         Returns a JS snippet (suitable for embedding in an HTML attribute)
-        that pushes a JSON `{type, target}` payload into the lightbox in-bus
-        and clicks the hidden lightbox trigger button. The Python handler +
-        JS .then() callback will populate and show the lightbox modal.
+        that pushes a JSON `{type, target, set_id?}` payload into the
+        lightbox in-bus and clicks the hidden lightbox trigger button. The
+        Python handler + JS .then() callback will populate and show the
+        lightbox modal.
         """
         elem_id_btn = AppHtml.elem_id_simg_editor_lightbox_button()
         elem_id_bus = AppHtml.elem_id_simg_editor_lightbox_databus()
 
-        payload = json.dumps({'type': target_type, 'target': target})
+        payload_obj: dict = {'type': target_type, 'target': target}
+        if set_id:
+            payload_obj['set_id'] = set_id
+        payload = json.dumps(payload_obj)
         # Escape for embedding in a single-quoted JS string literal
         # (\ -> \\ , ' -> \').
         payload_js = payload.replace('\\', '\\\\').replace("'", "\\'")
@@ -1261,6 +1371,12 @@ class AppSceneImageCell:
                 display: flex;
                 gap: 4px;
                 align-items: center;
+            }
+            .simg-edit-toggles {
+                display: flex;
+                justify-content: center;
+                gap: 6px;
+                padding: 6px 4px 4px 4px;
             }
             .simg-exclude-toggle,
             .simg-prototype-toggle {

@@ -329,6 +329,11 @@ class AIDBSceneApp:
                                 value=True,
                                 interactive=True,
                             )
+                            set_editor_show_prototype = gr.Checkbox(
+                                label='show prototypes',
+                                value=False,
+                                interactive=True,
+                            )
                             set_editor_show_excluded = gr.Checkbox(
                                 label='show excluded',
                                 value=False,
@@ -381,13 +386,13 @@ class AIDBSceneApp:
                                 value=False,
                                 interactive=True,
                             )
-                            set_editor_scenes_show_excluded = gr.Checkbox(
-                                label='show excluded',
+                            set_editor_scenes_show_prototype = gr.Checkbox(
+                                label='show prototypes',
                                 value=False,
                                 interactive=True,
                             )
-                            set_editor_scenes_show_prototype = gr.Checkbox(
-                                label='show prototypes',
+                            set_editor_scenes_show_excluded = gr.Checkbox(
+                                label='show excluded',
                                 value=False,
                                 interactive=True,
                             )
@@ -560,6 +565,7 @@ class AIDBSceneApp:
                     const overlay  = document.getElementById('simg-lightbox-overlay');
                     const caption  = document.getElementById('simg-lightbox-caption');
                     const proto    = document.getElementById('simg-lightbox-prototype');
+                    const excl     = document.getElementById('simg-lightbox-exclude');
                     if (!img || !overlay) return;
 
                     img.src = 'data:image/png;base64,' + data.b64;
@@ -568,20 +574,39 @@ class AIDBSceneApp:
                     if (data.type === 'registered' && data.image_id) {
                         overlay.dataset.targetType = 'registered';
                         overlay.dataset.imageId = data.image_id;
+                        overlay.dataset.setId = data.set_id || '';
                         if (caption) { caption.value = data.caption || ''; }
                         if (content) { content.classList.add('simg-lightbox-with-caption'); }
                         if (proto) {
                             proto.checked = !!data.prototype;
-                            proto.parentElement.style.display = 'inline-flex';
+                            const pp = proto.closest('label');
+                            if (pp) { pp.style.display = 'inline-flex'; }
+                        }
+                        if (excl) {
+                            const ep = excl.closest('label');
+                            if (data.set_id) {
+                                excl.checked = !!data.excluded;
+                                if (ep) { ep.style.display = 'inline-flex'; }
+                            } else {
+                                excl.checked = false;
+                                if (ep) { ep.style.display = 'none'; }
+                            }
                         }
                     } else {
                         overlay.dataset.targetType = data.type || '';
                         overlay.dataset.imageId = '';
+                        overlay.dataset.setId = '';
                         if (caption) { caption.value = ''; }
                         if (content) { content.classList.remove('simg-lightbox-with-caption'); }
                         if (proto) {
                             proto.checked = false;
-                            proto.parentElement.style.display = 'none';
+                            const pp = proto.closest('label');
+                            if (pp) { pp.style.display = 'none'; }
+                        }
+                        if (excl) {
+                            excl.checked = false;
+                            const ep = excl.closest('label');
+                            if (ep) { ep.style.display = 'none'; }
                         }
                     }
 
@@ -599,6 +624,7 @@ class AIDBSceneApp:
                 set_editor_caption_joy,
                 set_editor_labels,
                 set_editor_show_active,
+                set_editor_show_prototype,
                 set_editor_show_excluded,
             ]
 
@@ -632,8 +658,8 @@ class AIDBSceneApp:
                     set_editor_name,
                     set_editor_scenes_show_active,
                     set_editor_scenes_show_suppressed,
-                    set_editor_scenes_show_excluded,
                     set_editor_scenes_show_prototype,
+                    set_editor_scenes_show_excluded,
                 ],
                 outputs=[set_editor_scenes_html],
             )
@@ -714,6 +740,7 @@ class AIDBSceneApp:
         caption_joy_mode: Optional[str] = 'ignore',
         labels_mode: Optional[str] = 'ignore',
         show_active: bool = True,
+        show_prototype: bool = False,
         show_excluded: bool = False,
     ) -> str:
         if not name or not isinstance(name, str):
@@ -724,13 +751,19 @@ class AIDBSceneApp:
             return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
 
         try:
-            imgs_non_excluded = self._set_editor_filter_imgs(
+            imgs_non_excluded_all = self._set_editor_filter_imgs(
                 scene_set, rating_min, rating_max,
                 hints_mode, caption_mode, caption_joy_mode, labels_mode,
                 show_excluded=False,
-            ) if show_active else []
-            imgs_active = [i for i in imgs_non_excluded if not i.prototype]
-            imgs_prototype = [i for i in imgs_non_excluded if i.prototype]
+            )
+            imgs_active = (
+                [i for i in imgs_non_excluded_all if not i.prototype]
+                if show_active else []
+            )
+            imgs_prototype = (
+                [i for i in imgs_non_excluded_all if i.prototype]
+                if show_prototype else []
+            )
             imgs_excluded = self._set_editor_filter_imgs(
                 scene_set, rating_min, rating_max,
                 hints_mode, caption_mode, caption_joy_mode, labels_mode,
@@ -771,7 +804,7 @@ class AIDBSceneApp:
         if imgs_prototype:
             cells_p = ''.join(
                 f'<div class="set-editor-img-prototype">'
-                f'{AppSceneImageCell.html(img, set_id=scene_set.id, excluded=img.id in excluded_ids)}'
+                f'{AppSceneImageCell.html_info(img, set_id=scene_set.id, excluded=img.id in excluded_ids)}'
                 f'</div>'
                 for img in imgs_prototype
             )
@@ -782,7 +815,7 @@ class AIDBSceneApp:
         if imgs_excluded:
             cells_e = ''.join(
                 f'<div class="set-editor-img-excluded">'
-                f'{AppSceneImageCell.html(img, set_id=scene_set.id, excluded=True)}'
+                f'{AppSceneImageCell.html_info(img, set_id=scene_set.id, excluded=True)}'
                 f'</div>'
                 for img in imgs_excluded
             )
@@ -802,6 +835,7 @@ class AIDBSceneApp:
         caption_joy_mode: Optional[str] = 'ignore',
         labels_mode: Optional[str] = 'ignore',
         show_active: bool = True,
+        show_prototype: bool = False,
         show_excluded: bool = False,
     ) -> str:
         """
@@ -814,7 +848,7 @@ class AIDBSceneApp:
         refresh_args = (
             name, rating_min, rating_max,
             hints_mode, caption_mode, caption_joy_mode, labels_mode,
-            show_active, show_excluded,
+            show_active, show_prototype, show_excluded,
         )
         if not name or not isinstance(name, str):
             gr.Warning('No set selected.')
@@ -923,8 +957,8 @@ class AIDBSceneApp:
         name: Optional[str],
         show_active: bool = True,
         show_suppressed: bool = False,
-        show_excluded: bool = False,
         show_prototype: bool = False,
+        show_excluded: bool = False,
     ) -> str:
         if not name or not isinstance(name, str):
             return '<p>No set selected.</p>'
@@ -967,20 +1001,24 @@ class AIDBSceneApp:
                 pass
         top = [
             s for s in scenes
-            if s.id not in suppressed
-            and s.id not in removed
-            and s.id not in prototype_ids
+            if s.id not in suppressed and s.id not in removed
         ]
         proto = [
             s for s in scenes
             if s.id in prototype_ids and s.id not in removed
         ]
-        supp = [
+        # Suppressed: non-prototype suppressed first (rating-sorted), then
+        # prototype scenes appended at the end. Prototype scenes are by
+        # definition suppressed (all images non-active); listing them here
+        # too keeps the suppressed section complete (intentional duplication
+        # with the Prototype section).
+        supp_non_proto = [
             s for s in scenes
             if s.id in suppressed
-            and s.id not in removed
             and s.id not in prototype_ids
+            and s.id not in removed
         ]
+        supp = supp_non_proto + proto
         excl = [s for s in scenes if s.id in removed]
 
         def render(scene) -> str:
@@ -1027,16 +1065,16 @@ class AIDBSceneApp:
         parts = [styles]
         if cells_non:
             parts.append(AppHtml.html_styled_cells_grid(cells_non))
-        if cells_proto:
-            parts.append(
-                '<h3 style="margin-top:24px;color:#2563eb;">Prototype</h3>'
-            )
-            parts.append(AppHtml.html_styled_cells_grid(cells_proto))
         if cells_supp:
             parts.append(
                 '<h3 style="margin-top:24px;color:#d97706;">Suppressed</h3>'
             )
             parts.append(AppHtml.html_styled_cells_grid(cells_supp))
+        if cells_proto:
+            parts.append(
+                '<h3 style="margin-top:24px;color:#2563eb;">Prototype</h3>'
+            )
+            parts.append(AppHtml.html_styled_cells_grid(cells_proto))
         if cells_excl:
             parts.append(
                 '<h3 style="margin-top:24px;color:#b91c1c;">Excluded</h3>'
@@ -1695,6 +1733,7 @@ class AIDBSceneApp:
 
         target_type = data.get('type')
         target = data.get('target')
+        set_id_in = data.get('set_id') or ''
         if not target_type or not target:
             return ''
 
@@ -1702,6 +1741,7 @@ class AIDBSceneApp:
         b64: Optional[str] = None
         caption_text: Optional[str] = None
         prototype_flag: bool = False
+        excluded_flag: bool = False
         try:
             if target_type == 'registered':
                 try:
@@ -1713,6 +1753,13 @@ class AIDBSceneApp:
                 pil = simg.pil
                 caption_text = simg.caption or ''
                 prototype_flag = bool(simg.prototype)
+                if set_id_in:
+                    try:
+                        scene_set = self._ssm.set_from_id_or_name(set_id_in)
+                        excluded_flag = str(target) in set(scene_set.imgs_exclude)
+                    except Exception as e:
+                        print(f'WARN: lightbox set lookup [{set_id_in}]: {e}')
+                        set_id_in = ''
             elif target_type == 'unregistered':
                 url = Path(str(target).strip())
                 if not url.exists():
@@ -1752,6 +1799,9 @@ class AIDBSceneApp:
             result['image_id'] = str(target)
             result['caption'] = caption_text or ''
             result['prototype'] = prototype_flag
+            if set_id_in:
+                result['set_id'] = set_id_in
+                result['excluded'] = excluded_flag
         return json.dumps(result)
 
     def _caption_set_generate(self, image_id_str: Optional[str]) -> str:
