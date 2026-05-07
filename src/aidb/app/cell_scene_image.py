@@ -119,6 +119,9 @@ class AppSceneImageCell:
             exclude_html = AppSceneImageCell._html_exclude_checkbox(
                 set_id=set_id, img_id=obj.id, checked=excluded
             )
+        prototype_html = AppSceneImageCell._html_prototype_checkbox(
+            img_id=obj.id, checked=obj.prototype
+        )
 
         return f"""
         <div class="image-item simg-edit-cell" id="cell-simg-{obj.id}">
@@ -129,6 +132,7 @@ class AppSceneImageCell:
                     <div class="simg-edit-id">id: {obj.id}</div>
                     {url_copy_btn}
                     {url_scene_copy_btn}
+                    {prototype_html}
                     {exclude_html}
                 </div>
                 <div class="operation-radio-group">
@@ -415,6 +419,49 @@ class AppSceneImageCell:
         )
 
     @staticmethod
+    def _html_prototype_checkbox(img_id: str, checked: bool) -> str:
+        """
+        Per-image 'prototype' toggle.
+
+        Toggling on  -> dispatches `set_prototype(True)` to the image.
+        Toggling off -> dispatches `set_prototype(False)` to the image.
+        """
+        elem_id_btn = AppHtml.elem_id_cmd_button()
+        elem_id_bus = AppHtml.elem_id_cmd_databus()
+
+        skel_on = json.dumps({
+            'type': 'image', 'id': img_id, 'cmd': 'db_query',
+            'payload': {'set_prototype': True},
+            'label': 'prototype',
+        })
+        skel_off = json.dumps({
+            'type': 'image', 'id': img_id, 'cmd': 'db_query',
+            'payload': {'set_prototype': False},
+            'label': 'prototype',
+        })
+
+        js = f"""
+        event.stopPropagation();
+        const isOn = event.currentTarget.checked;
+        const skel = JSON.parse(isOn ? '{skel_on}' : '{skel_off}');
+        const bus = document.querySelector('#{elem_id_bus} textarea');
+        if (bus) {{
+            bus.value = JSON.stringify(skel);
+            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+        const trig = document.getElementById('{elem_id_btn}');
+        if (trig) {{ trig.click(); }}
+        """.replace('\n', ' ').replace('"', '&quot;')
+
+        cb_id = f'simg-prototype-{img_id}'
+        checked_attr = ' checked' if checked else ''
+        return (
+            f'<label class="simg-prototype-toggle" for="{cb_id}">'
+            f'<input type="checkbox" id="{cb_id}"{checked_attr} onchange="{js}">'
+            f'prototype</label>'
+        )
+
+    @staticmethod
     def _html_exclude_checkbox(set_id: str, img_id: str, checked: bool) -> str:
         """
         Per-image 'exclude' toggle for the Set Editor.
@@ -577,6 +624,7 @@ class AppSceneImageCell:
     LIGHTBOX_OVERLAY_ID: str = 'simg-lightbox-overlay'
     LIGHTBOX_IMG_ID: str = 'simg-lightbox-img'
     LIGHTBOX_CAPTION_ID: str = 'simg-lightbox-caption'
+    LIGHTBOX_PROTOTYPE_ID: str = 'simg-lightbox-prototype'
     LIGHTBOX_CONTENT_CLASS: str = 'simg-lightbox-content'
 
     @staticmethod
@@ -600,10 +648,27 @@ class AppSceneImageCell:
         overlay_id = AppSceneImageCell.LIGHTBOX_OVERLAY_ID
         img_id = AppSceneImageCell.LIGHTBOX_IMG_ID
         caption_id = AppSceneImageCell.LIGHTBOX_CAPTION_ID
+        prototype_id = AppSceneImageCell.LIGHTBOX_PROTOTYPE_ID
         content_cls = AppSceneImageCell.LIGHTBOX_CONTENT_CLASS
 
         cmd_btn_id = AppHtml.elem_id_cmd_button()
         cmd_bus_id = AppHtml.elem_id_cmd_databus()
+
+        # ---- prototype toggle: persists immediately on change ------------
+        prototype_change_js = (
+            f"event.stopPropagation();"
+            f"const o = document.getElementById('{overlay_id}');"
+            f"if (!o || !o.dataset.imageId) {{ return; }}"
+            f"const v = event.currentTarget.checked;"
+            f"const data = {{ type: 'image', id: o.dataset.imageId,"
+            f"  cmd: 'db_query', payload: {{ set_prototype: v }},"
+            f"  label: 'prototype' }};"
+            f"const cbus = document.querySelector('#{cmd_bus_id} textarea');"
+            f"if (cbus) {{ cbus.value = JSON.stringify(data);"
+            f"  cbus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
+            f"const cbtn = document.getElementById('{cmd_btn_id}');"
+            f"if (cbtn) {{ cbtn.click(); }}"
+        )
 
         # ---- close-only: X button ----------------------------------------
         # Just hide and clear all state, no DB write.
@@ -612,10 +677,12 @@ class AppSceneImageCell:
             f"const o = document.getElementById('{overlay_id}');"
             f"const i = document.getElementById('{img_id}');"
             f"const c = document.getElementById('{caption_id}');"
+            f"const p = document.getElementById('{prototype_id}');"
             f"if (o) {{ o.style.display = 'none'; "
             f"o.dataset.targetType = ''; o.dataset.imageId = ''; }}"
             f"if (i) {{ i.src = ''; }}"
             f"if (c) {{ c.value = ''; }}"
+            f"if (p) {{ p.checked = false; }}"
         )
 
         # ---- save-and-close: clicking the overlay background -------------
@@ -641,6 +708,8 @@ class AppSceneImageCell:
             f"o.dataset.targetType = ''; o.dataset.imageId = ''; }}"
             f"if (i) {{ i.src = ''; }}"
             f"if (c) {{ c.value = ''; }}"
+            f"const p2 = document.getElementById('{prototype_id}');"
+            f"if (p2) {{ p2.checked = false; }}"
         )
 
         # The textarea also gets stopPropagation on keystrokes so e.g. Esc
@@ -716,6 +785,31 @@ class AppSceneImageCell:
             #simg-lightbox-close:hover {{
                 color: #bbb;
             }}
+            #{overlay_id} .simg-lightbox-prototype-toggle {{
+                position: absolute;
+                top: 16px;
+                left: 24px;
+                z-index: 10001;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 5px 10px;
+                border: 1px solid #777;
+                border-radius: 5px;
+                font-size: 0.9em;
+                color: #ffffff;
+                background-color: rgba(40,40,40,0.85);
+                cursor: pointer;
+                user-select: none;
+                line-height: 1;
+            }}
+            #{overlay_id} .simg-lightbox-prototype-toggle:hover {{
+                background-color: rgba(70,70,70,0.95);
+            }}
+            #{overlay_id} .simg-lightbox-prototype-toggle input[type="checkbox"] {{
+                margin: 0;
+                cursor: pointer;
+            }}
             .simg-edit-cell img,
             .simg-unreg-cell img {{
                 cursor: zoom-in;
@@ -723,6 +817,14 @@ class AppSceneImageCell:
         </style>
         <div id="{overlay_id}" onclick="{save_close_js}">
             <span id="simg-lightbox-close" onclick="{close_js}">&times;</span>
+            <label class="simg-lightbox-prototype-toggle"
+                   for="{prototype_id}"
+                   onclick="event.stopPropagation();">
+                <input type="checkbox" id="{prototype_id}"
+                       onclick="event.stopPropagation();"
+                       onchange="{prototype_change_js}">
+                prototype
+            </label>
             <div class="{content_cls}">
                 <img id="{img_id}" src="" alt="Full Size Image">
                 <textarea id="{caption_id}" placeholder="caption"
@@ -912,6 +1014,8 @@ class AppSceneImageCell:
 
         elem_id_btn = AppHtml.elem_id_simg_editor_register_button()
         elem_id_bus = AppHtml.elem_id_simg_editor_register_databus()
+        elem_id_btn_p = AppHtml.elem_id_simg_editor_register_prototype_button()
+        elem_id_bus_p = AppHtml.elem_id_simg_editor_register_prototype_databus()
 
         # JS uses single quotes only so it survives embedding inside onclick="..."
         url_str = str(url)
@@ -923,6 +1027,14 @@ class AppSceneImageCell:
             f"if (bus) {{ bus.value = '{url_js}';"
             f"bus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
             f"const btn = document.getElementById('{elem_id_btn}');"
+            f"if (btn) {{ btn.click(); }}"
+        ).replace('"', '&quot;')
+        onclick_js_p = (
+            f"event.stopPropagation();"
+            f"const bus = document.querySelector('#{elem_id_bus_p} textarea');"
+            f"if (bus) {{ bus.value = '{url_js}';"
+            f"bus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
+            f"const btn = document.getElementById('{elem_id_btn_p}');"
             f"if (btn) {{ btn.click(); }}"
         ).replace('"', '&quot;')
 
@@ -960,6 +1072,10 @@ class AppSceneImageCell:
                     {caption_btn}
                     <button type="button" class="simg-register-btn" onclick="{onclick_js}">
                         register
+                    </button>
+                    <button type="button" class="simg-register-btn simg-register-prototype-btn"
+                            onclick="{onclick_js_p}">
+                        register prototype
                     </button>
                 </div>
             </div>
@@ -1146,7 +1262,8 @@ class AppSceneImageCell:
                 gap: 4px;
                 align-items: center;
             }
-            .simg-exclude-toggle {
+            .simg-exclude-toggle,
+            .simg-prototype-toggle {
                 display: inline-flex;
                 align-items: center;
                 gap: 4px;
@@ -1160,10 +1277,12 @@ class AppSceneImageCell:
                 user-select: none;
                 line-height: 1;
             }
-            .simg-exclude-toggle:hover {
+            .simg-exclude-toggle:hover,
+            .simg-prototype-toggle:hover {
                 background-color: #777777;
             }
-            .simg-exclude-toggle input[type="checkbox"] {
+            .simg-exclude-toggle input[type="checkbox"],
+            .simg-prototype-toggle input[type="checkbox"] {
                 margin: 0;
                 cursor: pointer;
             }

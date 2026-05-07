@@ -62,6 +62,7 @@ class SceneDef:
     RATING_MIN_IMG_CAP: Final = 1
 
     FIELD_LABELS: Final = 'labels'
+    FIELD_PROTOTYPE: Final = 'prototype'
 
     TAG_PREFIX_SET: Final = f'set{SEPERATOR_ID}'
     TAG_SETS: Final = ['test', 'gts_v3']

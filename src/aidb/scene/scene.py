@@ -85,6 +85,43 @@ class Scene:
     def imgs_sorted(self) -> list[SceneImage]:
         return SceneDef.sort_by_rating(self.imgs)
 
+    @property
+    def is_prototype(self) -> bool:
+        """
+        True iff the scene has at least one registered image and every
+        registered image has `prototype=True`. Empty scenes return False.
+        """
+        seen = False
+        for img in self.imgs:
+            seen = True
+            if not img.prototype:
+                return False
+        return seen
+
+    def make_prototype(self) -> tuple[int, int, int]:
+        """
+        Flag every registered image of this scene as prototype and persist.
+
+        Returns `(n_done, n_skipped, n_failed)`:
+          - n_done:    images flagged in this call (were not prototype yet)
+          - n_skipped: images already flagged
+          - n_failed:  images whose persist raised
+        """
+        n_done = 0
+        n_skipped = 0
+        n_failed = 0
+        for img in self.imgs:
+            if img.prototype:
+                n_skipped += 1
+                continue
+            try:
+                img.set_prototype(True)
+                img.db_store()
+                n_done += 1
+            except Exception:
+                n_failed += 1
+        return n_done, n_skipped, n_failed
+
     def ids_img_from_query(self, query: dict) -> Generator:
         im = self._scm.scene_image_manager()
 

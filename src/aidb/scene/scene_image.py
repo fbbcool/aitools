@@ -66,6 +66,13 @@ class SceneImage:
         """
         return self._data.get(SceneDef.FIELD_LABELS, []) or []
 
+    @property
+    def prototype(self) -> bool:
+        return bool(self._data.get(SceneDef.FIELD_PROTOTYPE, False))
+
+    def set_prototype(self, value: bool) -> None:
+        self._data |= {SceneDef.FIELD_PROTOTYPE: bool(value)}
+
     def set_rating(self, value: int | str) -> None:
         try:
             value = int(value)

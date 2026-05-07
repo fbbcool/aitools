@@ -109,18 +109,34 @@ class SceneSet:
 
     @property
     def ids_scene_surpressed(self) -> list[str]:
+        """
+        Scenes that contribute no *active* images to the set.
+
+        Active = not in `imgs_exclude` AND not flagged as prototype.
+        Empty scenes (zero matching registered images) are not suppressed —
+        they're just empty.
+        """
         from .scene import Scene
+        from .scene_image import SceneImage
 
         excluded = set(self.imgs_exclude)
-        if not excluded:
-            return []
         out: list[str] = []
         scene: Scene
         for scene in self.scenes:
-            ids = list(scene.ids_img_from_query(self.query_img))
-            if not ids:
+            has_active = False
+            seen = False
+            img: SceneImage
+            for img in scene.imgs_from_query(self.query_img):
+                seen = True
+                if img.id in excluded:
+                    continue
+                if img.prototype:
+                    continue
+                has_active = True
+                break
+            if not seen:
                 continue
-            if all(iid in excluded for iid in ids):
+            if not has_active:
                 out.append(scene.id)
         return out
 

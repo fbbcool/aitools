@@ -98,6 +98,7 @@ class SceneImageManager:
             return None
         data |= {SceneDef.FIELD_URL_SRC: str(url)}
         data |= {SceneDef.FIELD_RATING: SceneDef.RATING_INIT}
+        data |= {SceneDef.FIELD_PROTOTYPE: False}
         return data
 
     def _image_update(self, data: dict) -> dict | None:

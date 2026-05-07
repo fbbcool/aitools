@@ -79,6 +79,19 @@ class AIDBSceneApp:
                 elem_id=AppHtml.elem_id_simg_editor_register_databus(),
             )
 
+            # Hidden trigger + databus for registering an unregistered image
+            # AS prototype (same flow as `register`, but flips the new
+            # SceneImage's `prototype` field to True before refresh).
+            button_hidden_simg_editor_register_prototype = gr.Button(
+                'Hidden SceneImage Editor Register Prototype',
+                visible='hidden',
+                elem_id=AppHtml.elem_id_simg_editor_register_prototype_button(),
+            )
+            databus_simg_editor_register_prototype = gr.Textbox(
+                visible='hidden',
+                elem_id=AppHtml.elem_id_simg_editor_register_prototype_databus(),
+            )
+
             # Hidden trigger + databus for captioning an image (registered or
             # unregistered) using Joy / JoySceneDB.
             button_hidden_simg_editor_caption = gr.Button(
@@ -238,6 +251,7 @@ class AIDBSceneApp:
                 simg_editor_scene_info_html = gr.HTML(label='Scene')
                 with gr.Row():
                     simg_editor_caption_empty_button = gr.Button('caption')
+                    simg_editor_prototype_all_button = gr.Button('prototype all')
                     simg_editor_refresh_button = gr.Button('Refresh')
                 gr.Markdown('### Registered Images')
                 simg_editor_html = gr.HTML(label='Scene Images')
@@ -285,9 +299,22 @@ class AIDBSceneApp:
                                 allow_custom_value=False,
                                 interactive=True,
                             )
-                            set_editor_load_button = gr.Button(
-                                'Load',
-                                elem_id='set-editor-load-button',
+                            with gr.Column():
+                                set_editor_load_button = gr.Button(
+                                    'Load',
+                                    elem_id='set-editor-load-button',
+                                )
+                                set_editor_caption_empty_button = gr.Button('caption')
+                        with gr.Row():
+                            set_editor_show_active = gr.Checkbox(
+                                label='show active',
+                                value=True,
+                                interactive=True,
+                            )
+                            set_editor_show_excluded = gr.Checkbox(
+                                label='show excluded',
+                                value=False,
+                                interactive=True,
                             )
                         with gr.Row():
                             set_editor_hints = gr.Dropdown(
@@ -318,19 +345,28 @@ class AIDBSceneApp:
                                 allow_custom_value=False,
                                 interactive=True,
                             )
-                            set_editor_excluded = gr.Checkbox(
-                                label='excluded imgs',
-                                value=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            set_editor_caption_empty_button = gr.Button('caption')
                         set_editor_html = gr.HTML(label='Set Images')
                     with gr.Tab('Scenes'):
                         with gr.Row():
                             set_editor_scenes_load_button = gr.Button(
                                 'Load',
                                 elem_id='set-editor-scenes-load-button',
+                            )
+                        with gr.Row():
+                            set_editor_scenes_show_active = gr.Checkbox(
+                                label='show active',
+                                value=True,
+                                interactive=True,
+                            )
+                            set_editor_scenes_show_suppressed = gr.Checkbox(
+                                label='show suppressed',
+                                value=False,
+                                interactive=True,
+                            )
+                            set_editor_scenes_show_excluded = gr.Checkbox(
+                                label='show excluded',
+                                value=False,
+                                interactive=True,
                             )
                         set_editor_scenes_html = gr.HTML(label='Set Scenes')
 
@@ -410,11 +446,34 @@ class AIDBSceneApp:
                 outputs=editor_outputs,
             )
 
+            # 'prototype all': flag every registered image of the loaded scene
+            # as prototype, then refresh.
+            simg_editor_prototype_all_button.click(
+                self._editor_clear_content,
+                inputs=[simg_editor_scene_id],
+                outputs=editor_outputs,
+            ).then(
+                self._html_simg_editor_prototype_all,
+                inputs=[simg_editor_scene_id],
+                outputs=editor_outputs,
+            )
+
             # Register an unregistered image (driven by per-image register button
             # in the unregistered-images section). Refreshes the editor afterwards.
             button_hidden_simg_editor_register.click(
                 self._html_simg_editor_register,
                 inputs=[databus_simg_editor_register, simg_editor_scene_id],
+                outputs=editor_outputs,
+            )
+
+            # Register an unregistered image as prototype (sets
+            # `prototype: True` on the new SceneImage). Refreshes the editor.
+            button_hidden_simg_editor_register_prototype.click(
+                self._html_simg_editor_register_prototype,
+                inputs=[
+                    databus_simg_editor_register_prototype,
+                    simg_editor_scene_id,
+                ],
                 outputs=editor_outputs,
             )
 
@@ -477,6 +536,7 @@ class AIDBSceneApp:
                     const img      = document.getElementById('simg-lightbox-img');
                     const overlay  = document.getElementById('simg-lightbox-overlay');
                     const caption  = document.getElementById('simg-lightbox-caption');
+                    const proto    = document.getElementById('simg-lightbox-prototype');
                     if (!img || !overlay) return;
 
                     img.src = 'data:image/png;base64,' + data.b64;
@@ -487,11 +547,19 @@ class AIDBSceneApp:
                         overlay.dataset.imageId = data.image_id;
                         if (caption) { caption.value = data.caption || ''; }
                         if (content) { content.classList.add('simg-lightbox-with-caption'); }
+                        if (proto) {
+                            proto.checked = !!data.prototype;
+                            proto.parentElement.style.display = 'inline-flex';
+                        }
                     } else {
                         overlay.dataset.targetType = data.type || '';
                         overlay.dataset.imageId = '';
                         if (caption) { caption.value = ''; }
                         if (content) { content.classList.remove('simg-lightbox-with-caption'); }
+                        if (proto) {
+                            proto.checked = false;
+                            proto.parentElement.style.display = 'none';
+                        }
                     }
 
                     overlay.style.display = 'flex';
@@ -507,24 +575,42 @@ class AIDBSceneApp:
                 set_editor_caption,
                 set_editor_caption_joy,
                 set_editor_labels,
-                set_editor_excluded,
+                set_editor_show_active,
+                set_editor_show_excluded,
             ]
 
             set_editor_load_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_html],
+            ).then(
                 self._html_set_editor_open,
                 inputs=set_editor_filter_inputs,
                 outputs=[set_editor_html],
             )
 
             set_editor_caption_empty_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_html],
+            ).then(
                 self._html_set_editor_caption_empty,
                 inputs=set_editor_filter_inputs,
                 outputs=[set_editor_html],
             )
 
             set_editor_scenes_load_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_scenes_html],
+            ).then(
                 self._html_set_editor_open_scenes,
-                inputs=[set_editor_name],
+                inputs=[
+                    set_editor_name,
+                    set_editor_scenes_show_active,
+                    set_editor_scenes_show_suppressed,
+                    set_editor_scenes_show_excluded,
+                ],
                 outputs=[set_editor_scenes_html],
             )
 
@@ -603,6 +689,7 @@ class AIDBSceneApp:
         caption_mode: Optional[str] = 'ignore',
         caption_joy_mode: Optional[str] = 'ignore',
         labels_mode: Optional[str] = 'ignore',
+        show_active: bool = True,
         show_excluded: bool = False,
     ) -> str:
         if not name or not isinstance(name, str):
@@ -613,28 +700,73 @@ class AIDBSceneApp:
             return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
 
         try:
-            imgs = self._set_editor_filter_imgs(
+            imgs_non_excluded = self._set_editor_filter_imgs(
                 scene_set, rating_min, rating_max,
                 hints_mode, caption_mode, caption_joy_mode, labels_mode,
-                show_excluded=show_excluded,
-            )
+                show_excluded=False,
+            ) if show_active else []
+            imgs_active = [i for i in imgs_non_excluded if not i.prototype]
+            imgs_prototype = [i for i in imgs_non_excluded if i.prototype]
+            imgs_excluded = self._set_editor_filter_imgs(
+                scene_set, rating_min, rating_max,
+                hints_mode, caption_mode, caption_joy_mode, labels_mode,
+                show_excluded=True,
+            ) if show_excluded else []
         except Exception as e:
             return f'<p>Failed to list images for set <code>{name}</code>: {e}</p>'
 
-        if not imgs:
+        if not imgs_active and not imgs_prototype and not imgs_excluded:
             return (
                 f'<p>Set <code>{name}</code> contains no images matching the current filter.</p>'
             )
 
-        styles = AppSceneImageCell.html_styles()
-        excluded = set(scene_set.imgs_exclude)
-        cells = ''.join(
-            AppSceneImageCell.html(
-                img, set_id=scene_set.id, excluded=img.id in excluded
+        styles = AppSceneImageCell.html_styles() + """
+        <style>
+            .set-editor-img-excluded {
+                outline: 2px dashed #b91c1c;
+                outline-offset: -2px;
+                opacity: 0.6;
+            }
+            .set-editor-img-prototype {
+                outline: 2px dashed #2563eb;
+                outline-offset: -2px;
+            }
+        </style>
+        """
+        excluded_ids = set(scene_set.imgs_exclude)
+
+        parts = [styles]
+        if imgs_active:
+            cells_a = ''.join(
+                AppSceneImageCell.html(
+                    img, set_id=scene_set.id, excluded=img.id in excluded_ids
+                )
+                for img in imgs_active
             )
-            for img in imgs
-        )
-        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+            parts.append(AppHtml.html_styled_cells_grid(cells_a, columns=2))
+        if imgs_prototype:
+            cells_p = ''.join(
+                f'<div class="set-editor-img-prototype">'
+                f'{AppSceneImageCell.html(img, set_id=scene_set.id, excluded=img.id in excluded_ids)}'
+                f'</div>'
+                for img in imgs_prototype
+            )
+            parts.append(
+                '<h3 style="margin-top:24px;color:#2563eb;">Prototype</h3>'
+            )
+            parts.append(AppHtml.html_styled_cells_grid(cells_p, columns=2))
+        if imgs_excluded:
+            cells_e = ''.join(
+                f'<div class="set-editor-img-excluded">'
+                f'{AppSceneImageCell.html(img, set_id=scene_set.id, excluded=True)}'
+                f'</div>'
+                for img in imgs_excluded
+            )
+            parts.append(
+                '<h3 style="margin-top:24px;color:#b91c1c;">Excluded</h3>'
+            )
+            parts.append(AppHtml.html_styled_cells_grid(cells_e, columns=2))
+        return ''.join(parts)
 
     def _html_set_editor_caption_empty(
         self,
@@ -645,18 +777,20 @@ class AIDBSceneApp:
         caption_mode: Optional[str] = 'ignore',
         caption_joy_mode: Optional[str] = 'ignore',
         labels_mode: Optional[str] = 'ignore',
+        show_active: bool = True,
         show_excluded: bool = False,
     ) -> str:
         """
-        Set-level batch caption restricted to the currently filtered images
-        of the selected set (rating range + hints/caption/caption_joy/labels
-        modes) whose `caption_joy` is empty. Mirrors
-        `_html_simg_editor_caption_empty` but iterates a SceneSet's images.
+        Set-level batch caption restricted to the currently filtered ACTIVE
+        images of the selected set (rating range + hints/caption/caption_joy/
+        labels modes) whose `caption_joy` is empty. Excluded images are never
+        captioned. Mirrors `_html_simg_editor_caption_empty` but iterates a
+        SceneSet's images.
         """
         refresh_args = (
             name, rating_min, rating_max,
             hints_mode, caption_mode, caption_joy_mode, labels_mode,
-            show_excluded,
+            show_active, show_excluded,
         )
         if not name or not isinstance(name, str):
             gr.Warning('No set selected.')
@@ -673,7 +807,7 @@ class AIDBSceneApp:
             imgs_filtered = self._set_editor_filter_imgs(
                 scene_set, rating_min, rating_max,
                 hints_mode, caption_mode, caption_joy_mode, labels_mode,
-                show_excluded=show_excluded,
+                show_excluded=False,
             )
             ids_empty = [
                 img.id
@@ -760,7 +894,13 @@ class AIDBSceneApp:
 
         return self._html_set_editor_open(*refresh_args)
 
-    def _html_set_editor_open_scenes(self, name: Optional[str]) -> str:
+    def _html_set_editor_open_scenes(
+        self,
+        name: Optional[str],
+        show_active: bool = True,
+        show_suppressed: bool = False,
+        show_excluded: bool = False,
+    ) -> str:
         if not name or not isinstance(name, str):
             return '<p>No set selected.</p>'
         try:
@@ -813,9 +953,9 @@ class AIDBSceneApp:
                 return f'<div class="{wrap_cls}">{cell}</div>'
             return cell
 
-        cells_non = ''.join(render(s) for s in top)
-        cells_supp = ''.join(render(s) for s in supp)
-        cells_excl = ''.join(render(s) for s in excl)
+        cells_non = ''.join(render(s) for s in top) if show_active else ''
+        cells_supp = ''.join(render(s) for s in supp) if show_suppressed else ''
+        cells_excl = ''.join(render(s) for s in excl) if show_excluded else ''
 
         styles = AppSceneImageCell.html_styles() + """
         <style>
@@ -1074,6 +1214,23 @@ class AIDBSceneApp:
         """
         Registers an unregistered image file by url and refreshes the editor.
         """
+        return self._html_simg_editor_register_impl(url_str, scene_id, prototype=False)
+
+    def _html_simg_editor_register_prototype(
+        self, url_str: Optional[str], scene_id: Optional[str]
+    ) -> tuple[str, str, str, str]:
+        """
+        Registers an unregistered image file by url, flags it as prototype,
+        and refreshes the editor.
+        """
+        return self._html_simg_editor_register_impl(url_str, scene_id, prototype=True)
+
+    def _html_simg_editor_register_impl(
+        self,
+        url_str: Optional[str],
+        scene_id: Optional[str],
+        prototype: bool = False,
+    ) -> tuple[str, str, str, str]:
         if not url_str or not isinstance(url_str, str):
             gr.Warning('Register: invalid url.')
             return self._html_simg_editor_open(scene_id)
@@ -1094,7 +1251,15 @@ class AIDBSceneApp:
         if new_id is None:
             gr.Warning(f'Register: could not register {url} (not an img/vid or already managed).')
         else:
-            gr.Info(f'Registered {url.name} as id {new_id}.', duration=1.5)
+            label = 'prototype' if prototype else 'image'
+            gr.Info(f'Registered {url.name} as {label} id {new_id}.', duration=1.5)
+            if prototype:
+                try:
+                    simg = im.image_from_id_or_url(new_id)
+                    simg.set_prototype(True)
+                    simg.db_store()
+                except Exception as e:
+                    print(f'WARN: set_prototype on new id [{new_id}] failed: {e}')
 
         # Re-sync the scene so its imgs list picks up the new SceneImage.
         try:
@@ -1103,6 +1268,45 @@ class AIDBSceneApp:
                 scene.update()
         except Exception as e:
             print(f'WARN: scene.update after register failed: {e}')
+
+        return self._html_simg_editor_open(scene_id)
+
+    # ------------------------------------------------------------------
+    # prototype-all: bulk-flag every registered image of the loaded scene
+    # ------------------------------------------------------------------
+
+    def _html_simg_editor_prototype_all(
+        self, scene_id: Optional[str]
+    ) -> tuple[str, str, str, str]:
+        if not scene_id or not isinstance(scene_id, str):
+            gr.Warning('No scene loaded.')
+            return self._html_simg_editor_open(scene_id)
+
+        scene_id = scene_id.strip()
+        try:
+            scene = self._scm.scene_from_id_or_url(scene_id)
+        except Exception as e:
+            print(f'ERROR: prototype-all load scene [{scene_id}]: {e}')
+            gr.Warning(f'Failed to load scene: {e}')
+            return self._html_simg_editor_open(scene_id)
+
+        try:
+            n_done, n_skipped, n_failed = scene.make_prototype()
+        except Exception as e:
+            print(f'ERROR: prototype-all batch [{scene_id}]: {e}')
+            gr.Warning(f'prototype-all failed: {e}')
+            return self._html_simg_editor_open(scene_id)
+
+        msg_parts = [f'Flagged {n_done} as prototype']
+        if n_skipped > 0:
+            msg_parts.append(f'skipped {n_skipped}')
+        if n_failed > 0:
+            msg_parts.append(f'failed {n_failed}')
+        msg = ', '.join(msg_parts) + '.'
+        if n_failed > 0:
+            gr.Warning(msg)
+        else:
+            gr.Info(msg, duration=2.0)
 
         return self._html_simg_editor_open(scene_id)
 
@@ -1411,6 +1615,7 @@ class AIDBSceneApp:
         pil = None
         b64: Optional[str] = None
         caption_text: Optional[str] = None
+        prototype_flag: bool = False
         try:
             if target_type == 'registered':
                 try:
@@ -1421,6 +1626,7 @@ class AIDBSceneApp:
                     return ''
                 pil = simg.pil
                 caption_text = simg.caption or ''
+                prototype_flag = bool(simg.prototype)
             elif target_type == 'unregistered':
                 url = Path(str(target).strip())
                 if not url.exists():
@@ -1459,6 +1665,7 @@ class AIDBSceneApp:
         if target_type == 'registered':
             result['image_id'] = str(target)
             result['caption'] = caption_text or ''
+            result['prototype'] = prototype_flag
         return json.dumps(result)
 
     def _caption_set_generate(self, image_id_str: Optional[str]) -> str:
