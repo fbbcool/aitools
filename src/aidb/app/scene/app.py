@@ -311,6 +311,11 @@ class AIDBSceneApp:
                         allow_custom_value=False,
                         interactive=True,
                     )
+                    set_editor_excluded = gr.Checkbox(
+                        label='excluded imgs',
+                        value=False,
+                        interactive=True,
+                    )
                 with gr.Row():
                     set_editor_caption_empty_button = gr.Button('caption')
                 set_editor_html = gr.HTML(label='Set Images')
@@ -488,6 +493,7 @@ class AIDBSceneApp:
                 set_editor_caption,
                 set_editor_caption_joy,
                 set_editor_labels,
+                set_editor_excluded,
             ]
 
             set_editor_load_button.click(
@@ -525,6 +531,7 @@ class AIDBSceneApp:
         caption_mode: Optional[str],
         caption_joy_mode: Optional[str],
         labels_mode: Optional[str],
+        show_excluded: bool = False,
     ) -> list:
         r_min = int(rating_min) if rating_min is not None else SceneDef.RATING_MIN
         r_max = int(rating_max) if rating_max is not None else SceneDef.RATING_MAX
@@ -536,27 +543,35 @@ class AIDBSceneApp:
             (SceneDef.FIELD_LABELS, labels_mode),
         ]
 
-        out = []
-        from aidb.scene import Scene as _Scene
-        scene: _Scene
-        for scene in scene_set.scenes:
-            for img in scene.imgs_from_query(scene_set.query_img):
-                rating = img.data.get(SceneDef.FIELD_RATING, SceneDef.RATING_MIN)
-                if not (r_min <= rating <= r_max):
+        if show_excluded:
+            simg_mgr = self._scm.scene_image_manager()
+            imgs_iter: list = []
+            for iid in scene_set.imgs_exclude:
+                try:
+                    imgs_iter.append(simg_mgr.image_from_id_or_url(iid))
+                except Exception:
                     continue
-                ok = True
-                for field, mode in field_modes:
-                    if mode is None or mode == 'ignore':
-                        continue
-                    is_empty = not img.data.get(field)
-                    if mode == 'empty' and not is_empty:
-                        ok = False
-                        break
-                    if mode == 'set' and is_empty:
-                        ok = False
-                        break
-                if ok:
-                    out.append(img)
+        else:
+            imgs_iter = scene_set.imgs
+
+        out = []
+        for img in imgs_iter:
+            rating = img.data.get(SceneDef.FIELD_RATING, SceneDef.RATING_MIN)
+            if not (r_min <= rating <= r_max):
+                continue
+            ok = True
+            for field, mode in field_modes:
+                if mode is None or mode == 'ignore':
+                    continue
+                is_empty = not img.data.get(field)
+                if mode == 'empty' and not is_empty:
+                    ok = False
+                    break
+                if mode == 'set' and is_empty:
+                    ok = False
+                    break
+            if ok:
+                out.append(img)
         return out
 
     def _html_set_editor_open(
@@ -568,6 +583,7 @@ class AIDBSceneApp:
         caption_mode: Optional[str] = 'ignore',
         caption_joy_mode: Optional[str] = 'ignore',
         labels_mode: Optional[str] = 'ignore',
+        show_excluded: bool = False,
     ) -> str:
         if not name or not isinstance(name, str):
             return '<p>No set selected.</p>'
@@ -580,6 +596,7 @@ class AIDBSceneApp:
             imgs = self._set_editor_filter_imgs(
                 scene_set, rating_min, rating_max,
                 hints_mode, caption_mode, caption_joy_mode, labels_mode,
+                show_excluded=show_excluded,
             )
         except Exception as e:
             return f'<p>Failed to list images for set <code>{name}</code>: {e}</p>'
@@ -608,6 +625,7 @@ class AIDBSceneApp:
         caption_mode: Optional[str] = 'ignore',
         caption_joy_mode: Optional[str] = 'ignore',
         labels_mode: Optional[str] = 'ignore',
+        show_excluded: bool = False,
     ) -> str:
         """
         Set-level batch caption restricted to the currently filtered images
@@ -618,6 +636,7 @@ class AIDBSceneApp:
         refresh_args = (
             name, rating_min, rating_max,
             hints_mode, caption_mode, caption_joy_mode, labels_mode,
+            show_excluded,
         )
         if not name or not isinstance(name, str):
             gr.Warning('No set selected.')
@@ -634,6 +653,7 @@ class AIDBSceneApp:
             imgs_filtered = self._set_editor_filter_imgs(
                 scene_set, rating_min, rating_max,
                 hints_mode, caption_mode, caption_joy_mode, labels_mode,
+                show_excluded=show_excluded,
             )
             ids_empty = [
                 img.id
