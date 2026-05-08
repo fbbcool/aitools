@@ -1,3 +1,4 @@
+import re
 import torch
 from PIL import Image
 from transformers import AutoProcessor, LlavaForConditionalGeneration
@@ -64,14 +65,20 @@ DEFAULT_SYSTEM: Final = 'You are a helpful assistant and help users with any que
 # catches anything that slips through during generation.
 #
 _XLASM_DIRECTIVE: Final = (
-    f'This image shows a giantess theme scene with two figures: a much larger '
-    f'woman and a smaller adult man. Always identify them using exactly the '
-    f'phrase "{TRIGGER_WOMAN}" for the larger woman and exactly the phrase '
-    f'"{TRIGGER_MAN}" for the smaller adult man. These exact phrases are the '
-    f'only allowed identifiers - never substitute "giantess woman", "tall '
-    f'woman", "giantess", "small man", "shrunken man", or any other '
-    f'descriptor for them. Search carefully for the {TRIGGER_MAN} as he can '
-    f'be hard to spot. '
+    f'This image features two figures together: an {TRIGGER_WOMAN} and an '
+    f'{TRIGGER_MAN}. Always identify them using exactly the phrase '
+    f'"{TRIGGER_WOMAN}" for the woman and exactly the phrase "{TRIGGER_MAN}" '
+    f'for the adult man. These exact phrases are the only allowed identifiers '
+    f'- never substitute any other descriptor (such as forms of "tall", '
+    f'"large", "giant", "small", "shrunken", or any other size/magnitude '
+    f'word, age word, or object-comparison word) for either figure. '
+    f'Search carefully for the {TRIGGER_MAN} as he can be hard to spot. '
+    f'The interaction and physical relationship between the {TRIGGER_WOMAN} '
+    f'and the {TRIGGER_MAN} is the central subject of every image. Describe '
+    f'it first, in the greatest detail, and use the most specific verbs '
+    f'available. Clothing, hair, makeup, background, environment, lighting, '
+    f'and camera angle are secondary - describe them only after the '
+    f'interaction is fully described. '
     f'Never use size or magnitude words such as "huge", "towering", '
     f'"extremely tall", "giant", "enormous", "massive", or any numerical '
     f'heights anywhere in the caption - the trigger phrases carry the size '
@@ -113,6 +120,35 @@ CONTENT_SYSTEM: Final = {
 # Tightened from "very long detailed description" - shorter captions concentrate
 # trigger weight and train cleaner LoRAs.
 DEFAULT_PROMPT: Final = 'Write a detailed description of this image.'
+
+# ---------------------------------------------------------------------------
+# User-hint authoritative-override block
+# ---------------------------------------------------------------------------
+#
+# A user-provided hint (stored on the SceneImage as FIELD_HINTS) is human
+# ground truth: it says exactly what action and posture is visible in the
+# image. JoyCaption's most consistent failure modes drift around this
+# axis - active female-driven verbs get softened to passive male-positioning
+# verbs ("squeeze" -> "cup", "sit on her arm" -> "held in her hand"),
+# body-part references shift one level down ("arm" -> "hand"), and
+# qualifiers like "half" get dropped.
+#
+# To counter that, the user hint is wrapped in this preamble and inserted
+# *after* the directive (which sets the rules) but *before* the label-derived
+# hint expansions (which add concept activation). The preamble explicitly
+# tells the model that the hint overrides its visual interpretation when the
+# two conflict, and to preserve the hint's verbs and body-part references
+# verbatim.
+#
+USER_HINT_PREAMBLE: Final = (
+    ' In this image, the central interaction is: {hint} Describe this '
+    'interaction first and in full detail, reflecting every verb and spatial '
+    'relationship it names (do not collapse "wrapping around" into "between", '
+    'do not collapse "inserted" into "positioned", do not collapse "squeeze" '
+    'into "cup"). Use the same body-part references it gives you (arm vs '
+    'hand, palm vs hand). Do not quote, restate, or comment on this note - '
+    'just write the caption.'
+)
 
 CONTENT_PROMPT: Final = {
     'gts_prompter': 'The users are interested propmts for image generation of femdom giantess scenarios. in femdom giantess scenarios, women are always bigger, stronger and super sexy and superior. so always exaggerate any of such aspects to make men the weak, vulnerable and dominated part (the more the better!). always describe a man as a "xlasm man".dont describe styles, they do not matter.',
@@ -176,36 +212,52 @@ LABEL_PROMPT: Final = {
     # description. Apply only when the trait is unmistakable in the image.
     # Multiple body type labels can apply to the same image (e.g. muscular
     # AND busty).
-    'b_muscular': f'The {TRIGGER_WOMAN} has a muscular bodybuilder physique with visible muscle definition. Describe her muscles directly.',
-    'b_busty': f'The {TRIGGER_WOMAN} has prominently large breasts. Describe her breasts directly.',
-    'b_slim': f'The {TRIGGER_WOMAN} has a slim athletic build. Describe her build directly.',
-    'b_curvy': f'The {TRIGGER_WOMAN} has curvy hourglass proportions. Describe her proportions directly.',
+    'b_muscular': f'The {TRIGGER_WOMAN} has a muscular bodybuilder physique with visible muscle definition.',
+    'b_busty': f'The {TRIGGER_WOMAN} has prominently large breasts.',
+    'b_slim': f'The {TRIGGER_WOMAN} has a slim athletic build.',
+    'b_curvy': f'The {TRIGGER_WOMAN} has curvy hourglass proportions.',
     'all4': f'The {TRIGGER_WOMAN} is on her all fours.',
     'ass': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s ass.',
-    'blowjob': f'The {TRIGGER_WOMAN} gives the {TRIGGER_MAN} a blowjob (mention "giving a blowjob" along with oral stimulation right at the beginning as a focus information) with his erect penis inserted into her mouth and her lips closed on his penis.',
+    'blowjob': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} a blowjob, with his erect penis inserted into her mouth and her lips closed on his penis. The blowjob is the central content of the image.',
     'body': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s body.',
     'breast': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s breasts.',
     'cum': f'The {TRIGGER_MAN} ejaculates and cums.',
     'face': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s face.',
     'foot': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s foot.',
     'hand': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s hand.',
-    'handjob': f'The {TRIGGER_WOMAN} gives the {TRIGGER_MAN} a handjob (mention "giving a handjob" right at the beginning as a focus information) by stimulation and stroking his penis with her hand.',
+    'handjob': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} a handjob, stimulating and stroking his penis with her hand. The handjob is the central content of the image.',
     'hanging': f'The {TRIGGER_MAN} is in a hanging position.',
     'heap': '',
     'holding': f'The {TRIGGER_MAN} is held by the {TRIGGER_WOMAN}.',
-    'insert': f'the {TRIGGER_MAN} is definitly partly inserted into the {TRIGGER_WOMAN}s vagina, ass or mouth.  mention, when his head, upper body or lower body is inserted into her vagina, otherwise do not mention.',
+    'insert': f'The {TRIGGER_MAN} is partly inserted into one of the {TRIGGER_WOMAN}s orifices: her vagina, her anus, or her mouth. When the insertion is vaginal, the inserted body part is his head, his upper body, or his lower body, and that part is not visible.',
+    'i_ass_low': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s ass. his lower body is inserted, only his upper body is visible.',
+    'i_ass_up': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s ass. his upper body is inserted, only his lower body is visible.',
+    'i_ass_head': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s ass. his head is inserted, only the rest of his body is visible.',
+    'i_vagina_low': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s vagina. his lower body is inserted, only his upper body is visible.',
+    'i_vagina_up': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s vagina. his upper body is inserted, only his lower body is visible.',
+    'i_vagina_head': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s vagina. his head is inserted, only the rest of his body is visible.',
+    'i_breasts_low': f'The {TRIGGER_MAN} is partly inserted into between the {TRIGGER_WOMAN}s breasts. his lower body is inserted, only his upper body is visible.',
+    'i_breasts_up': f'The {TRIGGER_MAN} is partly inserted into between the {TRIGGER_WOMAN}s breasts. his upper body is inserted, only his lower body is visible.',
+    'i_breasts_head': f'The {TRIGGER_MAN} is partly inserted into between the {TRIGGER_WOMAN}s breasts. his head is inserted, only the rest of his body is visible.',
+    'i_breasts_body': f'The {TRIGGER_MAN} is inserted into between the {TRIGGER_WOMAN}s breasts with his body partly obscured by her breasts.',
+    'woman_front': f'The {TRIGGER_WOMAN} is seen from the front.',
+    'woman_back': f'The {TRIGGER_WOMAN} is seen from the back.',
+    'woman_side': f'The {TRIGGER_WOMAN} is seen from the side.',
+    'man_front': f'The {TRIGGER_MAN} is seen from the front.',
+    'man_back': f'The {TRIGGER_MAN} is seen from the back.',
+    'man_side': f'The {TRIGGER_MAN} is seen from the side.',
     'job': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} either a handjob or a blowjob.',
     'leg': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s leg.',
-    'masturbating': f'The {TRIGGER_MAN} is masturbating and gripping and stroking his penis. mention "masturbating and stroking his erect penis" right at the beginning of the image description because it is a central information',
+    'masturbating': f'The {TRIGGER_MAN} is masturbating, gripping and stroking his erect penis. This masturbation is the central content of the image.',
     'mouth': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s mouth.',
     'panties': f'The {TRIGGER_MAN} is inserted into the {TRIGGER_WOMAN}s panties.',
-    'penis': f'Include explicitly the phrase: "The {TRIGGER_MAN} has an erect penis."',
-    'penis_no': f'The {TRIGGER_MAN}s penis is not visible so avoid mentioning it.',
+    'penis': f'The {TRIGGER_MAN} has an erect penis.',
+    'penis_no': f'The {TRIGGER_MAN}s penis is not visible in the image.',
     'pussy': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s vagina.',
     'sex': f'The {TRIGGER_MAN} has sex with the {TRIGGER_WOMAN}, inserting his erect penis into her vagina.',
-    'sitting': f'The {TRIGGER_MAN} is in a sitting position. Most likely he sits on a bodypart of the {TRIGGER_WOMAN}.',
+    'sitting': f'The {TRIGGER_MAN} is in a sitting position, typically seated on a body part of the {TRIGGER_WOMAN}.',
     'step': f'The {TRIGGER_WOMAN} is stepping on the {TRIGGER_MAN} with her foot.',
-    'teasing_hj': f'The {TRIGGER_WOMAN} gives the {TRIGGER_MAN} a teasing handjob (mention "giving a teasing handjob" right at the beginning as a focus information) by stimulation and stroking his penis delicately with her fingers.',
+    'teasing_hj': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} a teasing handjob, stimulating and stroking his penis delicately with her fingers. The teasing handjob is the central content of the image.',
     'thigh': f'The {TRIGGER_MAN} is positioned between the thighs of the {TRIGGER_WOMAN}.',
     'tower': f'The {TRIGGER_WOMAN} stands directly above the {TRIGGER_MAN}, with him positioned at her feet or lower leg level.',
     'tongue': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s tongue.',
@@ -294,10 +346,21 @@ _FORBIDDEN_IN_XLASM: Final = (
 )
 
 
+_FORBIDDEN_IN_XLASM_RE: Final = re.compile(
+    r'\b(?:' + '|'.join(re.escape(p) for p in _FORBIDDEN_IN_XLASM) + r')\b',
+    re.IGNORECASE,
+)
+
+
 def caption_has_xlasm_violations(caption: str) -> list[str]:
-    """Return forbidden phrases found in the caption (empty list = clean)."""
-    lowered = caption.lower()
-    return [phrase for phrase in _FORBIDDEN_IN_XLASM if phrase in lowered]
+    """Return forbidden phrases found in the caption (empty list = clean).
+
+    Uses word-boundary matching so 'figures' does not trigger 'figure',
+    'simple' does not trigger 'imp', 'leaning' does not trigger 'lean',
+    etc. Multi-word phrases like 'small man' still match correctly because
+    \\b only fires at word/non-word transitions.
+    """
+    return [m.group(0).lower() for m in _FORBIDDEN_IN_XLASM_RE.finditer(caption)]
 
 
 # Body-type words that should ONLY appear in captions when the corresponding
@@ -311,20 +374,30 @@ _BODY_TYPE_WORDS: Final = {
 }
 
 
+_BODY_TYPE_WORD_RES: Final = {
+    label: re.compile(
+        r'\b(?:' + '|'.join(re.escape(w) for w in words) + r')\b',
+        re.IGNORECASE,
+    )
+    for label, words in _BODY_TYPE_WORDS.items()
+}
+
+
 def validate_body_type_consistency(caption: str, labels: list[str]) -> list[str]:
     """Flag body-type words appearing in caption without their authorizing label.
 
     Returns one warning per unauthorized body-type word found. Empty list
-    means the caption is consistent with the provided labels.
+    means the caption is consistent with the provided labels. Uses word-
+    boundary matching so 'leaning' does not trigger 'lean'.
     """
-    lowered = caption.lower()
     warnings = []
-    for label, words in _BODY_TYPE_WORDS.items():
+    for label, regex in _BODY_TYPE_WORD_RES.items():
         if label in labels:
             continue  # this label authorizes its body-type words
-        for word in words:
-            if word in lowered:
-                warnings.append(f'caption contains "{word}" but {label} label was not set')
+        for m in regex.finditer(caption):
+            warnings.append(
+                f'caption contains "{m.group(0).lower()}" but {label} label was not set'
+            )
     return warnings
 
 
@@ -392,14 +465,21 @@ class Joy:
 
         if labels is None:
             labels = []
+        # User-provided hint and label-expansion hints are kept separate so
+        # the user hint can be wrapped in USER_HINT_PREAMBLE as authoritative
+        # override, while label expansions act as ordinary concept hints.
+        user_hint = (hint or '').strip()
+        label_hint = ''
         for label in labels:
             add_hint = LABEL_PROMPT.get(label, None)
             if add_hint is not None:
-                hint += add_hint
+                label_hint += add_hint
         prompt = DEFAULT_PROMPT
         prompt += CONTENT_PROMPT.get(trigger, '')
-        if hint:
-            prompt += hint
+        if user_hint:
+            prompt += USER_HINT_PREAMBLE.format(hint=user_hint)
+        if label_hint:
+            prompt += label_hint
         prompt += POST_PROMPT
 
         caption = self._process(img, prompt)

@@ -293,31 +293,84 @@ class AIDBSceneApp:
                 with gr.Tabs():
                     with gr.Tab('Images'):
                         with gr.Row():
-                            set_editor_rating_min = gr.Dropdown(
-                                label='Rating Min',
-                                choices=[
-                                    str(x)
-                                    for x in list(
-                                        range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1)
+                            with gr.Column(scale=2):
+                                with gr.Row():
+                                    set_editor_rating_min = gr.Dropdown(
+                                        label='Rating Min',
+                                        choices=[
+                                            str(x)
+                                            for x in list(
+                                                range(
+                                                    SceneDef.RATING_MIN,
+                                                    SceneDef.RATING_MAX + 1,
+                                                )
+                                            )
+                                        ],
+                                        value=f'{SceneDef.RATING_INIT}',
+                                        allow_custom_value=False,
+                                        interactive=True,
                                     )
-                                ],
-                                value=f'{SceneDef.RATING_INIT}',
-                                allow_custom_value=False,
-                                interactive=True,
-                            )
-                            set_editor_rating_max = gr.Dropdown(
-                                label='Rating Max',
-                                choices=[
-                                    str(x)
-                                    for x in list(
-                                        range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1)
+                                    set_editor_rating_max = gr.Dropdown(
+                                        label='Rating Max',
+                                        choices=[
+                                            str(x)
+                                            for x in list(
+                                                range(
+                                                    SceneDef.RATING_MIN,
+                                                    SceneDef.RATING_MAX + 1,
+                                                )
+                                            )
+                                        ],
+                                        value=f'{SceneDef.RATING_MAX}',
+                                        allow_custom_value=False,
+                                        interactive=True,
                                     )
-                                ],
-                                value=f'{SceneDef.RATING_MAX}',
-                                allow_custom_value=False,
-                                interactive=True,
-                            )
-                            with gr.Column():
+                                with gr.Row():
+                                    set_editor_show_active = gr.Checkbox(
+                                        label='show active',
+                                        value=True,
+                                        interactive=True,
+                                    )
+                                    set_editor_show_prototype = gr.Checkbox(
+                                        label='show prototypes',
+                                        value=False,
+                                        interactive=True,
+                                    )
+                                    set_editor_show_excluded = gr.Checkbox(
+                                        label='show excluded',
+                                        value=False,
+                                        interactive=True,
+                                    )
+                                with gr.Row():
+                                    set_editor_hints = gr.Dropdown(
+                                        label='Hints',
+                                        choices=['ignore', 'empty', 'set'],
+                                        value='ignore',
+                                        allow_custom_value=False,
+                                        interactive=True,
+                                    )
+                                    set_editor_caption = gr.Dropdown(
+                                        label='Caption',
+                                        choices=['ignore', 'empty', 'set'],
+                                        value='ignore',
+                                        allow_custom_value=False,
+                                        interactive=True,
+                                    )
+                                    set_editor_caption_joy = gr.Dropdown(
+                                        label='Caption Joy',
+                                        choices=['ignore', 'empty', 'set'],
+                                        value='ignore',
+                                        allow_custom_value=False,
+                                        interactive=True,
+                                    )
+                                    set_editor_labels = gr.Dropdown(
+                                        label='Labels',
+                                        choices=['ignore', 'empty', 'set'],
+                                        value='ignore',
+                                        allow_custom_value=False,
+                                        interactive=True,
+                                    )
+                            with gr.Column(scale=1):
                                 set_editor_load_button = gr.Button(
                                     'Load',
                                     elem_id='set-editor-load-button',
@@ -328,52 +381,10 @@ class AIDBSceneApp:
                                 set_editor_load_done_button = gr.Button(
                                     'load done'
                                 )
+                                set_editor_load_edit_button = gr.Button(
+                                    'load edit 50'
+                                )
                                 set_editor_caption_empty_button = gr.Button('caption')
-                        with gr.Row():
-                            set_editor_show_active = gr.Checkbox(
-                                label='show active',
-                                value=True,
-                                interactive=True,
-                            )
-                            set_editor_show_prototype = gr.Checkbox(
-                                label='show prototypes',
-                                value=False,
-                                interactive=True,
-                            )
-                            set_editor_show_excluded = gr.Checkbox(
-                                label='show excluded',
-                                value=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            set_editor_hints = gr.Dropdown(
-                                label='Hints',
-                                choices=['ignore', 'empty', 'set'],
-                                value='ignore',
-                                allow_custom_value=False,
-                                interactive=True,
-                            )
-                            set_editor_caption = gr.Dropdown(
-                                label='Caption',
-                                choices=['ignore', 'empty', 'set'],
-                                value='ignore',
-                                allow_custom_value=False,
-                                interactive=True,
-                            )
-                            set_editor_caption_joy = gr.Dropdown(
-                                label='Caption Joy',
-                                choices=['ignore', 'empty', 'set'],
-                                value='ignore',
-                                allow_custom_value=False,
-                                interactive=True,
-                            )
-                            set_editor_labels = gr.Dropdown(
-                                label='Labels',
-                                choices=['ignore', 'empty', 'set'],
-                                value='ignore',
-                                allow_custom_value=False,
-                                interactive=True,
-                            )
                         set_editor_html = gr.HTML(label='Set Images')
                     with gr.Tab('Scenes'):
                         with gr.Row():
@@ -677,6 +688,16 @@ class AIDBSceneApp:
                 outputs=[set_editor_html],
             ).then(
                 self._html_set_editor_open_done,
+                inputs=[set_editor_name],
+                outputs=[set_editor_html],
+            )
+
+            set_editor_load_edit_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_html],
+            ).then(
+                self._html_set_editor_open_edit,
                 inputs=[set_editor_name],
                 outputs=[set_editor_html],
             )
@@ -1099,6 +1120,55 @@ class AIDBSceneApp:
                 img, set_id=scene_set.id, excluded=img.id in excluded_ids
             )
             for _, img in done
+        )
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+
+    def _html_set_editor_open_edit(self, name: Optional[str]) -> str:
+        """
+        Loads the 50 most recently edited active images of the selected set.
+        An image counts as edited when at least one of its editable fields
+        (hints, labels, caption_joy, caption) is non-empty. Sorted by latest
+        update / creation timestamp desc. Prototype images are skipped;
+        excluded images are already filtered by `scene_set.imgs`.
+        """
+        if not name or not isinstance(name, str):
+            return '<p>No set selected.</p>'
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
+
+        try:
+            edited: list[tuple[float, object]] = []
+            for img in scene_set.imgs:
+                if img.prototype:
+                    continue
+                d = img.data
+                if not (
+                    d.get(SceneDef.FIELD_HINTS)
+                    or d.get(SceneDef.FIELD_LABELS)
+                    or d.get(SceneDef.FIELD_CAPTION_JOY)
+                    or d.get(SceneDef.FIELD_CAPTION)
+                ):
+                    continue
+                ts = SceneDef.get_timestamp_update_from_data(img)
+                edited.append((ts, img))
+        except Exception as e:
+            return f'<p>Failed to scan images for set <code>{name}</code>: {e}</p>'
+
+        if not edited:
+            return f'<p>Set <code>{name}</code>: no edited images.</p>'
+
+        edited.sort(key=lambda t: -t[0])
+        edited = edited[:50]
+
+        styles = AppSceneImageCell.html_styles()
+        excluded_ids = set(scene_set.imgs_exclude)
+        cells = ''.join(
+            AppSceneImageCell.html(
+                img, set_id=scene_set.id, excluded=img.id in excluded_ids
+            )
+            for _, img in edited
         )
         return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
 
