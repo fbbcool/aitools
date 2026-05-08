@@ -42,6 +42,8 @@ class SceneDef:
     FIELD_RESOLUTIONS: Final = 'resolutions'
     FIELD_TIMESTAMP_CREATED: Final = 'timestamp_created'
     FIELD_TIMESTAMP_UPDATED: Final = 'timestamp_updated'
+    FIELD_TIMESTAMP_CAPTION: Final = 'timestamp_caption'
+    FIELD_TIMESTAMP_CAPTION_JOY: Final = 'timestamp_caption_joy'
 
     FIELD_IMGS_EXCLUDE: Final = 'imgs_exclude'
     FIELD_SCENES_EXCLUDE: Final = 'scenes_exclude'
@@ -138,6 +140,11 @@ class SceneDef:
         ]
 
     @classmethod
+    def now_ts(cls) -> float:
+        """Current wall-clock timestamp as float seconds since epoch."""
+        return datetime.datetime.now().timestamp()
+
+    @classmethod
     def prepare_data_for_update(cls, data: dict) -> dict:
         # copy
         update_data = deepcopy(data)
@@ -146,8 +153,7 @@ class SceneDef:
         update_data.pop(cls.FIELD_OID, None)
 
         # set update ts
-        ts = datetime.datetime.now().timestamp()
-        update_data |= {cls.FIELD_TIMESTAMP_UPDATED: ts}
+        update_data |= {cls.FIELD_TIMESTAMP_UPDATED: cls.now_ts()}
 
         return update_data
 

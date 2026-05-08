@@ -108,6 +108,45 @@ class AppHtml:
     def elem_id_simg_editor_lightbox_result_databus() -> str:
         return AppHtml.make_elem_id_databus_textbox('simg_editor_lightbox_out')
 
+    # Per-cell server refresh: callers pass {img_id, set_id?, mode='edit'|'info'}
+    # via the in-databus, the server re-renders the cell HTML, and the
+    # JS .then() swap-handler replaces the matching DOM element by id.
+    @staticmethod
+    def elem_id_cell_refresh_button() -> str:
+        return AppHtml.make_elem_id_hidden_button('cell_refresh')
+
+    @staticmethod
+    def elem_id_cell_refresh_databus_in() -> str:
+        return AppHtml.make_elem_id_databus_textbox('cell_refresh_in')
+
+    @staticmethod
+    def elem_id_cell_refresh_databus_out() -> str:
+        return AppHtml.make_elem_id_databus_textbox('cell_refresh_out')
+
+    @staticmethod
+    def js_cell_refresh_call(img_id: str, set_id: str = '', mode: str = 'edit') -> str:
+        """
+        Returns a JS snippet that, when executed, dispatches a per-cell
+        refresh for `img_id`. Use as inline `onclick` (or after a cmd
+        dispatch) to force the server to re-render the matching cell and
+        swap it into the DOM. `mode` selects 'edit' or 'info' rendering.
+        """
+        bus_id = AppHtml.elem_id_cell_refresh_databus_in()
+        btn_id = AppHtml.elem_id_cell_refresh_button()
+        payload = json.dumps({'img_id': img_id, 'set_id': set_id, 'mode': mode})
+        # The trailing setTimeout(...0) lets any in-flight cmd dispatch
+        # land in cmd_run before the refresh handler reads the DB state.
+        return (
+            f"setTimeout(() => {{"
+            f"  const bus = document.querySelector('#{bus_id} textarea');"
+            f"  if (!bus) return;"
+            f"  bus.value = {json.dumps(payload)};"
+            f"  bus.dispatchEvent(new Event('input', {{ bubbles: true }}));"
+            f"  const btn = document.getElementById('{btn_id}');"
+            f"  if (btn) btn.click();"
+            f"}}, 0);"
+        )
+
     @staticmethod
     def make_cmd_data(
         type_obj: str,

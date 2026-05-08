@@ -122,6 +122,25 @@ class AIDBSceneApp:
                 elem_id=AppHtml.elem_id_simg_editor_set_result_databus(),
             )
 
+            # Hidden trigger + in/out databuses for per-cell server refresh.
+            # JS writes JSON {img_id, set_id?, mode='edit'|'info'} to the
+            # in-databus, fires the button. The Python handler re-renders the
+            # cell and writes JSON {target_id, html} to the out-databus. A
+            # .then() JS callback swaps the matching DOM element by id.
+            button_hidden_cell_refresh = gr.Button(
+                'Hidden Cell Refresh',
+                visible='hidden',
+                elem_id=AppHtml.elem_id_cell_refresh_button(),
+            )
+            databus_cell_refresh_in = gr.Textbox(
+                visible='hidden',
+                elem_id=AppHtml.elem_id_cell_refresh_databus_in(),
+            )
+            databus_cell_refresh_out = gr.Textbox(
+                visible='hidden',
+                elem_id=AppHtml.elem_id_cell_refresh_databus_out(),
+            )
+
             # Hidden trigger + in/out databuses for the full-size lightbox.
             button_hidden_simg_editor_lightbox = gr.Button(
                 'Hidden SceneImage Editor Lightbox',
@@ -384,6 +403,9 @@ class AIDBSceneApp:
                                 set_editor_load_edit_button = gr.Button(
                                     'load edit 50'
                                 )
+                                set_editor_load_ood_cap_button = gr.Button(
+                                    'load ood cap 50'
+                                )
                                 set_editor_caption_empty_button = gr.Button('caption')
                         set_editor_html = gr.HTML(label='Set Images')
                     with gr.Tab('Scenes'):
@@ -565,6 +587,34 @@ class AIDBSceneApp:
                 """,
             )
 
+            # Per-cell server refresh: re-renders one image cell server-side
+            # and swaps the matching DOM element by id. Use after any mutation
+            # that should be reflected in the cell's rendered state (label
+            # highlights, exclude/prototype frames, etc.).
+            button_hidden_cell_refresh.click(
+                self._html_cell_refresh,
+                inputs=[databus_cell_refresh_in],
+                outputs=[databus_cell_refresh_out],
+            ).then(
+                fn=None,
+                inputs=[databus_cell_refresh_out],
+                outputs=None,
+                js="""
+                (resultStr) => {
+                    if (!resultStr) return;
+                    let data;
+                    try { data = JSON.parse(resultStr); } catch (e) { return; }
+                    if (!data || !data.target_id || !data.html) return;
+                    const target = document.getElementById(data.target_id);
+                    if (!target) return;
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = data.html.trim();
+                    const newCell = tmp.firstElementChild;
+                    if (newCell) target.replaceWith(newCell);
+                }
+                """,
+            )
+
             # Lightbox: thumbnail click -> server reads the full image and
             # returns a JSON payload `{b64, type, image_id?, caption?}`.
             # The JS .then() callback decodes it, sets the modal image,
@@ -698,6 +748,16 @@ class AIDBSceneApp:
                 outputs=[set_editor_html],
             ).then(
                 self._html_set_editor_open_edit,
+                inputs=[set_editor_name],
+                outputs=[set_editor_html],
+            )
+
+            set_editor_load_ood_cap_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_html],
+            ).then(
+                self._html_set_editor_open_ood_cap,
                 inputs=[set_editor_name],
                 outputs=[set_editor_html],
             )
@@ -1169,6 +1229,55 @@ class AIDBSceneApp:
                 img, set_id=scene_set.id, excluded=img.id in excluded_ids
             )
             for _, img in edited
+        )
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+
+    def _html_set_editor_open_ood_cap(self, name: Optional[str]) -> str:
+        """
+        Loads the 50 active images whose `caption` is out-of-date relative
+        to `caption_joy` — i.e. `timestamp_caption_joy > timestamp_caption`,
+        with both fields non-empty. Sorted by `timestamp_caption_joy` desc
+        (most recently regenerated first). Prototype images are skipped;
+        excluded images are already filtered by `scene_set.imgs`.
+        """
+        if not name or not isinstance(name, str):
+            return '<p>No set selected.</p>'
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
+
+        try:
+            ood: list[tuple[float, object]] = []
+            for img in scene_set.imgs:
+                if img.prototype:
+                    continue
+                d = img.data
+                if not d.get(SceneDef.FIELD_CAPTION):
+                    continue
+                if not d.get(SceneDef.FIELD_CAPTION_JOY):
+                    continue
+                ts_cap = d.get(SceneDef.FIELD_TIMESTAMP_CAPTION) or 0.0
+                ts_cap_joy = d.get(SceneDef.FIELD_TIMESTAMP_CAPTION_JOY) or 0.0
+                if ts_cap_joy <= ts_cap:
+                    continue
+                ood.append((ts_cap_joy, img))
+        except Exception as e:
+            return f'<p>Failed to scan images for set <code>{name}</code>: {e}</p>'
+
+        if not ood:
+            return f'<p>Set <code>{name}</code>: no out-of-date captions.</p>'
+
+        ood.sort(key=lambda t: -t[0])
+        ood = ood[:50]
+
+        styles = AppSceneImageCell.html_styles()
+        excluded_ids = set(scene_set.imgs_exclude)
+        cells = ''.join(
+            AppSceneImageCell.html(
+                img, set_id=scene_set.id, excluded=img.id in excluded_ids
+            )
+            for _, img in ood
         )
         return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
 
@@ -2037,6 +2146,64 @@ class AIDBSceneApp:
             duration=2.5,
         )
         return None
+
+    # ------------------------------------------------------------------
+    # per-cell server refresh
+    # ------------------------------------------------------------------
+
+    def _html_cell_refresh(self, payload_str: Optional[str]) -> str:
+        """
+        Re-render a single image cell server-side and return JSON
+        `{target_id, html}` for the JS .then() swap callback.
+
+        `payload_str` is JSON: `{img_id, set_id?, mode}` where mode is
+        'edit' (full edit cell) or 'info' (compact read-only cell).
+        Optional `set_id` controls whether the per-cell exclude toggle is
+        rendered and reads the current excluded state from that set's
+        `imgs_exclude` field.
+
+        Returns the empty string on any failure so the JS swap is a no-op.
+        """
+        if not payload_str or not isinstance(payload_str, str):
+            return ''
+        try:
+            payload = json.loads(payload_str)
+        except Exception:
+            return ''
+        img_id = payload.get('img_id')
+        set_id = payload.get('set_id') or None
+        mode = payload.get('mode', 'edit')
+        if not img_id:
+            return ''
+
+        try:
+            sim = self._scm.scene_image_manager()
+            img = sim.img_from_id(img_id)
+        except Exception:
+            return ''
+        if img is None:
+            return ''
+
+        excluded = False
+        if set_id:
+            try:
+                scene_set = self._ssm.set_from_id_or_name(set_id)
+                excluded = img_id in scene_set.imgs_exclude
+            except Exception:
+                excluded = False
+
+        if mode == 'info':
+            cell_html = AppSceneImageCell.html_info(
+                img, set_id=set_id, excluded=excluded
+            )
+            target_id = f'cell-simg-info-{img_id}'
+        else:
+            cell_html = AppSceneImageCell.html(
+                img, set_id=set_id, excluded=excluded
+            )
+            target_id = f'cell-simg-{img_id}'
+
+        return json.dumps({'target_id': target_id, 'html': cell_html})
 
     # ------------------------------------------------------------------
     # lightbox (full-size image modal)

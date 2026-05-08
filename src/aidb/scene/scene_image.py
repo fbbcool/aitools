@@ -88,7 +88,10 @@ class SceneImage:
         if value is None:
             return
         caption = str(value)
-        self._data |= {SceneDef.FIELD_CAPTION: caption}
+        self._data |= {
+            SceneDef.FIELD_CAPTION: caption,
+            SceneDef.FIELD_TIMESTAMP_CAPTION: SceneDef.now_ts(),
+        }
         if caption:
             rating = self._data.get(SceneDef.FIELD_RATING, SceneDef.RATING_INIT)
             if rating < SceneDef.RATING_MIN_IMG_CAP:
@@ -97,7 +100,10 @@ class SceneImage:
     def set_caption_joy(self, value: str) -> None:
         if value is None:
             return
-        self._data |= {SceneDef.FIELD_CAPTION_JOY: str(value)}
+        self._data |= {
+            SceneDef.FIELD_CAPTION_JOY: str(value),
+            SceneDef.FIELD_TIMESTAMP_CAPTION_JOY: SceneDef.now_ts(),
+        }
 
     def set_hints(self, value: str) -> None:
         if value is None:
