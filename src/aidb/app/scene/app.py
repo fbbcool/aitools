@@ -395,10 +395,10 @@ class AIDBSceneApp:
                                     elem_id='set-editor-load-button',
                                 )
                                 set_editor_load_todo_button = gr.Button(
-                                    'load todo 50'
+                                    'load todo 20'
                                 )
                                 set_editor_load_todo_low_button = gr.Button(
-                                    'load todo 50 low'
+                                    'load todo 20 low'
                                 )
                                 set_editor_load_done_button = gr.Button(
                                     'load done'
@@ -1091,7 +1091,7 @@ class AIDBSceneApp:
 
     def _html_set_editor_open_todo(self, name: Optional[str]) -> str:
         """
-        Loads up to 50 'todo' images of the selected set as edit cells.
+        Loads up to 20 'todo' images of the selected set as edit cells.
 
         Todoness is a priority code derived from emptiness of the four
         editable fields, weighted so the order is
@@ -1136,7 +1136,7 @@ class AIDBSceneApp:
             return f'<p>Set <code>{name}</code>: no todo images.</p>'
 
         scored.sort(key=lambda t: (-t[0], -t[1]))
-        scored = scored[:50]
+        scored = scored[:20]
 
         styles = AppSceneImageCell.html_styles()
         excluded_ids = set(scene_set.imgs_exclude)
@@ -1150,7 +1150,7 @@ class AIDBSceneApp:
 
     def _html_set_editor_open_todo_low(self, name: Optional[str]) -> str:
         """
-        Loads up to 50 'todo' images of the selected set, lowest todoness
+        Loads up to 20 'todo' images of the selected set, lowest todoness
         first ("almost done"). Same scoring as `_html_set_editor_open_todo`
         but ascending sort: an image with only `caption` empty (todoness 1)
         ranks above one with everything empty (todoness 15). Within the
@@ -1192,7 +1192,7 @@ class AIDBSceneApp:
 
         # Ascending todoness (lowest first), tiebreak: most recent first.
         scored.sort(key=lambda t: (t[0], -t[1]))
-        scored = scored[:50]
+        scored = scored[:20]
 
         styles = AppSceneImageCell.html_styles()
         excluded_ids = set(scene_set.imgs_exclude)
@@ -1537,6 +1537,10 @@ class AIDBSceneApp:
             'labels': 0,
             'hints': 0,
         }
+        rating_counts: dict[int, int] = {
+            r: 0 for r in range(SceneDef.RATING_MIN, SceneDef.RATING_MAX + 1)
+        }
+        n_imgs_unrated = 0
         for img in scene_set.imgs:
             n_imgs_total_in_scenes += 1
             if img.prototype:
@@ -1552,6 +1556,18 @@ class AIDBSceneApp:
                 todoness_buckets['caption_joy'] += 1
             if not d.get(SceneDef.FIELD_CAPTION):
                 todoness_buckets['caption'] += 1
+            r_raw = d.get(SceneDef.FIELD_RATING)
+            if r_raw is None:
+                n_imgs_unrated += 1
+            else:
+                try:
+                    ri = int(r_raw)
+                    if ri in rating_counts:
+                        rating_counts[ri] += 1
+                    else:
+                        n_imgs_unrated += 1
+                except Exception:
+                    n_imgs_unrated += 1
 
         def row(label: str, value, color: str = '#cccccc') -> str:
             return (
@@ -1590,10 +1606,52 @@ class AIDBSceneApp:
             + '</table>'
         )
 
+        # Rating histogram across active images. Bars rendered as inline-HTML
+        # divs with width proportional to the largest bucket. Unrated images
+        # (rating field missing or non-integer) are shown as a separate row.
+        max_count = max(rating_counts.values()) or 1
+        if n_imgs_unrated > max_count:
+            max_count = n_imgs_unrated
+        hist_rows: list[str] = []
+        for r in sorted(rating_counts):
+            cnt = rating_counts[r]
+            pct = (cnt * 100 / max_count) if max_count else 0
+            hist_rows.append(
+                '<tr>'
+                f'<td style="padding:3px 10px;color:#cccccc;text-align:right;'
+                f'font-variant-numeric:tabular-nums;">{r}</td>'
+                '<td style="padding:3px 10px;width:280px;">'
+                f'<div style="background:#3b82f6;height:14px;width:{pct:.1f}%;'
+                'border-radius:2px;"></div>'
+                '</td>'
+                '<td style="padding:3px 10px;text-align:right;color:#fff;'
+                f'font-variant-numeric:tabular-nums;">{cnt}</td>'
+                '</tr>'
+            )
+        if n_imgs_unrated:
+            pct = (n_imgs_unrated * 100 / max_count) if max_count else 0
+            hist_rows.append(
+                '<tr>'
+                '<td style="padding:3px 10px;color:#888;text-align:right;">—</td>'
+                '<td style="padding:3px 10px;width:280px;">'
+                f'<div style="background:#888;height:14px;width:{pct:.1f}%;'
+                'border-radius:2px;"></div>'
+                '</td>'
+                '<td style="padding:3px 10px;text-align:right;color:#fff;'
+                f'font-variant-numeric:tabular-nums;">{n_imgs_unrated}</td>'
+                '</tr>'
+            )
+        hist_table = (
+            '<h3 style="margin-top:18px;">Active images: rating histogram</h3>'
+            '<table style="border-collapse:collapse;">'
+            + ''.join(hist_rows)
+            + '</table>'
+        )
+
         return (
             f'<div style="padding:8px 4px;">'
             f'<h2>Set <code>{name}</code></h2>'
-            f'{scenes_table}{imgs_table}{todo_table}'
+            f'{scenes_table}{imgs_table}{todo_table}{hist_table}'
             f'</div>'
         )
 

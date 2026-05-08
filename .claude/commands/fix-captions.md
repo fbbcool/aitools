@@ -29,11 +29,15 @@ The main purpose is to fix discrepancies between `caption_joy` and the ground-tr
 3. **Qualifier stripping** — hint contains a degree word (`half`, `deeply`, `partly`, `slightly`, `barely`, `fully`) that `caption_joy` omits.
 4. **Forbidden vocabulary** — `caption_joy` contains words on `_FORBIDDEN_IN_XLASM`. Use `ait.caption.joy.caption_has_xlasm_violations(caption_joy)`.
 5. **Trigger absence** — `caption_joy` missing `xlgts woman` or `xlasm man`. Use `ait.caption.joy.validate_trigger_presence(caption_joy)`.
+6. handjob, blowjob, teasing handjob must be explicitly mentioned.
+7. guarantee 'the xlasm man has an erect penis.' phrase instead of other erection occurrence descriptions and remove redundant ones.
+8. if the xlgts woman or the xlasm man is naked, just add 'naked' to their first mention and remove all other redundant naked or nude descriptions.
+9. remove redundant captions and just keep the first occurrence.
+10. remove all newlines.
 
 ## Skip rules
-
-- Skip any `caption_joy` that shows clear signs of manual editing (e.g. structural cleanup the model wouldn't produce, deliberate phrasing like *"The central interaction is..."*). `caption_joy` is meant to be the raw model output, but if the user has manually tightened it, don't override that work.
-- Skip if `hints` and `labels` are both empty or trivially short — there's nothing to verify against.
+- Skip if `hints` or `labels` are empty — there's nothing to verify against.
+- Skip if image rating > 2
 
 ## Proposal pass
 
@@ -59,3 +63,8 @@ For each approved image:
 **Do not touch `caption`.** It is the human-edited, training-fed field and is out of scope for this command. Only `caption_joy` (the model-output / audit trail field) is repaired here.
 
 Report a per-image OK/FAIL summary at the end.
+
+## Access rights
+read-only access to db can be done w/o yes from user
+
+
