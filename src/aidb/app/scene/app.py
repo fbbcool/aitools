@@ -397,6 +397,9 @@ class AIDBSceneApp:
                                 set_editor_load_todo_button = gr.Button(
                                     'load todo 50'
                                 )
+                                set_editor_load_todo_low_button = gr.Button(
+                                    'load todo 50 low'
+                                )
                                 set_editor_load_done_button = gr.Button(
                                     'load done'
                                 )
@@ -728,6 +731,16 @@ class AIDBSceneApp:
                 outputs=[set_editor_html],
             ).then(
                 self._html_set_editor_open_todo,
+                inputs=[set_editor_name],
+                outputs=[set_editor_html],
+            )
+
+            set_editor_load_todo_low_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_html],
+            ).then(
+                self._html_set_editor_open_todo_low,
                 inputs=[set_editor_name],
                 outputs=[set_editor_html],
             )
@@ -1123,6 +1136,62 @@ class AIDBSceneApp:
             return f'<p>Set <code>{name}</code>: no todo images.</p>'
 
         scored.sort(key=lambda t: (-t[0], -t[1]))
+        scored = scored[:50]
+
+        styles = AppSceneImageCell.html_styles()
+        excluded_ids = set(scene_set.imgs_exclude)
+        cells = ''.join(
+            AppSceneImageCell.html(
+                img, set_id=scene_set.id, excluded=img.id in excluded_ids
+            )
+            for _, _, img in scored
+        )
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+
+    def _html_set_editor_open_todo_low(self, name: Optional[str]) -> str:
+        """
+        Loads up to 50 'todo' images of the selected set, lowest todoness
+        first ("almost done"). Same scoring as `_html_set_editor_open_todo`
+        but ascending sort: an image with only `caption` empty (todoness 1)
+        ranks above one with everything empty (todoness 15). Within the
+        same todoness, latest update / creation timestamp desc. Prototype
+        and excluded images are skipped; todoness 0 is excluded.
+        """
+        if not name or not isinstance(name, str):
+            return '<p>No set selected.</p>'
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
+
+        try:
+            scored: list[tuple[int, float, object]] = []
+            for img in scene_set.imgs:
+                if img.prototype:
+                    continue
+                d = img.data
+                empty_hints = not d.get(SceneDef.FIELD_HINTS)
+                empty_labels = not d.get(SceneDef.FIELD_LABELS)
+                empty_caption_joy = not d.get(SceneDef.FIELD_CAPTION_JOY)
+                empty_caption = not d.get(SceneDef.FIELD_CAPTION)
+                todoness = (
+                    int(empty_hints) * 8
+                    + int(empty_labels) * 4
+                    + int(empty_caption_joy) * 2
+                    + int(empty_caption) * 1
+                )
+                if todoness == 0:
+                    continue
+                ts = SceneDef.get_timestamp_update_from_data(img)
+                scored.append((todoness, ts, img))
+        except Exception as e:
+            return f'<p>Failed to scan images for set <code>{name}</code>: {e}</p>'
+
+        if not scored:
+            return f'<p>Set <code>{name}</code>: no todo images.</p>'
+
+        # Ascending todoness (lowest first), tiebreak: most recent first.
+        scored.sort(key=lambda t: (t[0], -t[1]))
         scored = scored[:50]
 
         styles = AppSceneImageCell.html_styles()
