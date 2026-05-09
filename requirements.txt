@@ -11,6 +11,7 @@ jsonlines
 accelerate
 torch
 transformers
+peft
 sentencepiece
 torchvision
 more_itertools
