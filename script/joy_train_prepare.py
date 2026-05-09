@@ -9,6 +9,7 @@ Requires reachability to prod Mongo and the image filesystem (since the
 dataset is built directly from `SceneSetManager` / `SceneImageManager`).
 """
 
+import os
 from pathlib import Path
 
 from ait.caption.joy_train import train
@@ -18,7 +19,7 @@ SET_NAME = 'gts_v3'
 CONFIG = 'prod'
 TRIGGER = '1xlasm'
 
-OUTPUT_DIR = Path('/workspace/joy_lora_gts_v3')
+OUTPUT_DIR = Path(os.environ['WORKSPACE']) / 'joy_lora_gts_v3'
 
 EPOCHS = 4
 LEARNING_RATE = 1e-4
@@ -26,7 +27,7 @@ LORA_R = 16
 LORA_ALPHA = 32
 LORA_DROPOUT = 0.05
 GRAD_ACCUM = 8
-MAX_LENGTH = 1024
+MAX_LENGTH = 4096
 SEED = 42
 
 

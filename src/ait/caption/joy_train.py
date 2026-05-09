@@ -153,7 +153,7 @@ class JoyDoneDataset(Dataset):
 @dataclass
 class JoyCollator:
     processor: Any
-    max_length: int = 1024
+    max_length: int = 4096
 
     def __call__(self, features: list[JoyTrainSample]) -> dict[str, torch.Tensor]:
         pad_id = self.processor.tokenizer.pad_token_id
@@ -194,10 +194,14 @@ class JoyCollator:
             labels = input_ids.clone()
             labels[:prompt_len] = -100
 
+            # Image tokens span ~hundreds of positions inside input_ids;
+            # naive tail truncation would remove image-token slots and break
+            # the vision-feature/placeholder count match. Fail loud instead.
             if input_ids.shape[0] > self.max_length:
-                input_ids = input_ids[: self.max_length]
-                attn = attn[: self.max_length]
-                labels = labels[: self.max_length]
+                raise RuntimeError(
+                    f'sample exceeds max_length={self.max_length} '
+                    f'(got {input_ids.shape[0]}); raise max_length or shorten the prompt'
+                )
 
             batch_input_ids.append(input_ids)
             batch_labels.append(labels)
@@ -267,7 +271,7 @@ def train(
     lora_alpha: int = 32,
     lora_dropout: float = 0.05,
     grad_accum: int = 8,
-    max_length: int = 1024,
+    max_length: int = 4096,
     seed: int = 42,
     verbose: int = 1,
 ) -> None:
