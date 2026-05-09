@@ -21,7 +21,7 @@ TRIGGER = '1xlasm'
 
 OUTPUT_DIR = Path(os.environ['WORKSPACE']) / 'joy_lora_gts_v3'
 
-EPOCHS = 4
+EPOCHS = 6
 LEARNING_RATE = 1e-4
 LORA_R = 16
 LORA_ALPHA = 32
