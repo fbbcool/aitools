@@ -9,11 +9,17 @@ class JoySceneDB:
     TRIGGER_DEFAULT: Final = '1xlasm'
 
     def __init__(
-        self, config: SceneConfig, trigger: str = '', verbose: int = 0, force: bool = False
+        self,
+        config: SceneConfig,
+        trigger: str = '',
+        verbose: int = 0,
+        force: bool = False,
+        lora: bool = True,
     ):
         self._dbconfig: SceneConfig = config
         self._verbose = verbose
         self._force = force
+        self._lora = lora
         self._scm: SceneManager = SceneManager(config=self._dbconfig, verbose=self._verbose)
         self._sim: SceneImageManager = self._scm.scene_image_manager()
         self._trigger: str = trigger
@@ -79,7 +85,7 @@ class JoySceneDB:
     @property
     def _joy(self) -> Joy:
         if self.__joy is None:
-            self.__joy = Joy(trigger=self._trigger)
+            self.__joy = Joy(trigger=self._trigger, lora=self._lora)
         return self.__joy
 
     def _log(self, msg: str, level: str = 'info') -> None:

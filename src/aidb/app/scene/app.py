@@ -2173,12 +2173,13 @@ class AIDBSceneApp:
         target_type = data.get('type')
         target = data.get('target')
         trigger = data.get('trigger')
+        clip_only = bool(data.get('clip_only', False))
         if not target_type or not target or not trigger:
             gr.Warning('Caption: incomplete request.')
             return None
 
         if target_type == 'registered':
-            self._caption_registered(target, trigger)
+            self._caption_registered(target, trigger, clip_only=clip_only)
         elif target_type == 'unregistered':
             self._caption_unregistered(target, trigger)
         else:
@@ -2225,7 +2226,9 @@ class AIDBSceneApp:
         except Exception as e:
             print(f'WARN: cuda cache clear failed: {e}')
 
-    def _caption_registered(self, image_id: str, trigger: str) -> None:
+    def _caption_registered(
+        self, image_id: str, trigger: str, clip_only: bool = False
+    ) -> None:
         try:
             from ait.caption.joy_scenedb import JoySceneDB
         except Exception as e:
@@ -2234,8 +2237,9 @@ class AIDBSceneApp:
             return None
 
         # 1xlasm auto-persists into caption_joy, so refuse if a stored
-        # caption_joy would be overwritten.
-        if trigger == '1xlasm':
+        # caption_joy would be overwritten. clip_only paths skip persistence
+        # entirely, so the guard does not apply.
+        if trigger == '1xlasm' and not clip_only:
             try:
                 sim = self._scm.scene_image_manager()
                 existing = sim.img_from_id(image_id)
@@ -2281,7 +2285,8 @@ class AIDBSceneApp:
 
         # 1xlasm captions are the canonical model output for caption_joy —
         # persist them automatically so the user does not have to copy/paste.
-        if trigger == '1xlasm':
+        # clip_only requests skip the auto-save (clipboard-only).
+        if trigger == '1xlasm' and not clip_only:
             try:
                 sim = self._scm.scene_image_manager()
                 simg = sim.img_from_id(image_id)

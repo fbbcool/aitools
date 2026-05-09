@@ -159,6 +159,13 @@ class AppSceneImageCell:
             trigger='1xlasm',
             label='caption 1xlasm',
         )
+        caption_btn_1xlasm_clip = AppSceneImageCell._html_caption_button(
+            target_type='registered',
+            target=obj.id,
+            trigger='1xlasm',
+            label='caption 1xlasm clip',
+            clip_only=True,
+        )
         caption_btn_gts = AppSceneImageCell._html_caption_button(
             target_type='registered',
             target=obj.id,
@@ -208,6 +215,7 @@ class AppSceneImageCell:
                 {prompt_field}
                 <div class="simg-cell-actions">
                     {caption_btn_1xlasm}
+                    {caption_btn_1xlasm_clip}
                     {caption_btn_gts}
                 </div>
             </div>
@@ -1096,16 +1104,16 @@ class AppSceneImageCell:
         target: str,
         trigger: str,
         label: Optional[str] = None,
+        clip_only: bool = False,
     ) -> str:
         """
         Renders a button which, when clicked, asks the backend to caption the
         given target (registered SceneImage id or unregistered file url) using
         the given trigger.
 
-        The JS pushes a JSON payload `{type, target, trigger}` into the caption
-        databus and triggers the hidden caption button. The backend handler
-        runs the captioning, optionally stores results, and refreshes the
-        editor.
+        When `clip_only=True`, the backend skips persistence (no caption_joy
+        write, no non-empty-caption_joy guard) and only copies the result to
+        the clipboard.
         """
         if not label:
             label = f'caption {trigger}'
@@ -1113,7 +1121,12 @@ class AppSceneImageCell:
         elem_id_btn = AppHtml.elem_id_simg_editor_caption_button()
         elem_id_bus = AppHtml.elem_id_simg_editor_caption_databus()
         skeleton_json = json.dumps(
-            {'type': target_type, 'target': target, 'trigger': trigger}
+            {
+                'type': target_type,
+                'target': target,
+                'trigger': trigger,
+                'clip_only': bool(clip_only),
+            }
         )
 
         js = f"""

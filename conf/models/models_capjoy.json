@@ -6,6 +6,12 @@
           "repo_id": "fancyfeast/llama-joycaption-beta-one-hf-llava",
           "action": "no_install"
         }
+      ],
+      "lora": [
+        {
+          "repo_id": "fbbcool/joy-gts-lora",
+          "skip": false
+        }
       ]
     }
   }

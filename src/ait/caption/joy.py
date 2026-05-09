@@ -247,14 +247,18 @@ LABEL_PROMPT: Final = {
     'woman_front': f'The {TRIGGER_WOMAN} is seen from the front.',
     'woman_back': f'The {TRIGGER_WOMAN} is seen from the back.',
     'woman_side': f'The {TRIGGER_WOMAN} is seen from the side.',
+    'woman_sitting': f'The {TRIGGER_WOMAN} is sitting.',
+    'woman_on_back': f'The {TRIGGER_WOMAN} is on his back.',
     'man_front': f'The {TRIGGER_MAN} is seen from the front.',
     'man_back': f'The {TRIGGER_MAN} is seen from the back.',
     'man_side': f'The {TRIGGER_MAN} is seen from the side.',
+    'man_sitting': f'The {TRIGGER_MAN} is sitting.',
+    'man_on_back': f'The {TRIGGER_MAN} is on his back.',
     'job': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} either a handjob or a blowjob.',
     'leg': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s leg.',
     'masturbating': f'The {TRIGGER_MAN} is masturbating, gripping and stroking his erect penis. This masturbation is the central content of the image.',
     'mouth': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s mouth.',
-    'panties': f'The {TRIGGER_MAN} is inserted into the {TRIGGER_WOMAN}s panties.',
+    'panties': f'The {TRIGGER_MAN} is inserted into the {TRIGGER_WOMAN}s panties. the fabric of her panties is over his body and traps him below.',
     'penis': f'The {TRIGGER_MAN} has an erect penis.',
     'penis_no': f'The {TRIGGER_MAN}s penis is not visible in the image.',
     'pussy': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s vagina.',
@@ -422,7 +426,7 @@ def validate_trigger_presence(caption: str) -> list[str]:
 
 
 class Joy:
-    def __init__(self, trigger: str = ''):
+    def __init__(self, trigger: str = '', lora: bool = True):
         self._count = 0
         self._tokens = 512
         self._top_p = 0.9
@@ -453,6 +457,20 @@ class Joy:
         self.model = LlavaForConditionalGeneration.from_pretrained(
             self.repo_id, torch_dtype='bfloat16', device_map=0
         )
+
+        # Optional LoRA adapter. The adapter was trained on the '1xlasm'
+        # prompt structure; applying it under other triggers produces
+        # out-of-distribution output, so scope to '1xlasm' by default.
+        self.lora_repo_id: Optional[str] = None
+        if lora and self._trigger == '1xlasm':
+            lora_ids = AInstallerDB().repo_ids(group='capjoy', variant='common', target='lora')
+            if lora_ids:
+                from peft import PeftModel
+
+                self.lora_repo_id = lora_ids[0]
+                self.model = PeftModel.from_pretrained(self.model, self.lora_repo_id)
+                print(f'[joy] applied LoRA: {self.lora_repo_id}')
+
         self.model.eval()
         self.processor = AutoProcessor.from_pretrained(self.repo_id, use_fast=False)
 
