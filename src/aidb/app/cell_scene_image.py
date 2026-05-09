@@ -166,8 +166,6 @@ class AppSceneImageCell:
             label='caption gts_prompter',
         )
 
-        save_image_btn = AppSceneImageCell._html_save_image_button(obj)
-
         thumb_onclick = AppSceneImageCell._html_lightbox_onclick(
             target_type='registered', target=obj.id, set_id=set_id
         )
@@ -211,9 +209,6 @@ class AppSceneImageCell:
                 <div class="simg-cell-actions">
                     {caption_btn_1xlasm}
                     {caption_btn_gts}
-                </div>
-                <div class="simg-cell-save">
-                    {save_image_btn}
                 </div>
             </div>
         </div>
@@ -307,18 +302,25 @@ class AppSceneImageCell:
         safe_value = html_lib.escape(value, quote=True)
         elem_id = f'simg-{attr_setter}-{obj.id}'
 
+        # `oninput` flags the wrapping field as stale on user edit; the
+        # save-button JS clears the flag after firing the save cmd.
+        stale_oninput = (
+            "this.closest('.simg-edit-field').classList.add('simg-stale')"
+        )
         if multiline:
             input_html = (
-                f'<textarea id="{elem_id}" class="simg-edit-textarea" rows="{rows}">'
+                f'<textarea id="{elem_id}" class="simg-edit-textarea" rows="{rows}" '
+                f'oninput="{stale_oninput}">'
                 f'{safe_value}</textarea>'
             )
         else:
             input_html = (
                 f'<input type="text" id="{elem_id}" class="simg-edit-input" '
-                f'value="{safe_value}">'
+                f'value="{safe_value}" oninput="{stale_oninput}">'
             )
 
         copy_btn_html = AppSceneImageCell._html_copy_button(elem_id)
+        clear_btn_html = AppSceneImageCell._html_clear_button(elem_id)
         save_btn_html = ''
         if with_save:
             save_btn_html = AppSceneImageCell._html_save_button(
@@ -336,6 +338,7 @@ class AppSceneImageCell:
                 <div class="simg-edit-field-actions">
                     {extras}
                     {copy_btn_html}
+                    {clear_btn_html}
                     {save_btn_html}
                 </div>
             </div>
@@ -384,6 +387,8 @@ class AppSceneImageCell:
         const trig = document.getElementById('{elem_id_btn}');
         if (trig) {{ trig.click(); }}
         const btn = event.currentTarget;
+        const field = btn.closest('.simg-edit-field');
+        if (field) {{ field.classList.remove('simg-stale'); }}
         const orig = btn.textContent;
         btn.textContent = 'saved';
         btn.classList.add('simg-copy-btn-ok');
@@ -428,6 +433,35 @@ class AppSceneImageCell:
             document.execCommand('copy');
             ok();
         }}
+        """.replace('\n', ' ').replace('"', '&quot;')
+        safe_label = html_lib.escape(label, quote=True)
+        return (
+            f'<button type="button" class="simg-copy-btn" onclick="{js}">{safe_label}</button>'
+        )
+
+    @staticmethod
+    def _html_clear_button(target_elem_id: str, label: str = 'clear') -> str:
+        """
+        Clears the value of the element with id `target_elem_id` (an <input>
+        or <textarea>) in the DOM only — does NOT save. Marks the wrapping
+        `.simg-edit-field` as stale so the user knows the field diverges
+        from the persisted value.
+        """
+        js = f"""
+        event.stopPropagation();
+        const el = document.getElementById('{target_elem_id}');
+        if (!el) {{ return; }}
+        el.value = '';
+        const field = el.closest('.simg-edit-field');
+        if (field) {{ field.classList.add('simg-stale'); }}
+        const btn = event.currentTarget;
+        const orig = btn.textContent;
+        btn.textContent = 'cleared';
+        btn.classList.add('simg-copy-btn-ok');
+        setTimeout(function() {{
+            btn.textContent = orig;
+            btn.classList.remove('simg-copy-btn-ok');
+        }}, 600);
         """.replace('\n', ' ').replace('"', '&quot;')
         safe_label = html_lib.escape(label, quote=True)
         return (
@@ -1057,60 +1091,6 @@ class AppSceneImageCell:
         return f'<button type="button" class="simg-set-btn" onclick="{js}">set</button>'
 
     @staticmethod
-    def _html_save_image_button(obj: SceneImage) -> str:
-        """
-        Major 'save image' button. Reads the current values of all editable
-        text fields on this cell (hints, caption, caption_joy) and persists
-        them in a single DB update via the cmd-bus 'db_query_multi' cmd.
-        """
-        elem_id_btn = AppHtml.elem_id_cmd_button()
-        elem_id_bus = AppHtml.elem_id_cmd_databus()
-
-        h_id = f'simg-set_hints-{obj.id}'
-        c_id = f'simg-set_caption-{obj.id}'
-        cj_id = f'simg-set_caption_joy-{obj.id}'
-
-        cmd_skeleton = {
-            'type': 'image',
-            'id': obj.id,
-            'cmd': 'db_query_multi',
-            'payload': {
-                'set_hints': '__H__',
-                'set_caption': '__C__',
-                'set_caption_joy': '__CJ__',
-            },
-            'label': 'save',
-        }
-        skeleton_json = json.dumps(cmd_skeleton)
-
-        js = f"""
-        event.stopPropagation();
-        const eh = document.getElementById('{h_id}');
-        const ec = document.getElementById('{c_id}');
-        const ecj = document.getElementById('{cj_id}');
-        const skel = JSON.parse('{skeleton_json}');
-        skel.payload['set_hints'] = eh ? eh.value : '';
-        skel.payload['set_caption'] = ec ? ec.value : '';
-        skel.payload['set_caption_joy'] = ecj ? ecj.value : '';
-        const bus = document.querySelector('#{elem_id_bus} textarea');
-        if (bus) {{
-            bus.value = JSON.stringify(skel);
-            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        }}
-        const trig = document.getElementById('{elem_id_btn}');
-        if (trig) {{ trig.click(); }}
-        const btn = event.currentTarget;
-        const orig = btn.textContent;
-        btn.textContent = 'saved';
-        btn.classList.add('simg-copy-btn-ok');
-        setTimeout(function() {{
-            btn.textContent = orig;
-            btn.classList.remove('simg-copy-btn-ok');
-        }}, 1000);
-        """.replace('\n', ' ').replace('"', '&quot;')
-        return f'<button type="button" class="simg-save-image-btn" onclick="{js}">save image</button>'
-
-    @staticmethod
     def _html_caption_button(
         target_type: str,
         target: str,
@@ -1174,6 +1154,8 @@ class AppSceneImageCell:
         url_js = url_str.replace('\\', '\\\\').replace("'", "\\'")
         onclick_js = (
             f"event.stopPropagation();"
+            f"const cell = event.currentTarget.closest('.image-item');"
+            f"if (cell) {{ cell.classList.add('simg-stale'); }}"
             f"const bus = document.querySelector('#{elem_id_bus} textarea');"
             f"if (bus) {{ bus.value = '{url_js}';"
             f"bus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
@@ -1182,6 +1164,8 @@ class AppSceneImageCell:
         ).replace('"', '&quot;')
         onclick_js_p = (
             f"event.stopPropagation();"
+            f"const cell = event.currentTarget.closest('.image-item');"
+            f"if (cell) {{ cell.classList.add('simg-stale'); }}"
             f"const bus = document.querySelector('#{elem_id_bus_p} textarea');"
             f"if (bus) {{ bus.value = '{url_js}';"
             f"bus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
@@ -1358,31 +1342,19 @@ class AppSceneImageCell:
             .simg-set-btn:hover {
                 background-color: #777777;
             }
-            .simg-cell-save {
-                display: flex;
-                justify-content: center;
-                margin-top: 10px;
+            /* Cells whose backend state has likely diverged from what is
+               rendered (e.g. register was clicked but the editor has not
+               been reloaded yet). Cleared on the next full editor render. */
+            .image-item.simg-stale {
+                outline: 3px solid #2563eb;
+                outline-offset: -3px;
             }
-            .simg-save-image-btn {
-                padding: 8px 16px;
-                border: 1px solid #4CAF50;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 0.95em;
-                font-weight: 600;
-                background-color: #4CAF50;
-                color: #ffffff;
-                font-family: inherit;
-                width: 100%;
-                line-height: 1.2;
-                transition: all 0.2s ease;
-            }
-            .simg-save-image-btn:hover {
-                background-color: #5fbd62;
-            }
-            .simg-save-image-btn.simg-copy-btn-ok {
-                background-color: #2e7d32 !important;
-                border-color: #2e7d32 !important;
+            /* Editable text fields whose textarea/input value has been
+               edited but not yet saved. Cleared by the save button JS. */
+            .simg-edit-field.simg-stale {
+                outline: 2px solid #2563eb;
+                outline-offset: 2px;
+                border-radius: 4px;
             }
             .simg-cell-actions {
                 display: flex;

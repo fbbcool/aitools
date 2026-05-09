@@ -302,10 +302,11 @@ class AIDBSceneApp:
                     '(per-image rating, caption, prompt, labels).'
                 )
                 with gr.Row():
+                    _set_editor_choices = self._set_names()
                     set_editor_name = gr.Dropdown(
                         label='Set',
-                        choices=self._set_names(),
-                        value=None,
+                        choices=_set_editor_choices,
+                        value='gts_v3' if 'gts_v3' in _set_editor_choices else None,
                         allow_custom_value=False,
                         interactive=True,
                     )
@@ -536,22 +537,25 @@ class AIDBSceneApp:
             )
 
             # Register an unregistered image (driven by per-image register button
-            # in the unregistered-images section). Refreshes the editor afterwards.
+            # in the unregistered-images section). Toast-only; no editor refresh
+            # — the user can register multiple images quickly and refresh manually.
             button_hidden_simg_editor_register.click(
                 self._html_simg_editor_register,
                 inputs=[databus_simg_editor_register, simg_editor_scene_id],
-                outputs=editor_outputs,
+                outputs=[],
+                show_progress='hidden',
             )
 
             # Register an unregistered image as prototype (sets
-            # `prototype: True` on the new SceneImage). Refreshes the editor.
+            # `prototype: True` on the new SceneImage). Toast-only; no refresh.
             button_hidden_simg_editor_register_prototype.click(
                 self._html_simg_editor_register_prototype,
                 inputs=[
                     databus_simg_editor_register_prototype,
                     simg_editor_scene_id,
                 ],
-                outputs=editor_outputs,
+                outputs=[],
+                show_progress='hidden',
             )
 
             # Caption an image (registered SceneImage via JoySceneDB, or an
@@ -1907,35 +1911,36 @@ class AIDBSceneApp:
 
     def _html_simg_editor_register(
         self, url_str: Optional[str], scene_id: Optional[str]
-    ) -> tuple[str, str, str, str]:
+    ) -> None:
         """
-        Registers an unregistered image file by url and refreshes the editor.
+        Registers an unregistered image file by url. Shows a toast only;
+        does NOT re-render the editor (user refreshes manually).
         """
-        return self._html_simg_editor_register_impl(url_str, scene_id, prototype=False)
+        self._html_simg_editor_register_impl(url_str, scene_id, prototype=False)
 
     def _html_simg_editor_register_prototype(
         self, url_str: Optional[str], scene_id: Optional[str]
-    ) -> tuple[str, str, str, str]:
+    ) -> None:
         """
-        Registers an unregistered image file by url, flags it as prototype,
-        and refreshes the editor.
+        Registers an unregistered image file by url and flags it as prototype.
+        Shows a toast only; does NOT re-render the editor.
         """
-        return self._html_simg_editor_register_impl(url_str, scene_id, prototype=True)
+        self._html_simg_editor_register_impl(url_str, scene_id, prototype=True)
 
     def _html_simg_editor_register_impl(
         self,
         url_str: Optional[str],
         scene_id: Optional[str],
         prototype: bool = False,
-    ) -> tuple[str, str, str, str]:
+    ) -> None:
         if not url_str or not isinstance(url_str, str):
             gr.Warning('Register: invalid url.')
-            return self._html_simg_editor_open(scene_id)
+            return
 
         url = Path(url_str.strip())
         if not url.exists():
             gr.Warning(f'Register: file does not exist: {url}')
-            return self._html_simg_editor_open(scene_id)
+            return
 
         try:
             im = self._scm.scene_image_manager()
@@ -1943,30 +1948,22 @@ class AIDBSceneApp:
         except Exception as e:
             print(f'ERROR: register_from_url [{url}]: {e}')
             gr.Warning(f'Register failed: {e}')
-            return self._html_simg_editor_open(scene_id)
+            return
 
         if new_id is None:
             gr.Warning(f'Register: could not register {url} (not an img/vid or already managed).')
-        else:
-            label = 'prototype' if prototype else 'image'
-            gr.Info(f'Registered {url.name} as {label} id {new_id}.', duration=1.5)
-            if prototype:
-                try:
-                    simg = im.image_from_id_or_url(new_id)
-                    simg.set_prototype(True)
-                    simg.db_store()
-                except Exception as e:
-                    print(f'WARN: set_prototype on new id [{new_id}] failed: {e}')
+            return
 
-        # Re-sync the scene so its imgs list picks up the new SceneImage.
-        try:
-            scene = self._scm.scene_from_id_or_url(scene_id) if scene_id else None
-            if scene is not None:
-                scene.update()
-        except Exception as e:
-            print(f'WARN: scene.update after register failed: {e}')
+        if prototype:
+            try:
+                simg = im.image_from_id_or_url(new_id)
+                simg.set_prototype(True)
+                simg.db_store()
+            except Exception as e:
+                print(f'WARN: set_prototype on new id [{new_id}] failed: {e}')
 
-        return self._html_simg_editor_open(scene_id)
+        label = 'prototype' if prototype else 'image'
+        gr.Info(f'{url.name} registered as {label}.', duration=0.5)
 
     # ------------------------------------------------------------------
     # prototype-all: bulk-flag every registered image of the loaded scene
@@ -2236,6 +2233,21 @@ class AIDBSceneApp:
             gr.Warning(f'Caption init failed: {e}')
             return None
 
+        # 1xlasm auto-persists into caption_joy, so refuse if a stored
+        # caption_joy would be overwritten.
+        if trigger == '1xlasm':
+            try:
+                sim = self._scm.scene_image_manager()
+                existing = sim.img_from_id(image_id)
+                if existing is not None and (existing.caption_joy or '').strip():
+                    gr.Warning(
+                        f'1xlasm rejected: caption_joy already set for {image_id}. '
+                        f'Clear it first to re-caption.'
+                    )
+                    return None
+            except Exception as e:
+                print(f'WARN: 1xlasm pre-check failed [{image_id}]: {e}')
+
         gr.Info(
             f'Captioning image {image_id} with trigger [{trigger}]...',
             duration=2.0,
@@ -2266,6 +2278,23 @@ class AIDBSceneApp:
             pyperclip.copy(caption)
         except Exception as e:
             print(f'WARN: clipboard copy failed: {e}')
+
+        # 1xlasm captions are the canonical model output for caption_joy —
+        # persist them automatically so the user does not have to copy/paste.
+        if trigger == '1xlasm':
+            try:
+                sim = self._scm.scene_image_manager()
+                simg = sim.img_from_id(image_id)
+                if simg is not None:
+                    simg.set_caption_joy(caption)
+                    simg.db_store()
+                    gr.Info(
+                        f'caption_joy saved for {image_id}.',
+                        duration=1.5,
+                    )
+            except Exception as e:
+                print(f'ERROR: caption_joy persist [{image_id}]: {e}')
+                gr.Warning(f'caption_joy save failed: {e}')
 
         preview = caption if len(caption) <= 80 else caption[:77] + '...'
         gr.Info(
