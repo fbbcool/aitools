@@ -136,6 +136,51 @@ class SceneImage:
         else:
             self.push_label(label)
 
+    # ---- labels_ng (structured label paths from a Skin) ----
+
+    @property
+    def labels_ng(self) -> list[str]:
+        """Structured label paths (e.g. 'primary.attribute.muscular').
+
+        See `ait.caption.skin` for the path schema. Empty list if the field
+        is unset.
+        """
+        return self._data.get(SceneDef.FIELD_LABELS_NG, []) or []
+
+    def set_labels_ng(self, value: list[str]) -> None:
+        if not isinstance(value, list):
+            return
+        # preserve order, dedupe
+        seen: set[str] = set()
+        out: list[str] = []
+        for v in value:
+            if v in seen:
+                continue
+            seen.add(v)
+            out.append(v)
+        self._data |= {SceneDef.FIELD_LABELS_NG: out}
+
+    def push_label_ng(self, path: str) -> None:
+        if not isinstance(path, str) or not path:
+            return
+        labels = list(self.labels_ng)
+        if path in labels:
+            return
+        labels.append(path)
+        self.set_labels_ng(labels)
+
+    def pop_label_ng(self, path: str) -> None:
+        if not isinstance(path, str) or not path:
+            return
+        labels = [l for l in self.labels_ng if l != path]
+        self.set_labels_ng(labels)
+
+    def switch_label_ng(self, path: str) -> None:
+        if path in self.labels_ng:
+            self.pop_label_ng(path)
+        else:
+            self.push_label_ng(path)
+
     def db_store(self) -> bool:
         return self._dbstore()
 

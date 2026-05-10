@@ -1,0 +1,902 @@
+{
+  "name": "1xlasm",
+  "version": 1,
+  "description": "Two-entity giantess captioning skin. The xlgts woman is the larger figure; the xlasm man is the smaller adult-man partner. Trained for the gts dataset; carries a fine-tuned LoRA adapter for caption-quality on this domain.",
+  "entities": {
+    "primary": {
+      "description": "The giantess woman, the larger figure in the scene. Always identified by the trigger phrase 'xlgts woman'. The trigger carries her size concept on its own; do not describe her as 'giant', 'tall', 'huge', etc.",
+      "token": "xlgts",
+      "phrase": "xlgts woman",
+      "rules": [
+        "Always identify her using exactly the phrase '{entities.primary.phrase}'. Never substitute any other descriptor (forms of 'tall', 'large', 'giant', or any other size/magnitude word).",
+        "Never use size or magnitude words such as 'huge', 'towering', 'extremely tall', 'giant', 'enormous', 'massive', or any numerical heights anywhere in the caption — the trigger phrase carries the size concept on its own.",
+        "Only describe her body type (muscular, slim, curvy, …) or breast prominence when explicitly authorized by a `b_*` label — otherwise omit body-type and breast descriptions entirely."
+      ],
+      "forbidden": [
+        "giantess",
+        "tall woman",
+        "large woman",
+        "big woman",
+        "huge woman",
+        "giant woman",
+        "towering",
+        "enormous",
+        "massive woman",
+        "colossal",
+        "gigantic",
+        "titanic",
+        "monstrous",
+        "immense",
+        "extremely tall",
+        "super tall",
+        "incredibly tall",
+        "amazon"
+      ],
+      "label_groups": {
+        "attribute": {
+          "description": "Body-type attributes of the woman. Opt-in: only describe in the caption when the corresponding label is set on the image.",
+          "labels": [
+            {
+              "name": "muscular",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} has a muscular bodybuilder physique with visible muscle definition.",
+              "migration": [
+                "2026-05-10T20:00:00+02:00: renamed from 'b_muscular' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_muscular' in the DB must be relabeled to 'muscular' before training, or until that's done a runtime alias must map them."
+              ]
+            },
+            {
+              "name": "busty",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} has prominently large breasts.",
+              "migration": [
+                "2026-05-10T20:00:00+02:00: renamed from 'b_busty' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_busty' in the DB must be relabeled to 'busty' before training, or until that's done a runtime alias must map them."
+              ]
+            },
+            {
+              "name": "slim",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} has a slim athletic build.",
+              "migration": [
+                "2026-05-10T20:00:00+02:00: renamed from 'b_slim' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_slim' in the DB must be relabeled to 'slim' before training, or until that's done a runtime alias must map them."
+              ]
+            },
+            {
+              "name": "curvy",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} has curvy hourglass proportions.",
+              "migration": [
+                "2026-05-10T20:00:00+02:00: renamed from 'b_curvy' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_curvy' in the DB must be relabeled to 'curvy' before training, or until that's done a runtime alias must map them."
+              ]
+            },
+            {
+              "name": "hairy",
+              "description": "",
+              "expansion": "The {entities.primary.phrase}s pubic area is hairy.",
+              "migration": [
+                "2026-05-10T20:00:00+02:00: renamed from 'b_hairy' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_hairy' in the DB must be relabeled to 'hairy' before training, or until that's done a runtime alias must map them."
+              ]
+            }
+          ]
+        },
+        "pose": {
+          "description": "Orientation, posture, and overall positioning of the woman.",
+          "labels": [
+            {
+              "name": "front",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is seen from the front.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'woman_front' (drop woman_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "back",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is seen from the back.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'woman_back' (drop woman_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "side",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is seen from the side.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'woman_side' (drop woman_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "sitting",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is sitting.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'woman_sitting' (drop woman_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "on_back",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is on his back.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'woman_on_back' (drop woman_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "all4",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is on her all fours.",
+              "migration": []
+            },
+            {
+              "name": "tower",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} stands directly above the {entities.secondary.phrase}, with him positioned at her feet or lower leg level.",
+              "migration": []
+            }
+          ]
+        },
+        "action": {
+          "description": "Actions the woman performs (toward herself or directed at the man).",
+          "labels": [
+            {
+              "name": "step",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is stepping on the {entities.secondary.phrase} with her foot.",
+              "migration": []
+            },
+            {
+              "name": "holding",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is held by the {entities.primary.phrase}.",
+              "migration": []
+            },
+            {
+              "name": "blowjob",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is giving the {entities.secondary.phrase} a blowjob, with his erect penis inserted into her mouth and her lips closed on his penis. The blowjob is the central content of the image.",
+              "migration": []
+            },
+            {
+              "name": "handjob",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is giving the {entities.secondary.phrase} a handjob, stimulating and stroking his penis with her hand. The handjob is the central content of the image.",
+              "migration": []
+            },
+            {
+              "name": "teasing_hj",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is giving the {entities.secondary.phrase} a teasing handjob, stimulating and stroking his penis delicately with her fingers. The teasing handjob is the central content of the image.",
+              "migration": []
+            },
+            {
+              "name": "job",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} is giving the {entities.secondary.phrase} either a handjob or a blowjob.",
+              "migration": []
+            }
+          ]
+        }
+      }
+    },
+    "secondary": {
+      "description": "The adult man, the smaller figure in the scene. Always identified by the trigger phrase 'xlasm man'. He is always adult-proportioned regardless of how small he may appear in the composition.",
+      "token": "xlasm",
+      "phrase": "xlasm man",
+      "rules": [
+        "Always identify him using exactly the phrase '{entities.secondary.phrase}'. Never substitute any diminutive, age, or object-comparison word.",
+        "Never describe him with diminutives like 'tiny', 'little', 'small man', 'child', 'figurine', or any similar reductive term — he is always an adult man.",
+        "Search carefully for him in the image; he can be hard to spot."
+      ],
+      "forbidden": [
+        "tiny",
+        "little",
+        "small man",
+        "miniature",
+        "mini",
+        "minute",
+        "figurine",
+        "figure",
+        "doll",
+        "action figure",
+        "toy",
+        "puppet",
+        "mannequin",
+        "statuette",
+        "child",
+        "kid",
+        "boy",
+        "young man",
+        "youth",
+        "youngster",
+        "teenager",
+        "teen",
+        "adolescent",
+        "juvenile",
+        "dwarf",
+        "midget",
+        "pygmy",
+        "gnome",
+        "imp",
+        "shrunken man",
+        "shrunk man",
+        "shrunken person"
+      ],
+      "label_groups": {
+        "attribute": {
+          "description": "Visible state of the man's body.",
+          "labels": [
+            {
+              "name": "penis",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} has an erect penis.",
+              "migration": []
+            },
+            {
+              "name": "penis_no",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase}s penis is not visible in the image.",
+              "migration": []
+            }
+          ]
+        },
+        "pose": {
+          "description": "Orientation, posture, and overall positioning of the man.",
+          "labels": [
+            {
+              "name": "front",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is seen from the front.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'man_front' (drop man_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "back",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is seen from the back.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'man_back' (drop man_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "side",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is seen from the side.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'man_side' (drop man_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "sitting",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is sitting.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'man_sitting' (drop man_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "on_back",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is on his back.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'man_on_back' (drop man_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+              ]
+            },
+            {
+              "name": "hanging",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is in a hanging position.",
+              "migration": []
+            },
+            {
+              "name": "perched",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is in a sitting position, typically seated on a body part of the {entities.primary.phrase}.",
+              "migration": [
+                "2026-05-10T20:30:00+02:00: renamed from 'sitting' (the on-body-part variant; the simple seated pose previously called 'man_sitting' is now this group's 'sitting')."
+              ]
+            }
+          ]
+        },
+        "action": {
+          "description": "Actions the man performs on his own.",
+          "labels": [
+            {
+              "name": "masturbating",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is masturbating, gripping and stroking his erect penis. This masturbation is the central content of the image.",
+              "migration": []
+            },
+            {
+              "name": "cum",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} ejaculates and cums.",
+              "migration": []
+            }
+          ]
+        }
+      }
+    }
+  },
+  "interaction": {
+    "description": "The physical interaction and relationship between the {entities.primary.phrase} and the {entities.secondary.phrase} is the central subject of every image.",
+    "rules": [
+      "Describe the interaction first, in the greatest detail. Use the most specific verbs available.",
+      "Use compositional position references such as 'at her ankle', 'at her hip level', 'in her palm', 'on her shoulder' — this is composition, not size.",
+      "Clothing, hair, makeup, background, environment, lighting, and camera angle are secondary — describe them only after the interaction is fully described.",
+      "Do not invent details that are not visible."
+    ],
+    "forbidden": [],
+    "label_groups": {
+      "touch": {
+        "description": "The man making contact with one of the woman's body parts (without insertion).",
+        "labels": [
+          {
+            "name": "ass",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s ass.",
+            "migration": []
+          },
+          {
+            "name": "body",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s body.",
+            "migration": []
+          },
+          {
+            "name": "breast",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s breasts.",
+            "migration": []
+          },
+          {
+            "name": "face",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s face.",
+            "migration": []
+          },
+          {
+            "name": "foot",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s foot.",
+            "migration": []
+          },
+          {
+            "name": "hand",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s hand.",
+            "migration": []
+          },
+          {
+            "name": "leg",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s leg.",
+            "migration": []
+          },
+          {
+            "name": "mouth",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s mouth.",
+            "migration": []
+          },
+          {
+            "name": "pussy",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s vagina.",
+            "migration": []
+          },
+          {
+            "name": "thigh",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is positioned between the thighs of the {entities.primary.phrase}.",
+            "migration": []
+          },
+          {
+            "name": "tongue",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} interacts with the {entities.primary.phrase}s tongue.",
+            "migration": []
+          }
+        ]
+      },
+      "insertion": {
+        "description": "The man partly inserted into one of the woman's orifices.",
+        "labels": [
+          {
+            "name": "insert",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into one of the {entities.primary.phrase}s orifices: her vagina, her anus, or her mouth. When the insertion is vaginal, the inserted body part is his head, his upper body, or his lower body, and that part is not visible.",
+            "migration": []
+          },
+          {
+            "name": "panties",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is inserted into the {entities.primary.phrase}s panties. the fabric of her panties is over his body and traps him below.",
+            "migration": []
+          },
+          {
+            "name": "breasts_body",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is inserted into between the {entities.primary.phrase}s breasts with his body partly obscured by her breasts.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_breasts_body' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "breasts_head",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into between the {entities.primary.phrase}s breasts. his head is inserted, only the rest of his body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_breasts_head' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "breasts_low",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into between the {entities.primary.phrase}s breasts. his lower body is inserted, only his upper body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_breasts_low' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "breasts_up",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into between the {entities.primary.phrase}s breasts. his upper body is inserted, only his lower body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_breasts_up' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "vagina_low",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the {entities.primary.phrase}s vagina. his lower body is inserted, only his upper body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_vagina_low' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "vagina_up",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the {entities.primary.phrase}s vagina. his upper body is inserted, only his lower body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_vagina_up' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "vagina_head",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the {entities.primary.phrase}s vagina. his head is inserted, only the rest of his body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_vagina_head' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "ass_low",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the {entities.primary.phrase}s ass. his lower body is inserted, only his upper body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_ass_low' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "ass_up",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the {entities.primary.phrase}s ass. his upper body is inserted, only his lower body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_ass_up' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "ass_head",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the {entities.primary.phrase}s ass. his head is inserted, only the rest of his body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_ass_head' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "mouth_body",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is inserted into the {entities.primary.phrase}s mouth with his body partly obscured by her mouth.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_mouth_body' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "mouth_head",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the {entities.primary.phrase}s mouth. his head is inserted, only the rest of his body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_mouth_head' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "mouth_low",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the {entities.primary.phrase}s mouth. his lower body is inserted, only his upper body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_mouth_low' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          },
+          {
+            "name": "mouth_up",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the {entities.primary.phrase}s mouth. his upper body is inserted, only his lower body is visible.",
+            "migration": [
+              "2026-05-10T20:45:00+02:00: renamed from 'i_mouth_up' (drop i_ prefix; the interaction.insertion group already encodes the insertion semantic)."
+            ]
+          }
+        ]
+      },
+      "act": {
+        "description": "Combined sexual acts involving both entities.",
+        "labels": [
+          {
+            "name": "sex",
+            "description": "",
+            "expansion": "The {entities.secondary.phrase} has sex with the {entities.primary.phrase}, inserting his erect penis into her vagina.",
+            "migration": []
+          }
+        ]
+      }
+    }
+  },
+  "default_prompt": "Write a detailed description of this image.",
+  "user_hint_preamble": " In this image, the central interaction is: {hint} Describe this interaction first and in full detail, reflecting every verb and spatial relationship it names (do not collapse \"wrapping around\" into \"between\", do not collapse \"inserted\" into \"positioned\", do not collapse \"squeeze\" into \"cup\"). Use the same body-part references it gives you (arm vs hand, palm vs hand). Do not quote, restate, or comment on this note - just write the caption.",
+  "post_prompt": "",
+  "body_type_words": {
+    "_doc": "Words that may only appear in a caption when the named label is on the image. Used by the validator to flag unauthorized body-type descriptions.",
+    "muscular": [
+      "muscular",
+      "muscle",
+      "bodybuilder",
+      "ripped",
+      "defined"
+    ],
+    "busty": [
+      "busty",
+      "large breasts",
+      "big breasts",
+      "voluptuous"
+    ],
+    "slim": [
+      "slim",
+      "slender",
+      "athletic build",
+      "lean"
+    ],
+    "curvy": [
+      "curvy",
+      "hourglass",
+      "voluptuous"
+    ]
+  },
+  "require_trigger_presence": true,
+  "concepts": {
+    "insertion": {
+      "description": "Any insertion-themed scene (i_* labels). Sub-concepts split by orifice.",
+      "label_prefix": [
+        "breasts_",
+        "vagina_",
+        "ass_",
+        "mouth_"
+      ],
+      "target": 200,
+      "sub_concepts": {
+        "breasts": {
+          "label_prefix": [
+            "breasts_"
+          ]
+        },
+        "vagina": {
+          "label_prefix": [
+            "vagina_"
+          ]
+        },
+        "ass": {
+          "label_prefix": [
+            "ass_"
+          ]
+        },
+        "mouth": {
+          "label_prefix": [
+            "mouth_"
+          ]
+        }
+      },
+      "labels": [
+        "insert",
+        "panties"
+      ]
+    },
+    "holding": {
+      "labels": [
+        "holding"
+      ],
+      "target": 130
+    },
+    "stepping": {
+      "labels": [
+        "step"
+      ],
+      "target": 130
+    },
+    "handjob": {
+      "labels": [
+        "handjob",
+        "teasing_hj"
+      ],
+      "target": 130
+    },
+    "blowjob": {
+      "labels": [
+        "blowjob"
+      ],
+      "target": 130
+    },
+    "masturbation": {
+      "labels": [
+        "masturbating"
+      ],
+      "target": 130
+    },
+    "general": {
+      "description": "Catch-all for labeled images that don't match any other concept.",
+      "residual": true,
+      "target": 100,
+      "ignore_labels": [
+        "muscular",
+        "busty",
+        "slim",
+        "curvy",
+        "hairy"
+      ]
+    }
+  },
+  "model": {
+    "group": "capjoy",
+    "variant": "common",
+    "target": "model"
+  },
+  "lora": {
+    "group": "capjoy",
+    "variant": "common",
+    "target": "lora"
+  },
+  "default_set": "gts_v3",
+  "_built": {
+    "version": 1,
+    "built_at": "2026-05-10T13:29:07+02:00",
+    "source_hash": "sha256:fd9bbb3138d584ffe064b5ef904329ba655af73a7fc6da7c0f8ba3017d386831",
+    "directive": "This image features two figures together: a xlgts woman and a xlasm man.\n\nThe giantess woman, the larger figure in the scene. Always identified by the trigger phrase 'xlgts woman'. The trigger carries her size concept on its own; do not describe her as 'giant', 'tall', 'huge', etc. Always identify her using exactly the phrase 'xlgts woman'. Never substitute any other descriptor (forms of 'tall', 'large', 'giant', or any other size/magnitude word). Never use size or magnitude words such as 'huge', 'towering', 'extremely tall', 'giant', 'enormous', 'massive', or any numerical heights anywhere in the caption — the trigger phrase carries the size concept on its own. Only describe her body type (muscular, slim, curvy, …) or breast prominence when explicitly authorized by a `b_*` label — otherwise omit body-type and breast descriptions entirely.\n\nThe adult man, the smaller figure in the scene. Always identified by the trigger phrase 'xlasm man'. He is always adult-proportioned regardless of how small he may appear in the composition. Always identify him using exactly the phrase 'xlasm man'. Never substitute any diminutive, age, or object-comparison word. Never describe him with diminutives like 'tiny', 'little', 'small man', 'child', 'figurine', or any similar reductive term — he is always an adult man. Search carefully for him in the image; he can be hard to spot.\n\nThe physical interaction and relationship between the xlgts woman and the xlasm man is the central subject of every image. Describe the interaction first, in the greatest detail. Use the most specific verbs available. Use compositional position references such as 'at her ankle', 'at her hip level', 'in her palm', 'on her shoulder' — this is composition, not size. Clothing, hair, makeup, background, environment, lighting, and camera angle are secondary — describe them only after the interaction is fully described. Do not invent details that are not visible.",
+    "labels": {
+      "primary.attribute.muscular": "The xlgts woman has a muscular bodybuilder physique with visible muscle definition.",
+      "primary.attribute.busty": "The xlgts woman has prominently large breasts.",
+      "primary.attribute.slim": "The xlgts woman has a slim athletic build.",
+      "primary.attribute.curvy": "The xlgts woman has curvy hourglass proportions.",
+      "primary.attribute.hairy": "The xlgts womans pubic area is hairy.",
+      "primary.pose.front": "The xlgts woman is seen from the front.",
+      "primary.pose.back": "The xlgts woman is seen from the back.",
+      "primary.pose.side": "The xlgts woman is seen from the side.",
+      "primary.pose.sitting": "The xlgts woman is sitting.",
+      "primary.pose.on_back": "The xlgts woman is on his back.",
+      "primary.pose.all4": "The xlgts woman is on her all fours.",
+      "primary.pose.tower": "The xlgts woman stands directly above the xlasm man, with him positioned at her feet or lower leg level.",
+      "primary.action.step": "The xlgts woman is stepping on the xlasm man with her foot.",
+      "primary.action.holding": "The xlasm man is held by the xlgts woman.",
+      "primary.action.blowjob": "The xlgts woman is giving the xlasm man a blowjob, with his erect penis inserted into her mouth and her lips closed on his penis. The blowjob is the central content of the image.",
+      "primary.action.handjob": "The xlgts woman is giving the xlasm man a handjob, stimulating and stroking his penis with her hand. The handjob is the central content of the image.",
+      "primary.action.teasing_hj": "The xlgts woman is giving the xlasm man a teasing handjob, stimulating and stroking his penis delicately with her fingers. The teasing handjob is the central content of the image.",
+      "primary.action.job": "The xlgts woman is giving the xlasm man either a handjob or a blowjob.",
+      "secondary.attribute.penis": "The xlasm man has an erect penis.",
+      "secondary.attribute.penis_no": "The xlasm mans penis is not visible in the image.",
+      "secondary.pose.front": "The xlasm man is seen from the front.",
+      "secondary.pose.back": "The xlasm man is seen from the back.",
+      "secondary.pose.side": "The xlasm man is seen from the side.",
+      "secondary.pose.sitting": "The xlasm man is sitting.",
+      "secondary.pose.on_back": "The xlasm man is on his back.",
+      "secondary.pose.hanging": "The xlasm man is in a hanging position.",
+      "secondary.pose.perched": "The xlasm man is in a sitting position, typically seated on a body part of the xlgts woman.",
+      "secondary.action.masturbating": "The xlasm man is masturbating, gripping and stroking his erect penis. This masturbation is the central content of the image.",
+      "secondary.action.cum": "The xlasm man ejaculates and cums.",
+      "interaction.touch.ass": "The xlasm man interacts with the xlgts womans ass.",
+      "interaction.touch.body": "The xlasm man interacts with the xlgts womans body.",
+      "interaction.touch.breast": "The xlasm man interacts with the xlgts womans breasts.",
+      "interaction.touch.face": "The xlasm man interacts with the xlgts womans face.",
+      "interaction.touch.foot": "The xlasm man interacts with the xlgts womans foot.",
+      "interaction.touch.hand": "The xlasm man interacts with the xlgts womans hand.",
+      "interaction.touch.leg": "The xlasm man interacts with the xlgts womans leg.",
+      "interaction.touch.mouth": "The xlasm man interacts with the xlgts womans mouth.",
+      "interaction.touch.pussy": "The xlasm man interacts with the xlgts womans vagina.",
+      "interaction.touch.thigh": "The xlasm man is positioned between the thighs of the xlgts woman.",
+      "interaction.touch.tongue": "The xlasm man interacts with the xlgts womans tongue.",
+      "interaction.insertion.insert": "The xlasm man is partly inserted into one of the xlgts womans orifices: her vagina, her anus, or her mouth. When the insertion is vaginal, the inserted body part is his head, his upper body, or his lower body, and that part is not visible.",
+      "interaction.insertion.panties": "The xlasm man is inserted into the xlgts womans panties. the fabric of her panties is over his body and traps him below.",
+      "interaction.insertion.breasts_body": "The xlasm man is inserted into between the xlgts womans breasts with his body partly obscured by her breasts.",
+      "interaction.insertion.breasts_head": "The xlasm man is partly inserted into between the xlgts womans breasts. his head is inserted, only the rest of his body is visible.",
+      "interaction.insertion.breasts_low": "The xlasm man is partly inserted into between the xlgts womans breasts. his lower body is inserted, only his upper body is visible.",
+      "interaction.insertion.breasts_up": "The xlasm man is partly inserted into between the xlgts womans breasts. his upper body is inserted, only his lower body is visible.",
+      "interaction.insertion.vagina_low": "The xlasm man is partly inserted into the xlgts womans vagina. his lower body is inserted, only his upper body is visible.",
+      "interaction.insertion.vagina_up": "The xlasm man is partly inserted into the xlgts womans vagina. his upper body is inserted, only his lower body is visible.",
+      "interaction.insertion.vagina_head": "The xlasm man is partly inserted into the xlgts womans vagina. his head is inserted, only the rest of his body is visible.",
+      "interaction.insertion.ass_low": "The xlasm man is partly inserted into the xlgts womans ass. his lower body is inserted, only his upper body is visible.",
+      "interaction.insertion.ass_up": "The xlasm man is partly inserted into the xlgts womans ass. his upper body is inserted, only his lower body is visible.",
+      "interaction.insertion.ass_head": "The xlasm man is partly inserted into the xlgts womans ass. his head is inserted, only the rest of his body is visible.",
+      "interaction.insertion.mouth_body": "The xlasm man is inserted into the xlgts womans mouth with his body partly obscured by her mouth.",
+      "interaction.insertion.mouth_head": "The xlasm man is partly inserted into the xlgts womans mouth. his head is inserted, only the rest of his body is visible.",
+      "interaction.insertion.mouth_low": "The xlasm man is partly inserted into the xlgts womans mouth. his lower body is inserted, only his upper body is visible.",
+      "interaction.insertion.mouth_up": "The xlasm man is partly inserted into the xlgts womans mouth. his upper body is inserted, only his lower body is visible.",
+      "interaction.act.sex": "The xlasm man has sex with the xlgts woman, inserting his erect penis into her vagina."
+    },
+    "label_to_group": {
+      "primary.attribute.muscular": "primary.attribute",
+      "primary.attribute.busty": "primary.attribute",
+      "primary.attribute.slim": "primary.attribute",
+      "primary.attribute.curvy": "primary.attribute",
+      "primary.attribute.hairy": "primary.attribute",
+      "primary.pose.front": "primary.pose",
+      "primary.pose.back": "primary.pose",
+      "primary.pose.side": "primary.pose",
+      "primary.pose.sitting": "primary.pose",
+      "primary.pose.on_back": "primary.pose",
+      "primary.pose.all4": "primary.pose",
+      "primary.pose.tower": "primary.pose",
+      "primary.action.step": "primary.action",
+      "primary.action.holding": "primary.action",
+      "primary.action.blowjob": "primary.action",
+      "primary.action.handjob": "primary.action",
+      "primary.action.teasing_hj": "primary.action",
+      "primary.action.job": "primary.action",
+      "secondary.attribute.penis": "secondary.attribute",
+      "secondary.attribute.penis_no": "secondary.attribute",
+      "secondary.pose.front": "secondary.pose",
+      "secondary.pose.back": "secondary.pose",
+      "secondary.pose.side": "secondary.pose",
+      "secondary.pose.sitting": "secondary.pose",
+      "secondary.pose.on_back": "secondary.pose",
+      "secondary.pose.hanging": "secondary.pose",
+      "secondary.pose.perched": "secondary.pose",
+      "secondary.action.masturbating": "secondary.action",
+      "secondary.action.cum": "secondary.action",
+      "interaction.touch.ass": "interaction.touch",
+      "interaction.touch.body": "interaction.touch",
+      "interaction.touch.breast": "interaction.touch",
+      "interaction.touch.face": "interaction.touch",
+      "interaction.touch.foot": "interaction.touch",
+      "interaction.touch.hand": "interaction.touch",
+      "interaction.touch.leg": "interaction.touch",
+      "interaction.touch.mouth": "interaction.touch",
+      "interaction.touch.pussy": "interaction.touch",
+      "interaction.touch.thigh": "interaction.touch",
+      "interaction.touch.tongue": "interaction.touch",
+      "interaction.insertion.insert": "interaction.insertion",
+      "interaction.insertion.panties": "interaction.insertion",
+      "interaction.insertion.breasts_body": "interaction.insertion",
+      "interaction.insertion.breasts_head": "interaction.insertion",
+      "interaction.insertion.breasts_low": "interaction.insertion",
+      "interaction.insertion.breasts_up": "interaction.insertion",
+      "interaction.insertion.vagina_low": "interaction.insertion",
+      "interaction.insertion.vagina_up": "interaction.insertion",
+      "interaction.insertion.vagina_head": "interaction.insertion",
+      "interaction.insertion.ass_low": "interaction.insertion",
+      "interaction.insertion.ass_up": "interaction.insertion",
+      "interaction.insertion.ass_head": "interaction.insertion",
+      "interaction.insertion.mouth_body": "interaction.insertion",
+      "interaction.insertion.mouth_head": "interaction.insertion",
+      "interaction.insertion.mouth_low": "interaction.insertion",
+      "interaction.insertion.mouth_up": "interaction.insertion",
+      "interaction.act.sex": "interaction.act"
+    },
+    "label_to_entity": {
+      "primary.attribute.muscular": "primary",
+      "primary.attribute.busty": "primary",
+      "primary.attribute.slim": "primary",
+      "primary.attribute.curvy": "primary",
+      "primary.attribute.hairy": "primary",
+      "primary.pose.front": "primary",
+      "primary.pose.back": "primary",
+      "primary.pose.side": "primary",
+      "primary.pose.sitting": "primary",
+      "primary.pose.on_back": "primary",
+      "primary.pose.all4": "primary",
+      "primary.pose.tower": "primary",
+      "primary.action.step": "primary",
+      "primary.action.holding": "primary",
+      "primary.action.blowjob": "primary",
+      "primary.action.handjob": "primary",
+      "primary.action.teasing_hj": "primary",
+      "primary.action.job": "primary",
+      "secondary.attribute.penis": "secondary",
+      "secondary.attribute.penis_no": "secondary",
+      "secondary.pose.front": "secondary",
+      "secondary.pose.back": "secondary",
+      "secondary.pose.side": "secondary",
+      "secondary.pose.sitting": "secondary",
+      "secondary.pose.on_back": "secondary",
+      "secondary.pose.hanging": "secondary",
+      "secondary.pose.perched": "secondary",
+      "secondary.action.masturbating": "secondary",
+      "secondary.action.cum": "secondary",
+      "interaction.touch.ass": "interaction",
+      "interaction.touch.body": "interaction",
+      "interaction.touch.breast": "interaction",
+      "interaction.touch.face": "interaction",
+      "interaction.touch.foot": "interaction",
+      "interaction.touch.hand": "interaction",
+      "interaction.touch.leg": "interaction",
+      "interaction.touch.mouth": "interaction",
+      "interaction.touch.pussy": "interaction",
+      "interaction.touch.thigh": "interaction",
+      "interaction.touch.tongue": "interaction",
+      "interaction.insertion.insert": "interaction",
+      "interaction.insertion.panties": "interaction",
+      "interaction.insertion.breasts_body": "interaction",
+      "interaction.insertion.breasts_head": "interaction",
+      "interaction.insertion.breasts_low": "interaction",
+      "interaction.insertion.breasts_up": "interaction",
+      "interaction.insertion.vagina_low": "interaction",
+      "interaction.insertion.vagina_up": "interaction",
+      "interaction.insertion.vagina_head": "interaction",
+      "interaction.insertion.ass_low": "interaction",
+      "interaction.insertion.ass_up": "interaction",
+      "interaction.insertion.ass_head": "interaction",
+      "interaction.insertion.mouth_body": "interaction",
+      "interaction.insertion.mouth_head": "interaction",
+      "interaction.insertion.mouth_low": "interaction",
+      "interaction.insertion.mouth_up": "interaction",
+      "interaction.act.sex": "interaction"
+    },
+    "forbidden": [
+      "giantess",
+      "tall woman",
+      "large woman",
+      "big woman",
+      "huge woman",
+      "giant woman",
+      "towering",
+      "enormous",
+      "massive woman",
+      "colossal",
+      "gigantic",
+      "titanic",
+      "monstrous",
+      "immense",
+      "extremely tall",
+      "super tall",
+      "incredibly tall",
+      "amazon",
+      "tiny",
+      "little",
+      "small man",
+      "miniature",
+      "mini",
+      "minute",
+      "figurine",
+      "figure",
+      "doll",
+      "action figure",
+      "toy",
+      "puppet",
+      "mannequin",
+      "statuette",
+      "child",
+      "kid",
+      "boy",
+      "young man",
+      "youth",
+      "youngster",
+      "teenager",
+      "teen",
+      "adolescent",
+      "juvenile",
+      "dwarf",
+      "midget",
+      "pygmy",
+      "gnome",
+      "imp",
+      "shrunken man",
+      "shrunk man",
+      "shrunken person"
+    ]
+  }
+}

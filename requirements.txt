@@ -8,6 +8,7 @@ gradio
 pymongo
 datasets
 jsonlines
+jsonschema
 accelerate
 torch
 transformers

@@ -954,7 +954,7 @@ class AIDBSceneApp:
                 )
                 for img in imgs_active
             )
-            parts.append(AppHtml.html_styled_cells_grid(cells_a, columns=2))
+            parts.append(AppHtml.html_styled_cells_grid(cells_a, columns=1))
         if imgs_prototype:
             cells_p = ''.join(
                 f'<div class="set-editor-img-prototype">'
@@ -1163,7 +1163,7 @@ class AIDBSceneApp:
             )
             for _, _, img in scored
         )
-        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=1)
 
     def _html_set_editor_open_todo_low(self, name: Optional[str]) -> str:
         """
@@ -1219,7 +1219,7 @@ class AIDBSceneApp:
             )
             for _, _, img in scored
         )
-        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=1)
 
     def _html_set_editor_open_todo_ai(self, name: Optional[str]) -> str:
         """
@@ -1276,7 +1276,7 @@ class AIDBSceneApp:
                 f'</p>'
             )
         styles = AppSceneImageCell.html_styles()
-        return styles + header + AppHtml.html_styled_cells_grid(''.join(cells_parts), columns=2)
+        return styles + header + AppHtml.html_styled_cells_grid(''.join(cells_parts), columns=1)
 
     def _html_set_editor_open_done(self, name: Optional[str]) -> str:
         """
@@ -1324,7 +1324,7 @@ class AIDBSceneApp:
             )
             for _, img in done
         )
-        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=1)
 
     def _html_set_editor_open_edit(self, name: Optional[str]) -> str:
         """
@@ -1373,7 +1373,7 @@ class AIDBSceneApp:
             )
             for _, img in edited
         )
-        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=1)
 
     def _html_set_editor_open_ood_cap(self, name: Optional[str]) -> str:
         """
@@ -1422,7 +1422,7 @@ class AIDBSceneApp:
             )
             for _, img in ood
         )
-        return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+        return styles + AppHtml.html_styled_cells_grid(cells, columns=1)
 
     def _html_set_editor_open_scenes(
         self,
@@ -1932,7 +1932,7 @@ class AIDBSceneApp:
                     cells_a = ''.join(
                         AppSceneImageCell.html(img) for img in imgs_active
                     )
-                    parts.append(AppHtml.html_styled_cells_grid(cells_a, columns=2))
+                    parts.append(AppHtml.html_styled_cells_grid(cells_a, columns=1))
                 if imgs_prototype:
                     cells_p = ''.join(
                         f'<div class="simg-editor-img-prototype">'
@@ -1943,7 +1943,7 @@ class AIDBSceneApp:
                     parts.append(
                         '<h3 style="margin-top:24px;color:#2563eb;">Prototype</h3>'
                     )
-                    parts.append(AppHtml.html_styled_cells_grid(cells_p, columns=2))
+                    parts.append(AppHtml.html_styled_cells_grid(cells_p, columns=1))
                 registered_html = ''.join(parts)
 
         # unregistered images

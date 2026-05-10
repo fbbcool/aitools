@@ -10,7 +10,26 @@ from aidb.scene import Scene, SceneDef
 from aidb.scene.scene_image import SceneImage
 
 from ait.caption.joy import LABEL_PROMPT
+from ait.caption.skin import Skin, SkinRegistry
 from ait.tools.images import image_from_url, _image_extract_prompt_from_info_ext
+
+
+_DEFAULT_SKIN_NAME = '1xlasm'
+_SKIN_CACHE: dict[str, Skin] = {}
+
+
+def _skin(name: str = _DEFAULT_SKIN_NAME) -> Optional[Skin]:
+    """Lazily load a Skin from the registry. Returns None if loading fails
+    (e.g. CONF_AIT not set, file missing) so the editor degrades gracefully."""
+    if name in _SKIN_CACHE:
+        return _SKIN_CACHE[name]
+    try:
+        s = SkinRegistry().get(name)
+    except Exception as e:
+        print(f'[cell_scene_image] failed to load skin {name!r}: {e}')
+        return None
+    _SKIN_CACHE[name] = s
+    return s
 
 
 def editor_labels() -> list[str]:
@@ -189,20 +208,36 @@ class AppSceneImageCell:
             f'<div class="simg-edit-toggles">{prototype_html}{exclude_html}</div>'
         )
 
+        labels_ng_html = AppSceneImageCell._html_labels_ng(obj)
+
+        id_copy_btn = AppSceneImageCell._html_copy_static_button(obj.id, label='id')
+
         return f"""
         <div class="image-item simg-edit-cell" id="cell-simg-{obj.id}">
-            <img src="data:image/png;base64,{img_b64}" onclick="{thumb_onclick}">
-            {toggles_row}
+            <div class="simg-edit-image-row">
+                <div class="simg-edit-image-col">
+                    <img src="data:image/png;base64,{img_b64}" onclick="{thumb_onclick}">
+                    {toggles_row}
+                    {hints_field}
+                    <div class="simg-edit-field simg-edit-rating">
+                        <label class="simg-edit-label">rating</label>
+                        <div class="operation-radio-group">
+                            {rating_html}
+                        </div>
+                    </div>
+                    <div class="simg-edit-image-col-links">
+                        {id_copy_btn}
+                        {url_copy_btn}
+                        {url_scene_copy_btn}
+                        {goto_scene_btn}
+                    </div>
+                </div>
+                {labels_ng_html}
+            </div>
             <div class="image-controls">
                 {caption_field}
                 <div class="simg-edit-id-row">
                     <div class="simg-edit-id">id: {obj.id}</div>
-                    {url_copy_btn}
-                    {url_scene_copy_btn}
-                    {goto_scene_btn}
-                </div>
-                <div class="operation-radio-group">
-                    {rating_html}
                 </div>
                 <div class="simg-edit-field">
                     <label class="simg-edit-label">labels</label>
@@ -210,7 +245,6 @@ class AppSceneImageCell:
                         {labels_html}
                     </div>
                 </div>
-                {hints_field}
                 {caption_joy_field}
                 {prompt_field}
                 <div class="simg-cell-actions">
@@ -254,6 +288,74 @@ class AppSceneImageCell:
                 checked=checked,
             )
         return html
+
+    @staticmethod
+    def _html_labels_ng(obj: SceneImage) -> str:
+        """
+        Structured `labels_ng` editor: three top-level boxes (primary entity,
+        secondary entity, interaction) each containing a sub-box per
+        label-group. Each label is a toggleable button — clicking flips the
+        full path (e.g. `primary.attribute.busty`) on the SceneImage's
+        `labels_ng` field via the `switch_label_ng` cmd.
+        """
+        skin = _skin()
+        if skin is None:
+            return (
+                '<div class="simg-edit-labels-ng simg-labels-ng-error">'
+                '<div class="simg-edit-label">labels_ng</div>'
+                '<div class="simg-labels-ng-empty">(skin unavailable)</div>'
+                '</div>'
+            )
+
+        applied = set(obj.labels_ng)
+        blocks: list[tuple[str, str, dict]] = []  # (entity_tag, title, label_groups)
+        primary = skin.entities_primary
+        blocks.append(('primary', primary.phrase or 'primary', primary.label_groups))
+        if skin.entities_secondary is not None:
+            secondary = skin.entities_secondary
+            blocks.append(('secondary', secondary.phrase or 'secondary', secondary.label_groups))
+        if skin.interaction is not None:
+            blocks.append(('interaction', 'interaction', skin.interaction.label_groups))
+
+        out: list[str] = []
+        for entity_tag, title, groups in blocks:
+            group_html: list[str] = []
+            for group_name, group in groups.items():
+                btn_html = ''
+                # Display labels alphabetically by name within each group;
+                # the source declaration order is preserved in `_built` for
+                # render_label_prompts but is not the right order for the UI.
+                for lab in sorted(group.labels, key=lambda l: l.name):
+                    path = f'{entity_tag}.{group_name}.{lab.name}'
+                    btn_html += AppHtml.html_make_cmd_button(
+                        AppHtml.make_cmd_data(
+                            'image',
+                            obj.id,
+                            'db_query',
+                            payload={'switch_label_ng': path},
+                            label=lab.name,
+                        ),
+                        checked=path in applied,
+                    )
+                group_html.append(
+                    f'<div class="simg-labels-ng-group">'
+                    f'  <div class="simg-labels-ng-group-title">{html_lib.escape(group_name, quote=True)}</div>'
+                    f'  <div class="operation-radio-group">{btn_html}</div>'
+                    f'</div>'
+                )
+            out.append(
+                f'<div class="simg-labels-ng-block">'
+                f'  <div class="simg-labels-ng-title">{html_lib.escape(title, quote=True)}</div>'
+                f'  {"".join(group_html)}'
+                f'</div>'
+            )
+
+        return (
+            '<div class="simg-edit-labels-ng">'
+            '<div class="simg-edit-label">labels_ng</div>'
+            f'{"".join(out)}'
+            '</div>'
+        )
 
     @staticmethod
     def _html_labels(obj: SceneImage) -> str:
@@ -1427,6 +1529,111 @@ class AppSceneImageCell:
             .simg-prototype-toggle input[type="checkbox"] {
                 margin: 0;
                 cursor: pointer;
+            }
+            /* ---- left-aligned thumbnail + labels_ng panel ---- */
+            /* Higher specificity (.image-item.simg-edit-cell) so these
+               override `.image-item { text-align: center }` and
+               `.image-item img { margin: 0 auto }` regardless of the
+               order in which the two style blocks are emitted. */
+            .image-item.simg-edit-cell {
+                text-align: left;
+            }
+            .image-item.simg-edit-cell .simg-edit-image-row {
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 5px;
+            }
+            .image-item.simg-edit-cell .simg-edit-image-row img {
+                margin: 0;
+                padding: 0;
+                flex: 0 0 auto;
+                border-bottom: none;
+            }
+            /* Image column: thumbnail stacked vertically with the hints
+               field directly below it. The column is fixed-width
+               (matches the thumbnail) so the labels_ng panel beside it
+               keeps a sensible flex share. */
+            .image-item.simg-edit-cell .simg-edit-image-col {
+                flex: 0 0 auto;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                width: auto;
+            }
+            .image-item.simg-edit-cell .simg-edit-image-col .simg-edit-field {
+                margin-top: 0;
+                padding: 0;
+            }
+            /* Inside the image column the prototype/exclude toggles should
+               left-align with the image, not center under it. */
+            .image-item.simg-edit-cell .simg-edit-image-col .simg-edit-toggles {
+                justify-content: flex-start;
+                padding: 4px 0 2px 0;
+            }
+            /* Rating row sits in the image column under the hints; the
+               buttons should left-align like the other controls there. */
+            .image-item.simg-edit-cell .simg-edit-image-col .simg-edit-rating .operation-radio-group {
+                justify-content: flex-start;
+            }
+            /* url / url scene / goto scene buttons sit under the rating. */
+            .image-item.simg-edit-cell .simg-edit-image-col-links {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                padding: 4px 0 2px 0;
+            }
+            .simg-edit-labels-ng {
+                flex: 1 1 auto;
+                font-size: 0.75em;
+                color: #cccccc;
+                min-width: 0;          /* allow flex item to shrink */
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            .simg-labels-ng-block {
+                border: 1px solid #555555;
+                border-radius: 6px;
+                background-color: #2a2a2a;
+                padding: 4px 6px 6px 6px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .simg-labels-ng-title {
+                font-size: 0.85em;
+                font-weight: 600;
+                color: #ffffff;
+                padding: 1px 0 2px 2px;
+            }
+            .simg-labels-ng-group {
+                border: 1px solid #444444;
+                border-radius: 4px;
+                background-color: #1f1f1f;
+                padding: 4px 6px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .simg-labels-ng-group-title {
+                font-size: 0.7em;
+                color: #aaaaaa;
+                text-align: left;
+                text-transform: lowercase;
+                letter-spacing: 0.02em;
+            }
+            /* Inside an ng-group the buttons should pack tight from the left
+               (the global `.operation-radio-group` rule centers them). */
+            .simg-labels-ng-group .operation-radio-group {
+                justify-content: flex-start;
+            }
+            .simg-labels-ng-empty {
+                color: #888888;
+                font-style: italic;
+            }
+            .simg-labels-ng-error {
+                color: #cc6666;
             }
         </style>
         """
