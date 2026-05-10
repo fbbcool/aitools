@@ -401,6 +401,9 @@ class AIDBSceneApp:
                                 set_editor_load_todo_low_button = gr.Button(
                                     'load todo 20 low'
                                 )
+                                set_editor_load_todo_ai_button = gr.Button(
+                                    'todo ai 20'
+                                )
                                 set_editor_load_done_button = gr.Button(
                                     'load done'
                                 )
@@ -745,6 +748,16 @@ class AIDBSceneApp:
                 outputs=[set_editor_html],
             ).then(
                 self._html_set_editor_open_todo_low,
+                inputs=[set_editor_name],
+                outputs=[set_editor_html],
+            )
+
+            set_editor_load_todo_ai_button.click(
+                lambda: '',
+                inputs=[],
+                outputs=[set_editor_html],
+            ).then(
+                self._html_set_editor_open_todo_ai,
                 inputs=[set_editor_name],
                 outputs=[set_editor_html],
             )
@@ -1207,6 +1220,63 @@ class AIDBSceneApp:
             for _, _, img in scored
         )
         return styles + AppHtml.html_styled_cells_grid(cells, columns=2)
+
+    def _html_set_editor_open_todo_ai(self, name: Optional[str]) -> str:
+        """
+        Loads up to 20 images from the AI-computed caption-priority ranking
+        for the selected set. The ranking is produced by the `/todo-ai`
+        Claude Code slash command and persisted to the `claude_todo`
+        MongoDB collection (kind='caption_priority', set_name=<name>).
+        If the ranking is missing or stale, prompts the user to run
+        `/todo-ai`.
+        """
+        if not name or not isinstance(name, str):
+            return '<p>No set selected.</p>'
+        coll = self._dbc._get_collection('claude_todo')
+        if coll is None:
+            return '<p>DB not connected.</p>'
+        doc = coll.find_one({'kind': 'caption_priority', 'set_name': name})
+        if not doc or not doc.get('items'):
+            return (
+                f'<p>No AI todo ranking for set <code>{name}</code>. '
+                f'Run <code>/todo-ai {name}</code> in Claude Code first.</p>'
+            )
+        items = doc['items'][:20]
+
+        try:
+            scene_set = self._ssm.set_from_id_or_name(name)
+        except Exception as e:
+            return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
+
+        by_id = {img.id: img for img in scene_set.imgs}
+        excluded_ids = set(scene_set.imgs_exclude)
+        cells_parts: list[str] = []
+        for item in items:
+            img = by_id.get(item.get('image_id'))
+            if img is None:
+                continue
+            cells_parts.append(
+                AppSceneImageCell.html(
+                    img, set_id=scene_set.id, excluded=img.id in excluded_ids
+                )
+            )
+        if not cells_parts:
+            return (
+                f'<p>AI todo ranking for set <code>{name}</code> has no '
+                f'currently-resolvable images (rerun <code>/todo-ai {name}</code>).</p>'
+            )
+
+        gen_at = doc.get('generated_at')
+        header = ''
+        if gen_at is not None:
+            header = (
+                f'<p style="color:#888;font-size:0.85em;margin:0 0 6px 0;">'
+                f'AI ranking generated: {gen_at} '
+                f'(showing top {len(cells_parts)} of {len(doc.get("items", []))})'
+                f'</p>'
+            )
+        styles = AppSceneImageCell.html_styles()
+        return styles + header + AppHtml.html_styled_cells_grid(''.join(cells_parts), columns=2)
 
     def _html_set_editor_open_done(self, name: Optional[str]) -> str:
         """

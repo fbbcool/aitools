@@ -81,6 +81,7 @@ Training a model is orchestrated by `trainer.Trainer` (`src/trainer/trainer.py`)
 - `src/ait/tools/files.py` is the canonical place for file-type predicates (`is_img_or_vid`, `is_dir`) and url/dir helpers used across both layers.
 - Notebooks in `nb/` are exploratory; the `.vscode/settings.json` sets `jupyter.notebookFileRoot` to `src/` so notebooks can `import aidb`/`ait` directly.
 - `src/depr_*` directories are deprecated — don't extend them; if you find yourself reading them to understand current behavior, double-check against the non-`depr_` equivalent first.
+- **`claude_*` MongoDB collections** — Claude may freely create, read, and write to collections prefixed `claude_` in the active `scenes_<config>` database (alongside the canonical `scenes` / `images` / `sets`) to persist AI-side scratch state: caption-priority rankings, batch run artifacts, scoring caches. These are not source-of-truth; the canonical collections are unaffected. Schema is whatever the writing tool defines — document it in the slash command or script that owns the collection. Direct access is via `DBConnection._get_collection('claude_xxx')`.
 
 ## Code style (project-specific points beyond AGENTS.md)
 
