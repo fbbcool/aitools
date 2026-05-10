@@ -124,7 +124,6 @@ class AppSceneImageCell:
             print(f'Warning: No image available for SceneImage ID: {obj.id}.')
 
         rating_html = AppSceneImageCell._html_rating(obj)
-        labels_html = AppSceneImageCell._html_labels(obj)
         # The caption field gets a 'set' button (in addition to copy + save)
         # which copies caption_joy into the caption textarea (DOM-only).
         # If caption_joy is empty the backend generates a caption that is
@@ -250,15 +249,6 @@ class AppSceneImageCell:
                 </div>
             </div>
             <div class="image-controls">
-                <div class="simg-edit-id-row">
-                    <div class="simg-edit-id">id: {obj.id}</div>
-                </div>
-                <div class="simg-edit-field">
-                    <label class="simg-edit-label">labels</label>
-                    <div class="operation-radio-group">
-                        {labels_html}
-                    </div>
-                </div>
                 {caption_joy_field}
                 {prompt_field}
                 {caption_prompt_field}

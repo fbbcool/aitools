@@ -1,9 +1,40 @@
 ---
-description: Compile a short, precise caption_prompt tailored to one image — Claude reads the image's labels_ng and hints, applies the skin's rules with judgment, and writes the result back to FIELD_CAPTION_PROMPT. Caption workflow then picks it up verbatim.
-argument-hint: "<image-id>"
+description: Compile a short, precise caption_prompt for one image (with id) or bulk-refresh all eligible images (no arg). Reads labels_ng + hints + skin rules; writes the result back to FIELD_CAPTION_PROMPT. Caption workflow then picks it up verbatim.
+argument-hint: "[image-id (omit to refresh all images with non-empty labels_ng + hints)]"
 ---
 
-For SceneImage id `$ARGUMENTS`, hand-craft a SHORT, PRECISE `caption_prompt` and store it to MongoDB `FIELD_CAPTION_PROMPT`. The next click of `caption 1xlasm` (or batch caption) will read this field and send it verbatim to JoyCaption.
+`$ARGUMENTS` controls the mode:
+
+- **`$ARGUMENTS` is a single image id** → hand-craft one SHORT, PRECISE `caption_prompt` for THAT image using Claude's judgment. Use the recipe below.
+- **`$ARGUMENTS` is empty** → bulk-refresh: iterate every non-prototype image whose `labels_ng` and `hints` are both non-empty, compose a focused prompt for each via the deterministic recipe (same constraints as the per-image judgment, just executed as Python so 100+ images finish in seconds), and persist. Print a one-line summary at the end.
+
+In either mode the resulting prompt is stored in `FIELD_CAPTION_PROMPT`; the next click of `caption 1xlasm` (or set-editor batch) reads this field and sends it verbatim to JoyCaption.
+
+## Bulk mode (`$ARGUMENTS` empty)
+
+Run a single Python script that mirrors the recipe below as deterministic code. It iterates `coll.find({labels_ng: non-empty, hints: non-empty, prototype != true}, …)`, composes the focused prompt for each, and calls `simg.set_caption_prompt(p) + simg.db_store()` so the timestamp gets bumped. The opener anchor is picked from labels via this preference: `interaction.insertion.*` → `primary.action.*` → `interaction.*` → generic `'This image features a {primary.phrase} and a {secondary.phrase}.'`. Each prompt assembles as:
+
+```
+default_prompt = 'Write a detailed description of this image.'
+opener = <picked label expansion's first sentence, or generic both-trigger>
+hint_section = "Preserve every verb and body-part reference verbatim: {hint}"
+labels = each applied path's expansion (anchor skipped to avoid duplication)
+constraints = [
+  "Do not use 'tall', 'huge', 'giant', 'enormous', or numerical heights — the phrase '{P}' carries her size.",
+  "Never describe the {S} as 'tiny', 'small', 'child', 'figurine', etc. — he is always an adult man, no matter how small he appears.",
+  "If either figure is naked, attach 'naked' to that figure ONCE at its first reference (e.g. 'The {P}, naked, ...' or 'The naked {S} ...'). Never use 'naked', 'nude', 'undressed', or 'unclothed' for that same figure afterward. Anti-pattern: 'The {P} holds the naked {S}. The naked {S} smiles.' is WRONG — the second sentence must say 'The {S} smiles.'",
+  # if NO primary.attribute.* applied:
+  "Do not use 'muscular', 'bodybuilder', 'busty', 'voluptuous', 'slim', 'slender', 'lean', 'curvy', 'hourglass', 'cleavage', 'large breasts', 'big breasts'.",
+  # if NO secondary.attribute.* applied:
+  "Do not describe his body build (no 'slim', 'muscular', 'lean', 'toned').",
+]
+closer = "Describe the interaction first; clothing, hair, makeup, background, lighting, and camera angle come strictly after."
+prompt = ' '.join([default_prompt, opener, hint_section, *labels, *constraints, closer])
+```
+
+Print one line at the end: `bulk update: N images refreshed (avg {chars} chars)`.
+
+## Per-image mode (`$ARGUMENTS` is an id)
 
 This is a **judgment task**: programmatic concatenation of every skin rule + every label sentence produces a 2000-3000 char prompt, which dilutes the model's attention. Your job is to compose a tight, image-specific prompt (~400-1000 chars) that bakes in **only the rules that matter for this image** and inlines the hint and applied-label content into natural prose.
 
