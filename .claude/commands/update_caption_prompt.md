@@ -1,28 +1,69 @@
 ---
-description: Compile a short, precise caption_prompt for one image (with id) or bulk-refresh all eligible images (no arg). Reads labels_ng + hints + skin rules; writes the result back to FIELD_CAPTION_PROMPT. Caption workflow then picks it up verbatim.
-argument-hint: "[image-id (omit to refresh all images with non-empty labels_ng + hints)]"
+description: Compile a focused caption_prompt for one image (with id) OR bulk-refresh many images with optional scope filters (set, rating). Reads labels_ng + hints + skin rules; writes the result back to FIELD_CAPTION_PROMPT. Caption workflow then picks it up verbatim.
+argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
 ---
 
-`$ARGUMENTS` controls the mode:
+`$ARGUMENTS` is parsed in three layers:
 
-- **`$ARGUMENTS` is a single image id** → hand-craft one SHORT, PRECISE `caption_prompt` for THAT image using Claude's judgment. Use the recipe below.
-- **`$ARGUMENTS` is empty** → bulk-refresh: iterate every non-prototype image whose `labels_ng` and `hints` are both non-empty, compose a focused prompt for each via the deterministic recipe (same constraints as the per-image judgment, just executed as Python so 100+ images finish in seconds), and persist. Print a one-line summary at the end.
+1. **`$ARGUMENTS` is empty** → bulk-refresh every non-prototype image with non-empty `labels_ng` and `hints`.
+2. **`$ARGUMENTS` matches a 24-char hex MongoDB ObjectId** (regex `^[0-9a-f]{24}$`) → per-image, judgment-driven compile (Claude hand-crafts one prompt). Recipe in §"Per-image mode" below.
+3. **`$ARGUMENTS` is a space-separated list of `key=value` / `key<op>value` filter terms** (with optional connective words like "for", "and", "where" the parser ignores) → bulk-refresh restricted to images matching every filter. Supported terms:
+    - `set=<name>` — restrict to images that are members of the named SceneSet (loaded via `SceneSetManager.set_from_id_or_name`). Excluded images of that set are skipped.
+    - `rating==<n>` / `rating=<n>` — exact rating match (integer; -2..5).
+    - `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
+    - Multiple terms combine with AND (no OR support).
 
-In either mode the resulting prompt is stored in `FIELD_CAPTION_PROMPT`; the next click of `caption 1xlasm` (or set-editor batch) reads this field and sends it verbatim to JoyCaption.
+Mode 1 and mode 3 use the same deterministic Python recipe — only the source-of-truth iterator differs.
 
-## Bulk mode (`$ARGUMENTS` empty)
+In every mode the resulting prompt is stored in `FIELD_CAPTION_PROMPT`; the next click of `caption 1xlasm` (or set-editor batch) reads this field and sends it verbatim to JoyCaption.
 
-Run a single Python script that mirrors the recipe below as deterministic code. It iterates `coll.find({labels_ng: non-empty, hints: non-empty, prototype != true}, …)`, composes the focused prompt for each, and calls `simg.set_caption_prompt(p) + simg.db_store()` so the timestamp gets bumped. The opener anchor is picked from labels via this preference: `interaction.insertion.*` → `primary.action.*` → `interaction.*` → generic `'This image features a {primary.phrase} and a {secondary.phrase}.'`. Each prompt assembles as:
+## Argument parser (tiny, written inline in the script)
+
+```python
+import re
+
+ID_RE = re.compile(r'^[0-9a-f]{24}$')
+TERM_RE = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
+
+def parse_args(s: str):
+    s = (s or '').strip()
+    if not s:
+        return ('bulk', {})
+    if ID_RE.match(s):
+        return ('id', s)
+    filters = {}
+    for kw, op, val in TERM_RE.findall(s):
+        op = '==' if op == '=' else op
+        if kw == 'rating':
+            filters[('rating', op)] = int(val)
+        elif kw == 'set':
+            filters[('set', op)] = val
+    return ('bulk', filters)
+```
+
+## Bulk mode
+
+Iterator selection:
+- If `('set', '==')` filter present → load `SceneSetManager(...).set_from_id_or_name(value)` and iterate `scene_set.imgs`, skipping `excluded_ids`.
+- Else → iterate `coll.find({labels_ng: non-empty, hints: non-empty, prototype != true}, …)`.
+
+For each candidate, apply remaining filters client-side:
+- `('rating', op)` — compare `img.data.get(FIELD_RATING, RATING_INIT)` against the value using `op`.
+
+Then compose using the recipe and persist via `simg.set_caption_prompt(p) + simg.db_store()`.
+
+Recipe (deterministic):
 
 ```
 default_prompt = 'Write a detailed description of this image.'
-opener = <picked label expansion's first sentence, or generic both-trigger>
+opener = <picked label expansion's first sentence (preference: interaction.insertion.* → primary.action.* → interaction.*) or generic both-trigger>
 hint_section = "Preserve every verb and body-part reference verbatim: {hint}"
 labels = each applied path's expansion (anchor skipped to avoid duplication)
 constraints = [
   "Do not use 'tall', 'huge', 'giant', 'enormous', or numerical heights — the phrase '{P}' carries her size.",
   "Never describe the {S} as 'tiny', 'small', 'child', 'figurine', etc. — he is always an adult man, no matter how small he appears.",
-  "If either figure is naked, attach 'naked' to that figure ONCE at its first reference (e.g. 'The {P}, naked, ...' or 'The naked {S} ...'). Never use 'naked', 'nude', 'undressed', or 'unclothed' for that same figure afterward. Anti-pattern: 'The {P} holds the naked {S}. The naked {S} smiles.' is WRONG — the second sentence must say 'The {S} smiles.'",
+  # naked-attribute rule (clothing-strict):
+  "Each figure's clothing state is independent and must be evaluated from the image directly. A figure is 'naked' ONLY when no clothing is visible on them at all. If a figure wears any of: dress, skirt, top, shirt, tank top, blouse, lingerie, bra, panties, thong, stockings, tights, hosiery, gloves, robe, gown, harness, jacket, coat, leotard, corset, swimsuit — that figure is NOT naked, even if much skin is exposed. Apply 'naked' sparingly, only to a fully unclothed figure, ONCE at first reference (e.g. 'The naked {S} ...'). Never repeat 'naked', 'nude', 'undressed', or 'unclothed' for that same figure afterward. Anti-pattern: image shows the {P} wearing a dress or lingerie -> 'The {P}, naked, ...' is WRONG; she is clothed.",
   # if NO primary.attribute.* applied:
   "Do not use 'muscular', 'bodybuilder', 'busty', 'voluptuous', 'slim', 'slender', 'lean', 'curvy', 'hourglass', 'cleavage', 'large breasts', 'big breasts'.",
   # if NO secondary.attribute.* applied:
@@ -32,70 +73,43 @@ closer = "Describe the interaction first; clothing, hair, makeup, background, li
 prompt = ' '.join([default_prompt, opener, hint_section, *labels, *constraints, closer])
 ```
 
-Print one line at the end: `bulk update: N images refreshed (avg {chars} chars)`.
+Print one line at the end describing the scope and counts:
+```
+bulk update [filters: set=…, rating==…]: N images refreshed (avg {chars} chars)
+```
 
-## Per-image mode (`$ARGUMENTS` is an id)
+## Per-image mode
 
 This is a **judgment task**: programmatic concatenation of every skin rule + every label sentence produces a 2000-3000 char prompt, which dilutes the model's attention. Your job is to compose a tight, image-specific prompt (~400-1000 chars) that bakes in **only the rules that matter for this image** and inlines the hint and applied-label content into natural prose.
 
-## Steps
+### Steps
 
-1. **Pull the image data.** Run a small Python script with `PYTHONPATH=src CONF_AIT=./conf HOME_AIT=. WORKSPACE=$HOME/Workspace AIDB_SCENE_CONFIG=prod AIDB_SCENE_DEFAULT=0000`:
+1. **Pull the image data.** Use the env vars `PYTHONPATH=src CONF_AIT=./conf HOME_AIT=. WORKSPACE=$HOME/Workspace AIDB_SCENE_CONFIG=prod AIDB_SCENE_DEFAULT=0000`:
 
 ```python
 from aidb import SceneDef, SceneManager
 scm = SceneManager(config='prod', verbose=0)
 sim = scm.scene_image_manager()
-simg = sim.img_from_id('$ARGUMENTS')
+simg = sim.img_from_id(image_id)
 labels_ng = simg.data.get(SceneDef.FIELD_LABELS_NG) or []
 hints     = simg.data.get(SceneDef.FIELD_HINTS, '') or ''
 ```
 
 If the image is missing or `labels_ng` is empty, abort with a short message.
 
-2. **Read the skin.** Load `Skin('1xlasm')`. You need:
-   - `skin.entities_primary.phrase` and `skin.entities_secondary.phrase` (the trigger phrases).
-   - `skin.labels` (path → rendered sentence). Use `skin.labels[path]` for each applied path to get the canonical expansion.
-   - `skin.entities_primary.rules`, `skin.entities_secondary.rules`, `skin.interaction.rules` for the constraint vocabulary.
-   - `skin.user_hint_preamble` for the hint-handling guidance.
+2. **Read the skin.** `Skin('1xlasm')` exposes `entities_primary.phrase`, `entities_secondary.phrase`, `labels` (path → rendered sentence), and the rule lists.
 
-3. **Compose the prompt.** Apply this recipe with judgment:
+3. **Compose.** Apply this recipe with judgment, aiming for ~400-1000 chars:
+    - **Opener:** one complete sentence naming BOTH `xlgts woman` AND `xlasm man`. Pick a verb that fits the labels (insertion → "inserted into her <orifice>"; holding → "holds the xlasm man …"; otherwise generic).
+    - **Hint** (when present): include the hint sentences essentially verbatim, with a one-line *"Preserve every verb and body-part reference exactly: …"* lead-in. Don't paraphrase.
+    - **Label expansions** (selective): include `skin.labels[path]` for each applied path, but skip any already implicit in the hint or the opener.
+    - **Constraints** (use the same set as bulk recipe above; conditional bans gated by attribute-label presence).
+    - **Closer:** one short ordering instruction.
 
-   **a) Opener (always):** one complete sentence naming BOTH `xlgts woman` AND `xlasm man`. Pick a verb that fits the labels — *e.g.* if `interaction.insertion.*` is applied, use *"The xlasm man is inserted into the xlgts woman's <orifice>."*; if `primary.action.holding` is applied, *"The xlgts woman holds the xlasm man …"*; otherwise a generic *"This image features a xlgts woman and a xlasm man."*
+4. **Persist** via `simg.set_caption_prompt(p) + simg.db_store()`.
 
-   **b) Hint (when present):** include the hint sentences essentially verbatim, with a brief "Preserve every verb and body-part reference exactly: …" lead-in (cribbed from `user_hint_preamble`, but trimmed to one short sentence). Don't expand the hint into multiple paraphrases.
-
-   **c) Label expansions (selective):** include `skin.labels[path]` for each applied path, but skip ones already implicit in the hint or the opener (e.g. if the hint says *"he is inserted into her vagina"* and `interaction.insertion.vagina_up` is applied, you don't need to repeat the label expansion). The point is *one* fact per assertion, not redundant repetition.
-
-   **d) Constraints (conditional):**
-     - Always include the size-word ban: *"Do not use 'tall', 'huge', 'giant', 'enormous', or numerical heights — the trigger phrase 'xlgts woman' carries her size."*
-     - Always include the diminutive ban: *"Never describe the xlasm man as 'tiny', 'small', 'child', 'figurine', etc. — he is always an adult man, no matter how small he appears."*
-     - Always include the naked-attribute rule: *"If either figure is naked, attach 'naked' to that figure ONCE at its first reference (e.g. 'The xlgts woman, naked, …' or 'The naked xlasm man …'). Never use 'naked', 'nude', 'undressed', or 'unclothed' for that same figure afterward. Anti-pattern: 'The xlgts woman holds the naked xlasm man. The naked xlasm man smiles.' is WRONG — the second sentence must say 'The xlasm man smiles.'"*
-     - If NO `primary.attribute.*` label is applied: add the explicit-word ban: *"Do not use 'muscular', 'bodybuilder', 'busty', 'voluptuous', 'slim', 'slender', 'lean', 'curvy', 'hourglass', 'cleavage', 'large breasts', 'big breasts'."*
-     - If NO `secondary.attribute.*` label is applied: add *"Do not describe his body build (no 'slim', 'muscular', 'lean', 'toned')."*
-     - If hint present: emphasize verb/body-part preservation in one short sentence.
-
-   **e) Closer (always):** one short instruction like *"Describe the interaction first; clothing, hair, makeup, background, lighting, and camera angle come strictly after."*
-
-   Aim for ~400-1000 chars. Sentences should flow as one paragraph. Order: opener → hint (if any) → label expansions → constraints → closer.
-
-4. **Persist.** Write the composed prompt to `FIELD_CAPTION_PROMPT`:
-
-```python
-from aidb.scene.scene_common import SceneDef
-simg.set_caption_prompt(composed_prompt)
-simg.db_store()
-```
-
-5. **Report.** Print:
-   - image id, applied labels_ng, hint
-   - char count of the new prompt vs. the previous (if any)
-   - the composed prompt (full text)
-
-## Output style
-
-Keep the report under ~30 lines. Show the composed prompt verbatim so the user can review before re-captioning.
+5. **Report:** image id, labels_ng, hint, char count vs. previous, and the composed prompt verbatim. Keep under ~30 lines.
 
 ## Access rights
 
-Read access to canonical collections + write to `FIELD_CAPTION_PROMPT` (single-document update, scoped to the named image) can be done w/o yes from user.
+Read access to canonical collections + write to `FIELD_CAPTION_PROMPT` (per-image updates, scoped to the named filter or single image) can be done w/o yes from user.

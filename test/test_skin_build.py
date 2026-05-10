@@ -51,7 +51,7 @@ def test_compose_built_label_count(source):
     # secondary: 2 attribute + 7 pose + 2 action = 11
     # interaction: 11 touch + 16 insertion + 1 act = 28
     # total = 57
-    assert len(built['labels']) == 65
+    assert len(built['labels']) == 74
 
 
 def test_compose_built_interpolation(source):
@@ -144,7 +144,7 @@ def test_loader_recomposes_when_built_missing(tmp_path, source):
     reg = SkinRegistry(srcdir=tmp_path, log=lambda m: seen_msgs.append(m))
     skin = reg.get('1xlasm')
     assert skin.directive
-    assert len(skin.labels) == 65
+    assert len(skin.labels) == 74
     # warning message emitted
     assert any('skin_build' in m for m in seen_msgs)
 
@@ -169,7 +169,7 @@ def test_loader_recomposes_when_built_stale(tmp_path, source):
     reg = SkinRegistry(srcdir=tmp_path, log=lambda m: seen_msgs.append(m))
     skin = reg.get('1xlasm')
     assert skin.directive != 'STALE'
-    assert len(skin.labels) == 65
+    assert len(skin.labels) == 74
     assert any('stale' in m or 'skin_build' in m for m in seen_msgs)
 
 

@@ -1,59 +1,92 @@
 ---
-description: Audit caption_joy in a SceneSet against the skin's rules (forbidden vocab, body-type authorization, missing triggers, naked-multi, opener) and auto-fix the mechanically tractable issues.
-argument-hint: "[set-name (default: gts_v3)] [skin (default: 1xlasm)]"
+description: Audit caption_joy in a scope (default whole DB) against the skin's rules (forbidden vocab, body-type authorization, missing triggers, naked-multi, opener) and auto-fix the mechanically tractable issues. Same argument grammar as /update_caption_prompt and /update_caption_joy.
+argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | …]"
 ---
 
-Validate `caption_joy` for every non-prototype image in `$ARGUMENTS` (default set `gts_v3`, default skin `1xlasm`) against the active skin's rules and auto-fix what can be patched without rerunning the captioner. Print a before / fixes / after summary so the user can see what the model produced vs. what's persisted.
+`$ARGUMENTS` is parsed by the shared filter grammar:
 
-## Steps
+1. **`$ARGUMENTS` is empty** → audit every non-prototype image with non-empty `caption_joy`, DB-wide.
+2. **`$ARGUMENTS` matches a 24-char hex MongoDB ObjectId** → audit just that one image.
+3. **`$ARGUMENTS` is a space-separated list of `key=value` / `key<op>value` filter terms** (connectives like `for` / `and` / `where` ignored) → audit restricted to matching images. Supported terms:
+    - `set=<name>` — restrict to a SceneSet's active members (excluded ids skipped).
+    - `rating==<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
+    - `skin=<name>` — which skin to audit against (default `1xlasm`).
+    - Multiple terms AND together.
 
-Run a single Python script against prod (`PYTHONPATH=src CONF_AIT=./conf HOME_AIT=. WORKSPACE=$HOME/Workspace AIDB_SCENE_CONFIG=prod AIDB_SCENE_DEFAULT=0000`).
+If neither a `set=` filter nor an ObjectId is given, the iterator scans the whole `images` collection. The `skin=` term is special: it picks the rule set used for validation (not a row filter); default `1xlasm`.
+
+## Argument parser
 
 ```python
 import re
-from collections import Counter
-from aidb import SceneDef
-from aidb.scene.scene_set_manager import SceneSetManager
-from ait.caption.skin import SkinRegistry
 
-# args: token 1 = set (default 'gts_v3'), token 2 = skin (default '1xlasm')
-skin = SkinRegistry().get(skin_name)
-P, S = skin.entities_primary.phrase, skin.entities_secondary.phrase
-P_RE, S_RE = re.compile(re.escape(P), re.IGNORECASE), re.compile(re.escape(S), re.IGNORECASE)
-NAKED_RE = re.compile(r'\b(naked|nude|undressed|unclothed)\b', re.IGNORECASE)
-SENT_SPLIT = re.compile(r'(?<=[.!?])\s+')
+ID_RE   = re.compile(r'^[0-9a-f]{24}$')
+TERM_RE = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
+
+def parse_args(s: str):
+    s = (s or '').strip()
+    if not s:
+        return ('batch', {}, '1xlasm')
+    if ID_RE.match(s):
+        return ('id', s, '1xlasm')   # skin override via filter form only
+    filters = {}
+    skin = '1xlasm'
+    for kw, op, val in TERM_RE.findall(s):
+        op = '==' if op == '=' else op
+        if kw == 'skin':
+            skin = val
+        elif kw == 'rating':
+            filters[('rating', op)] = int(val)
+        elif kw == 'set':
+            filters[('set', op)] = val
+    return ('batch', filters, skin)
 ```
+
+## Iterator selection (batch mode)
+
+- `('set', '==')` filter present → load `SceneSetManager(...).set_from_id_or_name(value)` and iterate `scene_set.imgs`, skipping prototype + excluded ids.
+- Else → iterate `coll.find({caption_joy: non-empty, prototype != true}, …)`.
+
+Apply remaining filters (e.g. `rating` op) client-side.
 
 ## Audit categories (per image)
 
 For each image with non-empty `caption_joy`:
 
 1. **forbidden vocab** — `skin.caption_violations(cj)`. Words on the skin's forbidden list (`tiny`, `little`, `small man`, `figurine`, `giantess`, etc.).
-2. **body-type unauthorized** — `skin.body_type_warnings(cj, applied_labels_ng)`. Body-type words that appear in caption without their authorizing label (`busty`, `muscular`, `slim`, `curvy`).
+2. **body-type unauthorized** — `skin.body_type_warnings(cj, applied_labels_ng)`. Body-type words appearing without their authorizing label (`busty`, `muscular`, `slim`, `curvy`).
 3. **missing trigger** — `skin.missing_triggers(cj)`. Caption is missing one of the entity phrases (`xlgts woman` / `xlasm man`) entirely.
 4. **opener** — first sentence (split on `.!?`) does not contain BOTH trigger phrases.
-5. **naked-multi** — `naked|nude|undressed|unclothed` appears more than once for the SAME figure. Attribute each match to whichever trigger phrase is nearest in either direction; flag if any figure has count > 1.
+5. **naked-multi** — `naked|nude|undressed|unclothed` appears more than once for the SAME figure (nearest-trigger attribution in either direction; flag if any figure has count > 1).
 
 ## Auto-fix recipe
 
-- **naked-multi** → walk matches in order; for each, attribute via nearest-trigger (in either direction). The first match per figure is kept; later matches are stripped (along with a leading "a/an/completely/fully" or trailing comma+space, then collapse whitespace).
+- **naked-multi** → walk matches in order; for each, attribute via nearest-trigger. The first match per figure is kept; later matches are stripped (along with a leading `a/an/completely/fully` or trailing comma+space, then collapse whitespace).
 - **body-type** → for each unauthorized body-type word still present, strip occurrences via the skin's compiled regex (`skin._body_type_res`). Same whitespace cleanup.
-- **opener** → if the first sentence is missing both phrases, prepend `"This image features a {primary.phrase} and a {secondary.phrase}."` as the new opening sentence. Original caption stays intact below.
-- **forbidden vocab** → drop the entire SENTENCE containing the forbidden word (more aggressive — preserves the rest of the caption but removes the offending observation). If every sentence has a violation, leave the caption alone for human review.
-- **missing trigger** → no auto-fix; flag only. (Re-captioning the image is the right path.)
+- **opener** → if the first sentence is missing both phrases, prepend `"This image features a {primary.phrase} and a {secondary.phrase}."` as the new opening sentence.
+- **forbidden vocab** → drop the entire SENTENCE containing the forbidden word. If every sentence has a violation, leave the caption alone for human review.
+- **missing trigger** → no auto-fix; flag only. (Re-captioning the image — `/update_caption_joy <id>` — is the right path.)
 
-For each modified caption, persist via `simg.set_caption_joy(fixed)` (which bumps `timestamp_caption_joy`). When `FIELD_CAPTION` was identical to `FIELD_CAPTION_JOY` before the fix, also update `set_caption(fixed)` so the curated and raw views stay aligned.
+For each modified caption, persist via `simg.set_caption_joy(fixed)` (which bumps `timestamp_caption_joy`). When `FIELD_CAPTION` was identical to `FIELD_CAPTION_JOY` before the fix, also update `set_caption(fixed)`.
+
+## Single-image mode
+
+Same audit + auto-fix pipeline, just on the one image. Print the diff (BEFORE → AFTER text) so the user can sanity-check the fix.
 
 ## Report
 
 Print three sections, each one short:
 
-1. **BEFORE** — issue counts before any fixes.
+1. **BEFORE** — issue counts before any fixes (header line announces the active scope, e.g. `set=gts_v3, rating==0, skin=1xlasm, captioned=53`).
 2. **FIX PASSES** — how many images each fix category touched.
 3. **AFTER** — final issue counts. Print `ALL CLEAN` when the dict is empty.
 
 Keep total output under ~30 lines.
 
+## Sequencing tip
+
+`/update_caption_prompt <scope>` → `/update_caption_joy <scope>` → `/validate_captions <scope>` — the three share filter grammar so the same scope string can drive all three steps in sequence.
+
 ## Access rights
 
-Read access to canonical collections + write to `FIELD_CAPTION` / `FIELD_CAPTION_JOY` (per-image updates, scoped to the named set, reversible from a backup) can be done w/o yes from user.
+Read access to canonical collections + write to `FIELD_CAPTION` / `FIELD_CAPTION_JOY` (per-image updates, scoped by the named filter or single image, reversible from a backup) can be done w/o yes from user.

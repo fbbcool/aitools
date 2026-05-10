@@ -107,14 +107,27 @@ LEGACY_NAME_TO_PATH: dict[str, str] = {
 # Listed separately so the no-extras test stays an explicit allow-list rather
 # than a permissive “anything goes” check.
 NEW_PATHS_NOT_IN_LEGACY: set[str] = {
+    # poses (added in two batches: standing, kneeling/arms_spread/legs_spread,
+    # then lying / lifted)
     'primary.pose.standing',
     'primary.pose.kneeling',
     'primary.pose.arms_spread',
     'primary.pose.legs_spread',
+    'primary.pose.lying',
     'secondary.pose.standing',
     'secondary.pose.kneeling',
     'secondary.pose.arms_spread',
     'secondary.pose.legs_spread',
+    'secondary.pose.lifted',
+    'secondary.pose.lying',
+    # body-attribute extensions (curated via the editor)
+    'primary.attribute.bigass',
+    'primary.attribute.leggy',
+    # interaction.act gaze labels
+    'interaction.act.he_look_at_her',
+    'interaction.act.look_at_each',
+    'interaction.act.she_look_at_him',
+    'interaction.act.she_look_at_penis',
 }
 
 
