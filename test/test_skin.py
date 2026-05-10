@@ -103,6 +103,21 @@ LEGACY_NAME_TO_PATH: dict[str, str] = {
 }
 
 
+# Paths that exist only in the new schema (no legacy joy.LABEL_PROMPT entry).
+# Listed separately so the no-extras test stays an explicit allow-list rather
+# than a permissive “anything goes” check.
+NEW_PATHS_NOT_IN_LEGACY: set[str] = {
+    'primary.pose.standing',
+    'primary.pose.kneeling',
+    'primary.pose.arms_spread',
+    'primary.pose.legs_spread',
+    'secondary.pose.standing',
+    'secondary.pose.kneeling',
+    'secondary.pose.arms_spread',
+    'secondary.pose.legs_spread',
+}
+
+
 # --- meta ---
 
 
@@ -137,7 +152,7 @@ def test_labels_byte_equal_legacy(skin):
 
 
 def test_no_extra_labels(skin):
-    expected = set(LEGACY_NAME_TO_PATH.values())
+    expected = set(LEGACY_NAME_TO_PATH.values()) | NEW_PATHS_NOT_IN_LEGACY
     extras = set(skin.labels) - expected
     assert not extras
 

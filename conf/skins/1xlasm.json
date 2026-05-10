@@ -132,6 +132,30 @@
               "description": "",
               "expansion": "The {entities.primary.phrase} stands directly above the {entities.secondary.phrase}, with him positioned at her feet or lower leg level.",
               "migration": []
+            },
+            {
+              "name": "standing",
+              "description": "The woman is standing upright on her feet.",
+              "expansion": "The {entities.primary.phrase} is standing upright.",
+              "migration": []
+            },
+            {
+              "name": "kneeling",
+              "description": "figure is on one or both knees.",
+              "expansion": "The {entities.primary.phrase} is kneeling.",
+              "migration": []
+            },
+            {
+              "name": "arms_spread",
+              "description": "arms held wide apart, away from the body.",
+              "expansion": "The {entities.primary.phrase} has her arms spread wide apart.",
+              "migration": []
+            },
+            {
+              "name": "legs_spread",
+              "description": "legs held wide apart.",
+              "expansion": "The {entities.primary.phrase} has her legs spread wide apart.",
+              "migration": []
             }
           ]
         },
@@ -296,6 +320,30 @@
               "migration": [
                 "2026-05-10T20:30:00+02:00: renamed from 'sitting' (the on-body-part variant; the simple seated pose previously called 'man_sitting' is now this group's 'sitting')."
               ]
+            },
+            {
+              "name": "standing",
+              "description": "The man is standing upright on his feet.",
+              "expansion": "The {entities.secondary.phrase} is standing upright.",
+              "migration": []
+            },
+            {
+              "name": "kneeling",
+              "description": "figure is on one or both knees.",
+              "expansion": "The {entities.secondary.phrase} is kneeling.",
+              "migration": []
+            },
+            {
+              "name": "arms_spread",
+              "description": "arms held wide apart, away from the body.",
+              "expansion": "The {entities.secondary.phrase} has his arms spread wide apart.",
+              "migration": []
+            },
+            {
+              "name": "legs_spread",
+              "description": "legs held wide apart.",
+              "expansion": "The {entities.secondary.phrase} has his legs spread wide apart.",
+              "migration": []
             }
           ]
         },
@@ -668,8 +716,8 @@
   "default_set": "gts_v3",
   "_built": {
     "version": 1,
-    "built_at": "2026-05-10T13:53:42+02:00",
-    "source_hash": "sha256:b0d0e90f72761a5d8225db35ceadd3c5c45ab3b3b5ac13f2e5e98cb988e8ebb3",
+    "built_at": "2026-05-10T14:17:15+02:00",
+    "source_hash": "sha256:ccc1f16dfd5f3dde1277f9b09fb6952daa6c16632139c07e994aed295de4d43d",
     "directive": "This image features two figures together: a xlgts woman and a xlasm man.\n\nThe giantess woman, the larger figure in the scene. Always identified by the trigger phrase 'xlgts woman'. The trigger carries her size concept on its own; do not describe her as 'giant', 'tall', 'huge', etc. Always identify her using exactly the phrase 'xlgts woman'. Never substitute any other descriptor (forms of 'tall', 'large', 'giant', or any other size/magnitude word). Never use size or magnitude words such as 'huge', 'towering', 'extremely tall', 'giant', 'enormous', 'massive', or any numerical heights anywhere in the caption — the trigger phrase carries the size concept on its own. Only describe her body type (muscular, slim, curvy, …) or breast prominence when explicitly authorized by a `b_*` label — otherwise omit body-type and breast descriptions entirely.\n\nThe adult man, the smaller figure in the scene. Always identified by the trigger phrase 'xlasm man'. He is always adult-proportioned regardless of how small he may appear in the composition. Always identify him using exactly the phrase 'xlasm man'. Never substitute any diminutive, age, or object-comparison word. Never describe him with diminutives like 'tiny', 'little', 'small man', 'child', 'figurine', or any similar reductive term — he is always an adult man. Search carefully for him in the image; he can be hard to spot. Do not describe the xlasm man’s body build (do not say 'slim', 'muscular', 'toned', 'athletic', 'lean', 'fit') unless an explicit label authorizes it — describe only his pose, action, and visible state.\n\nThe physical interaction and relationship between the xlgts woman and the xlasm man is the central subject of every image. Describe the interaction first, in the greatest detail. Use the most specific verbs available. Use compositional position references such as 'at her ankle', 'at her hip level', 'in her palm', 'on her shoulder' — this is composition, not size. Clothing, hair, makeup, background, environment, lighting, and camera angle are secondary — describe them only after the interaction is fully described. Do not invent details that are not visible. Preserve every verb and body-part reference the user hint names verbatim — do NOT collapse 'thumb and index finger' into 'hand', 'palm' into 'hand', 'arm' into 'hand', 'wrapping around' into 'between', or 'inserted' into 'positioned'. Use the same body-part level (arm vs hand, palm vs hand) the hint gives.",
     "labels": {
       "primary.attribute.muscular": "The xlgts woman has a muscular bodybuilder physique with visible muscle definition.",
@@ -684,6 +732,10 @@
       "primary.pose.on_back": "The xlgts woman is on his back.",
       "primary.pose.all4": "The xlgts woman is on her all fours.",
       "primary.pose.tower": "The xlgts woman stands directly above the xlasm man, with him positioned at her feet or lower leg level.",
+      "primary.pose.standing": "The xlgts woman is standing upright.",
+      "primary.pose.kneeling": "The xlgts woman is kneeling.",
+      "primary.pose.arms_spread": "The xlgts woman has her arms spread wide apart.",
+      "primary.pose.legs_spread": "The xlgts woman has her legs spread wide apart.",
       "primary.action.step": "The xlgts woman is stepping on the xlasm man with her foot.",
       "primary.action.holding": "The xlasm man is held by the xlgts woman.",
       "primary.action.blowjob": "The xlgts woman is giving the xlasm man a blowjob, with his erect penis inserted into her mouth and her lips closed on his penis. The blowjob is the central content of the image.",
@@ -699,6 +751,10 @@
       "secondary.pose.on_back": "The xlasm man is on his back.",
       "secondary.pose.hanging": "The xlasm man is in a hanging position.",
       "secondary.pose.perched": "The xlasm man is in a sitting position, typically seated on a body part of the xlgts woman.",
+      "secondary.pose.standing": "The xlasm man is standing upright.",
+      "secondary.pose.kneeling": "The xlasm man is kneeling.",
+      "secondary.pose.arms_spread": "The xlasm man has his arms spread wide apart.",
+      "secondary.pose.legs_spread": "The xlasm man has his legs spread wide apart.",
       "secondary.action.masturbating": "The xlasm man is masturbating, gripping and stroking his erect penis. This masturbation is the central content of the image.",
       "secondary.action.cum": "The xlasm man ejaculates and cums.",
       "interaction.touch.ass": "The xlasm man interacts with the xlgts womans ass.",
@@ -743,6 +799,10 @@
       "primary.pose.on_back": "primary.pose",
       "primary.pose.all4": "primary.pose",
       "primary.pose.tower": "primary.pose",
+      "primary.pose.standing": "primary.pose",
+      "primary.pose.kneeling": "primary.pose",
+      "primary.pose.arms_spread": "primary.pose",
+      "primary.pose.legs_spread": "primary.pose",
       "primary.action.step": "primary.action",
       "primary.action.holding": "primary.action",
       "primary.action.blowjob": "primary.action",
@@ -758,6 +818,10 @@
       "secondary.pose.on_back": "secondary.pose",
       "secondary.pose.hanging": "secondary.pose",
       "secondary.pose.perched": "secondary.pose",
+      "secondary.pose.standing": "secondary.pose",
+      "secondary.pose.kneeling": "secondary.pose",
+      "secondary.pose.arms_spread": "secondary.pose",
+      "secondary.pose.legs_spread": "secondary.pose",
       "secondary.action.masturbating": "secondary.action",
       "secondary.action.cum": "secondary.action",
       "interaction.touch.ass": "interaction.touch",
@@ -802,6 +866,10 @@
       "primary.pose.on_back": "primary",
       "primary.pose.all4": "primary",
       "primary.pose.tower": "primary",
+      "primary.pose.standing": "primary",
+      "primary.pose.kneeling": "primary",
+      "primary.pose.arms_spread": "primary",
+      "primary.pose.legs_spread": "primary",
       "primary.action.step": "primary",
       "primary.action.holding": "primary",
       "primary.action.blowjob": "primary",
@@ -817,6 +885,10 @@
       "secondary.pose.on_back": "secondary",
       "secondary.pose.hanging": "secondary",
       "secondary.pose.perched": "secondary",
+      "secondary.pose.standing": "secondary",
+      "secondary.pose.kneeling": "secondary",
+      "secondary.pose.arms_spread": "secondary",
+      "secondary.pose.legs_spread": "secondary",
       "secondary.action.masturbating": "secondary",
       "secondary.action.cum": "secondary",
       "interaction.touch.ass": "interaction",
