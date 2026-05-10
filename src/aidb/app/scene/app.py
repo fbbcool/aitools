@@ -1428,9 +1428,11 @@ class AIDBSceneApp:
         """
         Loads the 50 active images whose `caption` is out-of-date relative
         to `caption_joy` — i.e. `timestamp_caption_joy > timestamp_caption`,
-        with both fields non-empty. Sorted by `timestamp_caption_joy` desc
-        (most recently regenerated first). Prototype images are skipped;
-        excluded images are already filtered by `scene_set.imgs`.
+        with both fields non-empty. Sorted by `rating` ascending (lowest
+        ranked first — they need attention soonest), tiebreak by
+        `timestamp_caption_joy` desc (most recently regenerated first).
+        Prototype images are skipped; excluded images are already filtered
+        by `scene_set.imgs`.
         """
         if not name or not isinstance(name, str):
             return '<p>No set selected.</p>'
@@ -1440,7 +1442,7 @@ class AIDBSceneApp:
             return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
 
         try:
-            ood: list[tuple[float, object]] = []
+            ood: list[tuple[int, float, object]] = []
             for img in scene_set.imgs:
                 if img.prototype:
                     continue
@@ -1453,14 +1455,16 @@ class AIDBSceneApp:
                 ts_cap_joy = d.get(SceneDef.FIELD_TIMESTAMP_CAPTION_JOY) or 0.0
                 if ts_cap_joy <= ts_cap:
                     continue
-                ood.append((ts_cap_joy, img))
+                rating = d.get(SceneDef.FIELD_RATING, SceneDef.RATING_INIT)
+                ood.append((rating, ts_cap_joy, img))
         except Exception as e:
             return f'<p>Failed to scan images for set <code>{name}</code>: {e}</p>'
 
         if not ood:
             return f'<p>Set <code>{name}</code>: no out-of-date captions.</p>'
 
-        ood.sort(key=lambda t: -t[0])
+        # Lower rating first; within same rating, more recently regenerated first.
+        ood.sort(key=lambda t: (t[0], -t[1]))
         ood = ood[:50]
 
         styles = AppSceneImageCell.html_styles()
@@ -1469,7 +1473,7 @@ class AIDBSceneApp:
             AppSceneImageCell.html(
                 img, set_id=scene_set.id, excluded=img.id in excluded_ids
             )
-            for _, img in ood
+            for _, _, img in ood
         )
         return styles + AppHtml.html_styled_cells_grid(cells, columns=1)
 
