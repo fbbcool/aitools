@@ -16,7 +16,7 @@ from ait.install import AInstallerDB
 from ait.tools.scenes import scene_id_from_url
 
 from .joy_ng import JoyNG
-from .skin import Skin, SkinRegistry
+from .skin import Skin, SkinRegistry, compute_labels_ng
 
 
 class JoySceneDBNG:
@@ -146,24 +146,53 @@ class JoySceneDBNG:
     # ---- internals ----
 
     def _collect_labels(self, simg: SceneImage, url) -> list[str]:
-        """Prefer the image's own labels; fall back to the scene's labels when
-        the image carries none. Same precedence as `JoySceneDB._id_caption`.
+        """Return the structured label paths to feed into the captioner.
+
+        Precedence:
+        1. `FIELD_LABELS_NG` on the image (the canonical, path-keyed list
+           edited via the per-cell ng-buttons). Returned verbatim.
+        2. legacy `FIELD_LABELS` on the image, translated to paths via
+           `compute_labels_ng`. The legacy field is preserved for backward
+           compatibility but is not the source of truth for ng captioning.
+        3. legacy labels on the parent scene (translated the same way).
         """
-        labels = simg.data.get(SceneDef.FIELD_LABELS, []) or []
-        if labels:
-            self._log(f'id [{simg.id}]: using image labels {labels}.')
-            return labels
-        id_scene = scene_id_from_url(url)
-        if id_scene is None:
+        # 1) labels_ng on the image
+        ng_paths = simg.data.get(SceneDef.FIELD_LABELS_NG) or []
+        if ng_paths:
+            self._log(f'id [{simg.id}]: using labels_ng {ng_paths}.')
+            return list(ng_paths)
+
+        # 2) legacy image labels → translated paths
+        legacy = simg.data.get(SceneDef.FIELD_LABELS, []) or []
+        if not legacy:
+            # 3) legacy scene labels → translated paths
+            id_scene = scene_id_from_url(url)
+            if id_scene is None:
+                return []
+            try:
+                scene: Scene = self._scm.scene_from_id_or_url(id_scene)
+            except Exception:
+                return []
+            legacy = scene.data.get(SceneDef.FIELD_LABELS, []) or []
+            if legacy:
+                self._log(
+                    f'id [{simg.id}]: no labels_ng or image labels, '
+                    f'falling back to scene labels {legacy}.'
+                )
+        else:
+            self._log(
+                f'id [{simg.id}]: no labels_ng; translating legacy labels {legacy}.'
+            )
+
+        if not legacy:
             return []
-        try:
-            scene: Scene = self._scm.scene_from_id_or_url(id_scene)
-        except Exception:
-            return []
-        labels = scene.data.get(SceneDef.FIELD_LABELS, []) or []
-        if labels:
-            self._log(f'id [{simg.id}]: no image labels, falling back to scene labels {labels}.')
-        return labels
+        paths, unknown = compute_labels_ng(legacy, self.skin)
+        if unknown:
+            self._log(
+                f'id [{simg.id}]: legacy labels with no skin path: {unknown}',
+                'warn',
+            )
+        return paths
 
     def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:

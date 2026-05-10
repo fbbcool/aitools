@@ -243,11 +243,15 @@ class Skin:
     def body_type_warnings(self, caption: str, applied_labels: list[str]) -> list[str]:
         """One warning per body-type word found in `caption` whose authorizing
         label is NOT in `applied_labels`.
+
+        `applied_labels` may be bare leaf names (e.g. `'busty'`) or full
+        paths (e.g. `'primary.attribute.busty'`); we match against the leaf
+        segment so both forms work.
         """
-        applied = set(applied_labels)
+        applied_leaves = {l.rsplit('.', 1)[-1] for l in applied_labels}
         warnings: list[str] = []
         for label, regex in self._body_type_res.items():
-            if label in applied:
+            if label in applied_leaves:
                 continue
             for m in regex.finditer(caption):
                 warnings.append(
