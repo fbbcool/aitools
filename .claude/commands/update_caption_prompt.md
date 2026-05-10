@@ -39,8 +39,8 @@ If the image is missing or `labels_ng` is empty, abort with a short message.
    **d) Constraints (conditional):**
      - Always include the size-word ban: *"Do not use 'tall', 'huge', 'giant', 'enormous', or numerical heights — the trigger phrase 'xlgts woman' carries her size."*
      - Always include the diminutive ban: *"Never describe the xlasm man as 'tiny', 'small', 'child', 'figurine', etc. — he is always an adult man, no matter how small he appears."*
-     - Always include the naked-attribute rule: *"If either figure is naked, attach 'naked' to that figure ONCE at its first reference (e.g. 'The xlgts woman, naked, …' or 'The naked xlasm man …'). Never use 'naked', 'nude', 'undressed', or 'unclothed' for that same figure afterward."*
-     - If NO `primary.attribute.*` label is applied: add *"Do not describe her body type, breast prominence, or pubic hair."*
+     - Always include the naked-attribute rule: *"If either figure is naked, attach 'naked' to that figure ONCE at its first reference (e.g. 'The xlgts woman, naked, …' or 'The naked xlasm man …'). Never use 'naked', 'nude', 'undressed', or 'unclothed' for that same figure afterward. Anti-pattern: 'The xlgts woman holds the naked xlasm man. The naked xlasm man smiles.' is WRONG — the second sentence must say 'The xlasm man smiles.'"*
+     - If NO `primary.attribute.*` label is applied: add the explicit-word ban: *"Do not use 'muscular', 'bodybuilder', 'busty', 'voluptuous', 'slim', 'slender', 'lean', 'curvy', 'hourglass', 'cleavage', 'large breasts', 'big breasts'."*
      - If NO `secondary.attribute.*` label is applied: add *"Do not describe his body build (no 'slim', 'muscular', 'lean', 'toned')."*
      - If hint present: emphasize verb/body-part preservation in one short sentence.
 
