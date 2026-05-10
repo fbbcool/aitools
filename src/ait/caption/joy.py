@@ -216,6 +216,7 @@ LABEL_PROMPT: Final = {
     'b_busty': f'The {TRIGGER_WOMAN} has prominently large breasts.',
     'b_slim': f'The {TRIGGER_WOMAN} has a slim athletic build.',
     'b_curvy': f'The {TRIGGER_WOMAN} has curvy hourglass proportions.',
+    'b_hairy': f'The {TRIGGER_WOMAN}s pubic area is hairy.',
     'all4': f'The {TRIGGER_WOMAN} is on her all fours.',
     'ass': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s ass.',
     'blowjob': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} a blowjob, with his erect penis inserted into her mouth and her lips closed on his penis. The blowjob is the central content of the image.',
