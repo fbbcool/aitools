@@ -5,7 +5,7 @@ argument-hint: "[skin (default: 1xlasm)] [set-name (default: skin.default_set or
 
 Report v1 dataset progress for the gts LoRA. Args: `$ARGUMENTS` — first token is the skin name (default `1xlasm`), second is the set name (default = `skin.default_set` or `gts_v3`).
 
-Only **done** images count, in any set. **Done** = non-prototype, active image with non-empty `hints` AND non-empty `labels` AND non-empty `caption_joy` AND non-empty `caption`.
+Only **done** images count, in any set. **Done** = non-prototype, active image with non-empty `hints` AND non-empty `labels_ng` (preferred) or `labels` (legacy) AND non-empty `caption_joy` AND non-empty `caption`. The skin's renamed/path-based label vocabulary lives in `labels_ng`; `labels` retains the original pre-rename names for backward compatibility and is no longer the source of truth for concept matching.
 
 ## V1 plan (edit me)
 
@@ -54,9 +54,10 @@ Use `SceneSetManager(config='prod')` and `set_from_id_or_name(target_set)` to lo
 
 1. **Args** — parse `$ARGUMENTS`: token 1 = skin name (default `1xlasm`), token 2 = set name (default `skin.default_set` or `gts_v3`).
 2. **Input set** — load `target_set`.
-3. **Concept matching** — for each non-prototype image with at least one label, call `skin.matched_concepts(labels) -> {concept_name: bool}` (residual handling is internal). Tally `{done, potential}` per concept where `done` requires the full done filter.
-4. **Sub-concepts** — for each top-level concept that has `sub_concepts`, evaluate each sub-concept's match rule on the same image and tally `{done, potential}`. Sub-concepts have no target — informational only.
-5. **Distinct done total** — count distinct done images in the input set.
+3. **Applied labels for matching** — for each non-prototype image, take `labels_ng` (FIELD_LABELS_NG) directly; if missing/empty, fall back to translating `labels` (FIELD_LABELS) via `compute_labels_ng(labels, skin)`. Both forms feed `skin.matched_concepts(...)` — concept rules use leaf names, and the matcher extracts the leaf from each path automatically.
+4. **Concept matching** — for each non-prototype image with at least one applied label, call `skin.matched_concepts(applied_paths) -> {concept_name: bool}` (residual handling is internal). Tally `{done, potential}` per concept where `done` requires the full done filter.
+5. **Sub-concepts** — for each top-level concept that has `sub_concepts`, evaluate each sub-concept's match rule on the same image and tally `{done, potential}`. Sub-concepts have no target — informational only.
+6. **Distinct done total** — count distinct done images in the input set.
 
 For each concept, compute progress against its target with a status flag:
 - `OK` if `current >= target`

@@ -1040,33 +1040,27 @@ class AIDBSceneApp:
             )
             return self._html_set_editor_open(*refresh_args)
 
-        try:
-            from ait.caption.joy_scenedb import JoySceneDB
-        except Exception as e:
-            print(f'ERROR: JoySceneDB import failed: {e}')
-            gr.Warning(f'Caption init failed: {e}')
-            return self._html_set_editor_open(*refresh_args)
-
         gr.Info(
-            f"Batch captioning {len(ids_empty)} image(s) with trigger '1xlasm'...",
+            f"Batch captioning {len(ids_empty)} image(s) with skin '1xlasm'...",
             duration=3.0,
         )
 
         cfg_name = self._scm._dbc.config.config
         sim = self._scm.scene_image_manager()
-        jdb = None
+        jdb: Any = None
         n_done = 0
         n_failed = 0
         try:
-            jdb = JoySceneDB(
+            from ait.caption.joy_scenedb_ng import JoySceneDBNG
+            jdb = JoySceneDBNG(
                 config=cfg_name,
-                trigger='1xlasm',
+                skin='1xlasm',
                 verbose=1,
                 force=True,
             )
             for img_id in ids_empty:
                 try:
-                    _prompt, caption = jdb._id_caption(img_id)
+                    prompt, caption = jdb.caption_image(img_id)
                 except Exception as e:
                     print(f'ERROR: caption-empty inference [{img_id}]: {e}')
                     n_failed += 1
@@ -1078,6 +1072,8 @@ class AIDBSceneApp:
                 try:
                     simg = sim.image_from_id_or_url(img_id)
                     simg.set_caption_joy(caption)
+                    if prompt:
+                        simg.set_caption_prompt(prompt)
                     simg.db_store()
                     n_done += 1
                 except Exception as e:
@@ -2132,50 +2128,42 @@ class AIDBSceneApp:
             gr.Info('All registered images already have a caption_joy.')
             return self._html_simg_editor_open(scene_id)
 
-        # 2. Caption the ids with a single JoySceneDB run.
-        try:
-            from ait.caption.joy_scenedb import JoySceneDB
-        except Exception as e:
-            print(f'ERROR: JoySceneDB import failed: {e}')
-            gr.Warning(f'Caption init failed: {e}')
-            return self._html_simg_editor_open(scene_id)
-
+        # 2. Caption the ids with a single JoySceneDBNG run (1xlasm skin).
         gr.Info(
-            f"Batch captioning {len(ids_empty)} image(s) with trigger '1xlasm'...",
+            f"Batch captioning {len(ids_empty)} image(s) with skin '1xlasm'...",
             duration=3.0,
         )
 
         cfg_name = self._scm._dbc.config.config
         sim = self._scm.scene_image_manager()
-        jdb = None
+        jdb: Any = None
         n_done = 0
         n_failed = 0
         try:
             # IMPORTANT: force=True. Our query already filtered for empty
-            # caption_joy. JoySceneDB._id_caption's internal skip check
-            # ("caption_joy_current is not None") would otherwise skip
-            # images whose caption_joy is the empty string '' (because
-            # `'' is not None` is True), so we tell it to ignore that
-            # check and trust our own filter.
-            jdb = JoySceneDB(
+            # caption_joy; JoySceneDBNG.caption_image's internal skip check
+            # would otherwise skip images whose caption_joy is the empty
+            # string '' (`'' is not None` is True), so trust our filter.
+            from ait.caption.joy_scenedb_ng import JoySceneDBNG
+            jdb = JoySceneDBNG(
                 config=cfg_name,
-                trigger='1xlasm',
+                skin='1xlasm',
                 verbose=1,
                 force=True,
             )
-            # 3. For every id, run a single inference (the underlying Joy
-            #    model is lazy-loaded once on the JoySceneDB instance and
+            # 3. For every id, run a single inference (the underlying JoyNG
+            #    model is lazy-loaded once on the JoySceneDBNG instance and
             #    reused for the rest of the loop) and persist the result
             #    EXPLICITLY to caption_joy via set_caption_joy + db_store.
             for img_id in ids_empty:
                 try:
-                    _prompt, caption = jdb._id_caption(img_id)
+                    prompt, caption = jdb.caption_image(img_id)
                 except Exception as e:
                     print(f'ERROR: caption-empty inference [{img_id}]: {e}')
                     n_failed += 1
                     continue
                 if not caption:
-                    # JoySceneDB returns (None, None) when it could not
+                    # JoySceneDBNG returns (None, None) when it could not
                     # open the image (`simg.pil` was None) or when the
                     # model produced nothing.
                     print(f'WARN: caption-empty produced no caption for [{img_id}]')
@@ -2184,6 +2172,8 @@ class AIDBSceneApp:
                 try:
                     simg = sim.image_from_id_or_url(img_id)
                     simg.set_caption_joy(caption)  # writes FIELD_CAPTION_JOY
+                    if prompt:
+                        simg.set_caption_prompt(prompt)  # writes FIELD_CAPTION_PROMPT
                     simg.db_store()
                     n_done += 1
                 except Exception as e:
@@ -2263,8 +2253,11 @@ class AIDBSceneApp:
         torch model so VRAM is released for other tasks.
         """
         try:
-            # If it's a JoySceneDB it owns a Joy via .__joy / ._joy
+            # If it's a JoySceneDB / JoySceneDBNG it owns a Joy / JoyNG via
+            # .__joy / ._joy.
             inner = getattr(obj, '_JoySceneDB__joy', None)
+            if inner is None:
+                inner = getattr(obj, '_JoySceneDBNG__joy', None)
             if inner is None:
                 inner = getattr(obj, '_joy', None)
             for o in (inner, obj):
@@ -2299,13 +2292,6 @@ class AIDBSceneApp:
     def _caption_registered(
         self, image_id: str, trigger: str, clip_only: bool = False
     ) -> None:
-        try:
-            from ait.caption.joy_scenedb import JoySceneDB
-        except Exception as e:
-            print(f'ERROR: JoySceneDB import failed: {e}')
-            gr.Warning(f'Caption init failed: {e}')
-            return None
-
         # 1xlasm auto-persists into caption_joy, so refuse if a stored
         # caption_joy would be overwritten. clip_only paths skip persistence
         # entirely, so the guard does not apply.
@@ -2327,16 +2313,31 @@ class AIDBSceneApp:
             duration=2.0,
         )
         cfg_name = self._scm._dbc.config.config
-        jdb = None
+        jdb: Any = None
         caption: Optional[str] = None
+        prompt: Optional[str] = None
         try:
-            jdb = JoySceneDB(
-                config=cfg_name,
-                trigger=trigger,
-                verbose=1,
-                force=True,
-            )
-            _prompt, caption = jdb._id_caption(image_id)
+            if trigger == '1xlasm':
+                # NG path: skin-driven, uses JoyNG runtime under the hood.
+                from ait.caption.joy_scenedb_ng import JoySceneDBNG
+                jdb = JoySceneDBNG(
+                    config=cfg_name,
+                    skin='1xlasm',
+                    verbose=1,
+                    force=True,
+                )
+                prompt, caption = jdb.caption_image(image_id)
+            else:
+                # Legacy path for other triggers (gts_prompter, …) until they
+                # migrate to the JSON-skin pipeline.
+                from ait.caption.joy_scenedb import JoySceneDB
+                jdb = JoySceneDB(
+                    config=cfg_name,
+                    trigger=trigger,
+                    verbose=1,
+                    force=True,
+                )
+                prompt, caption = jdb._id_caption(image_id)
         except Exception as e:
             print(f'ERROR: caption registered [{image_id}]: {e}')
             gr.Warning(f'Caption failed: {e}')
@@ -2353,23 +2354,35 @@ class AIDBSceneApp:
         except Exception as e:
             print(f'WARN: clipboard copy failed: {e}')
 
-        # 1xlasm captions are the canonical model output for caption_joy —
-        # persist them automatically so the user does not have to copy/paste.
-        # clip_only requests skip the auto-save (clipboard-only).
-        if trigger == '1xlasm' and not clip_only:
+        # Persistence: every caption flow that is NOT clip-only force-stores
+        # the prompt that was sent to the model (FIELD_CAPTION_PROMPT) so the
+        # exact inputs are auditable. 1xlasm additionally writes caption_joy
+        # (the canonical model output for that recipe). Other triggers leave
+        # caption_joy alone — they're prompt-shaping helpers, not
+        # caption-source-of-truth.
+        if not clip_only:
             try:
                 sim = self._scm.scene_image_manager()
                 simg = sim.img_from_id(image_id)
                 if simg is not None:
-                    simg.set_caption_joy(caption)
+                    if prompt:
+                        simg.set_caption_prompt(prompt)
+                    if trigger == '1xlasm':
+                        simg.set_caption_joy(caption)
                     simg.db_store()
-                    gr.Info(
-                        f'caption_joy saved for {image_id}.',
-                        duration=1.5,
-                    )
+                    if trigger == '1xlasm':
+                        gr.Info(
+                            f'caption_joy + prompt saved for {image_id}.',
+                            duration=1.5,
+                        )
+                    else:
+                        gr.Info(
+                            f'caption_prompt saved for {image_id}.',
+                            duration=1.5,
+                        )
             except Exception as e:
-                print(f'ERROR: caption_joy persist [{image_id}]: {e}')
-                gr.Warning(f'caption_joy save failed: {e}')
+                print(f'ERROR: caption persist [{image_id}]: {e}')
+                gr.Warning(f'Caption save failed: {e}')
 
         preview = caption if len(caption) <= 80 else caption[:77] + '...'
         gr.Info(
@@ -2554,30 +2567,24 @@ class AIDBSceneApp:
         if not image_id:
             return ''
 
-        try:
-            from ait.caption.joy_scenedb import JoySceneDB
-        except Exception as e:
-            print(f'ERROR: JoySceneDB import failed: {e}')
-            gr.Warning(f'Caption init failed: {e}')
-            return ''
-
-        # 'set' always captions with the '1xlasm' trigger via JoySceneDB.
+        # 'set' always captions with the '1xlasm' skin via JoySceneDBNG.
         trigger = '1xlasm'
         gr.Info(
-            f"Generating caption for image {image_id} (set, trigger '{trigger}')...",
+            f"Generating caption for image {image_id} (set, skin '{trigger}')...",
             duration=2.0,
         )
         cfg_name = self._scm._dbc.config.config
-        jdb = None
+        jdb: Any = None
         caption: Optional[str] = None
         try:
-            jdb = JoySceneDB(
+            from ait.caption.joy_scenedb_ng import JoySceneDBNG
+            jdb = JoySceneDBNG(
                 config=cfg_name,
-                trigger=trigger,
+                skin=trigger,
                 verbose=1,
                 force=True,
             )
-            _prompt, caption = jdb._id_caption(image_id)
+            prompt, caption = jdb.caption_image(image_id)
         except Exception as e:
             print(f'ERROR: caption set [{image_id}]: {e}')
             gr.Warning(f'Caption failed: {e}')
@@ -2588,6 +2595,18 @@ class AIDBSceneApp:
         if not caption:
             gr.Warning(f'No caption produced for image {image_id}.')
             return ''
+
+        # Force-store the caption_prompt so the model inputs are auditable
+        # even though caption_joy/caption write back to DOM only.
+        if prompt:
+            try:
+                sim = self._scm.scene_image_manager()
+                simg = sim.img_from_id(image_id)
+                if simg is not None:
+                    simg.set_caption_prompt(prompt)
+                    simg.db_store()
+            except Exception as e:
+                print(f'WARN: caption_prompt persist [{image_id}]: {e}')
 
         gr.Info(
             f'Caption generated for image {image_id} (not saved - click "save image" to persist).',

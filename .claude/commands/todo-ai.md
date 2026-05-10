@@ -13,12 +13,13 @@ Concept names, match rules, and targets all come from `conf/skins/<skin>.json` u
 
 ## Scoring
 
-For each non-prototype image in the set that is **labeled but NOT done** (i.e. each "potential" image — done = hints + labels + caption_joy + caption all non-empty):
+For each non-prototype image in the set that is **labeled but NOT done** (i.e. each "potential" image — done = hints + labels_ng (or labels) + caption_joy + caption all non-empty):
 
-1. **Concept matches** — call `skin.matched_concepts(applied_labels) -> {concept_name: bool}`. An image can match multiple concepts (overlap fine); residual handling is internal to the skin.
-2. **Concept deficit** — first compute global per-concept `done` counts across the set (using the same matching). Then for each concept `c` matched by image `i`: `deficit_c = max(0, (target_c - done_c) / target_c)` where `target_c = skin.concepts[c].target`. Sum across matched concepts → `deficit_sum_i`.
-3. **Closeness to done** — count how many of `hints`, `caption_joy`, `caption` are already non-empty (range 0..3; `labels` is non-empty by construction).
-4. **Score** — `score_i = deficit_sum_i * (1 + 0.5 * closeness_i)`.
+1. **Applied labels for matching** — take `labels_ng` (FIELD_LABELS_NG) directly; if missing/empty, fall back to `compute_labels_ng(labels, skin)`. Both feed `skin.matched_concepts(...)`.
+2. **Concept matches** — `skin.matched_concepts(applied_paths) -> {concept_name: bool}`. An image can match multiple concepts; residual handling is internal.
+3. **Concept deficit** — first compute global per-concept `done` counts across the set (same matching). Then for each concept `c` matched by image `i`: `deficit_c = max(0, (target_c - done_c) / target_c)` where `target_c = skin.concepts[c].target`. Sum across matched concepts → `deficit_sum_i`.
+4. **Closeness to done** — count how many of `hints`, `caption_joy`, `caption` are already non-empty (range 0..3; `labels`/`labels_ng` is non-empty by construction).
+5. **Score** — `score_i = deficit_sum_i * (1 + 0.5 * closeness_i)`.
 
 Drop images whose score is 0 (only matched OK concepts). Sort descending by score; tiebreak by closeness desc, then most-recent timestamp desc.
 

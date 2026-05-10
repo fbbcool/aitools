@@ -160,6 +160,13 @@ class AppSceneImageCell:
             multiline=True,
             with_save=False,
         )
+        caption_prompt_field = AppSceneImageCell._html_text_field(
+            obj,
+            attr_setter='set_caption_prompt',
+            label='caption prompt',
+            value=obj.caption_prompt,
+            multiline=True,
+        )
 
         url = obj.url_from_data
         url_str = str(url) if url is not None else ''
@@ -231,11 +238,18 @@ class AppSceneImageCell:
                         {url_scene_copy_btn}
                         {goto_scene_btn}
                     </div>
+                    <div class="simg-cell-actions-col">
+                        {caption_btn_1xlasm}
+                        {caption_btn_1xlasm_clip}
+                        {caption_btn_gts}
+                    </div>
                 </div>
-                {labels_ng_html}
+                <div class="simg-edit-labels-col">
+                    {labels_ng_html}
+                    {caption_field}
+                </div>
             </div>
             <div class="image-controls">
-                {caption_field}
                 <div class="simg-edit-id-row">
                     <div class="simg-edit-id">id: {obj.id}</div>
                 </div>
@@ -247,11 +261,7 @@ class AppSceneImageCell:
                 </div>
                 {caption_joy_field}
                 {prompt_field}
-                <div class="simg-cell-actions">
-                    {caption_btn_1xlasm}
-                    {caption_btn_1xlasm_clip}
-                    {caption_btn_gts}
-                </div>
+                {caption_prompt_field}
             </div>
         </div>
         """
@@ -1582,6 +1592,28 @@ class AppSceneImageCell:
                 flex-wrap: wrap;
                 gap: 4px;
                 padding: 4px 0 2px 0;
+            }
+            /* Caption-action buttons: each on its own row, left-aligned in
+               the image column. */
+            .image-item.simg-edit-cell .simg-cell-actions-col {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+                padding: 6px 0 2px 0;
+            }
+            /* Right column of the image-row: stacks the labels_ng panel
+               and the caption text-field directly below it. */
+            .image-item.simg-edit-cell .simg-edit-labels-col {
+                flex: 1 1 auto;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .image-item.simg-edit-cell .simg-edit-labels-col .simg-edit-field {
+                margin-top: 0;
+                padding: 0;
             }
             .simg-edit-labels-ng {
                 flex: 1 1 auto;

@@ -58,6 +58,10 @@ class SceneImage:
         return self._data.get(SceneDef.FIELD_PROMPT, None)
 
     @property
+    def caption_prompt(self) -> Optional[str]:
+        return self._data.get(SceneDef.FIELD_CAPTION_PROMPT, None)
+
+    @property
     def labels(self) -> list[str]:
         """
         Returns the labels as a list of strings.
@@ -104,6 +108,16 @@ class SceneImage:
             SceneDef.FIELD_CAPTION_JOY: str(value),
             SceneDef.FIELD_TIMESTAMP_CAPTION_JOY: SceneDef.now_ts(),
         }
+
+    def set_caption_prompt(self, value: str) -> None:
+        """Store the prompt that was sent to the captioner alongside the
+        generated caption — the inputs (entity directive + interpolated
+        labels + hint preamble) the model saw. Force-overwrites; not gated
+        on prior content. Useful for traceability.
+        """
+        if value is None:
+            return
+        self._data |= {SceneDef.FIELD_CAPTION_PROMPT: str(value)}
 
     def set_hints(self, value: str) -> None:
         if value is None:
