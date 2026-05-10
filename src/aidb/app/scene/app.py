@@ -103,6 +103,13 @@ class AIDBSceneApp:
                 visible='hidden',
                 elem_id=AppHtml.elem_id_simg_editor_caption_databus(),
             )
+            # Out-databus carrying JSON {image_id, caption_joy?, caption_prompt?}
+            # so a .then() callback can update the per-cell textareas in the
+            # DOM after the server-side save.
+            databus_simg_editor_caption_out = gr.Textbox(
+                visible='hidden',
+                elem_id=AppHtml.elem_id_simg_editor_caption_result_databus(),
+            )
 
             # Hidden trigger + in/out databuses for the per-cell 'set' button.
             # The in-databus carries the image id; the out-databus carries
@@ -561,13 +568,45 @@ class AIDBSceneApp:
                 show_progress='hidden',
             )
 
-            # Caption an image (registered SceneImage via JoySceneDB, or an
-            # unregistered file via Joy directly). The caption is only copied
-            # to the clipboard - no DB writes, no UI refresh.
+            # Caption an image (registered SceneImage via JoySceneDBNG /
+            # legacy JoySceneDB, or an unregistered file via Joy directly).
+            # The caption is copied to the clipboard. For non-clip flows the
+            # backend force-stores caption_prompt (and caption_joy for the
+            # 1xlasm skin); the JSON written to the out-databus drives a JS
+            # .then() callback that mirrors those writes into the per-cell
+            # textareas so the DOM matches the DB without a manual reload.
             button_hidden_simg_editor_caption.click(
                 self._html_simg_editor_caption,
                 inputs=[databus_simg_editor_caption],
-                outputs=[],
+                outputs=[databus_simg_editor_caption_out],
+            ).then(
+                fn=None,
+                inputs=[databus_simg_editor_caption_out],
+                outputs=None,
+                js="""
+                (resultStr) => {
+                    if (!resultStr) return;
+                    let data;
+                    try { data = JSON.parse(resultStr); } catch (e) { return; }
+                    if (!data || !data.image_id) return;
+                    if (typeof data.caption_joy === 'string') {
+                        const cj = document.getElementById('simg-set_caption_joy-' + data.image_id);
+                        if (cj) {
+                            cj.value = data.caption_joy;
+                            const f = cj.closest('.simg-edit-field');
+                            if (f) f.classList.remove('simg-stale');
+                        }
+                    }
+                    if (typeof data.caption_prompt === 'string') {
+                        const cp = document.getElementById('simg-set_caption_prompt-' + data.image_id);
+                        if (cp) {
+                            cp.value = data.caption_prompt;
+                            const f = cp.closest('.simg-edit-field');
+                            if (f) f.classList.remove('simg-stale');
+                        }
+                    }
+                }
+                """,
             )
 
             # 'set' button (per-cell, on the caption field). The Python side
@@ -2212,23 +2251,28 @@ class AIDBSceneApp:
     # captions back to the DB - the result is only copied to the clipboard
     # and the user can decide what to do with it.
 
-    def _html_simg_editor_caption(self, data_str: Optional[str]) -> None:
+    def _html_simg_editor_caption(self, data_str: Optional[str]) -> str:
         """
-        Generates a caption for either a registered SceneImage (uses a
-        fresh JoySceneDB instance) or an unregistered image file (uses a
-        fresh Joy instance), copies the result to the clipboard and frees
-        the model.
+        Generates a caption for either a registered SceneImage (uses a fresh
+        JoySceneDBNG / JoySceneDB instance) or an unregistered image file
+        (uses a fresh Joy instance), copies the result to the clipboard and
+        frees the model.
+
+        Returns a JSON string `{image_id, caption_joy?, caption_prompt?}`
+        that the click's `.then()` JS callback uses to mirror the server-side
+        save into the per-cell textareas. Empty string when nothing was
+        persisted (clip-only flow, unregistered target, or failure).
         """
         if not data_str or not isinstance(data_str, str):
             gr.Warning('Caption: invalid request.')
-            return None
+            return ''
 
         try:
             data = json.loads(data_str)
         except Exception as e:
             print(f'ERROR: caption databus json parse: {e}')
             gr.Warning(f'Caption: malformed request: {e}')
-            return None
+            return ''
 
         target_type = data.get('type')
         target = data.get('target')
@@ -2236,15 +2280,15 @@ class AIDBSceneApp:
         clip_only = bool(data.get('clip_only', False))
         if not target_type or not target or not trigger:
             gr.Warning('Caption: incomplete request.')
-            return None
+            return ''
 
         if target_type == 'registered':
-            self._caption_registered(target, trigger, clip_only=clip_only)
-        elif target_type == 'unregistered':
+            return self._caption_registered(target, trigger, clip_only=clip_only) or ''
+        if target_type == 'unregistered':
             self._caption_unregistered(target, trigger)
-        else:
-            gr.Warning(f'Caption: unknown target type [{target_type}].')
-        return None
+            return ''
+        gr.Warning(f'Caption: unknown target type [{target_type}].')
+        return ''
 
     @staticmethod
     def _release_gpu(obj: Any) -> None:
@@ -2291,7 +2335,12 @@ class AIDBSceneApp:
 
     def _caption_registered(
         self, image_id: str, trigger: str, clip_only: bool = False
-    ) -> None:
+    ) -> str:
+        """Return JSON `{image_id, caption_joy?, caption_prompt?}` describing
+        the server-side save so the click's .then() callback can mirror the
+        write into the DOM textareas. Empty string when nothing was persisted
+        (clip_only / non-1xlasm without prompt / failures).
+        """
         # 1xlasm auto-persists into caption_joy, so refuse if a stored
         # caption_joy would be overwritten. clip_only paths skip persistence
         # entirely, so the guard does not apply.
@@ -2304,7 +2353,7 @@ class AIDBSceneApp:
                         f'1xlasm rejected: caption_joy already set for {image_id}. '
                         f'Clear it first to re-caption.'
                     )
-                    return None
+                    return ''
             except Exception as e:
                 print(f'WARN: 1xlasm pre-check failed [{image_id}]: {e}')
 
@@ -2347,7 +2396,7 @@ class AIDBSceneApp:
 
         if not caption:
             gr.Warning(f'No caption produced for image {image_id}.')
-            return None
+            return ''
 
         try:
             pyperclip.copy(caption)
@@ -2360,6 +2409,7 @@ class AIDBSceneApp:
         # (the canonical model output for that recipe). Other triggers leave
         # caption_joy alone — they're prompt-shaping helpers, not
         # caption-source-of-truth.
+        result: dict[str, Any] = {'image_id': image_id}
         if not clip_only:
             try:
                 sim = self._scm.scene_image_manager()
@@ -2367,8 +2417,10 @@ class AIDBSceneApp:
                 if simg is not None:
                     if prompt:
                         simg.set_caption_prompt(prompt)
+                        result['caption_prompt'] = prompt
                     if trigger == '1xlasm':
                         simg.set_caption_joy(caption)
+                        result['caption_joy'] = caption
                     simg.db_store()
                     if trigger == '1xlasm':
                         gr.Info(
@@ -2383,13 +2435,21 @@ class AIDBSceneApp:
             except Exception as e:
                 print(f'ERROR: caption persist [{image_id}]: {e}')
                 gr.Warning(f'Caption save failed: {e}')
+                # state of DOM is uncertain; bail without a result update
+                return ''
 
         preview = caption if len(caption) <= 80 else caption[:77] + '...'
         gr.Info(
             f'Caption copied to clipboard: {preview}',
             duration=2.5,
         )
-        return None
+
+        # Only emit a result when there's something for the .then() callback
+        # to update (i.e. non-clip flows that wrote to caption_joy or
+        # caption_prompt). Clip-only paths return empty so the JS no-ops.
+        if 'caption_joy' in result or 'caption_prompt' in result:
+            return json.dumps(result)
+        return ''
 
     # ------------------------------------------------------------------
     # per-cell server refresh

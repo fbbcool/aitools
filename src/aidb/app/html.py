@@ -85,6 +85,10 @@ class AppHtml:
         return AppHtml.make_elem_id_databus_textbox('simg_editor_caption')
 
     @staticmethod
+    def elem_id_simg_editor_caption_result_databus() -> str:
+        return AppHtml.make_elem_id_databus_textbox('simg_editor_caption_out')
+
+    @staticmethod
     def elem_id_simg_editor_set_button() -> str:
         return AppHtml.make_elem_id_hidden_button('simg_editor_set')
 
