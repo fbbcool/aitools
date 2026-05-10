@@ -44,6 +44,14 @@
               ]
             },
             {
+              "name": "leggy",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} has big calves.",
+              "migration": [
+                "2026-05-10T20:00:00+02:00: renamed from 'b_busty' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_busty' in the DB must be relabeled to 'busty' before training, or until that's done a runtime alias must map them."
+              ]
+            },
+            {
               "name": "busty",
               "description": "",
               "expansion": "The {entities.primary.phrase} has prominently large breasts.",
@@ -63,6 +71,14 @@
               "name": "curvy",
               "description": "",
               "expansion": "The {entities.primary.phrase} has curvy hourglass proportions.",
+              "migration": [
+                "2026-05-10T20:00:00+02:00: renamed from 'b_curvy' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_curvy' in the DB must be relabeled to 'curvy' before training, or until that's done a runtime alias must map them."
+              ]
+            },
+            {
+              "name": "bigass",
+              "description": "",
+              "expansion": "The {entities.primary.phrase} has a big round ass.",
               "migration": [
                 "2026-05-10T20:00:00+02:00: renamed from 'b_curvy' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_curvy' in the DB must be relabeled to 'curvy' before training, or until that's done a runtime alias must map them."
               ]
@@ -136,6 +152,12 @@
               "name": "standing",
               "description": "The woman is standing upright on her feet.",
               "expansion": "The {entities.primary.phrase} is standing upright.",
+              "migration": []
+            },
+            {
+              "name": "lying",
+              "description": "The woman is lying.",
+              "expansion": "The {entities.primary.phrase} is lying.",
               "migration": []
             },
             {
@@ -312,6 +334,12 @@
               "migration": []
             },
             {
+              "name": "lifted",
+              "description": "",
+              "expansion": "The {entities.secondary.phrase} is lifted by the {entities.primary.phrase}.",
+              "migration": []
+            },
+            {
               "name": "perched",
               "description": "",
               "expansion": "The {entities.secondary.phrase} is in a sitting position, typically seated on a body part of the {entities.primary.phrase}.",
@@ -323,6 +351,12 @@
               "name": "standing",
               "description": "The man is standing upright on his feet.",
               "expansion": "The {entities.secondary.phrase} is standing upright.",
+              "migration": []
+            },
+            {
+              "name": "lying",
+              "description": "The man is lying.",
+              "expansion": "The {entities.secondary.phrase} is lying.",
               "migration": []
             },
             {
@@ -369,7 +403,7 @@
     "description": "The interaction between the {entities.primary.phrase} and the {entities.secondary.phrase} is the central subject of every image.",
     "rules": [
       "Open every caption with a single COMPLETE sentence (subject + verb + object) that explicitly names BOTH '{entities.primary.phrase}' AND '{entities.secondary.phrase}' together — e.g. 'This image features a {entities.primary.phrase} and a {entities.secondary.phrase}.', 'The {entities.primary.phrase} holds the {entities.secondary.phrase} in her palm.'. If unsure how to combine the two, default to the literal opener 'This image features a {entities.primary.phrase} and a {entities.secondary.phrase}.' as the first sentence. Never a noun-phrase fragment. Setting, pose, clothing, hair, breasts, background, lighting, and camera angle come strictly AFTER this opener.",
-      "If either figure is naked, attach the word \"naked\" to that figure ONCE at its first reference in the caption (e.g., \"The {entities.primary.phrase}, naked, …\" or \"The naked {entities.secondary.phrase} …\"). After that first mention, NEVER use \"naked\", \"nude\", \"undressed\", or \"unclothed\" again for that same figure. Anti-pattern example: \"The xlgts woman holds the naked xlasm man. The naked xlasm man smiles.\" is WRONG — the second sentence must say \"The xlasm man smiles.\" (no second \"naked\").",
+      "If either figure is naked, attach the word \"naked\" to that figure ONCE at its first reference in the caption (e.g., \"The naked {entities.secondary.phrase} …\"). After that first mention, NEVER use \"naked\", \"nude\", \"undressed\", or \"unclothed\" again for that same figure. Anti-pattern example: \"The xlgts woman holds the naked xlasm man. The naked xlasm man smiles.\" is WRONG — the second sentence must say \"The xlasm man smiles.\" (no second \"naked\").",
       "Describe the interaction in detail using specific verbs.",
       "Use compositional position references ('at her ankle', 'at her hip level', 'in her palm', 'on her shoulder') — composition, not size.",
       "Do not invent details that are not visible.",
@@ -580,6 +614,30 @@
       "act": {
         "description": "Combined sexual acts involving both entities.",
         "labels": [
+          {
+            "name": "she_look_at_him",
+            "description": "",
+            "expansion": "She is looking at him.",
+            "migration": []
+          },
+          {
+            "name": "she_look_at_penis",
+            "description": "",
+            "expansion": "She is looking at his penis.",
+            "migration": []
+          },
+          {
+            "name": "he_look_at_her",
+            "description": "",
+            "expansion": "He is looking at her.",
+            "migration": []
+          },
+          {
+            "name": "look_at_each",
+            "description": "",
+            "expansion": "They are looking at each other.",
+            "migration": []
+          },
           {
             "name": "sex",
             "description": "",
