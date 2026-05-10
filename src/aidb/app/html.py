@@ -179,16 +179,30 @@ class AppHtml:
         return json.dumps(AppHtml.make_cmd_data(type_obj, id, cmd, payload=payload, label=label))
 
     @staticmethod
-    def html_make_cmd_button(data_cmd: dict, checked: bool = False) -> str:
+    def html_make_cmd_button(
+        data_cmd: dict, checked: bool = False, toggle: bool = False
+    ) -> str:
+        """Render a styled cmd-bus button.
+
+        `toggle=False` (default) emits an `<input type="radio">` — used for
+        mutex pickers like the rating bar where exactly one option is
+        active. The browser checks the radio on click and never unchecks
+        it, which matches "select one of N" semantics.
+
+        `toggle=True` emits an `<input type="checkbox">` — used for label
+        toggles (legacy `labels`, ng `labels_ng`, scene labels/sets) where
+        clicking a checked button must visually un-check it. Checkboxes
+        toggle natively on click, so the UI state stays in sync with the
+        backend toggle without any JS state-tracking.
+        """
         type_obj = data_cmd.get('type', None)
         id = data_cmd.get('id', None)
         cmd = data_cmd.get('cmd', None)
         label = data_cmd.get('label', None)
         payload = str(data_cmd.get('payload', None))
 
-        checked_html = ''
-        if checked:
-            checked_html = 'checked'
+        checked_html = 'checked' if checked else ''
+        input_type = 'checkbox' if toggle else 'radio'
         onclick_js = f"""
         console.log("cmd button clicked!");
         event.stopPropagation();
@@ -207,7 +221,7 @@ class AppHtml:
             '\n', ' '
         ).replace('"', '&quot;')
         output_html = f"""
-            <input type="radio" id="{cmd}-{type_obj}-{id}-{payload}" {checked_html} onclick="{onclick_js}">
+            <input type="{input_type}" id="{cmd}-{type_obj}-{id}-{payload}" {checked_html} onclick="{onclick_js}">
             <label for="{cmd}-{type_obj}-{id}-{payload}">{label}</label>
             """
         return output_html
@@ -316,8 +330,9 @@ class AppHtml:
                 gap: 5px;
                 flex-wrap: wrap; /* Allow wrapping for smaller screens */
             }}
-            .operation-radio-group input[type="radio"] {{
-                display: none; /* Hide default radio button */
+            .operation-radio-group input[type="radio"],
+            .operation-radio-group input[type="checkbox"] {{
+                display: none; /* Hide default radio/checkbox box */
             }}
             .operation-radio-group label {{
                 padding: 5px 8px;
@@ -326,17 +341,18 @@ class AppHtml:
                 cursor: pointer;
                 font-size: 0.8em;
                 transition: all 0.2s ease;
-                background-color: #555555; /* Slightly lighter grey for radio buttons */
-                color: #ffffff; /* White font for radio button labels */
+                background-color: #555555; /* Slightly lighter grey for buttons */
+                color: #ffffff; /* White font for button labels */
             }}
-            .operation-radio-group input[type="radio"]:checked + label {{
+            .operation-radio-group input[type="radio"]:checked + label,
+            .operation-radio-group input[type="checkbox"]:checked + label {{
                 background-color: #4CAF50; /* Green for selected */
                 color: white;
                 border-color: #4CAF50;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             }}
             .operation-radio-group label:hover {{
-                background-color: #777777; /* Darker hover for radio buttons */
+                background-color: #777777; /* Darker hover for buttons */
             }}
             .operation-checkbox-group {{
                 display: flex;

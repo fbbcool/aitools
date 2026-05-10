@@ -113,11 +113,16 @@ class SceneImage:
         """Store the prompt that was sent to the captioner alongside the
         generated caption — the inputs (entity directive + interpolated
         labels + hint preamble) the model saw. Force-overwrites; not gated
-        on prior content. Useful for traceability.
+        on prior content. Updates `FIELD_TIMESTAMP_CAPTION_PROMPT` so the
+        set-editor batch caption can pick up images whose prompt is newer
+        than the persisted `caption_joy`.
         """
         if value is None:
             return
-        self._data |= {SceneDef.FIELD_CAPTION_PROMPT: str(value)}
+        self._data |= {
+            SceneDef.FIELD_CAPTION_PROMPT: str(value),
+            SceneDef.FIELD_TIMESTAMP_CAPTION_PROMPT: SceneDef.now_ts(),
+        }
 
     def set_hints(self, value: str) -> None:
         if value is None:

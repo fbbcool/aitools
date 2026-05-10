@@ -207,6 +207,27 @@ class Skin:
 
     # ---- caption-time helpers ----
 
+    def compile_user_prompt(self, applied_paths: list[str], hint: str = '') -> str:
+        """Compose the FULL user-role prompt for one image.
+
+        Mirrors the assembly inside `JoyNG.caption`:
+            default_prompt + directive
+            + (user_hint_preamble.format(hint=…) if hint else '')
+            + ''.join(render_label_prompts(applied_paths))
+            + post_prompt
+
+        Used as the canonical pre-compiled prompt that gets stored in
+        `FIELD_CAPTION_PROMPT`. The caption workflow picks it up verbatim
+        if the field is non-empty, otherwise it composes fresh.
+        """
+        parts: list[str] = [self.default_prompt, self.directive]
+        h = (hint or '').strip()
+        if h:
+            parts.append(self.user_hint_preamble.format(hint=h))
+        parts.extend(self.render_label_prompts(applied_paths))
+        parts.append(self.post_prompt)
+        return ''.join(parts)
+
     def render_label_prompts(self, applied: list[str]) -> list[str]:
         """For each applied label that this skin recognizes, return its
         rendered label-prompt sentence. Output is ordered by build order

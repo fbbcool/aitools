@@ -45,6 +45,7 @@ class SceneDef:
     FIELD_TIMESTAMP_UPDATED: Final = 'timestamp_updated'
     FIELD_TIMESTAMP_CAPTION: Final = 'timestamp_caption'
     FIELD_TIMESTAMP_CAPTION_JOY: Final = 'timestamp_caption_joy'
+    FIELD_TIMESTAMP_CAPTION_PROMPT: Final = 'timestamp_caption_prompt'
 
     FIELD_IMGS_EXCLUDE: Final = 'imgs_exclude'
     FIELD_SCENES_EXCLUDE: Final = 'scenes_exclude'

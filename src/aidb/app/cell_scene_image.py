@@ -346,6 +346,7 @@ class AppSceneImageCell:
                             label=lab.name,
                         ),
                         checked=path in applied,
+                        toggle=True,
                     )
                 group_html.append(
                     f'<div class="simg-labels-ng-group">'
@@ -386,6 +387,7 @@ class AppSceneImageCell:
                     label=label,
                 ),
                 checked=checked,
+                toggle=True,
             )
         return html
 
@@ -836,6 +838,7 @@ class AppSceneImageCell:
                     label=label,
                 ),
                 checked=checked,
+                toggle=True,
             )
 
         sets_html = ''
@@ -850,6 +853,7 @@ class AppSceneImageCell:
                     label=label,
                 ),
                 checked=checked,
+                toggle=True,
             )
 
         return f"""

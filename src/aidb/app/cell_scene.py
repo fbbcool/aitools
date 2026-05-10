@@ -180,6 +180,7 @@ class AppSceneCell:
                     label=label,
                 ),
                 checked=checked,
+                toggle=True,
             )
         return html
 
@@ -199,5 +200,6 @@ class AppSceneCell:
                     label=label,
                 ),
                 checked=checked,
+                toggle=True,
             )
         return html

@@ -373,6 +373,30 @@ def test_compute_labels_ng_empty(skin):
     assert compute_labels_ng([], skin) == ([], [])
 
 
+def test_compile_user_prompt_includes_directive_and_label(skin):
+    p = skin.compile_user_prompt(['primary.action.blowjob'], hint='')
+    assert p.startswith(skin.default_prompt)
+    assert skin.directive in p
+    assert skin.labels['primary.action.blowjob'] in p
+    assert '{hint}' not in p
+    # no hint-preamble emitted when hint is empty
+    assert skin.user_hint_preamble.format(hint='') not in p
+
+
+def test_compile_user_prompt_inlines_hint(skin):
+    p = skin.compile_user_prompt([], hint='she holds him close')
+    assert 'she holds him close' in p
+    # the {hint} placeholder is filled, not left raw
+    assert '{hint}' not in p
+
+
+def test_compile_user_prompt_no_labels_no_label_text(skin):
+    p = skin.compile_user_prompt([], hint='')
+    # no label expansions, just default_prompt + directive + post_prompt
+    for v in skin.labels.values():
+        assert v not in p
+
+
 def test_compute_labels_ng_preserves_input_order(skin):
     """Output paths follow input order (caller controls semantics)."""
     from ait.caption.skin import compute_labels_ng

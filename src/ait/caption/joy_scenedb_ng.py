@@ -107,15 +107,30 @@ class JoySceneDBNG:
         if hint:
             self._log(f'id [{image_id}]: using image hints [{hint}].')
 
+        # Prompt-pickup: if the SceneImage has a non-empty caption_prompt
+        # in the DB, use it verbatim — that is the canonical (possibly
+        # human-edited) prompt to send. Otherwise compose fresh from skin
+        # rules + label expansions + hint.
+        stored_prompt = (simg.data.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
+        if stored_prompt:
+            self._log(f'id [{image_id}]: using stored caption_prompt ({len(stored_prompt)} chars).')
+            user_content = stored_prompt
+        else:
+            user_content = self.skin.compile_user_prompt(labels, hint)
+            self._log(
+                f'id [{image_id}]: composed fresh caption_prompt '
+                f'({len(user_content)} chars).'
+            )
+
         prompt, caption = self._joy.caption(
             img=img,
             system_content=self.skin.directive,
-            user_content=self.skin.directive,
-            default_prompt=self.skin.default_prompt,
-            label_prompts=self.skin.render_label_prompts(labels),
-            user_hint_preamble=self.skin.user_hint_preamble,
-            user_hint=hint,
-            post_prompt=self.skin.post_prompt,
+            user_content=user_content,
+            default_prompt='',
+            label_prompts=(),
+            user_hint_preamble=None,
+            user_hint='',
+            post_prompt='',
         )
         self._log(f'prompt[{prompt}] caption[{caption}]')
 

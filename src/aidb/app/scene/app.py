@@ -1032,11 +1032,12 @@ class AIDBSceneApp:
         show_excluded: bool = False,
     ) -> str:
         """
-        Set-level batch caption restricted to the currently filtered ACTIVE
-        images of the selected set (rating range + hints/caption/caption_joy/
-        labels modes) whose `caption_joy` is empty. Excluded images are never
-        captioned. Mirrors `_html_simg_editor_caption_empty` but iterates a
-        SceneSet's images.
+        Set-level batch caption: re-runs JoyCaptionNG on every filtered
+        ACTIVE image in the selected set whose stored `caption_prompt` is
+        non-empty AND newer than its `caption_joy` (or where `caption_joy`
+        is empty). Images with empty `caption_prompt` are skipped — the
+        compile step (`/update_caption_prompt`) is the upstream that
+        populates this field. Excluded images are never captioned.
         """
         refresh_args = (
             name, rating_min, rating_max,
@@ -1060,13 +1061,26 @@ class AIDBSceneApp:
                 hints_mode, caption_mode, caption_joy_mode, labels_mode,
                 show_excluded=False,
             )
-            ids_empty = [
-                img.id
-                for img in imgs_filtered
-                if not img.data.get(SceneDef.FIELD_CAPTION_JOY)
-                and img.data.get(SceneDef.FIELD_LABELS)
-                and img.data.get(SceneDef.FIELD_HINTS)
-            ]
+            ids_empty: list[str] = []
+            for img in imgs_filtered:
+                d = img.data
+                cprompt = (d.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
+                if not cprompt:
+                    continue   # skip: no compiled prompt, nothing to caption against
+                cjoy = (d.get(SceneDef.FIELD_CAPTION_JOY) or '').strip()
+                if not cjoy:
+                    ids_empty.append(img.id)
+                    continue
+                ts_p = d.get(SceneDef.FIELD_TIMESTAMP_CAPTION_PROMPT)
+                ts_j = d.get(SceneDef.FIELD_TIMESTAMP_CAPTION_JOY)
+                # Only re-caption when the prompt is genuinely newer.
+                # Missing prompt-timestamp + present caption_joy → assume
+                # the prompt was set BEFORE we started timestamping it
+                # (legacy migration backfill); skip rather than re-run.
+                if ts_p is None:
+                    continue
+                if ts_j is None or ts_p > ts_j:
+                    ids_empty.append(img.id)
         except Exception as e:
             print(f'ERROR: caption-empty filter set [{name}]: {e}')
             gr.Warning(f'Failed to filter images: {e}')
@@ -1074,8 +1088,8 @@ class AIDBSceneApp:
 
         if not ids_empty:
             gr.Info(
-                'No selected images with empty caption_joy that also have at '
-                'least one label and non-empty hints.'
+                'No filtered images need captioning '
+                '(caption_prompt empty or older than caption_joy).'
             )
             return self._html_set_editor_open(*refresh_args)
 

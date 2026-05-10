@@ -4,13 +4,12 @@
   "description": "Two-entity giantess captioning skin. The xlgts woman is the larger figure; the xlasm man is the smaller adult-man partner. Trained for the gts dataset; carries a fine-tuned LoRA adapter for caption-quality on this domain.",
   "entities": {
     "primary": {
-      "description": "The giantess woman, the larger figure in the scene. Always identified by the trigger phrase 'xlgts woman'. The trigger carries her size concept on its own; do not describe her as 'giant', 'tall', 'huge', etc.",
+      "description": "The giantess woman, the larger figure. Trigger phrase: '{entities.primary.phrase}'.",
       "token": "xlgts",
       "phrase": "xlgts woman",
       "rules": [
-        "Always identify her using exactly the phrase '{entities.primary.phrase}'. Never substitute any other descriptor (forms of 'tall', 'large', 'giant', or any other size/magnitude word).",
-        "Never use size or magnitude words such as 'huge', 'towering', 'extremely tall', 'giant', 'enormous', 'massive', or any numerical heights anywhere in the caption — the trigger phrase carries the size concept on its own.",
-        "Do not describe her body type or breast prominence unless an explicit instruction later in this prompt authorizes it. Default to omitting body-type and breast descriptions entirely."
+        "Identify her ONLY as '{entities.primary.phrase}'. Do not use 'tall', 'large', 'giant', 'huge', 'towering', 'enormous', 'massive', 'colossal', or any numerical heights — the trigger phrase carries her size concept.",
+        "Do not describe her body type or breast prominence unless an explicit instruction later in this prompt authorizes it."
       ],
       "forbidden": [
         "giantess",
@@ -203,14 +202,13 @@
       }
     },
     "secondary": {
-      "description": "The adult man, the smaller figure in the scene. Always identified by the trigger phrase 'xlasm man'. He is always adult-proportioned regardless of how small he may appear in the composition.",
+      "description": "The adult man, the smaller figure. Trigger phrase: '{entities.secondary.phrase}'. Always adult-proportioned regardless of apparent size.",
       "token": "xlasm",
       "phrase": "xlasm man",
       "rules": [
-        "Always identify him using exactly the phrase '{entities.secondary.phrase}'. Never substitute any diminutive, age, or object-comparison word.",
-        "Never describe him with diminutives like 'tiny', 'little', 'small man', 'child', 'figurine', or any similar reductive term — he is always an adult man.",
+        "Identify him ONLY as '{entities.secondary.phrase}'. Do not use 'tiny', 'little', 'small', 'miniature', 'child', 'kid', 'boy', 'figurine', 'doll', 'toy', 'youth', 'shrunken', or any diminutive, age-reductive, or object-comparison term — he is always an adult man.",
         "Search carefully for him in the image; he can be hard to spot.",
-        "Do not describe the {entities.secondary.phrase}’s body build (do not say 'slim', 'muscular', 'toned', 'athletic', 'lean', 'fit') unless an explicit instruction later in this prompt authorizes it — describe only his pose, action, and visible state."
+        "Do not describe his body build (no 'slim', 'muscular', 'toned', 'athletic', 'lean', 'fit') unless an explicit instruction later in this prompt authorizes it."
       ],
       "forbidden": [
         "tiny",
@@ -368,14 +366,14 @@
     }
   },
   "interaction": {
-    "description": "The physical interaction and relationship between the {entities.primary.phrase} and the {entities.secondary.phrase} is the central subject of every image.",
+    "description": "The interaction between the {entities.primary.phrase} and the {entities.secondary.phrase} is the central subject of every image.",
     "rules": [
-      "Open every caption with a single sentence that explicitly names BOTH '{entities.primary.phrase}' AND '{entities.secondary.phrase}' together (typical form: 'This image features a {entities.primary.phrase} and a {entities.secondary.phrase}.' or 'The xlgts woman holds the xlasm man ...'). The first sentence MUST contain both trigger phrases. Setting, pose, clothing, hair, breasts, background, lighting, and camera angle come strictly AFTER this opening sentence — never before.",
-      "Describe the interaction first, in the greatest detail. Use the most specific verbs available.",
-      "Use compositional position references such as 'at her ankle', 'at her hip level', 'in her palm', 'on her shoulder' — this is composition, not size.",
-      "Clothing, hair, makeup, background, environment, lighting, and camera angle are secondary — describe them only after the interaction is fully described.",
+      "Open every caption with a single COMPLETE sentence (subject + verb + object) that explicitly names BOTH '{entities.primary.phrase}' AND '{entities.secondary.phrase}' together — e.g. 'This image features a {entities.primary.phrase} and a {entities.secondary.phrase}.', 'The {entities.primary.phrase} holds the {entities.secondary.phrase} in her palm.'. Never a noun-phrase fragment. Setting, pose, clothing, hair, breasts, background, lighting, and camera angle come strictly AFTER this opener.",
+      "If either figure is naked, attach the word \"naked\" to that figure ONCE at its first reference in the caption (e.g., \"The {entities.primary.phrase}, naked, …\" or \"The naked {entities.secondary.phrase} …\"). After that first mention, never use \"naked\", \"nude\", \"undressed\", or \"unclothed\" again for that same figure.",
+      "Describe the interaction in detail using specific verbs.",
+      "Use compositional position references ('at her ankle', 'at her hip level', 'in her palm', 'on her shoulder') — composition, not size.",
       "Do not invent details that are not visible.",
-      "Preserve every verb and body-part reference the user hint names verbatim — do NOT collapse 'thumb and index finger' into 'hand', 'palm' into 'hand', 'arm' into 'hand', 'wrapping around' into 'between', or 'inserted' into 'positioned'. Use the same body-part level (arm vs hand, palm vs hand) the hint gives."
+      "Preserve every verb and body-part reference the user hint names verbatim — do NOT collapse 'thumb and index finger' to 'hand', 'palm' to 'hand', 'arm' to 'hand', 'wrapping around' to 'between', or 'inserted' to 'positioned'. Use the same body-part level (arm vs hand, palm vs hand) the hint gives."
     ],
     "forbidden": [],
     "label_groups": {
@@ -717,9 +715,9 @@
   "default_set": "gts_v3",
   "_built": {
     "version": 1,
-    "built_at": "2026-05-10T15:27:14+02:00",
-    "source_hash": "sha256:a27186409c5d3dbe8bb8581b260a235de4929359ab06d5650e88a1a8831ca21f",
-    "directive": "This image features two figures together: a xlgts woman and a xlasm man.\n\nThe giantess woman, the larger figure in the scene. Always identified by the trigger phrase 'xlgts woman'. The trigger carries her size concept on its own; do not describe her as 'giant', 'tall', 'huge', etc. Always identify her using exactly the phrase 'xlgts woman'. Never substitute any other descriptor (forms of 'tall', 'large', 'giant', or any other size/magnitude word). Never use size or magnitude words such as 'huge', 'towering', 'extremely tall', 'giant', 'enormous', 'massive', or any numerical heights anywhere in the caption — the trigger phrase carries the size concept on its own. Do not describe her body type or breast prominence unless an explicit instruction later in this prompt authorizes it. Default to omitting body-type and breast descriptions entirely.\n\nThe adult man, the smaller figure in the scene. Always identified by the trigger phrase 'xlasm man'. He is always adult-proportioned regardless of how small he may appear in the composition. Always identify him using exactly the phrase 'xlasm man'. Never substitute any diminutive, age, or object-comparison word. Never describe him with diminutives like 'tiny', 'little', 'small man', 'child', 'figurine', or any similar reductive term — he is always an adult man. Search carefully for him in the image; he can be hard to spot. Do not describe the xlasm man’s body build (do not say 'slim', 'muscular', 'toned', 'athletic', 'lean', 'fit') unless an explicit instruction later in this prompt authorizes it — describe only his pose, action, and visible state.\n\nThe physical interaction and relationship between the xlgts woman and the xlasm man is the central subject of every image. Open every caption with a single sentence that explicitly names BOTH 'xlgts woman' AND 'xlasm man' together (typical form: 'This image features a xlgts woman and a xlasm man.' or 'The xlgts woman holds the xlasm man ...'). The first sentence MUST contain both trigger phrases. Setting, pose, clothing, hair, breasts, background, lighting, and camera angle come strictly AFTER this opening sentence — never before. Describe the interaction first, in the greatest detail. Use the most specific verbs available. Use compositional position references such as 'at her ankle', 'at her hip level', 'in her palm', 'on her shoulder' — this is composition, not size. Clothing, hair, makeup, background, environment, lighting, and camera angle are secondary — describe them only after the interaction is fully described. Do not invent details that are not visible. Preserve every verb and body-part reference the user hint names verbatim — do NOT collapse 'thumb and index finger' into 'hand', 'palm' into 'hand', 'arm' into 'hand', 'wrapping around' into 'between', or 'inserted' into 'positioned'. Use the same body-part level (arm vs hand, palm vs hand) the hint gives.",
+    "built_at": "2026-05-10T16:47:57+02:00",
+    "source_hash": "sha256:ba73cd0784535096ff00e0a5b8198aeb59be8f389babfd4508b0785f4f133e39",
+    "directive": "This image features two figures together: a xlgts woman and a xlasm man.\n\nThe giantess woman, the larger figure. Trigger phrase: 'xlgts woman'. Identify her ONLY as 'xlgts woman'. Do not use 'tall', 'large', 'giant', 'huge', 'towering', 'enormous', 'massive', 'colossal', or any numerical heights — the trigger phrase carries her size concept. Do not describe her body type or breast prominence unless an explicit instruction later in this prompt authorizes it.\n\nThe adult man, the smaller figure. Trigger phrase: 'xlasm man'. Always adult-proportioned regardless of apparent size. Identify him ONLY as 'xlasm man'. Do not use 'tiny', 'little', 'small', 'miniature', 'child', 'kid', 'boy', 'figurine', 'doll', 'toy', 'youth', 'shrunken', or any diminutive, age-reductive, or object-comparison term — he is always an adult man. Search carefully for him in the image; he can be hard to spot. Do not describe his body build (no 'slim', 'muscular', 'toned', 'athletic', 'lean', 'fit') unless an explicit instruction later in this prompt authorizes it.\n\nThe interaction between the xlgts woman and the xlasm man is the central subject of every image. Open every caption with a single COMPLETE sentence (subject + verb + object) that explicitly names BOTH 'xlgts woman' AND 'xlasm man' together — e.g. 'This image features a xlgts woman and a xlasm man.', 'The xlgts woman holds the xlasm man in her palm.'. Never a noun-phrase fragment. Setting, pose, clothing, hair, breasts, background, lighting, and camera angle come strictly AFTER this opener. If either figure is naked, attach the word \"naked\" to that figure ONCE at its first reference in the caption (e.g., \"The xlgts woman, naked, …\" or \"The naked xlasm man …\"). After that first mention, never use \"naked\", \"nude\", \"undressed\", or \"unclothed\" again for that same figure. Describe the interaction in detail using specific verbs. Use compositional position references ('at her ankle', 'at her hip level', 'in her palm', 'on her shoulder') — composition, not size. Do not invent details that are not visible. Preserve every verb and body-part reference the user hint names verbatim — do NOT collapse 'thumb and index finger' to 'hand', 'palm' to 'hand', 'arm' to 'hand', 'wrapping around' to 'between', or 'inserted' to 'positioned'. Use the same body-part level (arm vs hand, palm vs hand) the hint gives.",
     "labels": {
       "primary.attribute.muscular": "The xlgts woman has a muscular bodybuilder physique with visible muscle definition.",
       "primary.attribute.busty": "The xlgts woman has prominently large breasts.",
