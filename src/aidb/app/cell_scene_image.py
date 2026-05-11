@@ -177,6 +177,7 @@ class AppSceneImageCell:
             scene_url_str, label='url scene'
         )
         goto_scene_btn = AppSceneImageCell._html_goto_scene_button(obj.scene_id)
+        refresh_btn = AppSceneImageCell._html_refresh_button(obj.id, set_id)
 
         caption_btn_1xlasm = AppSceneImageCell._html_caption_button(
             target_type='registered',
@@ -236,6 +237,7 @@ class AppSceneImageCell:
                         {url_copy_btn}
                         {url_scene_copy_btn}
                         {goto_scene_btn}
+                        {refresh_btn}
                     </div>
                     <div class="simg-cell-actions-col">
                         {caption_btn_1xlasm}
@@ -666,6 +668,17 @@ class AppSceneImageCell:
             f'<label class="simg-prototype-toggle" for="{cb_id}">'
             f'<input type="checkbox" id="{cb_id}"{checked_attr} onchange="{js}">'
             f'prototype</label>'
+        )
+
+    @staticmethod
+    def _html_refresh_button(img_id: str, set_id: Optional[str] = None) -> str:
+        """Re-fetch this cell from the DB and swap it in place. Uses the
+        existing per-cell server-refresh databus wired in `scene/app.py`."""
+        js = AppHtml.js_cell_refresh_call(img_id, set_id or '', 'edit')
+        js = ('event.stopPropagation();' + js).replace('"', '&quot;')
+        return (
+            f'<button type="button" class="simg-copy-btn" onclick="{js}" '
+            f'title="reload this cell from the database">refresh</button>'
         )
 
     @staticmethod

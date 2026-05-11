@@ -67,9 +67,9 @@ constraints = [
   # naked-attribute rule (clothing-strict):
   "Each figure's clothing state is independent and must be evaluated from the image directly. A figure is 'naked' ONLY when no clothing is visible on them at all. If a figure wears any of: dress, skirt, top, shirt, tank top, blouse, lingerie, bra, panties, thong, stockings, tights, hosiery, gloves, robe, gown, harness, jacket, coat, leotard, corset, swimsuit — that figure is NOT naked, even if much skin is exposed. Apply 'naked' sparingly, only to a fully unclothed figure, ONCE at first reference (e.g. 'The naked {S} ...'). Never repeat 'naked', 'nude', 'undressed', or 'unclothed' for that same figure afterward. Anti-pattern: image shows the {P} wearing a dress or lingerie -> 'The {P}, naked, ...' is WRONG; she is clothed.",
   # if NO primary.attribute.* applied:
-  "Do not use 'muscular', 'bodybuilder', 'busty', 'voluptuous', 'slim', 'slender', 'lean', 'curvy', 'hourglass', 'cleavage', 'large breasts', 'big breasts'.",
-  # if NO secondary.attribute.* applied:
-  "Do not describe his body build (no 'slim', 'muscular', 'lean', 'toned').",
+  "Do not use 'muscular', 'muscle', 'bodybuilder', 'ripped', 'defined', 'busty', 'voluptuous', 'slim', 'slender', 'lean', 'athletic build', 'curvy', 'hourglass', 'cleavage', 'large breasts', 'big breasts', 'leggy', 'long legs', 'big calves', 'big ass', 'big butt', 'round ass', 'bubble butt', 'thick thighs', 'hairy', 'pubic hair'.",
+  # always emit (secondary.attribute.* only carries penis-visibility info, not build authorization):
+  "Do not describe his body build (no 'slim', 'muscular', 'lean', 'toned', 'ripped', 'defined') and do not exaggerate his penis ('huge cock', 'massive cock', 'enormous penis', 'oversized penis').",
 ]
 closer = "Describe the interaction first; clothing, hair, makeup, background, lighting, and camera angle come strictly after."
 prompt = ' '.join([default_prompt, opener, hint_section, *labels, *constraints, closer])

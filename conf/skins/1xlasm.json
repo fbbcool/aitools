@@ -37,7 +37,7 @@
           "labels": [
             {
               "name": "muscular",
-              "description": "",
+              "description": "She is extremely muscular like a bodybuilder.",
               "expansion": "The {entities.primary.phrase} has a muscular bodybuilder physique with visible muscle definition.",
               "migration": [
                 "2026-05-10T20:00:00+02:00: renamed from 'b_muscular' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_muscular' in the DB must be relabeled to 'muscular' before training, or until that's done a runtime alias must map them."
@@ -45,7 +45,7 @@
             },
             {
               "name": "leggy",
-              "description": "",
+              "description": "Her calves are very muscular, round and big.",
               "expansion": "The {entities.primary.phrase} has big calves.",
               "migration": [
                 "2026-05-10T20:00:00+02:00: renamed from 'b_busty' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_busty' in the DB must be relabeled to 'busty' before training, or until that's done a runtime alias must map them."
@@ -53,7 +53,7 @@
             },
             {
               "name": "busty",
-              "description": "",
+              "description": "Her breasts are really round and large!",
               "expansion": "The {entities.primary.phrase} has prominently large breasts.",
               "migration": [
                 "2026-05-10T20:00:00+02:00: renamed from 'b_busty' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_busty' in the DB must be relabeled to 'busty' before training, or until that's done a runtime alias must map them."
@@ -77,7 +77,7 @@
             },
             {
               "name": "bigass",
-              "description": "",
+              "description": "Her ass is sexy round and big and prominently shown by her.",
               "expansion": "The {entities.primary.phrase} has a big round ass.",
               "migration": [
                 "2026-05-10T20:00:00+02:00: renamed from 'b_curvy' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_curvy' in the DB must be relabeled to 'curvy' before training, or until that's done a runtime alias must map them."
@@ -85,7 +85,7 @@
             },
             {
               "name": "hairy",
-              "description": "",
+              "description": "She is a raw natural beauty, unshaven and sexy with a hairy pubic area.",
               "expansion": "The {entities.primary.phrase}s pubic area is hairy.",
               "migration": [
                 "2026-05-10T20:00:00+02:00: renamed from 'b_hairy' the b_ prefix was dropped because label groups now carry the attribute taxonomy. SceneImages still tagged with 'b_hairy' in the DB must be relabeled to 'hairy' before training, or until that's done a runtime alias must map them."
