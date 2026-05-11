@@ -58,6 +58,7 @@ For each image with non-empty `caption_joy`:
 3. **missing trigger** — `skin.missing_triggers(cj)`. Caption is missing one of the entity phrases (`xlgts woman` / `xlasm man`) entirely.
 4. **opener** — first sentence (split on `.!?`) does not contain BOTH trigger phrases.
 5. **naked-multi** — `naked|nude|undressed|unclothed` appears more than once for the SAME figure (nearest-trigger attribution in either direction; flag if any figure has count > 1).
+6. **photo_filler** — content-free metadata sentence like *"The image is a photograph."* or *"The image is a highly detailed, realistic photograph."* Regex: `^(?:The image|This image|This|It)\s+is\s+(?:a |an )?(?:[A-Za-z\-]+(?:,\s*|\s+))*(?:photograph|photo|picture|image)\s*\.?\s*$` (case-insensitive). Sentences with trailing content like *"photograph with a neutral gray background."* are NOT matched (the regex requires the noun to terminate the sentence).
 
 ## Auto-fix recipe
 
@@ -65,6 +66,7 @@ For each image with non-empty `caption_joy`:
 - **body-type** → for each unauthorized body-type word still present, strip occurrences via the skin's compiled regex (`skin._body_type_res`). Same whitespace cleanup.
 - **opener** → if the first sentence is missing both phrases, prepend `"This image features a {primary.phrase} and a {secondary.phrase}."` as the new opening sentence.
 - **forbidden vocab** → drop the entire SENTENCE containing the forbidden word. If every sentence has a violation, leave the caption alone for human review.
+- **photo_filler** → drop the entire matched sentence. Run BEFORE the forbidden-vocab pass so the count of dropped sentences isn't confused with a forbidden-word fix.
 - **missing trigger** → no auto-fix; flag only. (Re-captioning the image — `/update_caption_joy <id>` — is the right path.)
 
 For each modified caption, persist via `simg.set_caption_joy(fixed)` (which bumps `timestamp_caption_joy`). When `FIELD_CAPTION` was identical to `FIELD_CAPTION_JOY` before the fix, also update `set_caption(fixed)`.
