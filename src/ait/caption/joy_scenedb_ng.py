@@ -103,9 +103,13 @@ class JoySceneDBNG:
             return None, None
 
         labels = self._collect_labels(simg, url)
-        hint = simg.data.get(SceneDef.FIELD_HINTS, '') or ''
+        hint_raw = simg.data.get(SceneDef.FIELD_HINTS, '') or ''
+        # Treat literal 'none' (case-insensitive) as a no-hint sentinel.
+        hint = hint_raw if hint_raw.strip().lower() != 'none' else ''
         if hint:
             self._log(f'id [{image_id}]: using image hints [{hint}].')
+        elif hint_raw.strip().lower() == 'none':
+            self._log(f'id [{image_id}]: hint is "none" sentinel — skipped.')
 
         # Prompt-pickup: if the SceneImage has a non-empty caption_prompt
         # in the DB, use it verbatim — that is the canonical (possibly

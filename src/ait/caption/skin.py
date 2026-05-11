@@ -216,13 +216,17 @@ class Skin:
             + ''.join(render_label_prompts(applied_paths))
             + post_prompt
 
+        The literal string 'none' (case-insensitive) in `hint` is treated
+        as no-hint; the preamble is suppressed. Useful for SceneImages
+        whose curator typed 'none' to signal "no extra hint applies".
+
         Used as the canonical pre-compiled prompt that gets stored in
         `FIELD_CAPTION_PROMPT`. The caption workflow picks it up verbatim
         if the field is non-empty, otherwise it composes fresh.
         """
         parts: list[str] = [self.default_prompt, self.directive]
         h = (hint or '').strip()
-        if h:
+        if h and h.lower() != 'none':
             parts.append(self.user_hint_preamble.format(hint=h))
         parts.extend(self.render_label_prompts(applied_paths))
         parts.append(self.post_prompt)

@@ -50,6 +50,8 @@ Iterator selection:
 For each candidate, apply remaining filters client-side:
 - `('rating', op)` — compare `img.data.get(FIELD_RATING, RATING_INIT)` against the value using `op`.
 
+Hint sentinel: if the SceneImage's `hints` field is the literal string `'none'` (case-insensitive after `.strip()`), treat it as no hint — skip the `Preserve every verb…` line in the composed prompt. The runtime (`JoySceneDBNG`, `Skin.compile_user_prompt`) does the same normalization, so caption-time and prompt-compile-time stay in sync.
+
 Then compose using the recipe and persist via `simg.set_caption_prompt(p) + simg.db_store()`.
 
 Recipe (deterministic):
