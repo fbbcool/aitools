@@ -12,9 +12,11 @@ Only **done** images count, in any set. **Done** = non-prototype, active image w
 - **total target images:** 1000
 - **lora rank:** 32
 
-### Real concepts (DEACTIVATED — skip for now)
+### Body variants — out of scope for gts-v3
 
-The four real concepts (`busty` / `fbb` / `leggy` / `hairy` SceneSets, 50 each) are part of the v1 plan but **deactivated** for the current report. Do not load any real sets, do not include real concepts in the tables, and do not include real-side todos in the urgency list. They will be reactivated later.
+Female body-type concepts (`busty` / `fbb` / `leggy` / `hairy` / `curvy` / etc.) and their dedicated SceneSets are **intentionally not part of the gts-v3 training set**. They are handled by a separate family of body-variant LoRAs trained AFTER gts-v3 ships, against a `snofs+gts-v3` merged base — see the body-LoRA architecture note in the project plan. Do not load body-variant sets, do not include body-variant concepts as report rows, and do not generate body-variant todos in the urgency list.
+
+Nuance worth keeping: **body-attribute labels on otherwise gts-focused images stay applied.** Example — an insertion scene where the woman is also tagged `primary.attribute.busty` remains in the gts-v3 set with the busty label intact. gts-v3 then learns "given busty context, render this way" as a *conditional* feature, and the later body-LoRAs can compose with that knowledge cleanly. What's excluded is *images whose primary subject is the body variant itself* (e.g. busty-woman portraits with no gts/size context) — those become training data for the body LoRAs, not gts-v3.
 
 ### GTS concepts (from the skin JSON)
 
