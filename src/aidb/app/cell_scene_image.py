@@ -169,7 +169,9 @@ class AppSceneImageCell:
 
         url = obj.url_from_data
         url_str = str(url) if url is not None else ''
-        url_copy_btn = AppSceneImageCell._html_copy_static_button(url_str, label='url')
+        url_copy_btn = AppSceneImageCell._html_url_clipspace_button(
+            url_str, img_id=obj.id, label='url'
+        )
 
         scene_url = obj.data.get(SceneDef.FIELD_URL_PARENT)
         scene_url_str = str(scene_url) if scene_url else ''
@@ -237,12 +239,12 @@ class AppSceneImageCell:
                         {url_copy_btn}
                         {url_scene_copy_btn}
                         {goto_scene_btn}
-                        {refresh_btn}
                     </div>
                     <div class="simg-cell-actions-col">
                         {caption_btn_1xlasm}
                         {caption_btn_1xlasm_clip}
                         {caption_btn_gts}
+                        <span class="simg-cell-actions-refresh">{refresh_btn}</span>
                     </div>
                 </div>
                 <div class="simg-edit-labels-col">
@@ -668,6 +670,66 @@ class AppSceneImageCell:
             f'<label class="simg-prototype-toggle" for="{cb_id}">'
             f'<input type="checkbox" id="{cb_id}"{checked_attr} onchange="{js}">'
             f'prototype</label>'
+        )
+
+    @staticmethod
+    def _html_url_clipspace_button(value: str, img_id: str, label: str = 'url') -> str:
+        """url button that (a) copies the URL string to the clipboard AND
+        (b) fires the `image_to_tmp` cmd so the server copies the actual
+        image file to $AIT_TMP (mirrors the `ait_tmp_clipspace` fish helper).
+        """
+        if value is None:
+            value = ''
+        value_js = (
+            value.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n').replace('\r', '')
+        )
+        elem_id_btn = AppHtml.elem_id_cmd_button()
+        elem_id_bus = AppHtml.elem_id_cmd_databus()
+        cmd_data = AppHtml.make_cmd_data(
+            'image', img_id, 'image_to_tmp', label='url-to-tmp'
+        )
+        cmd_json = json.dumps(cmd_data)
+
+        js = f"""
+        event.stopPropagation();
+        console.log('[url-clipspace] click; img={img_id}');
+        const btnEl = event.currentTarget;
+        const v = '{value_js}';
+        const ok = function() {{
+            const orig = btnEl.textContent;
+            btnEl.textContent = 'copied';
+            btnEl.classList.add('simg-copy-btn-ok');
+            setTimeout(function() {{
+                btnEl.textContent = orig;
+                btnEl.classList.remove('simg-copy-btn-ok');
+            }}, 800);
+        }};
+        try {{
+            if (navigator.clipboard) {{
+                navigator.clipboard.writeText(v).then(ok).catch(function() {{ ok(); }});
+            }} else {{
+                const ta = document.createElement('textarea');
+                ta.value = v; document.body.appendChild(ta);
+                ta.select(); document.execCommand('copy');
+                document.body.removeChild(ta); ok();
+            }}
+        }} catch (e) {{ console.warn('[url-clipspace] clipboard fail', e); ok(); }}
+        try {{
+            const bus = document.querySelector('#{elem_id_bus} textarea');
+            if (bus) {{
+                bus.value = '{cmd_json}';
+                bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                const trig = document.getElementById('{elem_id_btn}');
+                if (trig) {{ trig.click(); console.log('[url-clipspace] cmd-bus fired'); }}
+                else {{ console.warn('[url-clipspace] cmd button not found'); }}
+            }} else {{ console.warn('[url-clipspace] cmd bus textarea not found'); }}
+        }} catch (e) {{ console.warn('[url-clipspace] cmd-bus fail', e); }}
+        """.replace('\n', ' ').replace('"', '&quot;')
+        safe_label = html_lib.escape(label, quote=True)
+        return (
+            f'<button type="button" class="simg-copy-btn" onclick="{js}" '
+            f'title="copy URL to clipboard + copy file to $AIT_TMP">'
+            f'{safe_label}</button>'
         )
 
     @staticmethod
@@ -1522,6 +1584,15 @@ class AppSceneImageCell:
                 justify-content: center;
                 gap: 6px;
                 padding: 6px 4px 4px 4px;
+            }
+            /* Refresh button sits in the actions column, pushed to the bottom
+               (and naturally left-aligned via the column's flex-start). */
+            .image-item.simg-edit-cell .simg-cell-actions-col {
+                flex: 1 1 auto;
+            }
+            .image-item.simg-edit-cell .simg-cell-actions-refresh {
+                margin-top: auto;
+                align-self: flex-start;
             }
             .simg-exclude-toggle,
             .simg-prototype-toggle {

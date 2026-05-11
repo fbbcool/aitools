@@ -1,4 +1,7 @@
 import json
+import os
+import shutil
+from pathlib import Path
 from typing import Any, Final, Literal, Optional
 
 import base64
@@ -489,6 +492,8 @@ class AppHelper:
         payload = data.get('payload', None)
         if cmd == 'to_clipspace':
             self._cmd_attr_to_clipspace(obj, payload)
+        if cmd == 'image_to_tmp':
+            self._cmd_image_to_tmp(obj, payload)
         if cmd == 'db_query':
             self._cmd_db_query(obj, payload)
         if cmd == 'db_query_multi':
@@ -505,6 +510,32 @@ class AppHelper:
         clipspace = str(getattr(obj, attr))
         if clipspace:
             pyperclip.copy(clipspace)
+        return None
+
+    @classmethod
+    def _cmd_image_to_tmp(cls, obj: Sceneical, payload: Any) -> None:
+        """Copy the SceneImage's file to $AIT_TMP (mirrors the
+        `ait_tmp_clipspace` fish function: cp <image-url> $AIT_TMP)."""
+        if not isinstance(obj, SceneImage):
+            gr.Warning('[image_to_tmp]: obj is not a SceneImage')
+            return None
+        url = obj.url_from_data
+        if url is None:
+            gr.Warning('[image_to_tmp]: image has no url')
+            return None
+        ait_tmp_raw = os.environ.get('AIT_TMP', '')
+        if not ait_tmp_raw:
+            gr.Warning('[image_to_tmp]: AIT_TMP env var not set')
+            return None
+        ait_tmp = Path(ait_tmp_raw)
+        ait_tmp.mkdir(parents=True, exist_ok=True)
+        src = Path(url)
+        dst = ait_tmp / src.name
+        try:
+            shutil.copy(src, dst)
+            print(f'[image_to_tmp]: copied {src} -> {dst}')
+        except Exception as e:
+            gr.Warning(f'[image_to_tmp]: copy failed: {e}')
         return None
 
     @classmethod
