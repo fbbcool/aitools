@@ -1,0 +1,65 @@
+---
+description: Run the full caption pipeline (compose prompt → caption → validate) for ONE image by ObjectId. No batch mode — single-image only.
+argument-hint: "<image-id>"
+---
+
+`$ARGUMENTS` must be a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`). Anything else (empty, filter expression like `set=…`, multiple ids) is rejected with a short error — this command is explicitly single-image.
+
+## Pipeline
+
+For the given image id, run these three stages in order. If any stage hard-errors (image not found, GPU OOM, etc.), abort and report which stage failed.
+
+### 1. Compose caption_prompt (per-image judgment mode)
+
+Use the per-image recipe from `/update_caption_prompt`'s "Per-image mode": pull `labels_ng` + `hints` + `Skin('1xlasm')`, hand-craft a tight prompt (~400-1000 chars) that bakes in only the rules that matter for this image, persist via `simg.set_caption_prompt(p) + simg.db_store()`.
+
+Hint sentinel: a `hints` value equal to the literal string `'none'` (case-insensitive, stripped) means no hint — skip the *"Preserve every verb…"* lead-in.
+
+If `labels_ng` is empty, abort: this command refuses to caption an unlabeled image.
+
+### 2. Run JoyCaption (force=True)
+
+GPU prerequisite: `nvidia-smi --query-gpu=memory.free` ≥ 16 GiB. If not, ask the user to free the device and stop.
+
+```python
+from ait.caption.joy_scenedb_ng import JoySceneDBNG
+db = JoySceneDBNG(config='prod', skin='1xlasm', verbose=1, force=True, lora=True)
+prompt, caption = db.caption_image(image_id)
+if not caption:
+    abort('captioner returned no caption')
+simg = sim.img_from_id(image_id)
+if prompt:
+    simg.set_caption_prompt(prompt)
+simg.set_caption_joy(caption)
+simg.db_store()
+```
+
+`force=True` bypasses the freshness check; the stored caption_prompt from stage 1 is sent verbatim.
+
+### 3. Validate + auto-fix
+
+Use the single-image pipeline from `/validate_captions`: audit `caption_joy` against `skin.caption_violations` / `skin.body_type_warnings` / `skin.missing_triggers` / opener / naked-multi, then auto-fix the mechanically tractable categories (naked-multi, body-type, opener, forbidden vocab). Missing-trigger is flagged only — no auto-fix.
+
+If a fix is applied, persist `simg.set_caption_joy(fixed)`. When `FIELD_CAPTION` was identical to `FIELD_CAPTION_JOY` before stage 2, also update `set_caption(fixed)` so the manual caption stays in sync.
+
+## Report
+
+Print under ~25 lines, with these sections:
+
+1. **header** — image id, labels_ng, hint (or `<none>`)
+2. **stage 1** — composed caption_prompt char count (and delta from previous if non-empty)
+3. **stage 2** — captioner output (first ~200 chars of caption_joy, or truncated marker)
+4. **stage 3** — issues before/after with the categories that fired; auto-fixes applied; final caption diff (BEFORE → AFTER) if anything changed
+5. one-line summary: `caption_image <id>: prompt=N chars, caption=N chars, fixes=[…], status=clean|flagged`
+
+## Access rights
+
+Read access to canonical collections + write to `FIELD_CAPTION` / `FIELD_CAPTION_JOY` / `FIELD_CAPTION_PROMPT` (single image, fully reversible by re-running) can be done w/o yes from user. Captioning consumes ~16 GiB VRAM for ~10s; ask before starting if the GPU is contested.
+
+## See also
+
+- `/update_caption_prompt <id>` — stage 1 only
+- `/update_caption_joy <id>` — stage 2 only
+- `/validate_captions <id>` — stage 3 only
+
+This command is the orchestrator; use it when you want the whole loop on one image without three round trips.
