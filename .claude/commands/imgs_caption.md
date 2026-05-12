@@ -1,32 +1,36 @@
 ---
-description: Caption curated images in batch. Default: only those whose caption_joy is stale (suggestion newer than caption_joy, or caption_joy empty). With `force`: every curated image regardless of freshness. Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Runs the full /img_caption pipeline (compile prompt → caption → validate+fix) on each match.
+description: Caption curated images whose caption_joy is stale wrt caption_prompt. Default: caption_prompt non-empty AND (caption_joy empty OR ts_caption_prompt > ts_caption_joy). With `force`: every curated image with a non-empty caption_prompt, regardless of freshness. Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Uses the STORED caption_prompt verbatim (Stage 1 is a no-op); Stage 2 captions via joy_server; Stage 3 validates + auto-fixes. Upstream is /imgs_caption_prompt.
 argument-hint: "[force] [set=<name> | rating[==|>=|<=|>|<]<n> | limit=<n> | …]"
 ---
 
-`$ARGUMENTS` is an optional space-separated list of bare-word flags and `key=value` / `key<op>value` filter terms (connectives like `for` / `and` / `where` ignored). Empty → all curated images with stale `caption_joy`, DB-wide. Supported terms:
+`$ARGUMENTS` is an optional space-separated list of bare-word flags and `key=value` / `key<op>value` filter terms (connectives like `for` / `and` / `where` ignored). Empty → all curated images with a non-empty `caption_prompt` and stale `caption_joy`, DB-wide. Supported terms:
 
-- `force` — bare flag. Caption every curated image regardless of `caption_joy` freshness (the default-mode recency check is skipped). Useful after a captioner refresh (LoRA swap, skin rule change) when every existing caption should be regenerated.
+- `force` — bare flag. Caption every curated image with a non-empty `caption_prompt` regardless of `caption_joy` freshness (the recency check is skipped). Useful after a captioner refresh (LoRA swap, skin rule change) when every existing caption should be regenerated against the current prompts.
 - `set=<name>` — restrict to a SceneSet's active members.
 - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
 - `limit=<n>` — cap the batch at N images (default unlimited). Use when the pending list is large and the curator wants to review the first batch before continuing.
 
 `force` composes with the other filters — e.g. `force set=gts_v3 limit=10` recaptions the 10 newest curated images in `gts_v3` whether or not their captions were already fresh.
 
+**A curated image with an EMPTY `caption_prompt` is NEVER in scope** — even with `force`. Run `/imgs_caption_prompt` first to compile the prompt; that's this command's upstream. The report counts and lists such images so the curator knows.
+
 Same parser as `/imgs_update_caption_prompt`, extended with the `force` bare-word flag. A 24-char ObjectId is NOT a valid argument — use `/img_caption <id>` for single-image work.
 
 ## Why this exists
 
-The `/imgs_suggest` → curator-review → caption loop produces a steady stream of images that "just became ready". They have:
+This command sits **downstream of `/imgs_caption_prompt`** in the curator workflow:
 
-- a `_SUGGESTION` exists (Claude ran `/img_suggest` or `/imgs_suggest`)
-- canonical `labels_ng` + `hints` are populated (curator promoted the suggestion fields, possibly with edits)
-- but `caption_joy` is empty or older than the curator's promotion
+```
+/imgs_suggest            — Claude probes joy, writes _SUGGESTION fields
+  ↓ curator review + promote
+/imgs_caption_prompt     — judgment-mode caption_prompt compile for curated imgs
+  ↓
+/imgs_caption            — this command: caption + validate+fix using the stored prompt
+```
 
-"Curated" in this command's name is shorthand for the three-conjunct predicate: **suggestion AND hint AND labels are all non-empty**. The recency check then narrows it to the images that actually need a new caption.
+"Curated" is shorthand for **labels_ng AND hints AND suggestion all non-empty** — the curator has finished labeling and the suggestion fields remain as the provenance signal. The recency check then narrows to images whose `caption_joy` is older than the current `caption_prompt` (or empty).
 
-This command captures exactly that cohort and runs the full `/img_caption` pipeline (Stage 1 prompt compile + Stage 2 captioner + Stage 3 validate-and-fix) on each. It's the batch counterpart of `/img_caption` for the "curator just finished reviewing N images" case.
-
-The selection key is the **suggestion timestamp**, not `caption_prompt`. The curator may not have re-run `/imgs_update_caption_prompt` after promoting; that's fine — Stage 1 in this command compiles a fresh prompt deterministically (bulk-mode recipe, no per-image judgment).
+The Stage 1 prompt-compile work is **already done by `/imgs_caption_prompt`** and stored in `FIELD_CAPTION_PROMPT`. This command uses that stored prompt verbatim — no recompose, no overwrite. That way the high-quality judgment-mode prompts are preserved.
 
 ## Selection filter
 
@@ -44,24 +48,24 @@ def is_curated(img) -> bool:
 
 
 def is_curated_pending(img, *, force: bool = False) -> bool:
-    """Default: curated AND suggestion is newer than caption_joy (or caption_joy empty).
-    With force=True: curated, regardless of caption_joy freshness."""
+    """Curated AND non-empty caption_prompt AND caption_joy is stale wrt caption_prompt.
+    With force=True: only the recency check is skipped — curated + non-empty prompt
+    are still required.
+    """
     if not is_curated(img):
         return False
+    d = img.data
+    cap_prompt = (d.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
+    if not cap_prompt:
+        return False                     # upstream is /imgs_caption_prompt
     if force:
         return True
-    d = img.data
-    ts_sugg = max(
-        d.get(SceneDef.FIELD_TIMESTAMP_LABELS_NG_SUGGESTION) or 0,
-        d.get(SceneDef.FIELD_TIMESTAMP_HINTS_SUGGESTION) or 0,
-    )
-    if ts_sugg <= 0:
-        return False
     cap_joy = (d.get(SceneDef.FIELD_CAPTION_JOY) or '').strip()
     if not cap_joy:
-        return True
-    ts_cap = d.get(SceneDef.FIELD_TIMESTAMP_CAPTION_JOY) or 0
-    return ts_sugg > ts_cap
+        return True                      # never captioned → in scope
+    ts_cp = d.get(SceneDef.FIELD_TIMESTAMP_CAPTION_PROMPT) or 0
+    ts_cj = d.get(SceneDef.FIELD_TIMESTAMP_CAPTION_JOY) or 0
+    return ts_cp > ts_cj
 ```
 
 The "curator promoted" signal is implicit: the curator's promotion of `_SUGGESTION` → canonical bumps neither timestamp, but the curator typically *also* re-runs `/img_suggest` if they want to refine — in practice, an image with canonical labels_ng+hints populated AND a suggestion newer than the last caption is exactly the cohort we want. (If the curator promoted without re-running suggest, `ts_sugg` predates the promotion and may be older than `caption_joy`; that image is excluded — a deliberate trade-off to avoid re-captioning images the curator hasn't actively flagged as ready.)
@@ -96,7 +100,9 @@ def parse_args(s: str):
 
 For each candidate: apply `is_curated_pending(img, force=force)` AND remaining filters (e.g. `rating`). Sort the pending list by `timestamp_created` descending (newest first) so a `limit=N` slice picks the most recently created images. Apply `limit` if set. Collect matching ids into `pending`.
 
-If `len(pending) == 0`, print `nothing to do — no curated images have stale caption_joy` (or `nothing to do — no curated images match the filters` in `force` mode) and stop.
+Separately, count curated images that have an **empty `caption_prompt`** — these are NOT processed but the count is shown in the header so the curator knows to run `/imgs_caption_prompt` upstream.
+
+If `len(pending) == 0`, print `nothing to do — no curated images have stale caption_joy wrt caption_prompt` (or `nothing to do — no curated images with a non-empty caption_prompt match the filters` in `force` mode) and stop.
 
 ## Pipeline
 
@@ -113,11 +119,11 @@ sk = SkinRegistry().get('1xlasm')
 
 For each `iid` in `pending`:
 
-### Stage 1 — deterministic prompt compile
+### Stage 1 — use the stored caption_prompt (no recompose)
 
-Use the **bulk-mode recipe from `/imgs_update_caption_prompt`** (the deterministic, non-judgment one). Compose `default_prompt + opener + hint_section + label_prompts + constraints + closer`, persist via `simg.set_caption_prompt(p) + simg.db_store()`.
+The selection filter guarantees `caption_prompt` is non-empty for every pending image — `/imgs_caption_prompt` (the upstream) has already done the Stage 1 work and stored the judgment-mode prompt. This command **reads it verbatim from the DB and forwards it to Stage 2**. No recompose, no overwrite — that protects the judgment-mode quality.
 
-Per-image judgment compose (the `/img_caption` Stage 1 path) is intentionally NOT used here — composing N tight prompts by hand is impractical at batch scale. The deterministic recipe is the documented fallback for batch operation.
+(For images without a stored prompt, the filter excludes them so the curator runs `/imgs_caption_prompt` first.)
 
 ### Stage 2 — caption
 
@@ -148,13 +154,13 @@ If a fix is applied, persist `simg.set_caption_joy(fixed)`. When `FIELD_CAPTION`
 
 Print under ~30 lines:
 
-1. **header** — filters applied, `len(pending)` images selected
+1. **header** — filters applied, `len(pending)` images selected, plus a separate count of curated-but-no-prompt images that were skipped (with a hint to run `/imgs_caption_prompt` for them)
 2. **per-image one-liner table** — `<id>  prompt=N chars  caption=N chars  fixes=[…]  status=clean|flagged|error`
-3. one-line summary: `imgs_caption [filters: …]: ok=N, flagged=N, errors=N, total_seconds=N`
+3. one-line summary: `imgs_caption [filters: …]: ok=N, flagged=N, errors=N, skipped_no_prompt=N, total_seconds=N`
 
 ## Re-running
 
-Idempotent. After a successful run, each captioned image's `timestamp_caption_joy` advances past its suggestion timestamps and the image is excluded on the next run.
+Idempotent. After a successful run, each captioned image's `timestamp_caption_joy` advances past its `timestamp_caption_prompt` and the image is excluded on the next default-mode run. `force` mode keeps re-captioning regardless.
 
 ## Access rights
 
@@ -162,6 +168,7 @@ Read access to canonical collections + write to `FIELD_CAPTION` / `FIELD_CAPTION
 
 ## See also
 
-- `/img_caption <id>` — single-image variant with judgment-mode Stage 1; reuse for one-off recaptions or when the deterministic prompt isn't tight enough.
-- `/imgs_suggest [num]` — the upstream that populates the `_SUGGESTION` fields this command then waits for.
-- `/imgs_update_caption_prompt` / `/imgs_update_caption_joy` / `/imgs_validate_captions` — the lower-level batch steps this command bundles.
+- `/img_caption <id>` — single-image variant; runs Stage 1 (judgment) + Stage 2 + Stage 3 for one image.
+- `/imgs_caption_prompt` — the immediate upstream — produces the tight judgment-mode prompts this command then consumes.
+- `/imgs_suggest [num]` — populates the `_SUGGESTION` fields that gate "curated".
+- `/imgs_update_caption_joy` / `/imgs_validate_captions` — the lower-level batch steps bundled by Stage 2 + Stage 3.
