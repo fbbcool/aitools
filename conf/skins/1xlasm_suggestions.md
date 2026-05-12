@@ -461,6 +461,45 @@ The default `she holds him` (e.g. holding in a fist, in cupped hands,
 against her body) is just `primary.action.holding` + maybe a
 `proximity.*` label if she's holding him near a specific body part.
 
+### 5.8 Penis attribution — ALWAYS the xlasm man (domain invariant)
+
+The gts (xlgts) domain has **no futa / intersex / hermaphrodite
+content**. The xlgts woman **never** has a penis. Any visible penis
+in any image is, by definition, the xlasm man's erect penis. See
+`1xlasm.md` §5.8 for the captioning-side enforcement.
+
+For the suggestion step this matters in two places:
+
+**Label mapping.** If joy's probe response contains "her penis" /
+"the xlgts woman's penis" / "she has an erect penis", **discard
+the phrasing entirely** for label-mapping purposes. Do NOT use it
+as evidence for any label — there is no `primary.attribute.penis`
+to set. The visible-penis evidence still validates
+`secondary.attribute.penis` (the xlasm man HAS an erect penis); the
+mis-attribution is purely a joy hallucination of subject.
+
+**Hint composition** (iter-5, the hint-LoRA probe). The hint LoRA
+occasionally emits curator-style fragments like *"she strokes her
+penis"* or *"his head close to her penis"*. When parsing
+`hint_fragments`, **rewrite** any such fragment to attribute the
+penis to the xlasm man:
+
+| joy fragment (wrong) | rewritten fragment (correct) |
+|---|---|
+| `she strokes her penis` | `she strokes his erect penis` |
+| `his head close to her penis` | `his head close to his (own) erect penis` (if the body geometry suggests self-touch) OR drop the fragment if ambiguous |
+| `she has her penis between her thighs` | `the xlasm man's erect penis is between her thighs` (geometric repositioning — the curator probably means the man's penis is positioned between her thighs) |
+| `her erect penis` | `the xlasm man's erect penis` |
+
+When in doubt, **drop the fragment** rather than guessing — the
+canonical hint will be reviewed by the curator before promotion,
+and a missing fragment is less harmful than a wrong attribution
+that propagates into `caption_prompt` and then `caption_joy`.
+
+This rule applies to the hint-LoRA's iter-5 output specifically;
+the captioning LoRA (iters 1-4) is less prone to this drift but
+the same rule applies if it triggers.
+
 *(Add more cases as `/imgs_validate_suggestions` surfaces them.)*
 
 ---

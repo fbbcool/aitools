@@ -670,6 +670,137 @@ body-part references" rule because "erect" is an attribute modifier,
 not a verb or body-part reference — adding it preserves all of
 the curator's structural content.
 
+### 5.8 The penis ALWAYS belongs to the xlasm man (domain invariant)
+
+> ❌ "The xlgts woman's penis is visible."
+>
+> ❌ "Her penis is erect."
+>
+> ❌ "She strokes her penis."
+>
+> ❌ "The xlgts woman has an erect penis between her thighs."
+>
+> ✅ "The xlasm man's erect penis is visible between her thighs."
+>
+> ✅ "She strokes the xlasm man's erect penis."
+
+**Domain rule:** in the gts (xlgts) world, the **xlgts woman never has
+a penis**. Any visible penis in any scene is, by definition, the **xlasm
+man's erect penis**. There is no futa / intersex / hermaphrodite content
+in this dataset; the gts theme is strictly heterosexual size-difference.
+
+**Why this matters for joycaption.** When the xlasm man is small,
+partly hidden, or inserted, the model can occasionally lose track of
+attribution and emit *"her penis"* or *"the xlgts woman's penis"* —
+especially when the visible penis is the only clearly-rendered male
+anatomy in the frame. Every such phrasing is wrong by construction.
+
+**Auto-attribution at composition time:** when the prompt has
+`secondary.attribute.penis` applied, write the penis sentence as *"The
+xlasm man has an erect penis"* (or weave it into an action: *"She
+strokes the xlasm man's erect penis"*) — never as a possessive
+attached to the xlgts woman. If the curator's hint uses bare pronouns
+(*"she strokes his penis"*), the *his* is unambiguous; pass it through.
+
+**Stage-3 attribution fix (mechanical):** any caption containing
+`her penis` / `the xlgts woman's penis` / `she has ... penis` is a
+forbidden-domain violation. Drop the offending sentence (same as the
+forbidden-vocab fix-pass). Distinct from the §5.7 *"add erect"*
+rewrite — that one supplements; this one rejects.
+
+### 5.9 The penis label is bidirectional — presence AND absence are load-bearing
+
+The `secondary.attribute.penis` and `secondary.attribute.penis_no` labels
+form a **bidirectional contract** between the curator's labels and the
+caption:
+
+| label state | what's visible | caption MUST | caption MUST NOT |
+|---|---|---|---|
+| `secondary.attribute.penis` set | erect penis visible | mention as *"the xlasm man has/with an erect penis"* (per §5.7) | omit the penis |
+| `secondary.attribute.penis_no` set | penis explicitly NOT visible | use the canonical phrasing *"the xlasm man's penis is not visible in the image"* | invent a penis |
+| neither label set | scene doesn't involve / show a penis | omit any penis reference entirely | mention "penis" anywhere |
+
+**This is symmetric, not just one-sided.** §5.7 covers the *positive*
+case (when penis is mentioned, it's always "erect penis"). §5.9 adds
+the *negative* case: when the label is absent, the caption must contain
+no penis mention at all. A penis appearing in caption_joy without the
+authorizing label is the same class of violation as a body-type word
+appearing without its authorizing label (per `body_type_words` in the
+skin JSON) — joy hallucinated a detail the curator didn't authorize.
+
+**Examples:**
+
+Labels `[primary.action.holding, interaction.touch.hand]` (no `penis`,
+no `penis_no`):
+> ❌ "She holds the xlasm man in her hand. His erect penis presses
+>    against her palm." — *not authorized; penis label not set*
+> ✅ "She holds the xlasm man in her hand." — *clean*
+
+Labels `[secondary.attribute.penis_no, primary.pose.standing]`:
+> ❌ "The xlasm man stands at her feet. His erect penis is visible." — *contradicts `penis_no`*
+> ✅ "The xlasm man stands at her feet. The xlasm man's penis is not
+>    visible in the image." — *honors `penis_no`*
+
+**Why this matters as a separate rule.** Without §5.9, joy will
+occasionally add "erect penis" to scenes where the curator deliberately
+labeled it as not-visible (or didn't label it at all). Those mentions
+poison the LoRA's understanding of when a penis IS present:
+"penis-visible" should be the trained-in signal of the
+`secondary.attribute.penis` label, NOT a free-floating detail joy
+adds whenever the man is in frame.
+
+**Authorization set.** A penis mention is authorized whenever ANY of
+these label leaves is on the image — they either directly state the
+penis (`penis`, `penis_no`) or describe an action/gaze that
+inherently involves the penis in the gts domain:
+
+| leaf | source group | why it authorizes |
+|---|---|---|
+| `penis` | `secondary.attribute` | direct: erect penis is visible |
+| `penis_no` | `secondary.attribute` | direct: negative phrasing about the penis |
+| `handjob` | `primary.action` | handjob ⇒ stimulating his penis |
+| `blowjob` | `primary.action` | blowjob ⇒ his penis in her mouth |
+| `teasing_hj` | `primary.action` | teasing handjob ⇒ her fingers on his penis |
+| `sex` | `interaction.act` | vaginal sex ⇒ erect penis inserted |
+| `masturbating` | `secondary.action` | he strokes his own penis |
+| `cum` | `secondary.action` | ejaculation ⇒ penis is the source |
+| `she_look_at_penis` | `interaction.act` | gaze direction explicitly names the penis |
+
+If none of those are in the image's `labels_ng`, the caption MUST NOT
+contain the word "penis" — joy hallucinated it, drop the offending
+sentence.
+
+**Stage-3 absence-check (mechanical):**
+
+```python
+# pseudocode
+PENIS_AUTH = {'penis', 'penis_no',
+              'handjob', 'blowjob', 'teasing_hj',
+              'sex', 'masturbating', 'cum',
+              'she_look_at_penis'}
+
+applied_leaves = {l.rsplit('.', 1)[-1] for l in applied_labels}
+if applied_leaves & PENIS_AUTH:
+    return                       # authorized — caption may mention penis
+for sent in sentences(caption_joy):
+    if re.search(r'\bpenis\b', sent, re.IGNORECASE):
+        drop(sent)
+```
+
+Run AFTER §5.8 (`her penis` attribution) in the fix-pass: §5.8 may
+have already removed the offending sentence; the §5.9 check is then
+a no-op for that case. Run BEFORE the generic forbidden-vocab pass so
+the dropped-sentence boundary is clean.
+
+**Edge case — `penis` should have been set but the curator forgot.**
+For images where `handjob` / `blowjob` / `teasing_hj` / `sex` /
+`masturbating` / `cum` is set, the penis label is semantically
+implied even when `secondary.attribute.penis` isn't co-set. The
+authorization set above captures this: those action labels grant
+the penis-mention permit on their own. The curator can still
+add `secondary.attribute.penis` if they want the strongest training
+signal, but its absence isn't a hard error in those contexts.
+
 **Adjacent-property restatement (the `is also <adjective>` pattern).**
 A recurring joycaption habit is the symmetric restatement of an ambient
 property across two figures: *"the xlgts woman's skin is light, and the
