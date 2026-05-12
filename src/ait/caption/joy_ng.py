@@ -54,9 +54,9 @@ class JoyNG:
         is registered as `'default'` (PEFT convention); switching to an
         extra one at call time uses `caption(..., adapter=name)`.
 
-        Multi-adapter is currently used to route /suggest_image's iter-5
+        Multi-adapter is currently used to route /img_suggest's iter-5
         through the hint-specific LoRA while iters 1-4 + all of
-        /caption_image use the captioning LoRA.
+        /img_caption use the captioning LoRA.
         """
         self._verbose = verbose
         self._system_prefix = system_prefix

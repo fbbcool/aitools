@@ -36,7 +36,7 @@ from ait.install import AInstallerDB
 
 
 # ---------------------------------------------------------------------------
-# Hint-task prompt (mirrors iter-5 of /suggest_image)
+# Hint-task prompt (mirrors iter-5 of /img_suggest)
 # ---------------------------------------------------------------------------
 
 # Matches §3.5 of `conf/skins/1xlasm_suggestions.md`. The probe is the

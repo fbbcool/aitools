@@ -409,7 +409,7 @@ class AIDBSceneApp:
                                     'load todo 20 low'
                                 )
                                 set_editor_load_todo_ai_button = gr.Button(
-                                    'todo ai 20'
+                                    'load sugg 20'
                                 )
                                 set_editor_load_done_button = gr.Button(
                                     'load done'
@@ -1036,7 +1036,7 @@ class AIDBSceneApp:
         ACTIVE image in the selected set whose stored `caption_prompt` is
         non-empty AND newer than its `caption_joy` (or where `caption_joy`
         is empty). Images with empty `caption_prompt` are skipped — the
-        compile step (`/update_caption_prompt`) is the upstream that
+        compile step (`/img_update_caption_prompt`) is the upstream that
         populates this field. Excluded images are never captioned.
         """
         refresh_args = (
@@ -1272,58 +1272,74 @@ class AIDBSceneApp:
 
     def _html_set_editor_open_todo_ai(self, name: Optional[str]) -> str:
         """
-        Loads up to 20 images from the AI-computed caption-priority ranking
-        for the selected set. The ranking is produced by the `/todo-ai`
-        Claude Code slash command and persisted to the `claude_todo`
-        MongoDB collection (kind='caption_priority', set_name=<name>).
-        If the ranking is missing or stale, prompts the user to run
-        `/todo-ai`.
+        Loads up to 20 active (non-prototype) images from the selected
+        set that need curator review:
+
+          - have non-empty `_SUGGESTION` fields (labels or hints), AND
+          - canonical `labels_ng` AND `hints` are still empty
+            (suggestions haven't been promoted yet).
+
+        Sorted by newest image creation timestamp first. This narrows the
+        list to images where /img_suggest has run but the curator hasn't
+        yet reviewed — exactly the queue for the curator-review step of
+        the workflow.
+
+        (Function name is legacy — the button now reads "load sugg 20".)
         """
         if not name or not isinstance(name, str):
             return '<p>No set selected.</p>'
-        coll = self._dbc._get_collection('claude_todo')
-        if coll is None:
-            return '<p>DB not connected.</p>'
-        doc = coll.find_one({'kind': 'caption_priority', 'set_name': name})
-        if not doc or not doc.get('items'):
-            return (
-                f'<p>No AI todo ranking for set <code>{name}</code>. '
-                f'Run <code>/todo-ai {name}</code> in Claude Code first.</p>'
-            )
-        items = doc['items'][:20]
-
         try:
             scene_set = self._ssm.set_from_id_or_name(name)
         except Exception as e:
             return f'<p>Failed to load set <code>{name}</code>: {e}</p>'
 
-        by_id = {img.id: img for img in scene_set.imgs}
         excluded_ids = set(scene_set.imgs_exclude)
-        cells_parts: list[str] = []
-        for item in items:
-            img = by_id.get(item.get('image_id'))
-            if img is None:
+        pending: list[tuple[float, object]] = []
+        for img in scene_set.imgs:
+            if img.prototype:
                 continue
+            # Canonical fields must be blank — already-curated images are
+            # excluded so the queue only shows actionable items.
+            if img.labels_ng:
+                continue
+            if (img.hints or '').strip():
+                continue
+            # Must have at least one _SUGGESTION field populated.
+            labels_sug = img.labels_ng_suggestion or []
+            hint_sug = (img.hints_suggestion or '').strip()
+            if not labels_sug and not hint_sug:
+                continue
+            ts_created = img.data.get(SceneDef.FIELD_TIMESTAMP_CREATED, 0) or 0
+            pending.append((ts_created, img))
+
+        pending.sort(key=lambda t: -t[0])
+        top = pending[:20]
+
+        if not top:
+            return (
+                f'<p>No pending suggestions to review in set '
+                f'<code>{name}</code>. (Looking for images with '
+                f'<code>_SUGGESTION</code> populated AND canonical '
+                f'<code>labels_ng</code>/<code>hints</code> still blank.) '
+                f'Run <code>/img_suggest &lt;id&gt;</code> on blank '
+                f'images, then refresh.</p>'
+            )
+
+        cells_parts: list[str] = []
+        for _, img in top:
             cells_parts.append(
                 AppSceneImageCell.html(
                     img, set_id=scene_set.id, excluded=img.id in excluded_ids
                 )
             )
-        if not cells_parts:
-            return (
-                f'<p>AI todo ranking for set <code>{name}</code> has no '
-                f'currently-resolvable images (rerun <code>/todo-ai {name}</code>).</p>'
-            )
 
-        gen_at = doc.get('generated_at')
-        header = ''
-        if gen_at is not None:
-            header = (
-                f'<p style="color:#888;font-size:0.85em;margin:0 0 6px 0;">'
-                f'AI ranking generated: {gen_at} '
-                f'(showing top {len(cells_parts)} of {len(doc.get("items", []))})'
-                f'</p>'
-            )
+        header = (
+            f'<p style="color:#888;font-size:0.85em;margin:0 0 6px 0;">'
+            f'Pending review in set <code>{name}</code>: '
+            f'showing {len(cells_parts)} of {len(pending)} '
+            f'(active imgs with _SUGGESTION set + canonical labels/hints '
+            f'empty; sorted by newest image first).</p>'
+        )
         styles = AppSceneImageCell.html_styles()
         return styles + header + AppHtml.html_styled_cells_grid(''.join(cells_parts), columns=1)
 

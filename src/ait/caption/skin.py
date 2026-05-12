@@ -183,7 +183,7 @@ class Skin:
     concepts: dict[str, SkinConcept]
     model_key: tuple[str, str, str]
     lora_key: Optional[tuple[str, str, str]]
-    # Direct local path or HF repo id for a second LoRA used at /suggest_image
+    # Direct local path or HF repo id for a second LoRA used at /img_suggest
     # iter-5 (hint probing). Decoupled from AInstallerDB; populated from the
     # JSON's top-level `lora_hint_path` field. None = single-adapter mode.
     lora_hint_path: Optional[str]
@@ -197,14 +197,14 @@ class Skin:
     # raw source dict (for skin_build / inspection)
     source: dict[str, Any] = field(default_factory=dict)
     # Theme briefing — verbatim contents of the sibling `conf/skins/<name>.md`
-    # if present, else empty string. Read by /caption_image Stage 1 and
-    # /update_caption_prompt per-image mode for theme/world knowledge that
+    # if present, else empty string. Read by /img_caption Stage 1 and
+    # /img_update_caption_prompt per-image mode for theme/world knowledge that
     # doesn't fit in the structured JSON. Never sent to the captioner; only
     # consumed by Claude when composing per-image caption prompts.
     theme_md: str = ''
     # Suggestion-process briefing — verbatim contents of
     # `conf/skins/<name>_suggestions.md` if present, else empty. Read by
-    # /suggest_image and /validate_suggestions for the iterative probe
+    # /img_suggest and /img_validate_suggestions for the iterative probe
     # design, joy biases observed during suggestion, and convergence
     # heuristics. Distinct from `theme_md`: that one shapes final captions,
     # this one shapes the suggestion process. Never sent to the captioner.

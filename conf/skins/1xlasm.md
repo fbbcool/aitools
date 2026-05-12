@@ -23,7 +23,7 @@
 >
 > | consumer | reads |
 > | --- | --- |
-> | **/caption_image Stage 1** (per-image prompt compile, Claude in the loop) | this MD + applied labels + hint + Skin object — primary input |
+> | **/img_caption Stage 1** (per-image prompt compile, Claude in the loop) | this MD + applied labels + hint + Skin object — primary input |
 > | **Batch captioning** (no Claude composing) | JSON-derived `directive` + static label expansions only |
 > | **/v1-status, /todo-ai** | JSON `concepts` block |
 > | **Validators** (forbidden vocab, body-type, missing-trigger) | JSON-derived lists |
@@ -751,7 +751,7 @@ around.
 ## 7. When to put MD context into the per-image caption_prompt
 
 The MD doesn't reach the captioner directly. Only the directive (from the
-JSON) + the per-image `caption_prompt` (composed at /caption_image Stage 1)
+JSON) + the per-image `caption_prompt` (composed at /img_caption Stage 1)
 do. So the practical workflow is:
 
 1. Read this MD at Stage 1 to recognize the archetype + theme principles.

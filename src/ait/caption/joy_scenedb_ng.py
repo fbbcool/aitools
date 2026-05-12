@@ -64,7 +64,7 @@ class JoySceneDBNG:
                 if lora_ids:
                     lora_path = lora_ids[0]
                     self._log(f'applying LoRA: {lora_path}')
-            # Optional extra adapter (currently: hint LoRA for /suggest_image
+            # Optional extra adapter (currently: hint LoRA for /img_suggest
             # iter-5). Loaded as `adapter='hint'`. Skin's `lora_hint_path`
             # is a direct local path or HF repo id, decoupled from
             # AInstallerDB. None → single-adapter mode (default behavior).

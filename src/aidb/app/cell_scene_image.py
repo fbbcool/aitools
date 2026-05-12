@@ -1436,7 +1436,7 @@ class AppSceneImageCell:
         - No backend round-trip (the suggested hint is a known value from
           DB at render time).
         - No "generate fallback" path (suggestions are only populated by
-          `/suggest_image`).
+          `/img_suggest`).
         """
         hints_id = f'simg-set_hints-{obj_id}'
         # JSON-encode the hint so quotes / newlines / unicode survive both

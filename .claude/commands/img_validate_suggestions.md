@@ -1,12 +1,12 @@
 ---
-description: Validate the /suggest_image process against curator-authored labels+hints on done images (used as ground truth). Picks N random done images, runs the suggestion loop on each with canonical fields hidden, compares the suggestion output to the curator's stored labels_ng + hints, reports aggregate metrics. Read-only by default.
+description: Validate the /img_suggest process against curator-authored labels+hints on done images (used as ground truth). Picks N random done images, runs the suggestion loop on each with canonical fields hidden, compares the suggestion output to the curator's stored labels_ng + hints, reports aggregate metrics. Read-only by default.
 argument-hint: "[count=N] [set=gts_v3] [iters=5] [persist=true|false]"
 ---
 
 `$ARGUMENTS` may contain optional `key=value` pairs:
 - `count=N` (default `30`) — number of done images to sample
 - `set=NAME` (default `gts_v3`) — which SceneSet to sample from
-- `iters=N` (default `5`) — max iterations per image (matches `/suggest_image`)
+- `iters=N` (default `5`) — max iterations per image (matches `/img_suggest`)
 - `persist=true|false` (default `false`) — if true, ALSO write the produced suggestions to the SceneImage's `_SUGGESTION` fields. Default false = pure read-only validation.
 
 ## Why this exists
@@ -53,7 +53,7 @@ sk = SkinRegistry().get('1xlasm')
 truth_labels = set(simg.labels_ng)
 truth_hint   = (simg.data.get(SceneDef.FIELD_HINTS) or '').strip()
 
-# Run the SAME judgment-driven probe loop as /suggest_image, but with
+# Run the SAME judgment-driven probe loop as /img_suggest, but with
 # canonical labels_ng / hints treated as empty regardless of DB state.
 # Cap iterations per the `iters` arg.
 state = {
@@ -148,7 +148,7 @@ If invoked with `persist=true`, also append a dated entry to `conf/skins/1xlasm_
 
 - After authoring or editing `1xlasm_suggestions.md` §3 (probe templates) or §5 (mapping rules) — confirm the change moved the targeted metric
 - Periodically as the curator adds more done images (the test set grows)
-- Before declaring `/suggest_image` ready for production use
+- Before declaring `/img_suggest` ready for production use
 
 ## Access rights
 
@@ -156,6 +156,6 @@ Pure read by default (`persist=false`). With `persist=true`, writes to `_SUGGEST
 
 ## See also
 
-- `/suggest_image <id>` — the suggestion procedure under test.
+- `/img_suggest <id>` — the suggestion procedure under test.
 - `1xlasm_suggestions.md` §7 — the validation methodology and current acceptance criteria.
 - Plan file `/home/misw/.claude/plans/elegant-brewing-dawn.md` — full methodology, refinement-loop pattern, ground-truth caveats.

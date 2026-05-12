@@ -29,7 +29,7 @@ else:
 
 ## When to invoke
 
-- **Before a curator session**: `start` pre-warms the model (~23s) so the first `/caption_image` or `/suggest_image` returns in ~5-10s instead of ~30s.
+- **Before a curator session**: `start` pre-warms the model (~23s) so the first `/img_caption` or `/img_suggest` returns in ~5-10s instead of ~30s.
 - **After a session**: `stop` frees ~24 GiB of GPU memory for ComfyUI / other workloads. The server also self-shuts after 30 min of idle, so explicit stop is usually optional.
 - **If the captioner misbehaves**: `restart` reloads the model cleanly.
 - **To check state**: `status` prints `{status, skin, loaded_at, last_request_at, request_count, idle_seconds}`.
@@ -52,6 +52,6 @@ Read access to the local HTTP server and write to the PID/log files in `$WORKSPA
 
 ## See also
 
-- `/caption_image <id>` — routes through joy_client when the server is running, falls back to in-process loading when not.
-- `/suggest_image <id>` — same.
-- `/validate_suggestions count=N` — same.
+- `/img_caption <id>` — routes through joy_client when the server is running, falls back to in-process loading when not.
+- `/img_suggest <id>` — same.
+- `/img_validate_suggestions count=N` — same.

@@ -202,7 +202,7 @@ class SceneImage:
 
     # ---- _SUGGESTION fields (Claude's first-pass suggestions, separate
     #      from canonical labels_ng / hints to keep curator-edited state
-    #      sacrosanct; populated by /suggest_image, never auto-promoted) ----
+    #      sacrosanct; populated by /img_suggest, never auto-promoted) ----
 
     @property
     def labels_ng_suggestion(self) -> list[str]:

@@ -160,7 +160,7 @@ def caption(image_url: str, user_content: str, *,
     `adapter` selects the LoRA adapter on the server side (default = main
     captioning LoRA; 'hint' = iter-5 hint LoRA when configured via
     skin.lora_hint_path). Pass 'hint' only when calling iter-5 of the
-    /suggest_image workflow.
+    /img_suggest workflow.
 
     If the request fails with a connection error AND `retry_once`, tries
     `ensure_running()` and retries the POST once. This handles the case

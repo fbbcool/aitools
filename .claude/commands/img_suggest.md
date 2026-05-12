@@ -34,7 +34,7 @@ has_prev_suggestion = bool(simg.labels_ng_suggestion) or bool((simg.hints_sugges
 if has_canonical:
     # Image is already curated; suggestion is unusual. Confirm intent.
     print('NOTE: this image already has canonical labels_ng / hints. '
-          'Running /suggest_image will populate the _SUGGESTION fields '
+          'Running /img_suggest will populate the _SUGGESTION fields '
           'but will NOT touch the canonical fields.')
 ```
 
@@ -44,7 +44,7 @@ Ensure the joy server is running:
 joy_client.ensure_running()
 ```
 
-GPU prereq: at least 16 GiB free for the server's startup. If `ensure_running` raises, surface the same "free the GPU" guidance as `/caption_image` Stage 2.
+GPU prereq: at least 16 GiB free for the server's startup. If `ensure_running` raises, surface the same "free the GPU" guidance as `/img_caption` Stage 2.
 
 ### 2. Iteration loop (max 5, converge early)
 
@@ -160,7 +160,7 @@ Print under ~30 lines:
 
 ## Re-running
 
-`/suggest_image <id>` is fully idempotent — re-running overwrites the previous `_SUGGESTION` fields. Useful when:
+`/img_suggest <id>` is fully idempotent — re-running overwrites the previous `_SUGGESTION` fields. Useful when:
 - the MD probe templates were updated (re-run to see if metrics improve)
 - the joy LoRA was refreshed
 - the curator wants to see if a second pass produces a different first-pass
@@ -174,5 +174,5 @@ Read access to canonical fields + write to `FIELD_LABELS_NG_SUGGESTION` / `FIELD
 ## See also
 
 - `/joy_server start|stop|status` — explicit server lifecycle.
-- `/validate_suggestions count=N` — validate the suggestion process against done images as ground truth.
-- `/caption_image <id>` — the next step after the curator promotes `_SUGGESTION` → canonical.
+- `/img_validate_suggestions count=N` — validate the suggestion process against done images as ground truth.
+- `/img_caption <id>` — the next step after the curator promotes `_SUGGESTION` → canonical.
