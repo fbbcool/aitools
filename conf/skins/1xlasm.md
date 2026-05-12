@@ -212,19 +212,24 @@ precisely because the labels couldn't capture what mattered.
    expansions is approximate.
 
 2. **Pull `render_label_prompts(labels_ng)` second.** For each rendered
-   sentence: ask *"does the hint already say this, possibly with different
-   wording?"*
-   - **Hint covers it**: drop the label expansion. Keep the hint's
-     phrasing. (E.g. label = *"The xlasm man is positioned between the
-     thighs..."*; hint = *"he stands between her thighs..."* — keep the
-     hint phrasing, drop the label expansion. The label served its
-     purpose by confirming the broad category.)
-   - **Hint is silent on it**: include the label expansion. (E.g. pose
-     labels and attributes the hint doesn't mention — `primary.attribute.hairy`
-     → include "Her pubic area is hairy" as its own short clause.)
-   - **Hint contradicts the label expansion** (rare): trust the hint;
-     the label is a coarse bucket and may have miss-fit the specific
-     geometry. Flag for follow-up if it recurs.
+   sentence, classify the label and apply the right rule:
+
+   - **Trigger labels** (see §4.6 for the full list — `blowjob`,
+     `handjob`, `sex`, `step`, `holding`, etc.): **ALWAYS include the
+     expansion.** Their expansion-string contains the LoRA trigger word
+     for the concept; dropping it omits a load-bearing token from the
+     caption. The hint's mechanics complement, not replace, the trigger
+     word — emit both.
+
+   - **Descriptive labels** (everything else — poses, attributes,
+     touch, proximity, insertion, gaze): ask *"does the hint already
+     say this, possibly with different wording?"*
+       - **Hint covers it** → drop the label expansion; keep hint
+         phrasing.
+       - **Hint silent on it** → include the label expansion as a
+         short clause.
+       - **Hint contradicts it** (rare) → trust the hint; the label
+         is a coarse bucket that miss-fit the specific geometry.
 
 3. **Compose interaction sentences using hint vocabulary.** Fuse hint
    phrases with label-confirmed details into one or two fluent
@@ -428,6 +433,61 @@ prompt, group labels by domain:
   no fusion needed
 - act labels (look-at-X) → standalone short clauses, no fusion needed
 
+### 4.6 Trigger labels — always emit their expansion
+
+**Key insight (2026-05-12)**: a small set of labels function as
+**caption trigger words**, analogous to the entity trigger phrases
+`xlgts woman` and `xlasm man`. The LoRA learned the corresponding
+concepts from these exact words appearing in training captions. The
+word itself is load-bearing training signal — its absence from a
+caption means the concept-trigger isn't reinforced on that example.
+
+**Trigger labels for `1xlasm`** (always include their expansion in
+the per-image prompt; never drop them even when the hint describes
+the mechanics):
+
+| label | trigger word(s) in the caption |
+|---|---|
+| `primary.action.blowjob` | "blowjob" |
+| `primary.action.handjob` | "handjob" |
+| `primary.action.teasing_hj` | "teasing handjob" |
+| `primary.action.step` | "steps on" |
+| `primary.action.holding` | "holds" / "holding" |
+| `primary.action.job` | "handjob or blowjob" |
+| `secondary.action.masturbating` | "masturbating" |
+| `secondary.action.cum` | "ejaculates" / "cums" |
+| `interaction.act.sex` | "sex" / "inserts his penis" |
+
+All other labels are **descriptive** — they describe geometry, pose,
+attributes, or gaze; their *expansion strings* are scaffolding, not
+training-signal words. The §4.1 hint-spine rule ("drop labels the hint
+covers") applies to them normally.
+
+**This is what `4.1 step 2` actually means**: the rule isn't "labels
+are always redundant when hint covers them" — it's "**descriptive**
+labels are redundant when hint covers them." Trigger labels are not
+descriptive; they're the LoRA-anchor word for a concept, and their
+expansion must appear in the prompt so the captioner emits the
+trigger word in the final caption.
+
+**Hint + trigger label co-occurrence**: when a trigger label is set
+AND the hint describes the mechanics of the same action, emit BOTH:
+
+- the label expansion (which names the act type with the trigger
+  word and declares it central)
+- the hint verbatim (which preserves the specific verbs, hand
+  placement, body parts)
+
+The two don't paraphrase each other — one provides the *categorical
+trigger*, the other provides the *image-specific mechanics*.
+
+**Bad-call observation (2026-05-12, image `69f51225f7b7f5b04564e635`)**:
+hint *"she strokes his penis with her right hand and holds him with
+her left"* led me to drop `primary.action.handjob`. The captioner
+preserved the hint's mechanics but **never emitted the trigger word
+"handjob"**. Curator flagged. This is the failure mode the rule
+above prevents.
+
 ---
 
 ## 5. Anti-patterns (with the reasoning)
@@ -437,19 +497,40 @@ The following patterns recur as joycaption failure modes. Each rule has a
 prompt-compile time and produces less brittle behavior than chasing each
 new symptom with a new rule row.
 
-### 5.1 `"is naked, with X"`
+### 5.1 `"is naked, with X"` / `"is nude, with X"`
 
 > ❌ "The xlasm man is naked, with an erect penis."
 >
 > ❌ "The xlasm man is naked, with his arms spread wide."
+>
+> ❌ "The xlasm man is nude, with his erect penis visible." (variant: nude)
 >
 > ✅ "The xlasm man has an erect penis." (nudity in noun phrase at intro)
 
 **Principle:** nudity is a property of the figure, established once at first
 mention via the noun phrase. After that, the figure can have body parts,
 poses, attributes — but those should be expressed as `has X` /
-`<verb> X`, not as appositives to `is naked`. The "is naked, with X"
+`<verb> X`, not as appositives to `is naked` (or `is nude`). The
 construction conflates two unrelated assertions and reads as awkward.
+
+**Synonym coverage**: the rule applies to both `naked` AND `nude` — joy
+sometimes substitutes the synonym when "naked" was already used at
+intro, producing a fresh variant of the same anti-pattern. Observed
+2026-05-12 on image `69f22ae2fa7c7e4d4d0a9e68`: opener used "naked
+xlasm man", later sentence emitted "The xlasm man is nude, with his
+erect penis visible." — same structural issue.
+
+**Auto-fix at Stage 3** must match both forms:
+
+```python
+re.search(r'\bis\s+(naked|nude),\s*with\b', caption, re.IGNORECASE)
+```
+
+The typical fix is to drop the entire `"is naked/nude, with X"`
+sentence (it's redundant — nudity was established at intro, and the
+trailing `with X` is usually a fact already stated elsewhere). When
+the trailing fact is novel, rewrite as `"The xlasm man has X."`
+instead.
 
 ### 5.2 The comma-appositive `", naked,"`
 
@@ -538,6 +619,56 @@ filler verbs that don't carry information. Pick a specific verb that
 describes what is happening, or omit the clause entirely. "Is visible" in
 particular adds nothing — if a body part is described, the reader already
 knows it's visible.
+
+### 5.7 Penis is always "erect penis" (when penis is mentioned at all)
+
+> ❌ "The xlasm man's penis is between her fingers."
+>
+> ❌ "She strokes his penis."
+>
+> ❌ "His penis is in her hand."
+>
+> ✅ "The xlasm man's erect penis is between her fingers."
+>
+> ✅ "She strokes his erect penis."
+
+**Principle:** the `secondary.attribute.penis` label's expansion is
+*"The xlasm man has an **erect** penis."* — the LoRA learned the
+two-word concept *"erect penis"* as the anchor for the penis-visible
+concept. The bare word *"penis"* omits the load-bearing modifier,
+weakening the training signal, similar to how omitting an action
+trigger word does (§4.6).
+
+**Auto-fix at Stage 3 (mechanically tractable)**. Regex pattern:
+
+```python
+# Add "erect " before any bare "penis" reference that doesn't already
+# have "erect" within ~2 words before it. Don't touch existing "erect penis".
+re.sub(
+    r"\b(his|the|xlasm man['’]s)\s+(?<!erect )penis\b",
+    r"\1 erect penis",
+    caption,
+    flags=re.IGNORECASE,
+)
+```
+
+Edge cases:
+- `"erect penis"` — already correct, regex skips via the negative lookbehind.
+- `"his penis is erect"` — adjective in a different syntactic position;
+  optional cleanup → `"his erect penis is..."` but the original form
+  already contains "erect" so no critical training-signal loss.
+- `secondary.attribute.penis_no` label is set — caption says
+  *"his penis is not visible in the image"*; do NOT inject "erect"
+  in this case (the label's expansion is already correct).
+
+**Exemption when curator hint uses bare "penis"**: the curator's hint
+may emit bare *"penis"* in their terse style (*"she strokes his
+penis"*). The verbatim-pattern compile passes the hint through;
+Stage-3 fix-up adds "erect" to those occurrences in the final
+caption. This does NOT violate MD §4.1's "preserve verbs and
+body-part references" rule because "erect" is an attribute modifier,
+not a verb or body-part reference — adding it preserves all of
+the curator's structural content.
 
 **Adjacent-property restatement (the `is also <adjective>` pattern).**
 A recurring joycaption habit is the symmetric restatement of an ambient
