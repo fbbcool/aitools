@@ -1,5 +1,5 @@
 ---
-description: Run the per-image judgment-mode caption_prompt compile (the same Stage 1 as /img_caption) on curated images. Default: only those whose caption_prompt is out of date (suggestion newer than caption_prompt, or caption_prompt empty). With `force`: every curated image regardless of freshness. Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Produces tight ~400-1000 char prompts, NOT the ~5000 char deterministic kind. Persists FIELD_CAPTION_PROMPT only; downstream /imgs_update_caption_joy picks them up.
+description: Run the per-image judgment-mode caption_prompt compile (the same Stage 1 as /img_caption) on curated images. Default: only those whose caption_prompt is out of date (suggestion newer than caption_prompt, or caption_prompt empty). With `force`: every curated image regardless of freshness. Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Produces tight ~400-1000 char prompts, NOT the ~5000 char deterministic kind. Persists FIELD_CAPTION_PROMPT only; downstream /imgs_caption_joy picks them up.
 argument-hint: "[force] [set=<name> | rating[==|>=|<=|>|<]<n> | limit=<n> | …]"
 ---
 
@@ -16,9 +16,9 @@ Same parser as `/imgs_update_caption_prompt`, extended with the `force` bare-wor
 
 ## Why this exists
 
-`/imgs_caption` does end-to-end Stage 1+2+3 in one shot, but its Stage 1 uses the **deterministic** recipe (mechanical concat of all label expansions + every constraint, ~5000 chars). That trades narrative quality for batch throughput — observed in production as elevated `naked_multi` and `photo_filler` fix counts because the prompt doesn't tailor to the image.
+This command is **Stage 1 of the curator workflow** — judgment-mode `caption_prompt` compile for curated images. It produces tight ~400-1000 char prompts that bake in only the rules relevant to each specific image. Downstream `/imgs_caption_joy` consumes these prompts verbatim to generate `caption_joy`.
 
-This command is the high-quality alternative: it runs the **judgment-mode** Stage 1 (the per-image hand-crafted ~400-1000 char prompt from `/img_caption` Stage 1) for the same cohort, but only Stage 1. The curator then runs `/imgs_update_caption_joy` to caption and `/imgs_validate_captions` to fix.
+Contrast with the lower-level `/imgs_update_caption_prompt` (bulk-mode), which mechanically concatenates `default_prompt + opener + label_prompts + every-constraint + closer` into a ~5000-char prompt. That's faster (no judgment cost) but dilutes the captioner's attention — observed in production as elevated `naked_multi` and `photo_filler` fix counts.
 
 The cost is **Claude's context window** — each judgment compile reads the skin's `theme_md` briefing and reasons about the specific image's hint, archetype, anti-patterns, and label set. For N images this is ~N×~15-30 seconds of my thinking + several thousand tokens per image. Run with `limit=<n>` (e.g. 5-10) when context budget is a concern; the same command can be re-invoked later to handle the rest.
 
@@ -58,7 +58,7 @@ def is_prompt_compile_pending(img, *, force: bool = False) -> bool:
     return ts_sugg > ts_cp
 ```
 
-The filter mirrors `/imgs_caption` exactly except the timestamp compared against is `caption_prompt`, not `caption_joy`. Result: images that have been suggested-then-curated but whose stored caption_prompt is stale (or empty).
+The filter mirrors `/imgs_caption_joy` exactly except the timestamp compared against is `caption_prompt`, not `caption_joy`. Result: images that have been suggested-then-curated but whose stored caption_prompt is stale (or empty).
 
 ## Argument parser
 
@@ -128,13 +128,12 @@ The typical sequence is:
 ```
 /imgs_suggest [num]                  # populates _SUGGESTION fields
   ↓ curator review + promote
-/imgs_caption_prompt         # this command — high-quality Stage 1
-  ↓ Stage 2+3
-/imgs_update_caption_joy             # picks up newly-fresh caption_prompts, runs joy
-/imgs_validate_captions              # audit + auto-fix
+/imgs_caption_prompt         # this command — judgment-mode Stage 1
+  ↓
+/imgs_caption_joy            # Stage 2+3 using the stored prompts
 ```
 
-The lighter-weight alternative for the same cohort is `/imgs_caption`, which collapses all three into one batch but uses the deterministic Stage 1.
+The lower-level alternative is `/imgs_update_caption_prompt` (bulk-mode, deterministic Stage 1) followed by `/imgs_update_caption_joy` — faster but lower per-image quality.
 
 ## Access rights
 
@@ -142,7 +141,7 @@ Read access to canonical collections + write to `FIELD_CAPTION_PROMPT` only (thi
 
 ## See also
 
+- `/imgs_caption_joy` — the immediate downstream — captions every curated image with a stored prompt (uses these prompts verbatim).
 - `/img_caption <id>` — single-image variant; runs Stage 1+2+3 for one image with judgment Stage 1 and on-GPU caption.
-- `/imgs_caption` — batch variant that runs Stage 1+2+3 but with the deterministic Stage 1; faster but lower per-image quality.
-- `/imgs_update_caption_joy` — the natural downstream — picks up images whose `caption_prompt` is newer than `caption_joy`.
-- `/imgs_update_caption_prompt <id>` — single-image, Stage 1 only (the upstream of this command's per-image work).
+- `/imgs_update_caption_prompt <id>` — single-image, Stage 1 only (the lower-level per-image equivalent of this command's work).
+- `/imgs_update_caption_joy` — lower-level batch Stage 2 only; works on any image with a stored prompt (not scoped to curated).

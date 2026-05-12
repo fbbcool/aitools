@@ -25,7 +25,7 @@ This command sits **downstream of `/imgs_caption_prompt`** in the curator workfl
   ↓ curator review + promote
 /imgs_caption_prompt     — judgment-mode caption_prompt compile for curated imgs
   ↓
-/imgs_caption            — this command: caption + validate+fix using the stored prompt
+/imgs_caption_joy            — this command: caption + validate+fix using the stored prompt
 ```
 
 "Curated" is shorthand for **labels_ng AND hints AND suggestion all non-empty** — the curator has finished labeling and the suggestion fields remain as the provenance signal. The recency check then narrows to images whose `caption_joy` is older than the current `caption_prompt` (or empty).
@@ -148,7 +148,7 @@ If a fix is applied, persist `simg.set_caption_joy(fixed)`. When `FIELD_CAPTION`
 
 ## Background mode
 
-`/imgs_caption` typically processes 5-50 images. Total time = ~30s startup + N × (~5s prompt + ~5s caption + ~1s validate) ≈ 30s + N×11s. For N>5, run with `run_in_background: true` — the user will be notified on completion.
+`/imgs_caption_joy` typically processes 5-50 images. Total time = ~30s startup + N × (~5s prompt + ~5s caption + ~1s validate) ≈ 30s + N×11s. For N>5, run with `run_in_background: true` — the user will be notified on completion.
 
 ## Report
 
