@@ -84,6 +84,8 @@ bulk update [filters: set=…, rating==…]: N images refreshed (avg {chars} cha
 
 This is a **judgment task**: programmatic concatenation of every skin rule + every label sentence produces a 2000-3000 char prompt, which dilutes the model's attention. Your job is to compose a tight, image-specific prompt (~400-1000 chars) that bakes in **only the rules that matter for this image** and inlines the hint and applied-label content into natural prose.
 
+**Primary input.** This is where the **JSON/MD split** (see `conf/skins/_schema.json` top description) becomes operative. The structured surface (entities, labels, compose tables, validators) lives in `1xlasm.json` and is auto-applied by `Skin.render_label_prompts`. The **theme/world knowledge** — scene archetypes, anti-pattern principles, captioner quirks, stylistic intuition — lives in `conf/skins/1xlasm.md`, loaded into `skin.theme_md`. Read the MD before composing; it's the briefing that lets you *think* about this image instead of mechanically concatenating expansions.
+
 ### Steps
 
 1. **Pull the image data.** Use the env vars `PYTHONPATH=src CONF_AIT=./conf HOME_AIT=. WORKSPACE=$HOME/Workspace AIDB_SCENE_CONFIG=prod AIDB_SCENE_DEFAULT=0000`:
@@ -99,18 +101,38 @@ hints     = simg.data.get(SceneDef.FIELD_HINTS, '') or ''
 
 If the image is missing or `labels_ng` is empty, abort with a short message.
 
-2. **Read the skin.** `Skin('1xlasm')` exposes `entities_primary.phrase`, `entities_secondary.phrase`, `labels` (path → rendered sentence), and the rule lists.
+2. **Read the skin AND the theme briefing.** `Skin('1xlasm')` exposes:
+   - `entities_primary.phrase`, `entities_secondary.phrase` — the trigger phrases
+   - `labels` (path → rendered sentence) — for static fallback rendering
+   - `render_label_prompts(applied_paths)` — context-aware rendering (uses `compose` tables when a group has one, e.g. proximity verb selection by secondary pose)
+   - `theme_md` — verbatim contents of `conf/skins/1xlasm.md`; primary input for theme/style judgment, captioner-quirk awareness, and anti-pattern reasoning
 
-3. **Compose.** Apply this recipe with judgment, aiming for ~400-1000 chars:
-    - **Opener:** one complete sentence naming BOTH `xlgts woman` AND `xlasm man`. Pick a verb that fits the labels (insertion → "inserted into her <orifice>"; holding → "holds the xlasm man …"; otherwise generic).
-    - **Hint** (when present): include the hint sentences essentially verbatim, with a one-line *"Preserve every verb and body-part reference exactly: …"* lead-in. Don't paraphrase.
-    - **Label expansions** (selective): include `skin.labels[path]` for each applied path, but skip any already implicit in the hint or the opener.
-    - **Constraints** (use the same set as bulk recipe above; conditional bans gated by attribute-label presence).
-    - **Closer:** one short ordering instruction.
+   Use `skin.render_label_prompts(labels_ng)` rather than indexing `skin.labels[path]` directly, so compose-aware expansions are applied.
 
-4. **Persist** via `simg.set_caption_prompt(p) + simg.db_store()`.
+3. **Reason from the MD.** Before drafting, identify which sections of `skin.theme_md` matter for *this* image:
+   - **Hint-spine principle** (§4.1): READ FIRST. The hint is the primary source of contextual truth; labels are coarse approximations. The compile is NOT `expand(labels) + hint`; it is hint-driven narrative with labels confirming/filling gaps. See §4.1 for the workflow.
+   - **Scene archetype** (§3.2): does this image match held-to-mouth, between-thighs, panties-insertion, all-fours, standing-tower, or vaginal-insertion? Use the archetype's composition cues.
+   - **Anti-patterns at risk** (§5): if the man is fully nude → §5.1/§5.3 risk elevated; if the image has watermarks → §5.5 risk; if 3+ pose labels are set on one figure → §4.4 / pose-combination intervention needed.
+   - **Captioner quirks** (§6): bake in inline guidance for the quirks most likely on this image.
 
-5. **Report:** image id, labels_ng, hint, char count vs. previous, and the composed prompt verbatim. Keep under ~30 lines.
+4. **Compose.** Apply this recipe with judgment, aiming for ~400-1000 chars. Note the **hint-first ordering** below — labels are NOT the spine.
+    - **Read the hint** (when present). Treat it as the spine of the interaction description: its verbs, body parts, and spatial relationships are precise; the labels are approximate. If `hints == 'none'` (case-insensitive), fall back to a label-driven compose.
+    - **Pull `skin.render_label_prompts(labels_ng)`**. For each rendered sentence: ask *"does the hint already say this, possibly with different wording?"* If yes — drop the label expansion and use the hint's phrasing instead. If no — the label fills a gap (pose, attribute, etc.) the hint is silent on; include it.
+    - **Pick a hint-threading pattern** (MD §4.1, "Hint-threading pattern"). **Do not duplicate the hint** — pick ONE:
+        - **verbatim pattern**: include the hint verbatim with *"Preserve every verb and body-part reference exactly: …"* lead-in. Let the captioner compose its own integrated sentence. **Do NOT pre-write an integrated sentence with the same content** in the prompt — duplication triggers a repetition spiral.
+        - **prefused pattern**: pre-write the integrated sentence (hint vocabulary fused with label-confirmed details). OMIT the verbatim hint quote. A short directive (*"Use the hint vocabulary verbatim"*) is fine.
+        - Heuristic: hint is a clean complete sentence → verbatim pattern; hint is fragmentary, has typos, or needs heavy label-fusion → prefused pattern.
+    - **Opener:** one complete sentence naming BOTH `xlgts woman` AND `xlasm man`. Pick a verb that fits the labels (insertion → "inserted into her <orifice>"; holding → "holds the xlasm man …"; otherwise generic). Apply MD §4.2 (opener pattern) and §2 (noun-phrase nudity).
+    - **Interaction sentences** (the body of the prompt, per chosen pattern):
+        - verbatim pattern: emit `Preserve … : <verbatim hint>` and stop there for the interaction. No pre-composed paraphrase.
+        - prefused pattern: emit the pre-composed integrated sentence(s) only. No verbatim hint quote.
+    - **Gap-fill from labels:** for pose, attribute, and other labels the hint doesn't mention, include the label expansion as a short clause. For multi-pose figures, fuse poses into one compound sentence (MD §4.4).
+    - **Inline anti-pattern guard** (only the ones at risk for this image): e.g. for a nude man, add *"never emit 'is naked, with ...'; bind nudity to the noun phrase"*. Don't ship the full §5 list — pick the 1-3 relevant ones.
+    - **Closer:** one short ordering instruction ("describe interaction first, then setting").
+
+5. **Persist** via `simg.set_caption_prompt(p) + simg.db_store()`.
+
+6. **Report:** image id, labels_ng, hint, char count vs. previous, the composed prompt verbatim, and a one-line note on which MD sections informed the composition (e.g. *"hint-spine: stands+immersed; archetype=between-thighs; risks=§5.1; labels-dropped: touch.thigh+pose.standing (covered by hint)"*). Keep under ~30 lines.
 
 ## Access rights
 

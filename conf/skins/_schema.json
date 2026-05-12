@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://aidb.local/skins/_schema.json",
   "title": "Caption Skin",
-  "description": "A complete captioning recipe. Source fields are authored by humans; the `_built` block is written by `python -m ait.caption.skin_build <name>` and read by use-time consumers (Skin.load, JoyNG, JoySceneDBNG, /v1-status, /todo-ai). Never hand-edit `_built`.",
+  "description": "A complete captioning recipe. Source fields are authored by humans; the `_built` block is written by `python -m ait.caption.skin_build <name>` and read by use-time consumers (Skin.load, JoyNG, JoySceneDBNG, /v1-status, /todo-ai). Never hand-edit `_built`.\n\nLOAD-BEARING CONVENTION — JSON vs MD split: this JSON is the MACHINE-READABLE SURFACE (entity taxonomy, label groups, compose substitution tables, mechanical validators, concept matchers, model refs). A sibling file `conf/skins/<name>.md` (when present) is the THEME BRIEFING — intuition, scene archetypes, captioner quirks, anti-pattern principles, exemplars, stylistic preferences that don't compress well into rule rows. The JSON should stay close to a stable taxonomy + a small core of mechanical rules; new insights about the theme accumulate in the MD, not as new JSON rule rows. At /caption_image Stage 1 (per-image prompt compile with Claude in the loop) the MD is the primary input alongside applied labels and hint. At batch captioning time (no Claude composing) only the JSON-derived directive is used; slight quality degradation is the accepted tradeoff. /v1-status and /todo-ai read only the JSON.",
   "type": "object",
   "additionalProperties": false,
   "required": [

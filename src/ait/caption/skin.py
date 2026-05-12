@@ -192,6 +192,12 @@ class Skin:
     forbidden: tuple[str, ...]           # union of all forbidden lists, deduplicated
     # raw source dict (for skin_build / inspection)
     source: dict[str, Any] = field(default_factory=dict)
+    # Theme briefing — verbatim contents of the sibling `conf/skins/<name>.md`
+    # if present, else empty string. Read by /caption_image Stage 1 and
+    # /update_caption_prompt per-image mode for theme/world knowledge that
+    # doesn't fit in the structured JSON. Never sent to the captioner; only
+    # consumed by Claude when composing per-image caption prompts.
+    theme_md: str = ''
 
     # ---- regex caches ----
 
@@ -427,12 +433,17 @@ class Skin:
                   log: Optional[callable] = None) -> 'Skin':
         with open(path) as f:
             data = json.load(f)
-        return cls.from_dict(data, source_path=path, schema=schema, log=log)
+        md_path = path.with_suffix('.md')
+        theme_md = md_path.read_text(encoding='utf-8') if md_path.exists() else ''
+        return cls.from_dict(
+            data, source_path=path, schema=schema, log=log, theme_md=theme_md,
+        )
 
     @classmethod
     def from_dict(cls, data: dict, *, source_path: Optional[Path] = None,
                   schema: Optional[dict] = None,
-                  log: Optional[callable] = None) -> 'Skin':
+                  log: Optional[callable] = None,
+                  theme_md: str = '') -> 'Skin':
         if schema is None:
             schema = _load_schema()
         Draft202012Validator(schema).validate(data)
@@ -502,6 +513,7 @@ class Skin:
             label_to_entity=dict(built['label_to_entity']),
             forbidden=tuple(built['forbidden']),
             source=data,
+            theme_md=theme_md,
         )
 
 

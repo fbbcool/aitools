@@ -13,6 +13,10 @@ For the given image id, run these three stages in order. If any stage hard-error
 
 Use the per-image recipe from `/update_caption_prompt`'s "Per-image mode": pull `labels_ng` + `hints` + `Skin('1xlasm')`, hand-craft a tight prompt (~400-1000 chars) that bakes in only the rules that matter for this image, persist via `simg.set_caption_prompt(p) + simg.db_store()`.
 
+**Primary inputs are the curator's `hints` and `skin.theme_md`** (the theme briefing in `conf/skins/1xlasm.md`). The hint is the source of contextual truth for the interaction — its verbs, body parts, and spatial relationships are precise. Labels are coarse approximations and confirm/refine specific aspects of what the hint already describes; the compile is hint-driven narrative with labels filling gaps the hint is silent on. **NOT** `expand(labels) + hint` — read MD §4.1 first for the hint-spine workflow. JSON/MD split: structured taxonomy + mechanical validators live in the JSON; theme/world knowledge (archetypes, anti-pattern principles, captioner quirks) lives in the MD. See `/update_caption_prompt` per-image mode steps 2-4 for the full recipe.
+
+Use `skin.render_label_prompts(labels_ng)` (context-aware via `compose` tables) for the label sentence pool — but use those sentences as a *candidate set to confirm/drop against the hint*, not as a scaffold to concatenate.
+
 Hint sentinel: a `hints` value equal to the literal string `'none'` (case-insensitive, stripped) means no hint — skip the *"Preserve every verb…"* lead-in.
 
 If `labels_ng` is empty, abort: this command refuses to caption an unlabeled image.
