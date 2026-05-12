@@ -7,6 +7,12 @@ Edit the values below and run:
 
 Requires reachability to prod Mongo and the image filesystem (since the
 dataset is built directly from `SceneSetManager` / `SceneImageManager`).
+
+Training data shape: each row is ((image, caption_prompt) → caption).
+The `caption_prompt` is the curator-finalized stored prompt (built by
+`/imgs_caption_prompt` for curated images, or `/imgs_update_caption_prompt`
+for legacy ones). Training on the same prompt distribution `/imgs_caption_joy`
+forwards at inference avoids train/inference mismatch.
 """
 
 import os
@@ -17,9 +23,12 @@ from ait.caption.joy_train import train
 
 SET_NAME = 'gts_v3'
 CONFIG = 'prod'
-TRIGGER = '1xlasm'
+SKIN = '1xlasm'
 
-OUTPUT_DIR = Path(os.environ['WORKSPACE']) / 'joy_lora_gts_v3'
+# Versioned output dir — the legacy LoRA at $WORKSPACE/joy_lora_gts_v3 is
+# preserved for performance comparison. After validation, the curator can
+# either repoint AInstallerDB to this new path or rename.
+OUTPUT_DIR = Path(os.environ['WORKSPACE']) / 'joy_lora_gts_v3_jp'
 
 EPOCHS = 6
 LEARNING_RATE = 1e-4
@@ -35,7 +44,7 @@ if __name__ == '__main__':
     train(
         set_name=SET_NAME,
         config=CONFIG,
-        trigger=TRIGGER,
+        skin_name=SKIN,
         output_dir=OUTPUT_DIR,
         epochs=EPOCHS,
         learning_rate=LEARNING_RATE,

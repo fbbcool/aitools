@@ -2,8 +2,13 @@
 JoyCaption LoRA fine-tuning on a SceneSet of done images.
 
 Trains a PEFT/LoRA adapter on the language-model linear layers of the
-JoyCaption Llava base, using the same prompt-construction logic as
-`Joy.img_caption()` and the human-edited `caption` field as the target.
+JoyCaption Llava base. Each training example is the curator's stored
+`caption_prompt` (built by `/imgs_caption_prompt` upstream) conditioned
+on the image, with the curator-edited `caption` field as the target.
+
+By training on the same `caption_prompt` that inference forwards to the
+captioner, train and inference share the user-role prompt distribution
+— no train/inference mismatch.
 
 Reads images directly from the prod (or test) Mongo via SceneImageManager
 - no HF hub round-trip. Run on a box that can reach prod Mongo and the
@@ -25,47 +30,9 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model
 
-from aidb import SceneConfig, SceneManager, SceneSetManager
+from aidb import SceneConfig, SceneDef, SceneManager, SceneSetManager
 from ait.install import AInstallerDB
-
-from .joy import (
-    CONTENT_PROMPT,
-    CONTENT_SYSTEM,
-    DEFAULT_PROMPT,
-    DEFAULT_SYSTEM,
-    LABEL_PROMPT,
-    POST_PROMPT,
-    USER_HINT_PREAMBLE,
-)
-
-
-# ---------------------------------------------------------------------------
-# Prompt assembly (mirrors Joy.img_caption / Joy._process)
-# ---------------------------------------------------------------------------
-
-
-def _build_prompt(trigger: str, hint: str, labels: list[str]) -> str:
-    user_hint = (hint or '').strip()
-    label_hint = ''
-    for label in labels or []:
-        add = LABEL_PROMPT.get(label)
-        if add:
-            label_hint += add
-    prompt = DEFAULT_PROMPT
-    prompt += CONTENT_PROMPT.get(trigger, '')
-    if user_hint:
-        prompt += USER_HINT_PREAMBLE.format(hint=user_hint)
-    if label_hint:
-        prompt += label_hint
-    prompt += POST_PROMPT
-    return prompt
-
-
-def _build_convo(trigger: str, prompt: str) -> list[dict]:
-    return [
-        {'role': 'system', 'content': DEFAULT_SYSTEM + CONTENT_SYSTEM.get(trigger, '')},
-        {'role': 'user', 'content': prompt},
-    ]
+from ait.caption.skin import SkinRegistry
 
 
 # ---------------------------------------------------------------------------
@@ -76,28 +43,28 @@ def _build_convo(trigger: str, prompt: str) -> list[dict]:
 @dataclass
 class JoyTrainSample:
     img: Image.Image
-    trigger: str
-    hint: str
-    labels: list[str]
-    caption: str
+    caption_prompt: str       # conditioning text (user role)
+    caption: str              # target text (assistant role)
 
 
 class JoyDoneDataset(Dataset):
     """
-    Iterates 'done' active images of a SceneSet.
+    Iterates active images of a SceneSet that have both `caption_prompt`
+    and `caption` populated. `caption_prompt` is the curator-finalized
+    prompt (judgment-mode or deterministic) that `/imgs_caption_joy`
+    forwards to the captioner at inference; `caption` is the
+    curator-edited target text.
 
-    'Done' = non-prototype + non-empty hints + non-empty labels +
-    non-empty caption_joy + non-empty caption.
+    `labels`, `hints`, and `caption_joy` are upstream that *produced* these
+    two fields and are not used by training directly.
     """
 
     def __init__(
         self,
         set_name: str,
         config: SceneConfig = 'prod',
-        trigger: str = '1xlasm',
         verbose: int = 0,
     ) -> None:
-        self._trigger = trigger
         self._items: list[dict] = []
 
         ssm = SceneSetManager(config=config, verbose=verbose)
@@ -108,18 +75,16 @@ class JoyDoneDataset(Dataset):
         for img in scene_set.imgs:
             if img.prototype:
                 continue
-            hints = (img.hints or '').strip()
-            labels = img.labels or []
-            cap = (img.caption or '').strip()
-            cap_joy = (img.caption_joy or '').strip()
-            if not (hints and labels and cap and cap_joy):
+            d = img.data
+            caption = (d.get(SceneDef.FIELD_CAPTION) or '').strip()
+            caption_prompt = (d.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
+            if not (caption and caption_prompt):
                 continue
             self._items.append(
                 {
                     'id': img.id,
-                    'hint': hints,
-                    'labels': list(labels),
-                    'caption': cap,
+                    'caption_prompt': caption_prompt,
+                    'caption': caption,
                 }
             )
 
@@ -138,9 +103,7 @@ class JoyDoneDataset(Dataset):
             raise RuntimeError(f'pil load failed: {item["id"]}')
         return JoyTrainSample(
             img=pil,
-            trigger=self._trigger,
-            hint=item['hint'],
-            labels=item['labels'],
+            caption_prompt=item['caption_prompt'],
             caption=item['caption'],
         )
 
@@ -153,6 +116,7 @@ class JoyDoneDataset(Dataset):
 @dataclass
 class JoyCollator:
     processor: Any
+    system_content: str            # = skin.directive (constant across batch)
     max_length: int = 4096
 
     def __call__(self, features: list[JoyTrainSample]) -> dict[str, torch.Tensor]:
@@ -168,8 +132,10 @@ class JoyCollator:
         batch_pixels: list[torch.Tensor] = []
 
         for s in features:
-            prompt = _build_prompt(s.trigger, s.hint, s.labels)
-            convo = _build_convo(s.trigger, prompt)
+            convo = [
+                {'role': 'system', 'content': self.system_content},
+                {'role': 'user', 'content': s.caption_prompt},
+            ]
 
             prompt_str = self.processor.apply_chat_template(
                 convo, tokenize=False, add_generation_prompt=True
@@ -263,7 +229,7 @@ def _freeze_vision_tower(model: torch.nn.Module) -> None:
 def train(
     set_name: str = 'gts_v3',
     config: SceneConfig = 'prod',
-    trigger: str = '1xlasm',
+    skin_name: str = '1xlasm',
     output_dir: Path | str = Path('./out_joy_lora'),
     epochs: int = 4,
     learning_rate: float = 1e-4,
@@ -277,6 +243,10 @@ def train(
 ) -> None:
     torch.manual_seed(seed)
     output_dir = Path(output_dir)
+
+    skin = SkinRegistry().get(skin_name)
+    if verbose:
+        print(f'[joy_train] skin: {skin_name}  directive: {len(skin.directive)} chars')
 
     repo_id = AInstallerDB().repo_ids(group='capjoy', variant='common', target='model')[0]
     if verbose:
@@ -314,14 +284,19 @@ def train(
         model.print_trainable_parameters()
 
     dataset = JoyDoneDataset(
-        set_name=set_name, config=config, trigger=trigger, verbose=verbose
+        set_name=set_name, config=config, verbose=verbose
     )
     if len(dataset) == 0:
-        raise RuntimeError(f'no done images in set [{set_name}]')
+        raise RuntimeError(f'no trainable images in set [{set_name}] '
+                           f'(need caption_prompt + caption both non-empty)')
     if verbose:
-        print(f'[joy_train] dataset: {len(dataset)} done images')
+        print(f'[joy_train] dataset: {len(dataset)} trainable images')
 
-    collator = JoyCollator(processor=processor, max_length=max_length)
+    collator = JoyCollator(
+        processor=processor,
+        system_content=skin.directive,
+        max_length=max_length,
+    )
 
     args = TrainingArguments(
         output_dir=str(output_dir),

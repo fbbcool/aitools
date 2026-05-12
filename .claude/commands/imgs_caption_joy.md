@@ -13,9 +13,11 @@ argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> |
 
 Flags compose with the filters — e.g. `force set=gts_v3 limit=10` recaptions the 10 newest curated images in `gts_v3` whether or not their captions were already fresh; `ignore_curated rating==0` captions the rating-0 cohort regardless of suggestion provenance.
 
+**Single-image mode**: if `$ARGUMENTS` is (or contains) a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`), the command processes just that image. The eligibility filter (`is_curated` / `is_labeled`) is **skipped** — the curator named it explicitly. The freshness check is also skipped (single-image = implicit `force`). The non-empty-`caption_prompt` precondition still applies (Stage 2 needs a prompt to forward to joy_server); if `caption_prompt` is empty, abort with `caption_prompt is empty — run /imgs_caption_prompt or /imgs_update_caption_prompt first`.
+
 **An eligible image with an EMPTY `caption_prompt` is NEVER in scope** — even with `force` or `ignore_curated`. Run `/imgs_caption_prompt` first to compile the prompt; that's this command's upstream. The report counts and lists such images so the curator knows.
 
-Same parser as `/imgs_update_caption_prompt`, extended with the `force` bare-word flag. A 24-char ObjectId is NOT a valid argument — use `/img_caption <id>` for single-image work.
+Same parser as `/imgs_update_caption_prompt`, extended with the `force` and `ignore_curated` bare-word flags and bare-ObjectId single-image mode.
 
 ## Why this exists
 
@@ -92,12 +94,17 @@ The "curator promoted" signal is implicit: the curator's promotion of `_SUGGESTI
 
 ```python
 import re
-TERM_RE = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
+ID_RE    = re.compile(r'\b([0-9a-f]{24})\b')
+TERM_RE  = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
 FORCE_RE = re.compile(r'\bforce\b', re.IGNORECASE)
 IGN_RE   = re.compile(r'\bignore_curated\b', re.IGNORECASE)
 
 def parse_args(s: str):
     s = (s or '').strip()
+    image_id: str | None = None
+    m = ID_RE.search(s)
+    if m:
+        image_id = m.group(1)
     filters: dict = {}
     limit: int | None = None
     force = bool(FORCE_RE.search(s))
@@ -110,15 +117,19 @@ def parse_args(s: str):
             filters[('set', op)] = val
         elif kw == 'limit':
             limit = int(val)
-    return filters, limit, force, ignore_curated
+    return image_id, filters, limit, force, ignore_curated
 ```
+
+If `image_id` is set, jump straight to single-image mode (below); the
+other filters/flags are ignored.
 
 ## Iterator
 
+- `image_id` set (single-image mode) → `pending = [sim.img_from_id(image_id)]`. Skip the eligibility/freshness check; require only that `caption_prompt` is non-empty. If empty, abort with `caption_prompt is empty — run /imgs_caption_prompt or /imgs_update_caption_prompt first`.
 - `('set', '==')` present → load `SceneSetManager(...).set_from_id_or_name(value)` and iterate `scene_set.imgs`, skipping `excluded_ids`.
 - Else → iterate `coll.find({prototype: {$ne: true}}, …)`.
 
-For each candidate: apply `is_curated_pending(img, force=force, ignore_curated=ignore_curated)` AND remaining filters (e.g. `rating`). Sort the pending list by `timestamp_created` descending (newest first) so a `limit=N` slice picks the most recently created images. Apply `limit` if set. Collect matching ids into `pending`.
+For each candidate (batch modes): apply `is_curated_pending(img, force=force, ignore_curated=ignore_curated)` AND remaining filters (e.g. `rating`). Sort the pending list by `timestamp_created` descending (newest first) so a `limit=N` slice picks the most recently created images. Apply `limit` if set. Collect matching ids into `pending`.
 
 Separately, count eligible images (curated or labeled, depending on flag) that have an **empty `caption_prompt`** — these are NOT processed but the count is shown in the header so the curator knows to run `/imgs_caption_prompt` upstream.
 
