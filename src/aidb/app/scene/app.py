@@ -1036,7 +1036,7 @@ class AIDBSceneApp:
         ACTIVE image in the selected set whose stored `caption_prompt` is
         non-empty AND newer than its `caption_joy` (or where `caption_joy`
         is empty). Images with empty `caption_prompt` are skipped — the
-        compile step (`/img_update_caption_prompt`) is the upstream that
+        compile step (`/imgs_update_caption_prompt`) is the upstream that
         populates this field. Excluded images are never captioned.
         """
         refresh_args = (

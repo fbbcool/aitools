@@ -11,9 +11,9 @@ For the given image id, run these three stages in order. If any stage hard-error
 
 ### 1. Compose caption_prompt (per-image judgment mode)
 
-Use the per-image recipe from `/img_update_caption_prompt`'s "Per-image mode": pull `labels_ng` + `hints` + `Skin('1xlasm')`, hand-craft a tight prompt (~400-1000 chars) that bakes in only the rules that matter for this image, persist via `simg.set_caption_prompt(p) + simg.db_store()`.
+Use the per-image recipe from `/imgs_update_caption_prompt`'s "Per-image mode": pull `labels_ng` + `hints` + `Skin('1xlasm')`, hand-craft a tight prompt (~400-1000 chars) that bakes in only the rules that matter for this image, persist via `simg.set_caption_prompt(p) + simg.db_store()`.
 
-**Primary inputs are the curator's `hints` and `skin.theme_md`** (the theme briefing in `conf/skins/1xlasm.md`). The hint is the source of contextual truth for the interaction — its verbs, body parts, and spatial relationships are precise. Labels are coarse approximations and confirm/refine specific aspects of what the hint already describes; the compile is hint-driven narrative with labels filling gaps the hint is silent on. **NOT** `expand(labels) + hint` — read MD §4.1 first for the hint-spine workflow. JSON/MD split: structured taxonomy + mechanical validators live in the JSON; theme/world knowledge (archetypes, anti-pattern principles, captioner quirks) lives in the MD. See `/img_update_caption_prompt` per-image mode steps 2-4 for the full recipe.
+**Primary inputs are the curator's `hints` and `skin.theme_md`** (the theme briefing in `conf/skins/1xlasm.md`). The hint is the source of contextual truth for the interaction — its verbs, body parts, and spatial relationships are precise. Labels are coarse approximations and confirm/refine specific aspects of what the hint already describes; the compile is hint-driven narrative with labels filling gaps the hint is silent on. **NOT** `expand(labels) + hint` — read MD §4.1 first for the hint-spine workflow. JSON/MD split: structured taxonomy + mechanical validators live in the JSON; theme/world knowledge (archetypes, anti-pattern principles, captioner quirks) lives in the MD. See `/imgs_update_caption_prompt` per-image mode steps 2-4 for the full recipe.
 
 Use `skin.render_label_prompts(labels_ng)` (context-aware via `compose` tables) for the label sentence pool — but use those sentences as a *candidate set to confirm/drop against the hint*, not as a scaffold to concatenate.
 
@@ -65,7 +65,7 @@ Either path: the stored caption_prompt from Stage 1 is sent verbatim. `force=Tru
 
 ### 3. Validate + auto-fix
 
-Use the single-image pipeline from `/img_validate_captions`: audit `caption_joy` against `skin.caption_violations` / `skin.body_type_warnings` / `skin.missing_triggers` / opener / naked-multi, then auto-fix the mechanically tractable categories (naked-multi, body-type, opener, forbidden vocab). Missing-trigger is flagged only — no auto-fix.
+Use the single-image pipeline from `/imgs_validate_captions`: audit `caption_joy` against `skin.caption_violations` / `skin.body_type_warnings` / `skin.missing_triggers` / opener / naked-multi, then auto-fix the mechanically tractable categories (naked-multi, body-type, opener, forbidden vocab). Missing-trigger is flagged only — no auto-fix.
 
 If a fix is applied, persist `simg.set_caption_joy(fixed)`. When `FIELD_CAPTION` was identical to `FIELD_CAPTION_JOY` before stage 2, also update `set_caption(fixed)` so the manual caption stays in sync.
 
@@ -85,8 +85,8 @@ Read access to canonical collections + write to `FIELD_CAPTION` / `FIELD_CAPTION
 
 ## See also
 
-- `/img_update_caption_prompt <id>` — stage 1 only
-- `/img_update_caption_joy <id>` — stage 2 only
-- `/img_validate_captions <id>` — stage 3 only
+- `/imgs_update_caption_prompt <id>` — stage 1 only
+- `/imgs_update_caption_joy <id>` — stage 2 only
+- `/imgs_validate_captions <id>` — stage 3 only
 
 This command is the orchestrator; use it when you want the whole loop on one image without three round trips.

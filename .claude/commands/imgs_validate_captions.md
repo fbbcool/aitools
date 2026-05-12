@@ -1,5 +1,5 @@
 ---
-description: Audit caption_joy in a scope (default whole DB) against the skin's rules (forbidden vocab, body-type authorization, missing triggers, naked-multi, opener) and auto-fix the mechanically tractable issues. Same argument grammar as /img_update_caption_prompt and /img_update_caption_joy.
+description: Audit caption_joy in a scope (default whole DB) against the skin's rules (forbidden vocab, body-type authorization, missing triggers, naked-multi, opener) and auto-fix the mechanically tractable issues. Same argument grammar as /imgs_update_caption_prompt and /imgs_update_caption_joy.
 argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | …]"
 ---
 
@@ -67,7 +67,7 @@ For each image with non-empty `caption_joy`:
 - **opener** → if the first sentence is missing both phrases, prepend `"This image features a {primary.phrase} and a {secondary.phrase}."` as the new opening sentence.
 - **forbidden vocab** → drop the entire SENTENCE containing the forbidden word. If every sentence has a violation, leave the caption alone for human review.
 - **photo_filler** → drop the entire matched sentence. Run BEFORE the forbidden-vocab pass so the count of dropped sentences isn't confused with a forbidden-word fix.
-- **missing trigger** → no auto-fix; flag only. (Re-captioning the image — `/img_update_caption_joy <id>` — is the right path.)
+- **missing trigger** → no auto-fix; flag only. (Re-captioning the image — `/imgs_update_caption_joy <id>` — is the right path.)
 
 For each modified caption, persist via `simg.set_caption_joy(fixed)` (which bumps `timestamp_caption_joy`). When `FIELD_CAPTION` was identical to `FIELD_CAPTION_JOY` before the fix, also update `set_caption(fixed)`.
 
@@ -87,7 +87,7 @@ Keep total output under ~30 lines.
 
 ## Sequencing tip
 
-`/img_update_caption_prompt <scope>` → `/img_update_caption_joy <scope>` → `/img_validate_captions <scope>` — the three share filter grammar so the same scope string can drive all three steps in sequence.
+`/imgs_update_caption_prompt <scope>` → `/imgs_update_caption_joy <scope>` → `/imgs_validate_captions <scope>` — the three share filter grammar so the same scope string can drive all three steps in sequence.
 
 ## Access rights
 

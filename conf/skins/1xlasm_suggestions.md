@@ -4,12 +4,12 @@
 >
 > `1xlasm.md` (`skin.theme_md`) describes how to *write a final caption*
 > from labels + hints — read by `/img_caption` Stage 1 and
-> `/img_update_caption_prompt`.
+> `/imgs_update_caption_prompt`.
 >
 > **This file** (`1xlasm_suggestions.md`, `skin.theme_md_suggestions`)
 > describes how to *derive labels + hints from a blank image* by
 > iteratively probing JoyCaption — read by `/img_suggest` and
-> `/img_validate_suggestions`. It accumulates suggestion-process knowledge
+> `/imgs_validate_suggestions`. It accumulates suggestion-process knowledge
 > separately from the captioning compile rules.
 >
 > Neither file is sent to the captioner; both are inputs to Claude's
@@ -35,7 +35,7 @@ next probe, and converges within 5 iterations. Output goes to
 curator reviews and promotes to canonical fields.
 
 This MD is the *briefing for the suggestion procedure*. It grows as
-we observe what works and what doesn't via `/img_validate_suggestions`.
+we observe what works and what doesn't via `/imgs_validate_suggestions`.
 
 ---
 
@@ -186,7 +186,7 @@ clauses and reconstruct in curator style.
 
 ## 4. Joy biases observed during suggestion
 
-Populated by `/img_validate_suggestions` findings. Each entry dated and
+Populated by `/imgs_validate_suggestions` findings. Each entry dated and
 cites the validation-run metric that surfaced it.
 
 Format for new entries:
@@ -461,7 +461,7 @@ The default `she holds him` (e.g. holding in a fist, in cupped hands,
 against her body) is just `primary.action.holding` + maybe a
 `proximity.*` label if she's holding him near a specific body part.
 
-*(Add more cases as `/img_validate_suggestions` surfaces them.)*
+*(Add more cases as `/imgs_validate_suggestions` surfaces them.)*
 
 ---
 
@@ -490,7 +490,7 @@ Same scale for hint material:
 
 ## 7. Validation harness
 
-Run `/img_validate_suggestions count=N [set=gts_v3]` to validate the
+Run `/imgs_validate_suggestions count=N [set=gts_v3]` to validate the
 suggestion process against curator-authored labels+hints on done
 images. See the active plan file
 (`/home/misw/.claude/plans/elegant-brewing-dawn.md`) for the full
@@ -564,7 +564,7 @@ v2 per-group recall (15 imgs):
 Same iterative-knowledge accumulation pattern as `1xlasm.md` §8.
 
 Update §4 (joy biases) and §5 (mapping ambiguities) when
-`/img_validate_suggestions` surfaces a systematic miss. Edit §3 (probe
+`/imgs_validate_suggestions` surfaces a systematic miss. Edit §3 (probe
 templates) when a template change measurably improves a metric;
 re-run validation to confirm.
 

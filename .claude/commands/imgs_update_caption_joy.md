@@ -1,9 +1,9 @@
 ---
-description: Run JoySceneDBNG('1xlasm') against one image (with id) OR a filtered batch (scope by set, rating, etc.). Only images whose caption_prompt is newer than caption_joy are captioned. Empty caption_prompt skips. Same argument grammar as /img_update_caption_prompt.
+description: Run JoySceneDBNG('1xlasm') against one image (with id) OR a filtered batch (scope by set, rating, etc.). Only images whose caption_prompt is newer than caption_joy are captioned. Empty caption_prompt skips. Same argument grammar as /imgs_update_caption_prompt.
 argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
 ---
 
-`$ARGUMENTS` is parsed in three layers (same grammar as `/img_update_caption_prompt`):
+`$ARGUMENTS` is parsed in three layers (same grammar as `/imgs_update_caption_prompt`):
 
 1. **`$ARGUMENTS` is empty** → batch over every non-prototype image with non-empty `caption_prompt` that's newer than `caption_joy` (DB-wide, all sets).
 2. **`$ARGUMENTS` matches a 24-char hex MongoDB ObjectId** → single-image: caption that one image (force=True bypasses the freshness check; the stored `caption_prompt` is sent verbatim if non-empty, else fresh skin-compose).
@@ -12,13 +12,13 @@ argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
     - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
     - Multiple terms AND together.
 
-In every batch mode the **stale-prompt** filter applies on top: only caption images where `caption_prompt` is non-empty AND (`caption_joy` empty OR `timestamp_caption_prompt > timestamp_caption_joy`). Images with empty `caption_prompt` are skipped (the upstream is `/img_update_caption_prompt`).
+In every batch mode the **stale-prompt** filter applies on top: only caption images where `caption_prompt` is non-empty AND (`caption_joy` empty OR `timestamp_caption_prompt > timestamp_caption_joy`). Images with empty `caption_prompt` are skipped (the upstream is `/imgs_update_caption_prompt`).
 
 In every mode the resulting caption is persisted via `simg.set_caption_joy(caption) + simg.set_caption_prompt(prompt) + simg.db_store()` so the timestamps line up.
 
 ## Argument parser
 
-Reuse the parser from `/img_update_caption_prompt`:
+Reuse the parser from `/imgs_update_caption_prompt`:
 
 ```python
 import re
@@ -86,7 +86,7 @@ Report: `image_id`, prompt length used, caption text, and a one-line validator s
 
 ## Sequencing tip
 
-Typical workflow: `/img_update_caption_prompt <scope>` → `/img_update_caption_joy <scope>` → `/img_validate_captions <set>`. The three together close the loop from rule edit to clean caption_joy on disk.
+Typical workflow: `/imgs_update_caption_prompt <scope>` → `/imgs_update_caption_joy <scope>` → `/imgs_validate_captions <set>`. The three together close the loop from rule edit to clean caption_joy on disk.
 
 ## Access rights
 

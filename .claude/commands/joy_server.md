@@ -54,4 +54,4 @@ Read access to the local HTTP server and write to the PID/log files in `$WORKSPA
 
 - `/img_caption <id>` — routes through joy_client when the server is running, falls back to in-process loading when not.
 - `/img_suggest <id>` — same.
-- `/img_validate_suggestions count=N` — same.
+- `/imgs_validate_suggestions count=N` — same.

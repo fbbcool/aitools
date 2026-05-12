@@ -174,5 +174,5 @@ Read access to canonical fields + write to `FIELD_LABELS_NG_SUGGESTION` / `FIELD
 ## See also
 
 - `/joy_server start|stop|status` — explicit server lifecycle.
-- `/img_validate_suggestions count=N` — validate the suggestion process against done images as ground truth.
+- `/imgs_validate_suggestions count=N` — validate the suggestion process against done images as ground truth.
 - `/img_caption <id>` — the next step after the curator promotes `_SUGGESTION` → canonical.

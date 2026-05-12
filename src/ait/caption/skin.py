@@ -198,13 +198,13 @@ class Skin:
     source: dict[str, Any] = field(default_factory=dict)
     # Theme briefing — verbatim contents of the sibling `conf/skins/<name>.md`
     # if present, else empty string. Read by /img_caption Stage 1 and
-    # /img_update_caption_prompt per-image mode for theme/world knowledge that
+    # /imgs_update_caption_prompt per-image mode for theme/world knowledge that
     # doesn't fit in the structured JSON. Never sent to the captioner; only
     # consumed by Claude when composing per-image caption prompts.
     theme_md: str = ''
     # Suggestion-process briefing — verbatim contents of
     # `conf/skins/<name>_suggestions.md` if present, else empty. Read by
-    # /img_suggest and /img_validate_suggestions for the iterative probe
+    # /img_suggest and /imgs_validate_suggestions for the iterative probe
     # design, joy biases observed during suggestion, and convergence
     # heuristics. Distinct from `theme_md`: that one shapes final captions,
     # this one shapes the suggestion process. Never sent to the captioner.
