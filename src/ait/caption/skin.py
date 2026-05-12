@@ -198,6 +198,13 @@ class Skin:
     # doesn't fit in the structured JSON. Never sent to the captioner; only
     # consumed by Claude when composing per-image caption prompts.
     theme_md: str = ''
+    # Suggestion-process briefing — verbatim contents of
+    # `conf/skins/<name>_suggestions.md` if present, else empty. Read by
+    # /suggest_image and /validate_suggestions for the iterative probe
+    # design, joy biases observed during suggestion, and convergence
+    # heuristics. Distinct from `theme_md`: that one shapes final captions,
+    # this one shapes the suggestion process. Never sent to the captioner.
+    theme_md_suggestions: str = ''
 
     # ---- regex caches ----
 
@@ -435,15 +442,22 @@ class Skin:
             data = json.load(f)
         md_path = path.with_suffix('.md')
         theme_md = md_path.read_text(encoding='utf-8') if md_path.exists() else ''
+        suggestions_path = path.parent / f'{path.stem}_suggestions.md'
+        theme_md_suggestions = (
+            suggestions_path.read_text(encoding='utf-8')
+            if suggestions_path.exists() else ''
+        )
         return cls.from_dict(
-            data, source_path=path, schema=schema, log=log, theme_md=theme_md,
+            data, source_path=path, schema=schema, log=log,
+            theme_md=theme_md, theme_md_suggestions=theme_md_suggestions,
         )
 
     @classmethod
     def from_dict(cls, data: dict, *, source_path: Optional[Path] = None,
                   schema: Optional[dict] = None,
                   log: Optional[callable] = None,
-                  theme_md: str = '') -> 'Skin':
+                  theme_md: str = '',
+                  theme_md_suggestions: str = '') -> 'Skin':
         if schema is None:
             schema = _load_schema()
         Draft202012Validator(schema).validate(data)
@@ -514,6 +528,7 @@ class Skin:
             forbidden=tuple(built['forbidden']),
             source=data,
             theme_md=theme_md,
+            theme_md_suggestions=theme_md_suggestions,
         )
 
 

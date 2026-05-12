@@ -137,12 +137,23 @@ class AppSceneImageCell:
             extra_header_buttons=[AppSceneImageCell._html_set_button(obj.id)],
             rows=9,
         )
+        # If a hint SUGGESTION exists, surface a `set` button in the hints
+        # field's header (left of `copy`) that loads the suggestion into
+        # this textarea on click — DOM-only, mirrors the caption-side
+        # `_html_set_button` flow. No button when no suggestion exists.
+        hints_extra_buttons: list[str] = []
+        sug_hint_for_field = (obj.hints_suggestion or '').strip()
+        if sug_hint_for_field:
+            hints_extra_buttons.append(
+                AppSceneImageCell._html_hint_set_button(obj.id, sug_hint_for_field)
+            )
         hints_field = AppSceneImageCell._html_text_field(
             obj,
             attr_setter='set_hints',
             label='hints',
             value=obj.hints,
             multiline=True,
+            extra_header_buttons=hints_extra_buttons,
         )
         caption_joy_field = AppSceneImageCell._html_text_field(
             obj,
@@ -218,6 +229,7 @@ class AppSceneImageCell:
         )
 
         labels_ng_html = AppSceneImageCell._html_labels_ng(obj)
+        suggestions_html = AppSceneImageCell._html_suggestions(obj)
 
         id_copy_btn = AppSceneImageCell._html_copy_static_button(obj.id, label='id')
 
@@ -249,6 +261,7 @@ class AppSceneImageCell:
                 </div>
                 <div class="simg-edit-labels-col">
                     {labels_ng_html}
+                    {suggestions_html}
                     {caption_field}
                 </div>
             </div>
@@ -312,6 +325,7 @@ class AppSceneImageCell:
             )
 
         applied = set(obj.labels_ng)
+        suggested = set(obj.labels_ng_suggestion or [])
         blocks: list[tuple[str, str, dict]] = []  # (entity_tag, title, label_groups)
         primary = skin.entities_primary
         blocks.append(('primary', primary.phrase or 'primary', primary.label_groups))
@@ -331,7 +345,7 @@ class AppSceneImageCell:
                 # render_label_prompts but is not the right order for the UI.
                 for lab in sorted(group.labels, key=lambda l: l.name):
                     path = f'{entity_tag}.{group_name}.{lab.name}'
-                    btn_html += AppHtml.html_make_cmd_button(
+                    btn = AppHtml.html_make_cmd_button(
                         AppHtml.make_cmd_data(
                             'image',
                             obj.id,
@@ -342,6 +356,15 @@ class AppSceneImageCell:
                         checked=path in applied,
                         toggle=True,
                     )
+                    # Suggested-but-not-yet-on-canonical → wrap with the
+                    # pink-framed marker so the curator sees joy's
+                    # candidates inline with the regular taxonomy. The
+                    # frame is independent of the checked state, so it
+                    # persists after the curator accepts (until the
+                    # _SUGGESTION field is cleared).
+                    if path in suggested:
+                        btn = f'<span class="simg-labels-ng-suggested">{btn}</span>'
+                    btn_html += btn
                 group_html.append(
                     f'<div class="simg-labels-ng-group">'
                     f'  <div class="simg-labels-ng-group-title">{html_lib.escape(group_name, quote=True)}</div>'
@@ -360,6 +383,127 @@ class AppSceneImageCell:
             '<div class="simg-edit-label">labels_ng</div>'
             f'{"".join(out)}'
             '</div>'
+        )
+
+    @staticmethod
+    def _html_suggestions(obj: SceneImage) -> str:
+        """Render the `_SUGGESTION` accept/clear controls + hint preview.
+
+        Labels suggestions are now shown INLINE in the `_html_labels_ng`
+        editor via the `simg-labels-ng-suggested` pink-frame wrapper —
+        no separate labels list here. This panel carries:
+
+        - top-line actions when labels are suggested: "accept all labels"
+          (union onto canonical, clear suggestion field) and "clear labels"
+          (wipe suggestion field, don't touch canonical)
+        - hint preview row, ALWAYS shown:
+          * non-empty hint → italic ivory text + accept/clear actions
+          * empty hint → grey "— no hint suggested —" placeholder, no actions
+
+        The panel always renders so the curator has a fixed surface to
+        review suggestions on every cell, regardless of state.
+        """
+        sug_labels = list(obj.labels_ng_suggestion or [])
+        sug_hint = (obj.hints_suggestion or '').strip()
+        applied = set(obj.labels_ng)
+
+        # Labels row — only when there are suggested labels.
+        labels_row = ''
+        if sug_labels:
+            already = sum(1 for p in sug_labels if p in applied)
+            union = sorted(set(applied) | set(sug_labels))
+            accept_all_btn = AppHtml.html_make_cmd_button(
+                AppHtml.make_cmd_data(
+                    'image',
+                    obj.id,
+                    'db_query_multi',
+                    payload={
+                        'set_labels_ng': union,
+                        'set_labels_ng_suggestion': [],
+                    },
+                    label='accept all labels',
+                ),
+                toggle=False,
+            )
+            clear_labels_btn = AppHtml.html_make_cmd_button(
+                AppHtml.make_cmd_data(
+                    'image',
+                    obj.id,
+                    'db_query',
+                    payload={'set_labels_ng_suggestion': []},
+                    label='clear labels',
+                ),
+                toggle=False,
+            )
+            labels_row = (
+                f'<div class="simg-suggestions-row">'
+                f'  <span class="simg-suggestions-section-title">'
+                f'    labels: {len(sug_labels)} suggested ({already} already on canonical)'
+                f'  </span>'
+                f'  <span class="operation-radio-group simg-suggestions-actions">'
+                f'    {accept_all_btn}{clear_labels_btn}'
+                f'  </span>'
+                f'</div>'
+            )
+
+        # Hint row — always rendered; placeholder when empty.
+        if sug_hint:
+            accept_hint_btn = AppHtml.html_make_cmd_button(
+                AppHtml.make_cmd_data(
+                    'image',
+                    obj.id,
+                    'db_query_multi',
+                    payload={
+                        'set_hints': sug_hint,
+                        'set_hints_suggestion': '',
+                    },
+                    label='accept hint',
+                ),
+                toggle=False,
+            )
+            clear_hint_btn = AppHtml.html_make_cmd_button(
+                AppHtml.make_cmd_data(
+                    'image',
+                    obj.id,
+                    'db_query',
+                    payload={'set_hints_suggestion': ''},
+                    label='clear hint',
+                ),
+                toggle=False,
+            )
+            # NOTE: the `set` button for this hint lives in the hints
+            # field's header (left of `copy`) — see `hints_extra_buttons`
+            # in `html()`. The suggestions panel only carries accept/clear
+            # actions; loading-into-the-textarea is the hints field's job.
+            hint_row = (
+                f'<div class="simg-suggestions-row">'
+                f'  <span class="simg-suggestions-section-title">'
+                f'    hint: {len(sug_hint)} chars suggested'
+                f'  </span>'
+                f'  <div class="simg-suggestions-hint-text">'
+                f'    {html_lib.escape(sug_hint)}'
+                f'  </div>'
+                f'  <span class="operation-radio-group simg-suggestions-actions">'
+                f'    {accept_hint_btn}{clear_hint_btn}'
+                f'  </span>'
+                f'</div>'
+            )
+        else:
+            hint_row = (
+                f'<div class="simg-suggestions-row">'
+                f'  <span class="simg-suggestions-section-title">hint:</span>'
+                f'  <div class="simg-suggestions-hint-text simg-suggestions-hint-empty">'
+                f'    — no hint suggested —'
+                f'  </div>'
+                f'</div>'
+            )
+
+        return (
+            f'<div class="simg-edit-suggestions">'
+            f'  <div class="simg-edit-label">SUGGESTIONS</div>'
+            f'  {labels_row}'
+            f'  {hint_row}'
+            f'</div>'
         )
 
     @staticmethod
@@ -1280,6 +1424,44 @@ class AppSceneImageCell:
         return f'<button type="button" class="simg-set-btn" onclick="{js}">set</button>'
 
     @staticmethod
+    def _html_hint_set_button(obj_id: str, suggested_hint: str) -> str:
+        """`set` button for the SUGGESTIONS hint row.
+
+        Copies the SUGGESTED hint (embedded at render time, NOT read from a
+        textarea) into the canonical `hints` textarea on the same cell —
+        DOM-only, not persisted. The curator then reviews/edits and uses
+        the textarea's own `save` button to commit.
+
+        Mirrors the caption-side `_html_set_button` flow, simplified:
+        - No backend round-trip (the suggested hint is a known value from
+          DB at render time).
+        - No "generate fallback" path (suggestions are only populated by
+          `/suggest_image`).
+        """
+        hints_id = f'simg-set_hints-{obj_id}'
+        # JSON-encode the hint so quotes / newlines / unicode survive both
+        # the HTML attribute encoding and the JS string parser. The outer
+        # `.replace('"', '&quot;')` converts JSON's double-quotes to HTML
+        # entities; the browser decodes them back when parsing onclick.
+        hint_js_literal = json.dumps(suggested_hint)
+        js = f"""
+        event.stopPropagation();
+        const tgt = document.getElementById('{hints_id}');
+        if (!tgt) {{ return; }}
+        tgt.value = {hint_js_literal};
+        tgt.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        const btn = event.currentTarget;
+        const orig = btn.textContent;
+        btn.textContent = 'set';
+        btn.classList.add('simg-copy-btn-ok');
+        setTimeout(function() {{
+            btn.textContent = orig;
+            btn.classList.remove('simg-copy-btn-ok');
+        }}, 800);
+        """.replace('\n', ' ').replace('"', '&quot;')
+        return f'<button type="button" class="simg-set-btn" onclick="{js}">set</button>'
+
+    @staticmethod
     def _html_caption_button(
         target_type: str,
         target: str,
@@ -1744,6 +1926,71 @@ class AppSceneImageCell:
             }
             .simg-labels-ng-error {
                 color: #cc6666;
+            }
+            /* ---- _SUGGESTION inline marker on labels_ng buttons ---- */
+            /* Wraps each suggested label's <input>+<label> pair with a
+               subtle pink frame. Independent of the checked state, so the
+               curator can see "joy suggested this" at a glance regardless
+               of whether the label is already on canonical. The frame
+               persists until the _SUGGESTION field is cleared. */
+            .simg-labels-ng-suggested {
+                display: inline-block;
+                border: 1.5px solid #d8709c;
+                border-radius: 5px;
+                padding: 0 1px;
+                margin: 1px;
+                background-color: rgba(216, 112, 156, 0.08);
+            }
+            /* ---- _SUGGESTION panel (compact, always rendered) ---- */
+            /* Carries top-line accept/clear actions for labels (when
+               suggestions exist) and the hint preview (always shown;
+               grey placeholder when no hint has been suggested). */
+            .simg-edit-suggestions {
+                font-size: 0.75em;
+                color: #cccccc;
+                min-width: 0;
+                border: 1px solid #5a4855;
+                border-radius: 6px;
+                background-color: #251f23;
+                padding: 5px 8px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .simg-edit-suggestions .simg-edit-label {
+                color: #d8709c;
+                font-weight: 600;
+                letter-spacing: 0.04em;
+            }
+            .simg-suggestions-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            .simg-suggestions-section-title {
+                font-size: 0.85em;
+                color: #cc99b8;
+                white-space: nowrap;
+            }
+            .simg-suggestions-actions {
+                justify-content: flex-start;
+            }
+            .simg-suggestions-hint-text {
+                flex: 1 1 200px;
+                min-width: 100px;
+                font-size: 0.95em;
+                color: #ffe0ec;
+                font-style: italic;
+                background-color: #1a151a;
+                border-radius: 3px;
+                padding: 3px 6px;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+            .simg-suggestions-hint-empty {
+                color: #777777;
+                font-style: italic;
             }
         </style>
         """

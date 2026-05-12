@@ -200,6 +200,41 @@ class SceneImage:
         else:
             self.push_label_ng(path)
 
+    # ---- _SUGGESTION fields (Claude's first-pass suggestions, separate
+    #      from canonical labels_ng / hints to keep curator-edited state
+    #      sacrosanct; populated by /suggest_image, never auto-promoted) ----
+
+    @property
+    def labels_ng_suggestion(self) -> list[str]:
+        return self._data.get(SceneDef.FIELD_LABELS_NG_SUGGESTION, []) or []
+
+    @property
+    def hints_suggestion(self) -> Optional[str]:
+        return self._data.get(SceneDef.FIELD_HINTS_SUGGESTION, None)
+
+    def set_labels_ng_suggestion(self, value: list[str]) -> None:
+        if not isinstance(value, list):
+            return
+        seen: set[str] = set()
+        out: list[str] = []
+        for v in value:
+            if v in seen:
+                continue
+            seen.add(v)
+            out.append(v)
+        self._data |= {
+            SceneDef.FIELD_LABELS_NG_SUGGESTION: out,
+            SceneDef.FIELD_TIMESTAMP_LABELS_NG_SUGGESTION: SceneDef.now_ts(),
+        }
+
+    def set_hints_suggestion(self, value: str) -> None:
+        if value is None:
+            return
+        self._data |= {
+            SceneDef.FIELD_HINTS_SUGGESTION: str(value),
+            SceneDef.FIELD_TIMESTAMP_HINTS_SUGGESTION: SceneDef.now_ts(),
+        }
+
     def db_store(self) -> bool:
         return self._dbstore()
 

@@ -25,6 +25,29 @@ If `labels_ng` is empty, abort: this command refuses to caption an unlabeled ima
 
 GPU prerequisite: `nvidia-smi --query-gpu=memory.free` ≥ 16 GiB. If not, ask the user to free the device and stop.
 
+**Preferred path — via the persistent `joy_server`** (reuses the loaded model across invocations; ~5-10s per caption after the first):
+
+```python
+from ait.caption import joy_client
+from ait.caption.skin import SkinRegistry
+
+joy_client.ensure_running()   # ~23s on first call; ~0s if already up
+sk = SkinRegistry().get('1xlasm')
+simg = sim.img_from_id(image_id)
+stored_prompt = (simg.data.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
+prompt, caption = joy_client.caption(
+    image_url=str(simg.url_from_data),
+    user_content=stored_prompt,
+    system_content=sk.directive,
+)
+if not caption:
+    abort('captioner returned no caption')
+simg.set_caption_joy(caption)
+simg.db_store()
+```
+
+**Fallback path — in-process load** (when the server can't be started, e.g. GPU contested at the moment of startup):
+
 ```python
 from ait.caption.joy_scenedb_ng import JoySceneDBNG
 db = JoySceneDBNG(config='prod', skin='1xlasm', verbose=1, force=True, lora=True)
@@ -38,7 +61,7 @@ simg.set_caption_joy(caption)
 simg.db_store()
 ```
 
-`force=True` bypasses the freshness check; the stored caption_prompt from stage 1 is sent verbatim.
+Either path: the stored caption_prompt from Stage 1 is sent verbatim. `force=True` semantics are implicit in the joy_client path (it always runs the caption regardless of freshness).
 
 ### 3. Validate + auto-fix
 

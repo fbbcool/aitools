@@ -67,6 +67,10 @@ class SceneDef:
 
     FIELD_LABELS: Final = 'labels'
     FIELD_LABELS_NG: Final = 'labels_ng'
+    FIELD_LABELS_NG_SUGGESTION: Final = 'labels_ng_SUGGESTION'
+    FIELD_HINTS_SUGGESTION: Final = 'hints_SUGGESTION'
+    FIELD_TIMESTAMP_LABELS_NG_SUGGESTION: Final = 'timestamp_labels_ng_SUGGESTION'
+    FIELD_TIMESTAMP_HINTS_SUGGESTION: Final = 'timestamp_hints_SUGGESTION'
     FIELD_PROTOTYPE: Final = 'prototype'
 
     TAG_PREFIX_SET: Final = f'set{SEPERATOR_ID}'
