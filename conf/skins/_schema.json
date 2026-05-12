@@ -154,6 +154,61 @@
           "description": "Array of label objects in declaration order. Each label has a unique `name`, an optional human-readable `description`, and an `expansion` template (placeholders use {entities.primary.phrase} etc.).",
           "type": "array",
           "items": { "$ref": "#/$defs/label" }
+        },
+        "compose": {
+          "description": "Optional context-aware composition rule for this group's labels. When present, `Skin.render_label_prompts` selects verb/subject at render time based on co-occurring labels (e.g. picks 'lies close to' when secondary.pose.lying is also applied). Labels in such a group should additionally carry a `target` field. If absent, the static `expansion` is used unchanged.",
+          "$ref": "#/$defs/group_compose"
+        }
+      }
+    },
+
+    "group_compose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "default", "template_primary", "template_secondary"],
+      "properties": {
+        "kind": {
+          "description": "Which composition strategy this group uses. Only 'subject_verb_by_secondary_pose' is currently implemented.",
+          "type": "string",
+          "enum": ["subject_verb_by_secondary_pose"]
+        },
+        "subject_verb_by_secondary_pose": {
+          "description": "Map of secondary.pose.<leaf> -> {subject, verb}. The first leaf in declaration order that is present in the applied labels wins. `verb` is a fragment like 'lies close to' (no period); placeholders allowed.",
+          "type": "object",
+          "patternProperties": {
+            "^[A-Za-z0-9_]+$": { "$ref": "#/$defs/compose_rule" }
+          },
+          "additionalProperties": false
+        },
+        "default": {
+          "description": "Fallback rule when no entry in the keyed map matches.",
+          "$ref": "#/$defs/compose_rule"
+        },
+        "template_primary": {
+          "description": "Sentence template used when the selected rule has subject='primary'. Placeholders: {entities.primary.phrase}, {entities.secondary.phrase}, {verb}, {target}.",
+          "type": "string"
+        },
+        "template_secondary": {
+          "description": "Sentence template used when the selected rule has subject='secondary'. Placeholders: {entities.primary.phrase}, {entities.secondary.phrase}, {verb}, {target}.",
+          "type": "string"
+        }
+      }
+    },
+
+    "compose_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "verb"],
+      "properties": {
+        "subject": {
+          "description": "Which entity is the grammatical subject of the rendered sentence.",
+          "type": "string",
+          "enum": ["primary", "secondary"]
+        },
+        "verb": {
+          "description": "Verb fragment, e.g. 'lies close to'. May contain {entities.secondary.phrase} etc.",
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -173,7 +228,11 @@
           "type": "string"
         },
         "expansion": {
-          "description": "Label-prompt template — the sentence inserted into the model prompt when this label is on an image. Placeholders are interpolated at build time.",
+          "description": "Label-prompt template — the sentence inserted into the model prompt when this label is on an image. Placeholders are interpolated at build time. When the enclosing group has a `compose` rule, this expansion is used only as a static fallback (e.g. for tools that don't call render_label_prompts).",
+          "type": "string"
+        },
+        "target": {
+          "description": "Body-part phrase (e.g. 'her mouth') used as the {target} placeholder in compose templates. Required when the enclosing group has a `compose` rule; ignored otherwise.",
           "type": "string"
         },
         "migration": {

@@ -81,6 +81,9 @@ class SkinLabel:
     name: str
     description: str
     expansion: str  # raw (un-interpolated) prompt template
+    # Body-part phrase substituted into {target} when the enclosing group has
+    # a compose rule (e.g. 'her mouth'). Empty string when not applicable.
+    target: str = ''
     # Accumulating log of migration notes (each entry is a string prefixed
     # with an ISO-8601 UTC timestamp). Authoring metadata only; not surfaced
     # to the runtime. Cleared only via a manual flush (TBD).
@@ -91,6 +94,10 @@ class SkinLabel:
 class SkinLabelGroup:
     description: str
     labels: tuple[SkinLabel, ...]  # in declaration order; names unique within group
+    # Optional context-aware composition rule. Held as a raw dict (kind +
+    # rule maps + templates) to keep the schema flexible; consumed by
+    # Skin.render_label_prompts when present. None = static expansion only.
+    compose: Optional[dict] = None
 
 
 @dataclass(frozen=True)
@@ -244,6 +251,11 @@ class Skin:
         first path whose final segment equals the leaf — ambiguous when the
         same leaf exists in multiple groups, in which case the first match
         in build order wins.
+
+        For labels whose enclosing group has a `compose` rule, the static
+        `_built.labels[path]` is replaced at render time with a
+        context-aware variant computed from co-occurring labels (e.g.
+        proximity labels read `secondary.pose.*` to pick the right verb).
         """
         applied_paths = {a for a in applied if a in self.labels}
         applied_leaves = {a for a in applied if a not in self.labels}
@@ -251,15 +263,101 @@ class Skin:
         out: list[str] = []
         for path in self.labels:                  # iteration is build-order
             if path in applied_paths:
-                out.append(self.labels[path])
+                out.append(self._render_one(path, applied_paths))
                 continue
             if not applied_leaves:
                 continue
             leaf = path.rsplit('.', 1)[-1]
             if leaf in applied_leaves and leaf not in leaves_consumed:
-                out.append(self.labels[path])
+                out.append(self._render_one(path, applied_paths))
                 leaves_consumed.add(leaf)   # first match wins (build order)
         return out
+
+    def _group_for_path(self, path: str) -> Optional[SkinLabelGroup]:
+        """Return the SkinLabelGroup that owns `path`, or None if unknown."""
+        parts = path.split('.', 2)
+        if len(parts) != 3:
+            return None
+        entity_tag, group_name, _leaf = parts
+        if entity_tag == 'primary':
+            return self.entities_primary.label_groups.get(group_name)
+        if entity_tag == 'secondary' and self.entities_secondary is not None:
+            return self.entities_secondary.label_groups.get(group_name)
+        if entity_tag == 'interaction' and self.interaction is not None:
+            return self.interaction.label_groups.get(group_name)
+        return None
+
+    def _render_one(self, path: str, applied_paths: set[str]) -> str:
+        """Render one label-prompt sentence. Dispatches to the compose-aware
+        renderer when the label's group has a `compose` rule and the label
+        carries a `target`; otherwise returns the static `_built.labels[path]`.
+        """
+        group = self._group_for_path(path)
+        static = self.labels[path]
+        if group is None or group.compose is None:
+            return static
+        leaf = path.rsplit('.', 1)[-1]
+        label = next((l for l in group.labels if l.name == leaf), None)
+        if label is None or not label.target:
+            return static
+        try:
+            return self._render_compose(group.compose, label, applied_paths)
+        except Exception as e:  # noqa: BLE001  — never break rendering on compose bugs
+            # Fall back to the static expansion so a broken compose rule
+            # degrades gracefully rather than dropping the label.
+            print(f'[skin:{self.name}] compose render failed for {path!r}: {e}; '
+                  f'falling back to static expansion')
+            return static
+
+    def _render_compose(
+        self, compose: dict, label: SkinLabel, applied_paths: set[str]
+    ) -> str:
+        """Apply the group-level compose rule to one label.
+
+        Currently the only supported `kind` is `subject_verb_by_secondary_pose`:
+        scan `applied_paths` for `secondary.pose.<leaf>` entries; pick the first
+        leaf listed in the rule map (iteration order) that is present; fall
+        back to `default`. Then render `template_<subject>` with `verb` and
+        `target` substituted.
+        """
+        kind = compose.get('kind')
+        if kind != 'subject_verb_by_secondary_pose':
+            raise ValueError(f'unknown compose kind {kind!r}')
+
+        # Build leaf set for secondary poses present on the image.
+        sec_pose_leaves = {
+            p.rsplit('.', 1)[-1] for p in applied_paths
+            if p.startswith('secondary.pose.')
+        }
+
+        rule_map = compose.get('subject_verb_by_secondary_pose') or {}
+        rule: Optional[dict] = None
+        for pose_leaf, sv in rule_map.items():
+            if pose_leaf in sec_pose_leaves:
+                rule = sv
+                break
+        if rule is None:
+            rule = compose.get('default')
+        if rule is None:
+            raise ValueError('no matching compose rule and no default')
+
+        subject = rule.get('subject', 'primary')
+        verb = rule.get('verb', '')
+        template_key = f'template_{subject}'
+        template = compose.get(template_key)
+        if not template:
+            raise ValueError(f'compose missing {template_key!r}')
+
+        ctx = _format_ctx(self.entities_primary, self.entities_secondary)
+        # Two-pass interpolation: first resolve {entities.*.phrase} inside `verb`,
+        # then expand the outer template (which references the resolved verb).
+        verb_resolved = verb.format_map(ctx) if '{' in verb else verb
+        ctx_with_fields = _SafeFormatDict(
+            entities=ctx['entities'],
+            verb=verb_resolved,
+            target=label.target,
+        )
+        return template.format_map(ctx_with_fields)
 
     def caption_violations(self, caption: str) -> list[str]:
         """Return forbidden phrases found in `caption` (empty list = clean)."""
@@ -439,6 +537,7 @@ def _label_groups_from_dict(d: dict) -> dict[str, SkinLabelGroup]:
                 name=str(item['name']),
                 description=str(item.get('description', '')),
                 expansion=str(item['expansion']),
+                target=str(item.get('target', '')),
                 migration=tuple(str(m) for m in (item.get('migration') or ())),
             )
             for item in g['labels']
@@ -450,9 +549,19 @@ def _label_groups_from_dict(d: dict) -> dict[str, SkinLabelGroup]:
                     f'duplicate label name {lab.name!r} within group {group_name!r}'
                 )
             seen.add(lab.name)
+        compose = g.get('compose')
+        if compose is not None:
+            # Sanity check: every label in a compose-aware group needs a target.
+            missing = [lab.name for lab in labels if not lab.target]
+            if missing:
+                raise ValueError(
+                    f'group {group_name!r} has a compose rule but labels '
+                    f'{missing!r} have no `target` field'
+                )
         out[group_name] = SkinLabelGroup(
             description=str(g.get('description', '')),
             labels=labels,
+            compose=compose,
         )
     return out
 

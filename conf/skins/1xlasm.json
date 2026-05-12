@@ -131,9 +131,10 @@
             {
               "name": "on_back",
               "description": "",
-              "expansion": "The {entities.primary.phrase} is on his back.",
+              "expansion": "The {entities.primary.phrase} is on her back.",
               "migration": [
-                "2026-05-10T20:30:00+02:00: renamed from 'woman_on_back' (drop woman_ prefix; legacy label remains in SceneImage.labels for backward compat)."
+                "2026-05-10T20:30:00+02:00: renamed from 'woman_on_back' (drop woman_ prefix; legacy label remains in SceneImage.labels for backward compat).",
+                "2026-05-12: pronoun fix — corrected 'his back' → 'her back' (primary is the woman)."
               ]
             },
             {
@@ -264,7 +265,11 @@
         "imp",
         "shrunken man",
         "shrunk man",
-        "shrunken person"
+        "shrunken person",
+        "shirtless",
+        "has a build",
+        "with a build",
+        "is naked, with"
       ],
       "label_groups": {
         "attribute": {
@@ -408,10 +413,117 @@
       "Use compositional position references ('at her ankle', 'at her hip level', 'in her palm', 'on her shoulder') — composition, not size.",
       "Do not invent details that are not visible.",
       "Preserve every verb and body-part reference the user hint names verbatim — do NOT collapse 'thumb and index finger' to 'hand', 'palm' to 'hand', 'arm' to 'hand', 'wrapping around' to 'between', or 'inserted' to 'positioned'. Use the same body-part level (arm vs hand, palm vs hand) the hint gives.",
-      "Hint sentinel: a SceneImage whose `hints` field is the literal string 'none' (case-insensitive) means no hint applies — the runtime drops the user-hint preamble entirely for that image. Treat it as if no hint were provided."
+      "Hint sentinel: a SceneImage whose `hints` field is the literal string 'none' (case-insensitive) means no hint applies — the runtime drops the user-hint preamble entirely for that image. Treat it as if no hint were provided.",
+      "Never emit the construction 'is naked, with ...' (e.g. 'The {entities.secondary.phrase} is naked, with an erect penis'). When indicating nudity, place 'naked' inside the noun phrase at first mention ('a naked {entities.secondary.phrase}', 'a naked {entities.primary.phrase}'). For attributes or body parts, use 'has' ('The {entities.secondary.phrase} has an erect penis'). Never emit the comma-bracketed appositive 'X, naked, Y' either; bind nudity to the noun phrase or drop it.",
+      "Never describe watermarks, logos, studio names, brand names, captions, subtitles, or any overlaid text present in the image. Ignore them as if they were not there.",
+      "When introducing the entities for the first time, prefer the opener 'This image features a {entities.primary.phrase} and a [naked] {entities.secondary.phrase}.' (or '... and a [naked] {entities.primary.phrase}.' when she is the nude one) — bundle the nudity adjective with the noun rather than asserting it later as a standalone sentence. Use 'naked' here only if the figure is fully unclothed.",
+      "When multiple pose labels apply to the same figure (e.g. 'lying' + 'on_back', or 'sitting' + 'legs_spread'), combine them into one fluent compound sentence ('lying on her back with her legs spread wide apart') rather than emitting each pose as its own standalone sentence. Avoid 'is positioned' as a filler verb; use a concrete spatial verb or omit."
     ],
-    "forbidden": [],
+    "forbidden": [
+      "is naked, with",
+      ", naked,"
+    ],
     "label_groups": {
+      "proximity": {
+        "description": "The man is held in close proximity to a specific body part of the woman, without making contact or being inserted. Use these instead of touch.* when the geometry is 'near but not touching' — typically she holds him hovering near the named body part.",
+        "compose": {
+          "kind": "subject_verb_by_secondary_pose",
+          "subject_verb_by_secondary_pose": {
+            "hanging": {
+              "subject": "secondary",
+              "verb": "hangs close to"
+            },
+            "lying": {
+              "subject": "secondary",
+              "verb": "lies close to"
+            },
+            "kneeling": {
+              "subject": "secondary",
+              "verb": "kneels close to"
+            },
+            "sitting": {
+              "subject": "secondary",
+              "verb": "sits close to"
+            },
+            "perched": {
+              "subject": "secondary",
+              "verb": "sits close to"
+            },
+            "standing": {
+              "subject": "secondary",
+              "verb": "stands close to"
+            }
+          },
+          "default": {
+            "subject": "primary",
+            "verb": "holds the {entities.secondary.phrase} close to"
+          },
+          "template_primary": "The {entities.primary.phrase} {verb} {target}, without contact or insertion.",
+          "template_secondary": "The {entities.secondary.phrase} {verb} {target}, without contact or insertion."
+        },
+        "labels": [
+          {
+            "name": "mouth",
+            "description": "He is held close to her mouth, often as the lead-up to or position of a blowjob, without contact or insertion.",
+            "expansion": "The {entities.primary.phrase} holds the {entities.secondary.phrase} close to her mouth, without contact or insertion.",
+            "target": "her mouth",
+            "migration": [
+              "2026-05-12: introduced — covers 13/119 gts_v3 hints of the form 'she holds him close to her mouth'.",
+              "2026-05-12: added compose target='her mouth' for context-aware verb selection."
+            ]
+          },
+          {
+            "name": "face",
+            "description": "He is held close to her face, often paired with looking or teasing, without contact.",
+            "expansion": "The {entities.primary.phrase} holds the {entities.secondary.phrase} close to her face, without contact or insertion.",
+            "target": "her face",
+            "migration": [
+              "2026-05-12: introduced — covers 6/119 gts_v3 hints of the form 'she holds him close to her face'.",
+              "2026-05-12: added compose target='her face' for context-aware verb selection."
+            ]
+          },
+          {
+            "name": "breasts",
+            "description": "He is held close to her breasts but not against, between, or inserted between them.",
+            "expansion": "The {entities.primary.phrase} holds the {entities.secondary.phrase} close to her breasts, without contact or insertion.",
+            "target": "her breasts",
+            "migration": [
+              "2026-05-12: introduced — covers 6/119 gts_v3 hints of the form 'she holds him close to her breasts'.",
+              "2026-05-12: added compose target='her breasts' for context-aware verb selection."
+            ]
+          },
+          {
+            "name": "thighs",
+            "description": "He is held close to her thighs but not against or between them.",
+            "expansion": "The {entities.primary.phrase} holds the {entities.secondary.phrase} close to her thighs, without contact or insertion.",
+            "target": "her thighs",
+            "migration": [
+              "2026-05-12: introduced — proximity counterpart of interaction.touch.thigh.",
+              "2026-05-12: added compose target='her thighs' for context-aware verb selection."
+            ]
+          },
+          {
+            "name": "ass",
+            "description": "He is held close to her ass but not against or inserted.",
+            "expansion": "The {entities.primary.phrase} holds the {entities.secondary.phrase} close to her ass, without contact or insertion.",
+            "target": "her ass",
+            "migration": [
+              "2026-05-12: introduced — proximity counterpart of interaction.touch.ass.",
+              "2026-05-12: added compose target='her ass' for context-aware verb selection."
+            ]
+          },
+          {
+            "name": "vagina",
+            "description": "He is held close to her vagina or pubic area but not against or inserted.",
+            "expansion": "The {entities.primary.phrase} holds the {entities.secondary.phrase} close to her vagina, without contact or insertion.",
+            "target": "her vagina",
+            "migration": [
+              "2026-05-12: introduced — proximity counterpart of interaction.touch.pussy and interaction.insertion.vagina_*.",
+              "2026-05-12: added compose target='her vagina' for context-aware verb selection."
+            ]
+          }
+        ]
+      },
       "touch": {
         "description": "The man making contact with one of the woman's body parts (without insertion).",
         "labels": [
@@ -495,8 +607,10 @@
           {
             "name": "panties",
             "description": "",
-            "expansion": "The {entities.secondary.phrase} is inserted into the {entities.primary.phrase}s panties. the fabric of her panties is over his body and traps him below.",
-            "migration": []
+            "expansion": "The {entities.secondary.phrase} is partly inserted into the waistband of the {entities.primary.phrase}s panties. His upper body is below the waistband; his lower body and head may be visible above it depending on orientation. Describe what is visible above and below the waistband.",
+            "migration": [
+              "2026-05-12: rewrote expansion to be more specific about waistband geometry — curator rewrote all 3 occurrences of the prior version."
+            ]
           },
           {
             "name": "breasts_body",
@@ -774,9 +888,9 @@
   "default_set": "gts_v3",
   "_built": {
     "version": 1,
-    "built_at": "2026-05-10T23:05:30+02:00",
-    "source_hash": "sha256:a82b018beeaab7419421e1c6c4f9ed75e6c5d139e7441fe738acfb3fdde00248",
-    "directive": "This image features two figures together: a xlgts woman and a xlasm man.\n\nThe giantess woman, the larger figure. Trigger phrase: 'xlgts woman'. Identify her ONLY as 'xlgts woman'. Do not use 'tall', 'large', 'giant', 'huge', 'towering', 'enormous', 'massive', 'colossal', or any numerical heights — the trigger phrase carries her size concept. Do not use these words unless an explicit instruction later in this prompt authorizes them: 'muscular', 'bodybuilder', 'busty', 'voluptuous', 'slim', 'slender', 'lean', 'curvy', 'hourglass', 'cleavage', 'large breasts', 'big breasts'. Default to omitting body-type and breast descriptions entirely.\n\nThe adult man, the smaller figure. Trigger phrase: 'xlasm man'. Always adult-proportioned regardless of apparent size. Identify him ONLY as 'xlasm man'. Do not use 'tiny', 'little', 'small', 'miniature', 'child', 'kid', 'boy', 'figurine', 'doll', 'toy', 'youth', 'shrunken', or any diminutive, age-reductive, or object-comparison term — he is always an adult man. Search carefully for him in the image; he can be hard to spot. Do not describe his body build (no 'slim', 'muscular', 'toned', 'athletic', 'lean', 'fit') unless an explicit instruction later in this prompt authorizes it.\n\nThe interaction between the xlgts woman and the xlasm man is the central subject of every image. Open every caption with a single COMPLETE sentence (subject + verb + object) that explicitly names BOTH 'xlgts woman' AND 'xlasm man' together — e.g. 'This image features a xlgts woman and a xlasm man.', 'The xlgts woman holds the xlasm man in her palm.'. If unsure how to combine the two, default to the literal opener 'This image features a xlgts woman and a xlasm man.' as the first sentence. Never a noun-phrase fragment. Setting, pose, clothing, hair, breasts, background, lighting, and camera angle come strictly AFTER this opener. Each figure's clothing state is independent and must be evaluated from the image directly. A figure is \"naked\" ONLY when no clothing at all is visible on them. If a figure is wearing any of: dress, skirt, top, shirt, tank top, blouse, lingerie, bra, panties, thong, stockings, tights, hosiery, gloves, robe, gown, harness, jacket, coat, leotard, corset, swimsuit — that figure is NOT naked, even if much skin is exposed. Apply \"naked\" sparingly, only to a fully unclothed figure, ONCE at the figure's first reference (e.g. \"The naked xlasm man …\"). Never repeat \"naked\", \"nude\", \"undressed\", or \"unclothed\" for that same figure afterward. Anti-pattern: image shows the xlgts woman wearing a dress or lingerie → \"The xlgts woman, naked, …\" is WRONG; she is clothed. Anti-pattern (repetition): \"The xlgts woman holds the naked xlasm man. The naked xlasm man smiles.\" is WRONG — the second sentence must say \"The xlasm man smiles.\" Describe the interaction in detail using specific verbs. Use compositional position references ('at her ankle', 'at her hip level', 'in her palm', 'on her shoulder') — composition, not size. Do not invent details that are not visible. Preserve every verb and body-part reference the user hint names verbatim — do NOT collapse 'thumb and index finger' to 'hand', 'palm' to 'hand', 'arm' to 'hand', 'wrapping around' to 'between', or 'inserted' to 'positioned'. Use the same body-part level (arm vs hand, palm vs hand) the hint gives. Hint sentinel: a SceneImage whose `hints` field is the literal string 'none' (case-insensitive) means no hint applies — the runtime drops the user-hint preamble entirely for that image. Treat it as if no hint were provided.",
+    "built_at": "2026-05-12T08:27:37+02:00",
+    "source_hash": "sha256:19249e245b075bb8d5f062211f8cf2484fde3b56cb96fa5363f2cb15318f38b0",
+    "directive": "This image features two figures together: a xlgts woman and a xlasm man.\n\nThe giantess woman, the larger figure. Trigger phrase: 'xlgts woman'. Identify her ONLY as 'xlgts woman'. Do not use 'tall', 'large', 'giant', 'huge', 'towering', 'enormous', 'massive', 'colossal', or any numerical heights — the trigger phrase carries her size concept. Do not use these words unless an explicit instruction later in this prompt authorizes them: 'muscular', 'bodybuilder', 'busty', 'voluptuous', 'slim', 'slender', 'lean', 'curvy', 'hourglass', 'cleavage', 'large breasts', 'big breasts'. Default to omitting body-type and breast descriptions entirely.\n\nThe adult man, the smaller figure. Trigger phrase: 'xlasm man'. Always adult-proportioned regardless of apparent size. Identify him ONLY as 'xlasm man'. Do not use 'tiny', 'little', 'small', 'miniature', 'child', 'kid', 'boy', 'figurine', 'doll', 'toy', 'youth', 'shrunken', or any diminutive, age-reductive, or object-comparison term — he is always an adult man. Search carefully for him in the image; he can be hard to spot. Do not describe his body build (no 'slim', 'muscular', 'toned', 'athletic', 'lean', 'fit') unless an explicit instruction later in this prompt authorizes it.\n\nThe interaction between the xlgts woman and the xlasm man is the central subject of every image. Open every caption with a single COMPLETE sentence (subject + verb + object) that explicitly names BOTH 'xlgts woman' AND 'xlasm man' together — e.g. 'This image features a xlgts woman and a xlasm man.', 'The xlgts woman holds the xlasm man in her palm.'. If unsure how to combine the two, default to the literal opener 'This image features a xlgts woman and a xlasm man.' as the first sentence. Never a noun-phrase fragment. Setting, pose, clothing, hair, breasts, background, lighting, and camera angle come strictly AFTER this opener. Each figure's clothing state is independent and must be evaluated from the image directly. A figure is \"naked\" ONLY when no clothing at all is visible on them. If a figure is wearing any of: dress, skirt, top, shirt, tank top, blouse, lingerie, bra, panties, thong, stockings, tights, hosiery, gloves, robe, gown, harness, jacket, coat, leotard, corset, swimsuit — that figure is NOT naked, even if much skin is exposed. Apply \"naked\" sparingly, only to a fully unclothed figure, ONCE at the figure's first reference (e.g. \"The naked xlasm man …\"). Never repeat \"naked\", \"nude\", \"undressed\", or \"unclothed\" for that same figure afterward. Anti-pattern: image shows the xlgts woman wearing a dress or lingerie → \"The xlgts woman, naked, …\" is WRONG; she is clothed. Anti-pattern (repetition): \"The xlgts woman holds the naked xlasm man. The naked xlasm man smiles.\" is WRONG — the second sentence must say \"The xlasm man smiles.\" Describe the interaction in detail using specific verbs. Use compositional position references ('at her ankle', 'at her hip level', 'in her palm', 'on her shoulder') — composition, not size. Do not invent details that are not visible. Preserve every verb and body-part reference the user hint names verbatim — do NOT collapse 'thumb and index finger' to 'hand', 'palm' to 'hand', 'arm' to 'hand', 'wrapping around' to 'between', or 'inserted' to 'positioned'. Use the same body-part level (arm vs hand, palm vs hand) the hint gives. Hint sentinel: a SceneImage whose `hints` field is the literal string 'none' (case-insensitive) means no hint applies — the runtime drops the user-hint preamble entirely for that image. Treat it as if no hint were provided. Never emit the construction 'is naked, with ...' (e.g. 'The xlasm man is naked, with an erect penis'). When indicating nudity, place 'naked' inside the noun phrase at first mention ('a naked xlasm man', 'a naked xlgts woman'). For attributes or body parts, use 'has' ('The xlasm man has an erect penis'). Never emit the comma-bracketed appositive 'X, naked, Y' either; bind nudity to the noun phrase or drop it. Never describe watermarks, logos, studio names, brand names, captions, subtitles, or any overlaid text present in the image. Ignore them as if they were not there. When introducing the entities for the first time, prefer the opener 'This image features a xlgts woman and a [naked] xlasm man.' (or '... and a [naked] xlgts woman.' when she is the nude one) — bundle the nudity adjective with the noun rather than asserting it later as a standalone sentence. Use 'naked' here only if the figure is fully unclothed. When multiple pose labels apply to the same figure (e.g. 'lying' + 'on_back', or 'sitting' + 'legs_spread'), combine them into one fluent compound sentence ('lying on her back with her legs spread wide apart') rather than emitting each pose as its own standalone sentence. Avoid 'is positioned' as a filler verb; use a concrete spatial verb or omit.",
     "labels": {
       "primary.attribute.muscular": "The xlgts woman has a muscular bodybuilder physique with visible muscle definition.",
       "primary.attribute.leggy": "The xlgts woman has big calves.",
@@ -789,7 +903,7 @@
       "primary.pose.back": "The xlgts woman is seen from the back.",
       "primary.pose.side": "The xlgts woman is seen from the side.",
       "primary.pose.sitting": "The xlgts woman is sitting.",
-      "primary.pose.on_back": "The xlgts woman is on his back.",
+      "primary.pose.on_back": "The xlgts woman is on her back.",
       "primary.pose.all4": "The xlgts woman is on her all fours.",
       "primary.pose.tower": "The xlgts woman stands directly above the xlasm man, with him positioned at her feet or lower leg level.",
       "primary.pose.standing": "The xlgts woman is standing upright.",
@@ -820,6 +934,12 @@
       "secondary.pose.legs_spread": "The xlasm man has his legs spread wide apart.",
       "secondary.action.masturbating": "The xlasm man is masturbating, gripping and stroking his erect penis. This masturbation is the central content of the image.",
       "secondary.action.cum": "The xlasm man ejaculates and cums.",
+      "interaction.proximity.mouth": "The xlgts woman holds the xlasm man close to her mouth, without contact or insertion.",
+      "interaction.proximity.face": "The xlgts woman holds the xlasm man close to her face, without contact or insertion.",
+      "interaction.proximity.breasts": "The xlgts woman holds the xlasm man close to her breasts, without contact or insertion.",
+      "interaction.proximity.thighs": "The xlgts woman holds the xlasm man close to her thighs, without contact or insertion.",
+      "interaction.proximity.ass": "The xlgts woman holds the xlasm man close to her ass, without contact or insertion.",
+      "interaction.proximity.vagina": "The xlgts woman holds the xlasm man close to her vagina, without contact or insertion.",
       "interaction.touch.ass": "The xlasm man interacts with the xlgts womans ass.",
       "interaction.touch.body": "The xlasm man interacts with the xlgts womans body.",
       "interaction.touch.breast": "The xlasm man interacts with the xlgts womans breasts.",
@@ -832,7 +952,7 @@
       "interaction.touch.thigh": "The xlasm man is positioned between the thighs of the xlgts woman.",
       "interaction.touch.tongue": "The xlasm man interacts with the xlgts womans tongue.",
       "interaction.insertion.insert": "The xlasm man is partly inserted into one of the xlgts womans orifices: her vagina, her anus, or her mouth. When the insertion is vaginal, the inserted body part is his head, his upper body, or his lower body, and that part is not visible.",
-      "interaction.insertion.panties": "The xlasm man is inserted into the xlgts womans panties. the fabric of her panties is over his body and traps him below.",
+      "interaction.insertion.panties": "The xlasm man is partly inserted into the waistband of the xlgts womans panties. His upper body is below the waistband; his lower body and head may be visible above it depending on orientation. Describe what is visible above and below the waistband.",
       "interaction.insertion.breasts_body": "The xlasm man is inserted into between the xlgts womans breasts with his body partly obscured by her breasts.",
       "interaction.insertion.breasts_head": "The xlasm man is partly inserted into between the xlgts womans breasts. his head is inserted, only the rest of his body is visible.",
       "interaction.insertion.breasts_low": "The xlasm man is partly inserted into between the xlgts womans breasts. his lower body is inserted, only his upper body is visible.",
@@ -896,6 +1016,12 @@
       "secondary.pose.legs_spread": "secondary.pose",
       "secondary.action.masturbating": "secondary.action",
       "secondary.action.cum": "secondary.action",
+      "interaction.proximity.mouth": "interaction.proximity",
+      "interaction.proximity.face": "interaction.proximity",
+      "interaction.proximity.breasts": "interaction.proximity",
+      "interaction.proximity.thighs": "interaction.proximity",
+      "interaction.proximity.ass": "interaction.proximity",
+      "interaction.proximity.vagina": "interaction.proximity",
       "interaction.touch.ass": "interaction.touch",
       "interaction.touch.body": "interaction.touch",
       "interaction.touch.breast": "interaction.touch",
@@ -972,6 +1098,12 @@
       "secondary.pose.legs_spread": "secondary",
       "secondary.action.masturbating": "secondary",
       "secondary.action.cum": "secondary",
+      "interaction.proximity.mouth": "interaction",
+      "interaction.proximity.face": "interaction",
+      "interaction.proximity.breasts": "interaction",
+      "interaction.proximity.thighs": "interaction",
+      "interaction.proximity.ass": "interaction",
+      "interaction.proximity.vagina": "interaction",
       "interaction.touch.ass": "interaction",
       "interaction.touch.body": "interaction",
       "interaction.touch.breast": "interaction",
@@ -1055,7 +1187,12 @@
       "imp",
       "shrunken man",
       "shrunk man",
-      "shrunken person"
+      "shrunken person",
+      "shirtless",
+      "has a build",
+      "with a build",
+      "is naked, with",
+      ", naked,"
     ]
   }
 }
