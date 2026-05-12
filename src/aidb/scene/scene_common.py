@@ -46,6 +46,8 @@ class SceneDef:
     FIELD_TIMESTAMP_CAPTION: Final = 'timestamp_caption'
     FIELD_TIMESTAMP_CAPTION_JOY: Final = 'timestamp_caption_joy'
     FIELD_TIMESTAMP_CAPTION_PROMPT: Final = 'timestamp_caption_prompt'
+    FIELD_TIMESTAMP_HINTS: Final = 'timestamp_hints'
+    FIELD_TIMESTAMP_LABELS_NG: Final = 'timestamp_labels_ng'
 
     FIELD_IMGS_EXCLUDE: Final = 'imgs_exclude'
     FIELD_SCENES_EXCLUDE: Final = 'scenes_exclude'

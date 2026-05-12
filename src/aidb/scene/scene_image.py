@@ -127,7 +127,10 @@ class SceneImage:
     def set_hints(self, value: str) -> None:
         if value is None:
             return
-        self._data |= {SceneDef.FIELD_HINTS: str(value)}
+        self._data |= {
+            SceneDef.FIELD_HINTS: str(value),
+            SceneDef.FIELD_TIMESTAMP_HINTS: SceneDef.now_ts(),
+        }
 
     def set_prompt(self, value: str) -> None:
         if value is None:
@@ -177,7 +180,10 @@ class SceneImage:
                 continue
             seen.add(v)
             out.append(v)
-        self._data |= {SceneDef.FIELD_LABELS_NG: out}
+        self._data |= {
+            SceneDef.FIELD_LABELS_NG: out,
+            SceneDef.FIELD_TIMESTAMP_LABELS_NG: SceneDef.now_ts(),
+        }
 
     def push_label_ng(self, path: str) -> None:
         if not isinstance(path, str) or not path:

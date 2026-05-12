@@ -369,22 +369,8 @@ class AIDBSceneApp:
                                         interactive=True,
                                     )
                                 with gr.Row():
-                                    set_editor_hints = gr.Dropdown(
-                                        label='Hints',
-                                        choices=['ignore', 'empty', 'set'],
-                                        value='ignore',
-                                        allow_custom_value=False,
-                                        interactive=True,
-                                    )
-                                    set_editor_caption = gr.Dropdown(
-                                        label='Caption',
-                                        choices=['ignore', 'empty', 'set'],
-                                        value='ignore',
-                                        allow_custom_value=False,
-                                        interactive=True,
-                                    )
-                                    set_editor_caption_joy = gr.Dropdown(
-                                        label='Caption Joy',
+                                    set_editor_suggestions = gr.Dropdown(
+                                        label='Suggestions',
                                         choices=['ignore', 'empty', 'set'],
                                         value='ignore',
                                         allow_custom_value=False,
@@ -393,6 +379,34 @@ class AIDBSceneApp:
                                     set_editor_labels = gr.Dropdown(
                                         label='Labels',
                                         choices=['ignore', 'empty', 'set'],
+                                        value='ignore',
+                                        allow_custom_value=False,
+                                        interactive=True,
+                                    )
+                                    set_editor_hints = gr.Dropdown(
+                                        label='Hints',
+                                        choices=['ignore', 'empty', 'set'],
+                                        value='ignore',
+                                        allow_custom_value=False,
+                                        interactive=True,
+                                    )
+                                    set_editor_caption_prompt = gr.Dropdown(
+                                        label='Caption Prompt',
+                                        choices=['ignore', 'empty', 'set', 'stale'],
+                                        value='ignore',
+                                        allow_custom_value=False,
+                                        interactive=True,
+                                    )
+                                    set_editor_caption_joy = gr.Dropdown(
+                                        label='Caption Joy',
+                                        choices=['ignore', 'empty', 'set', 'stale'],
+                                        value='ignore',
+                                        allow_custom_value=False,
+                                        interactive=True,
+                                    )
+                                    set_editor_caption = gr.Dropdown(
+                                        label='Caption',
+                                        choices=['ignore', 'empty', 'set', 'stale'],
                                         value='ignore',
                                         allow_custom_value=False,
                                         interactive=True,
@@ -742,10 +756,12 @@ class AIDBSceneApp:
                 set_editor_name,
                 set_editor_rating_min,
                 set_editor_rating_max,
-                set_editor_hints,
-                set_editor_caption,
-                set_editor_caption_joy,
+                set_editor_suggestions,
                 set_editor_labels,
+                set_editor_hints,
+                set_editor_caption_prompt,
+                set_editor_caption_joy,
+                set_editor_caption,
                 set_editor_show_active,
                 set_editor_show_prototype,
                 set_editor_show_excluded,
@@ -876,21 +892,56 @@ class AIDBSceneApp:
         scene_set,
         rating_min: Optional[str],
         rating_max: Optional[str],
-        hints_mode: Optional[str],
-        caption_mode: Optional[str],
-        caption_joy_mode: Optional[str],
+        suggestions_mode: Optional[str],
         labels_mode: Optional[str],
+        hints_mode: Optional[str],
+        caption_prompt_mode: Optional[str],
+        caption_joy_mode: Optional[str],
+        caption_mode: Optional[str],
         show_excluded: bool = False,
     ) -> list:
         r_min = int(rating_min) if rating_min is not None else SceneDef.RATING_MIN
         r_max = int(rating_max) if rating_max is not None else SceneDef.RATING_MAX
 
-        field_modes = [
-            (SceneDef.FIELD_HINTS, hints_mode),
-            (SceneDef.FIELD_CAPTION, caption_mode),
-            (SceneDef.FIELD_CAPTION_JOY, caption_joy_mode),
-            (SceneDef.FIELD_LABELS, labels_mode),
+        # Suggestion state is a combo of two fields (labels_ng_SUGGESTION,
+        # hints_SUGGESTION), so we represent it as a sentinel key rather than
+        # a single field name; `_is_field_empty` resolves it. Only the three
+        # caption-* fields support 'stale' (compared against upstream-edit ts).
+        SUGG_KEY = '_SUGGESTION'
+        # (field, mode, stale-upstream-ts-fields)
+        # stale_upstream is the list of timestamp fields whose newer-than
+        # comparison defines staleness for this field; None = no 'stale' mode.
+        T_LABELS = SceneDef.FIELD_TIMESTAMP_LABELS_NG
+        T_HINTS = SceneDef.FIELD_TIMESTAMP_HINTS
+        T_CP = SceneDef.FIELD_TIMESTAMP_CAPTION_PROMPT
+        T_CJ = SceneDef.FIELD_TIMESTAMP_CAPTION_JOY
+        T_C = SceneDef.FIELD_TIMESTAMP_CAPTION
+        field_specs = [
+            (SUGG_KEY, suggestions_mode, None, None),
+            (SceneDef.FIELD_LABELS, labels_mode, None, None),
+            (SceneDef.FIELD_HINTS, hints_mode, None, None),
+            (SceneDef.FIELD_CAPTION_PROMPT, caption_prompt_mode, T_CP, [T_LABELS, T_HINTS]),
+            (SceneDef.FIELD_CAPTION_JOY, caption_joy_mode, T_CJ, [T_CP]),
+            (SceneDef.FIELD_CAPTION, caption_mode, T_C, [T_CJ]),
         ]
+
+        def _is_field_empty(img, field: str) -> bool:
+            if field == SUGG_KEY:
+                # empty = BOTH suggestion fields empty; set = either populated.
+                return (not (img.data.get(SceneDef.FIELD_LABELS_NG_SUGGESTION) or [])
+                        and not (img.data.get(SceneDef.FIELD_HINTS_SUGGESTION) or '').strip())
+            return not img.data.get(field)
+
+        def _is_stale(img, own_ts_field: str, upstream_ts_fields: list[str]) -> bool:
+            # Stale = field is non-empty AND at least one upstream-edit ts
+            # is greater than the field's own ts. Empty downstream / missing
+            # upstream ts → not-stale (use 'empty' to find empty fields).
+            own_ts = img.data.get(own_ts_field) or 0
+            for f in upstream_ts_fields:
+                up_ts = img.data.get(f) or 0
+                if up_ts > 0 and up_ts > own_ts:
+                    return True
+            return False
 
         if show_excluded:
             simg_mgr = self._scm.scene_image_manager()
@@ -909,16 +960,23 @@ class AIDBSceneApp:
             if not (r_min <= rating <= r_max):
                 continue
             ok = True
-            for field, mode in field_modes:
+            for field, mode, own_ts_field, upstream_ts_fields in field_specs:
                 if mode is None or mode == 'ignore':
                     continue
-                is_empty = not img.data.get(field)
-                if mode == 'empty' and not is_empty:
-                    ok = False
-                    break
-                if mode == 'set' and is_empty:
-                    ok = False
-                    break
+                is_empty = _is_field_empty(img, field)
+                if mode == 'empty':
+                    if not is_empty:
+                        ok = False; break
+                elif mode == 'set':
+                    if is_empty:
+                        ok = False; break
+                elif mode == 'stale':
+                    if own_ts_field is None or upstream_ts_fields is None:
+                        ok = False; break        # stale not defined for this field
+                    if is_empty:
+                        ok = False; break        # empty isn't stale
+                    if not _is_stale(img, own_ts_field, upstream_ts_fields):
+                        ok = False; break
             if ok:
                 out.append(img)
         return out
@@ -928,10 +986,12 @@ class AIDBSceneApp:
         name: Optional[str],
         rating_min: Optional[str],
         rating_max: Optional[str],
-        hints_mode: Optional[str] = 'ignore',
-        caption_mode: Optional[str] = 'ignore',
-        caption_joy_mode: Optional[str] = 'ignore',
+        suggestions_mode: Optional[str] = 'ignore',
         labels_mode: Optional[str] = 'ignore',
+        hints_mode: Optional[str] = 'ignore',
+        caption_prompt_mode: Optional[str] = 'ignore',
+        caption_joy_mode: Optional[str] = 'ignore',
+        caption_mode: Optional[str] = 'ignore',
         show_active: bool = True,
         show_prototype: bool = False,
         show_excluded: bool = False,
@@ -946,7 +1006,8 @@ class AIDBSceneApp:
         try:
             imgs_non_excluded_all = self._set_editor_filter_imgs(
                 scene_set, rating_min, rating_max,
-                hints_mode, caption_mode, caption_joy_mode, labels_mode,
+                suggestions_mode, labels_mode, hints_mode,
+                caption_prompt_mode, caption_joy_mode, caption_mode,
                 show_excluded=False,
             )
             imgs_active = (
@@ -959,7 +1020,8 @@ class AIDBSceneApp:
             )
             imgs_excluded = self._set_editor_filter_imgs(
                 scene_set, rating_min, rating_max,
-                hints_mode, caption_mode, caption_joy_mode, labels_mode,
+                suggestions_mode, labels_mode, hints_mode,
+                caption_prompt_mode, caption_joy_mode, caption_mode,
                 show_excluded=True,
             ) if show_excluded else []
         except Exception as e:
@@ -1023,10 +1085,12 @@ class AIDBSceneApp:
         name: Optional[str],
         rating_min: Optional[str],
         rating_max: Optional[str],
-        hints_mode: Optional[str] = 'ignore',
-        caption_mode: Optional[str] = 'ignore',
-        caption_joy_mode: Optional[str] = 'ignore',
+        suggestions_mode: Optional[str] = 'ignore',
         labels_mode: Optional[str] = 'ignore',
+        hints_mode: Optional[str] = 'ignore',
+        caption_prompt_mode: Optional[str] = 'ignore',
+        caption_joy_mode: Optional[str] = 'ignore',
+        caption_mode: Optional[str] = 'ignore',
         show_active: bool = True,
         show_prototype: bool = False,
         show_excluded: bool = False,
@@ -1041,7 +1105,8 @@ class AIDBSceneApp:
         """
         refresh_args = (
             name, rating_min, rating_max,
-            hints_mode, caption_mode, caption_joy_mode, labels_mode,
+            suggestions_mode, labels_mode, hints_mode,
+            caption_prompt_mode, caption_joy_mode, caption_mode,
             show_active, show_prototype, show_excluded,
         )
         if not name or not isinstance(name, str):
@@ -1058,7 +1123,8 @@ class AIDBSceneApp:
         try:
             imgs_filtered = self._set_editor_filter_imgs(
                 scene_set, rating_min, rating_max,
-                hints_mode, caption_mode, caption_joy_mode, labels_mode,
+                suggestions_mode, labels_mode, hints_mode,
+                caption_prompt_mode, caption_joy_mode, caption_mode,
                 show_excluded=False,
             )
             ids_empty: list[str] = []
