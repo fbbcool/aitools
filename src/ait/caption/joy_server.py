@@ -108,9 +108,12 @@ class _State:
 
     def caption(self, image_url: str, user_content: str,
                 system_content: Optional[str] = None,
-                gen_kwargs: Optional[dict] = None) -> tuple[str, str]:
+                gen_kwargs: Optional[dict] = None,
+                adapter: str = 'default') -> tuple[str, str]:
         """Run a single caption/probe. Serialized via internal lock so
-        concurrent HTTP requests don't trample the GPU."""
+        concurrent HTTP requests don't trample the GPU. `adapter` selects
+        which loaded LoRA adapter to use (default = the main captioning
+        LoRA; 'hint' = the iter-5-hint LoRA when skin.lora_hint_path is set)."""
         if self._joy is None or self._skin is None:
             raise RuntimeError('captioner not loaded')
         img = _load_image(image_url)
@@ -128,6 +131,7 @@ class _State:
                 user_hint='',
                 post_prompt='',
                 gen_kwargs=gen_kwargs or None,
+                adapter=adapter,
             )
         return prompt, caption
 
@@ -141,6 +145,7 @@ class _State:
             'request_count': self.request_count,
             'idle_timeout_seconds': self.idle_timeout,
             'idle_seconds': max(0.0, time.time() - self.last_request_at) if self.last_request_at else 0.0,
+            'adapters': sorted(self._joy.adapters.keys()) if (self._joy is not None and self._joy.adapters) else [],
         }
 
     def start_idle_watchdog(self) -> None:
@@ -233,6 +238,7 @@ class _Handler(BaseHTTPRequestHandler):
                     user_content=user_content,
                     system_content=body.get('system_content'),
                     gen_kwargs=body.get('gen_kwargs'),
+                    adapter=body.get('adapter', 'default'),
                 )
                 dt = time.time() - t0
                 self._send_json(200, {

@@ -81,6 +81,10 @@
       "oneOf": [{ "$ref": "#/$defs/install_ref" }, { "type": "null" }],
       "description": "Optional AInstallerDB tuple for a fine-tuned LoRA adapter; null = no LoRA."
     },
+    "lora_hint_path": {
+      "oneOf": [{ "type": "string" }, { "type": "null" }],
+      "description": "Optional direct path (local filesystem or HF repo id) to a SECOND LoRA adapter used specifically for the iter-5 hint probe in /suggest_image. When set, joy_server loads both adapters at startup; clients route hint requests via `adapter='hint'`. Decoupled from AInstallerDB for now (single-skin use case) — direct path bypasses the install-ref machinery."
+    },
     "default_set": {
       "oneOf": [{ "type": "string" }, { "type": "null" }],
       "description": "SceneSet most associated with this skin; default for /v1-status and /todo-ai."

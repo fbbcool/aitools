@@ -885,6 +885,7 @@
     "variant": "common",
     "target": "lora"
   },
+  "lora_hint_path": "/home/misw/Workspace/joy_hint_lora_gts_v3_v3/adapter",
   "default_set": "gts_v3",
   "_built": {
     "version": 1,

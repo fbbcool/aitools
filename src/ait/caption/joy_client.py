@@ -151,10 +151,16 @@ def ensure_running(*, skin: str = '1xlasm', config: str = 'prod',
 def caption(image_url: str, user_content: str, *,
             system_content: Optional[str] = None,
             gen_kwargs: Optional[dict] = None,
+            adapter: str = 'default',
             host: str = DEFAULT_HOST, port: int = DEFAULT_PORT,
             timeout: float = 600.0,
             retry_once: bool = True) -> tuple[str, str]:
     """POST /caption. Returns `(prompt, caption)`.
+
+    `adapter` selects the LoRA adapter on the server side (default = main
+    captioning LoRA; 'hint' = iter-5 hint LoRA when configured via
+    skin.lora_hint_path). Pass 'hint' only when calling iter-5 of the
+    /suggest_image workflow.
 
     If the request fails with a connection error AND `retry_once`, tries
     `ensure_running()` and retries the POST once. This handles the case
@@ -165,6 +171,8 @@ def caption(image_url: str, user_content: str, *,
         body['system_content'] = system_content
     if gen_kwargs is not None:
         body['gen_kwargs'] = gen_kwargs
+    if adapter != 'default':
+        body['adapter'] = adapter
 
     s, data = _http_post('/caption', body, host=host, port=port, timeout=timeout)
     if s != 200 and retry_once and 'connection refused' in data.get('error', ''):

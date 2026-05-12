@@ -71,10 +71,44 @@ class HintTrainSample:
     hint: str       # curator's hints field — the training target
 
 
+def list_eligible_pairs(
+    set_name: str,
+    config: SceneConfig = 'prod',
+    min_hint_chars: int = 10,
+    verbose: int = 0,
+) -> list[dict]:
+    """Returns the full list of `{id, hint}` pairs eligible for hint-LoRA
+    training (or validation). The filter logic — non-prototype + non-empty
+    hint + not 'none' + min length — is the same one `HintDataset` applies.
+
+    Exposed at module level so the prepare script can split into
+    train/val before constructing the per-split datasets.
+    """
+    pairs: list[dict] = []
+    scm = SceneManager(config=config, verbose=verbose)
+    ssm = SceneSetManager(scm._dbc, scm, verbose=verbose)
+    scene_set = ssm.set_from_id_or_name(set_name)
+    if scene_set is None:
+        raise ValueError(f'set [{set_name}] not found')
+    for img in scene_set.imgs:
+        if img.prototype:
+            continue
+        hint = (img.data.get(SceneDef.FIELD_HINTS) or '').strip()
+        if not hint or hint.lower() == 'none':
+            continue
+        if len(hint) < min_hint_chars:
+            continue
+        pairs.append({'id': img.id, 'hint': hint})
+    return pairs
+
+
 class HintDataset(Dataset):
     """Iterates SceneImages in a set whose `hints` field is non-empty and
     not the `none` sentinel. Independent of the `caption`/`caption_joy`/
     `labels` fields — only the hint matters for this task.
+
+    `include_ids` (optional) restricts to a specific subset — used by the
+    prepare script to enforce train/val splits without re-querying the DB.
     """
 
     def __init__(
@@ -82,9 +116,11 @@ class HintDataset(Dataset):
         set_name: str,
         config: SceneConfig = 'prod',
         min_hint_chars: int = 10,
+        include_ids: list[str] | set[str] | None = None,
         verbose: int = 0,
     ) -> None:
         self._items: list[dict] = []
+        include_set = set(include_ids) if include_ids is not None else None
 
         scm = SceneManager(config=config, verbose=verbose)
         ssm = SceneSetManager(scm._dbc, scm, verbose=verbose)
@@ -104,11 +140,14 @@ class HintDataset(Dataset):
                 # Skip very-short fragments (e.g. "step.") that don't
                 # represent the curator style we want to learn.
                 continue
+            if include_set is not None and img.id not in include_set:
+                continue
             self._items.append({'id': img.id, 'hint': hint})
 
         self._sim = scm.scene_image_manager()
         if verbose:
-            print(f'[joy_train_hint] dataset: {len(self._items)} pairs')
+            print(f'[joy_train_hint] dataset: {len(self._items)} pairs'
+                  f'{" (filtered to include_ids)" if include_set is not None else ""}')
 
     def __len__(self) -> int:
         return len(self._items)
@@ -239,6 +278,7 @@ def train_hint(
     grad_accum: int = 8,
     max_length: int = 4096,
     min_hint_chars: int = 10,
+    train_ids: list[str] | set[str] | None = None,
     seed: int = 42,
     verbose: int = 1,
 ) -> None:
@@ -287,6 +327,7 @@ def train_hint(
         set_name=set_name,
         config=config,
         min_hint_chars=min_hint_chars,
+        include_ids=train_ids,
         verbose=verbose,
     )
     if len(dataset) == 0:

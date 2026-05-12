@@ -183,6 +183,10 @@ class Skin:
     concepts: dict[str, SkinConcept]
     model_key: tuple[str, str, str]
     lora_key: Optional[tuple[str, str, str]]
+    # Direct local path or HF repo id for a second LoRA used at /suggest_image
+    # iter-5 (hint probing). Decoupled from AInstallerDB; populated from the
+    # JSON's top-level `lora_hint_path` field. None = single-adapter mode.
+    lora_hint_path: Optional[str]
     default_set: Optional[str]
     # derived (from _built or in-memory composition)
     directive: str
@@ -490,6 +494,7 @@ class Skin:
         model_key = (model['group'], model['variant'], model['target'])
         lora_raw = data.get('lora')
         lora_key = (lora_raw['group'], lora_raw['variant'], lora_raw['target']) if lora_raw else None
+        lora_hint_path = data.get('lora_hint_path') or None
 
         # _built handling
         source_hash = _compute_source_hash(data)
@@ -520,6 +525,7 @@ class Skin:
             concepts=concepts,
             model_key=model_key,
             lora_key=lora_key,
+            lora_hint_path=lora_hint_path,
             default_set=data.get('default_set') or None,
             directive=str(built['directive']),
             labels=dict(built['labels']),

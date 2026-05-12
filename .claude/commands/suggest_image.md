@@ -99,6 +99,18 @@ for i in range(5):
 
 Adapt order based on what each iteration reveals. Skip an iteration's probe if its target was already resolved by a prior iter (e.g. skip iter 4 if iter 1's response was unambiguous about insertion vs touch).
 
+**Iter-5 uses the hint-specific LoRA adapter** (when `skin.lora_hint_path` is set, e.g. for 1xlasm). The captioning LoRA is the wrong distribution for terse curator-style hint generation; iter-5 routes through a separately-trained hint LoRA that closes the hint-jaccard gap from ~0.10 to ~0.39 on held-out validation:
+
+```python
+# iters 1-4 use the default (captioning) LoRA
+_, response = joy_client.caption(image_url=..., user_content=probe, system_content=sk.directive)
+
+# iter 5 uses the hint LoRA
+_, response = joy_client.caption(image_url=..., user_content=probe, system_content=sk.directive, adapter='hint')
+```
+
+The server's `/healthz` reports available adapters in the `adapters` field. If `'hint'` is not in that list, the skin has no `lora_hint_path` configured; iter-5 falls back to the default adapter (with degraded hint quality).
+
 **Parse-response heuristic** (per `skin.theme_md_suggestions` §5):
 
 - map pose words → `primary.pose.*` / `secondary.pose.*` paths

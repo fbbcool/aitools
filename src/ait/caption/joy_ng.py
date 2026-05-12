@@ -46,8 +46,18 @@ class JoyNG:
         max_new_tokens: int = 512,
         top_p: float = 0.9,
         temperature: float = 0.6,
+        extra_adapters: Optional[dict[str, str]] = None,
         verbose: int = 0,
     ):
+        """`extra_adapters` is a `{name: path}` map of additional LoRA
+        adapters to load alongside the main `lora_path`. The main adapter
+        is registered as `'default'` (PEFT convention); switching to an
+        extra one at call time uses `caption(..., adapter=name)`.
+
+        Multi-adapter is currently used to route /suggest_image's iter-5
+        through the hint-specific LoRA while iters 1-4 + all of
+        /caption_image use the captioning LoRA.
+        """
         self._verbose = verbose
         self._system_prefix = system_prefix
         self._max_new_tokens = max_new_tokens
@@ -60,11 +70,28 @@ class JoyNG:
         )
 
         self.lora_path: Optional[str] = None
+        # adapter_name → path (for inspection / debugging).
+        self.adapters: dict[str, str] = {}
+        self._default_adapter = 'default'
         if lora_path:
             from peft import PeftModel
-            self._log(f'applying LoRA {lora_path!r}')
-            self.model = PeftModel.from_pretrained(self.model, lora_path)
+            self._log(f'applying LoRA (adapter=default) {lora_path!r}')
+            self.model = PeftModel.from_pretrained(
+                self.model, lora_path, adapter_name='default',
+            )
             self.lora_path = lora_path
+            self.adapters['default'] = lora_path
+            if extra_adapters:
+                for name, path in extra_adapters.items():
+                    if name == 'default':
+                        raise ValueError(
+                            "extra_adapter name 'default' collides with the main lora_path"
+                        )
+                    self._log(f'loading extra adapter {name!r} from {path!r}')
+                    self.model.load_adapter(path, adapter_name=name)
+                    self.adapters[name] = path
+            # ensure default is active after all loads
+            self.model.set_adapter('default')
 
         self.model.eval()
         self.processor = AutoProcessor.from_pretrained(model_repo, use_fast=False)
@@ -82,8 +109,16 @@ class JoyNG:
         user_hint: str = '',
         post_prompt: str = '',
         gen_kwargs: Optional[dict] = None,
+        adapter: str = 'default',
     ) -> tuple[str, str]:
-        """Compose the prompt, run generation, return `(prompt, caption)`."""
+        """Compose the prompt, run generation, return `(prompt, caption)`.
+
+        `adapter` selects which PEFT adapter is active for this call. The
+        main `lora_path` is registered as `'default'`. Extra adapters
+        passed to `__init__(extra_adapters={...})` can be selected by
+        their name. The adapter is restored to `'default'` after the call
+        so concurrent callers in the same process don't see leftover state.
+        """
         prompt = default_prompt + user_content
         hint = (user_hint or '').strip()
         if hint:
@@ -94,13 +129,33 @@ class JoyNG:
             prompt += ''.join(label_prompts)
         prompt += post_prompt
 
-        caption = self._process(
-            img,
-            prompt=prompt,
-            system_content=self._system_prefix + system_content,
-            gen_kwargs=gen_kwargs or {},
-        )
+        # Adapter switch (no-op when single-adapter or adapter='default')
+        active_adapter = self._set_adapter(adapter)
+        try:
+            caption = self._process(
+                img,
+                prompt=prompt,
+                system_content=self._system_prefix + system_content,
+                gen_kwargs=gen_kwargs or {},
+            )
+        finally:
+            # Restore the default to keep behaviour deterministic for next caller.
+            if active_adapter != self._default_adapter:
+                self._set_adapter(self._default_adapter)
         return prompt, caption
+
+    def _set_adapter(self, adapter: str) -> str:
+        """Switch the active LoRA adapter. Returns the name set.
+        No-op when no adapters are loaded. Raises on unknown name."""
+        if not self.adapters:
+            # Single-LoRA or no-LoRA mode; nothing to switch.
+            return adapter
+        if adapter not in self.adapters:
+            raise ValueError(
+                f'unknown adapter {adapter!r}; available: {sorted(self.adapters)}'
+            )
+        self.model.set_adapter(adapter)
+        return adapter
 
     def compose_prompt(
         self,
