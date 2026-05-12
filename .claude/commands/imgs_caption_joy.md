@@ -1,18 +1,19 @@
 ---
-description: Caption curated images whose caption_joy is stale wrt caption_prompt. Default: caption_prompt non-empty AND (caption_joy empty OR ts_caption_prompt > ts_caption_joy). With `force`: every curated image with a non-empty caption_prompt, regardless of freshness. Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Uses the STORED caption_prompt verbatim (Stage 1 is a no-op); Stage 2 captions via joy_server; Stage 3 validates + auto-fixes. Upstream is /imgs_caption_prompt.
-argument-hint: "[force] [set=<name> | rating[==|>=|<=|>|<]<n> | limit=<n> | …]"
+description: Caption curated images whose caption_joy is stale wrt caption_prompt. Default: caption_prompt non-empty AND (caption_joy empty OR ts_caption_prompt > ts_caption_joy). With `force`: every curated image with a non-empty caption_prompt, regardless of freshness. With `ignore_curated`: drop the suggestion requirement, accept any image with non-empty labels_ng + hints + caption_prompt (legacy / non-curator-promoted cohort). Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Uses the STORED caption_prompt verbatim (Stage 1 is a no-op); Stage 2 captions via joy_server; Stage 3 validates + auto-fixes. Upstream is /imgs_caption_prompt.
+argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> | limit=<n> | …]"
 ---
 
 `$ARGUMENTS` is an optional space-separated list of bare-word flags and `key=value` / `key<op>value` filter terms (connectives like `for` / `and` / `where` ignored). Empty → all curated images with a non-empty `caption_prompt` and stale `caption_joy`, DB-wide. Supported terms:
 
-- `force` — bare flag. Caption every curated image with a non-empty `caption_prompt` regardless of `caption_joy` freshness (the recency check is skipped). Useful after a captioner refresh (LoRA swap, skin rule change) when every existing caption should be regenerated against the current prompts.
+- `force` — bare flag. Caption every eligible image with a non-empty `caption_prompt` regardless of `caption_joy` freshness (the recency check is skipped). Useful after a captioner refresh (LoRA swap, skin rule change) when every existing caption should be regenerated against the current prompts.
+- `ignore_curated` — bare flag. Drop the suggestion-non-empty requirement. Eligibility becomes "labels_ng non-empty AND hints non-empty AND caption_prompt non-empty". Mirrors the `/imgs_caption_prompt ignore_curated` flag — needed when that upstream was used to compile prompts for non-curator-promoted images (legacy data, manual labels+hints without `_SUGGESTION`).
 - `set=<name>` — restrict to a SceneSet's active members.
 - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
 - `limit=<n>` — cap the batch at N images (default unlimited). Use when the pending list is large and the curator wants to review the first batch before continuing.
 
-`force` composes with the other filters — e.g. `force set=gts_v3 limit=10` recaptions the 10 newest curated images in `gts_v3` whether or not their captions were already fresh.
+Flags compose with the filters — e.g. `force set=gts_v3 limit=10` recaptions the 10 newest curated images in `gts_v3` whether or not their captions were already fresh; `ignore_curated rating==0` captions the rating-0 cohort regardless of suggestion provenance.
 
-**A curated image with an EMPTY `caption_prompt` is NEVER in scope** — even with `force`. Run `/imgs_caption_prompt` first to compile the prompt; that's this command's upstream. The report counts and lists such images so the curator knows.
+**An eligible image with an EMPTY `caption_prompt` is NEVER in scope** — even with `force` or `ignore_curated`. Run `/imgs_caption_prompt` first to compile the prompt; that's this command's upstream. The report counts and lists such images so the curator knows.
 
 Same parser as `/imgs_update_caption_prompt`, extended with the `force` bare-word flag. A 24-char ObjectId is NOT a valid argument — use `/img_caption <id>` for single-image work.
 
@@ -47,13 +48,30 @@ def is_curated(img) -> bool:
     return has_labels and has_hint and has_sugg
 
 
-def is_curated_pending(img, *, force: bool = False) -> bool:
-    """Curated AND non-empty caption_prompt AND caption_joy is stale wrt caption_prompt.
-    With force=True: only the recency check is skipped — curated + non-empty prompt
-    are still required.
+def is_labeled(img) -> bool:
+    """Labeled = labels_ng AND hints non-empty (suggestion ignored)."""
+    d = img.data
+    return bool(d.get(SceneDef.FIELD_LABELS_NG) or []) \
+        and bool((d.get(SceneDef.FIELD_HINTS) or '').strip())
+
+
+def is_curated_pending(img, *, force: bool = False,
+                              ignore_curated: bool = False) -> bool:
+    """Eligible image AND non-empty caption_prompt AND caption_joy is stale wrt caption_prompt.
+
+    Eligibility:
+      - default: is_curated(img)
+      - ignore_curated=True: is_labeled(img)   (no suggestion required)
+
+    With force=True the recency check is skipped — eligibility + non-empty
+    caption_prompt are still required.
     """
-    if not is_curated(img):
-        return False
+    if ignore_curated:
+        if not is_labeled(img):
+            return False
+    else:
+        if not is_curated(img):
+            return False
     d = img.data
     cap_prompt = (d.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
     if not cap_prompt:
@@ -75,13 +93,15 @@ The "curator promoted" signal is implicit: the curator's promotion of `_SUGGESTI
 ```python
 import re
 TERM_RE = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
-WORD_RE = re.compile(r'\b(force)\b', re.IGNORECASE)
+FORCE_RE = re.compile(r'\bforce\b', re.IGNORECASE)
+IGN_RE   = re.compile(r'\bignore_curated\b', re.IGNORECASE)
 
 def parse_args(s: str):
     s = (s or '').strip()
     filters: dict = {}
     limit: int | None = None
-    force = bool(WORD_RE.search(s))
+    force = bool(FORCE_RE.search(s))
+    ignore_curated = bool(IGN_RE.search(s))
     for kw, op, val in TERM_RE.findall(s):
         op = '==' if op == '=' else op
         if kw == 'rating':
@@ -90,7 +110,7 @@ def parse_args(s: str):
             filters[('set', op)] = val
         elif kw == 'limit':
             limit = int(val)
-    return filters, limit, force
+    return filters, limit, force, ignore_curated
 ```
 
 ## Iterator
@@ -98,11 +118,11 @@ def parse_args(s: str):
 - `('set', '==')` present → load `SceneSetManager(...).set_from_id_or_name(value)` and iterate `scene_set.imgs`, skipping `excluded_ids`.
 - Else → iterate `coll.find({prototype: {$ne: true}}, …)`.
 
-For each candidate: apply `is_curated_pending(img, force=force)` AND remaining filters (e.g. `rating`). Sort the pending list by `timestamp_created` descending (newest first) so a `limit=N` slice picks the most recently created images. Apply `limit` if set. Collect matching ids into `pending`.
+For each candidate: apply `is_curated_pending(img, force=force, ignore_curated=ignore_curated)` AND remaining filters (e.g. `rating`). Sort the pending list by `timestamp_created` descending (newest first) so a `limit=N` slice picks the most recently created images. Apply `limit` if set. Collect matching ids into `pending`.
 
-Separately, count curated images that have an **empty `caption_prompt`** — these are NOT processed but the count is shown in the header so the curator knows to run `/imgs_caption_prompt` upstream.
+Separately, count eligible images (curated or labeled, depending on flag) that have an **empty `caption_prompt`** — these are NOT processed but the count is shown in the header so the curator knows to run `/imgs_caption_prompt` upstream.
 
-If `len(pending) == 0`, print `nothing to do — no curated images have stale caption_joy wrt caption_prompt` (or `nothing to do — no curated images with a non-empty caption_prompt match the filters` in `force` mode) and stop.
+If `len(pending) == 0`, print `nothing to do — no <scope> images have stale caption_joy wrt caption_prompt` where `<scope>` is "curated" (default) or "labeled" (`ignore_curated`); `force` mode swaps "stale caption_joy" for "match the filters". Then stop.
 
 ## Pipeline
 

@@ -1,16 +1,17 @@
 ---
-description: Run the per-image judgment-mode caption_prompt compile (the same Stage 1 as /img_caption) on curated images. Default: only those whose caption_prompt is out of date (suggestion newer than caption_prompt, or caption_prompt empty). With `force`: every curated image regardless of freshness. Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Produces tight ~400-1000 char prompts, NOT the ~5000 char deterministic kind. Persists FIELD_CAPTION_PROMPT only; downstream /imgs_caption_joy picks them up.
-argument-hint: "[force] [set=<name> | rating[==|>=|<=|>|<]<n> | limit=<n> | …]"
+description: Run the per-image judgment-mode caption_prompt compile (the same Stage 1 as /img_caption) on curated images. Default: only those whose caption_prompt is out of date (suggestion newer than caption_prompt, or caption_prompt empty). With `force`: every curated image regardless of freshness. With `ignore_curated`: drop the suggestion requirement and accept any image with non-empty labels_ng + hints (legacy / non-curator-promoted cohort). Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Produces tight ~400-1000 char prompts, NOT the ~5000 char deterministic kind. Persists FIELD_CAPTION_PROMPT only; downstream /imgs_caption_joy picks them up.
+argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> | limit=<n> | …]"
 ---
 
 `$ARGUMENTS` is an optional space-separated list of bare-word flags and `key=value` / `key<op>value` filter terms (connectives like `for` / `and` / `where` ignored). Empty → all curated images with stale `caption_prompt`, DB-wide. Supported terms:
 
-- `force` — bare flag. Process every curated image regardless of `caption_prompt` freshness (the default-mode recency check is skipped). Useful after a prompt-compile-recipe edit when the curator wants every existing prompt rebuilt.
+- `force` — bare flag. Process every eligible image regardless of `caption_prompt` freshness (the recency check is skipped). Useful after a prompt-compile-recipe edit when the curator wants every existing prompt rebuilt.
+- `ignore_curated` — bare flag. Drop the suggestion-non-empty requirement. Eligible image becomes "labels_ng non-empty AND hints non-empty" (the minimum needed to compose a prompt). Useful for legacy images that pre-date the `_SUGGESTION` workflow but still carry curator labels+hints, or images promoted to canonical without ever running `/img_suggest`.
 - `set=<name>` — restrict to a SceneSet's active members.
 - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
 - `limit=<n>` — cap the batch at N images (default unlimited). Use when the pending list is large and the curator wants to review the first batch before continuing.
 
-`force` composes with the other filters — e.g. `force set=gts_v3 limit=10` rebuilds prompts for the first 10 curated images in `gts_v3` whether or not they have a current caption_prompt.
+Flags compose with the filters — e.g. `force set=gts_v3 limit=10` rebuilds prompts for the first 10 curated images in `gts_v3` whether or not they have a current caption_prompt; `ignore_curated rating==1` picks up the entire done cohort regardless of suggestion provenance.
 
 Same parser as `/imgs_update_caption_prompt`, extended with the `force` bare-word flag. A 24-char ObjectId is NOT a valid argument — use `/img_caption <id>` (which runs all three stages) or `/imgs_update_caption_prompt <id>` (single-image, Stage 1 only).
 
@@ -37,25 +38,46 @@ def is_curated(img) -> bool:
     return has_labels and has_hint and has_sugg
 
 
-def is_prompt_compile_pending(img, *, force: bool = False) -> bool:
-    """Default: curated AND suggestion is newer than caption_prompt (or caption_prompt empty).
-    With force=True: curated, regardless of caption_prompt freshness."""
-    if not is_curated(img):
-        return False
+def is_labeled(img) -> bool:
+    """Labeled = labels_ng AND hints non-empty (suggestion ignored)."""
+    d = img.data
+    has_labels = bool(d.get(SceneDef.FIELD_LABELS_NG) or [])
+    has_hint   = bool((d.get(SceneDef.FIELD_HINTS) or '').strip())
+    return has_labels and has_hint
+
+
+def is_prompt_compile_pending(img, *, force: bool = False,
+                                     ignore_curated: bool = False) -> bool:
+    """Default: curated AND upstream-edit ts > caption_prompt ts (or caption_prompt empty).
+    With force=True: skip the freshness check.
+    With ignore_curated=True: require only `is_labeled` (drop the suggestion check).
+
+    Upstream-edit ts = max(ts_labels_ng, ts_hints, ts_labels_ng_SUGGESTION,
+    ts_hints_SUGGESTION). Any edit to those fields counts as a reason to
+    re-compile.
+    """
+    if ignore_curated:
+        if not is_labeled(img):
+            return False
+    else:
+        if not is_curated(img):
+            return False
     if force:
         return True
     d = img.data
-    ts_sugg = max(
+    ts_up = max(
+        d.get(SceneDef.FIELD_TIMESTAMP_LABELS_NG) or 0,
+        d.get(SceneDef.FIELD_TIMESTAMP_HINTS) or 0,
         d.get(SceneDef.FIELD_TIMESTAMP_LABELS_NG_SUGGESTION) or 0,
         d.get(SceneDef.FIELD_TIMESTAMP_HINTS_SUGGESTION) or 0,
     )
-    if ts_sugg <= 0:
-        return False
     cap_prompt = (d.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
     if not cap_prompt:
-        return True
+        return True                      # never compiled → in scope
+    if ts_up <= 0:
+        return False                     # legacy data, no edit ts → not stale
     ts_cp = d.get(SceneDef.FIELD_TIMESTAMP_CAPTION_PROMPT) or 0
-    return ts_sugg > ts_cp
+    return ts_up > ts_cp
 ```
 
 The filter mirrors `/imgs_caption_joy` exactly except the timestamp compared against is `caption_prompt`, not `caption_joy`. Result: images that have been suggested-then-curated but whose stored caption_prompt is stale (or empty).
@@ -65,13 +87,15 @@ The filter mirrors `/imgs_caption_joy` exactly except the timestamp compared aga
 ```python
 import re
 TERM_RE = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
-WORD_RE = re.compile(r'\b(force)\b', re.IGNORECASE)
+FORCE_RE = re.compile(r'\bforce\b', re.IGNORECASE)
+IGN_RE   = re.compile(r'\bignore_curated\b', re.IGNORECASE)
 
 def parse_args(s: str):
     s = (s or '').strip()
     filters: dict = {}
     limit: int | None = None
-    force = bool(WORD_RE.search(s))
+    force = bool(FORCE_RE.search(s))
+    ignore_curated = bool(IGN_RE.search(s))
     for kw, op, val in TERM_RE.findall(s):
         op = '==' if op == '=' else op
         if kw == 'rating':
@@ -80,7 +104,7 @@ def parse_args(s: str):
             filters[('set', op)] = val
         elif kw == 'limit':
             limit = int(val)
-    return filters, limit, force
+    return filters, limit, force, ignore_curated
 ```
 
 ## Iterator
@@ -88,9 +112,9 @@ def parse_args(s: str):
 - `('set', '==')` present → load `SceneSetManager(...).set_from_id_or_name(value)` and iterate `scene_set.imgs`, skipping `excluded_ids`.
 - Else → iterate `coll.find({prototype: {$ne: true}}, …)`.
 
-For each candidate: apply `is_prompt_compile_pending(img, force=force)` AND remaining filters (e.g. `rating`). Sort the pending list by `timestamp_created` descending (newest first) so a `limit=N` slice picks the most recently created images. Apply `limit` if set.
+For each candidate: apply `is_prompt_compile_pending(img, force=force, ignore_curated=ignore_curated)` AND remaining filters (e.g. `rating`). Sort the pending list by `timestamp_created` descending (newest first) so a `limit=N` slice picks the most recently created images. Apply `limit` if set.
 
-If `len(pending) == 0`, print `nothing to do — no curated images have stale caption_prompt` (or `nothing to do — no curated images match the filters` in `force` mode) and stop.
+If `len(pending) == 0`, print `nothing to do — no <scope> images have stale caption_prompt` where `<scope>` is "curated" (default) or "labeled" (`ignore_curated`); `force` mode swaps "stale caption_prompt" for "match the filters". Then stop.
 
 If `len(pending) > 0`, print the count and the first ~5 ids before starting so the curator knows what's about to be processed.
 
