@@ -170,3 +170,7 @@ external/
 .DS_Store
 .DS_Store/
 dbmanager.yaml
+
+# Claude Code runtime artifacts (per-process locks, transient state).
+# Slash-command specs in .claude/commands/*.md ARE versioned.
+.claude/*.lock
