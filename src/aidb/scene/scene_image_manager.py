@@ -202,11 +202,12 @@ class SceneImageManager:
         url_move_to_new_parent(url_src, url_parent, filename_orig, delete_src=True, exist_ok=True)
 
     def ids_img_from_query(self, query: dict, ids: Optional[list[Any]]) -> list[str]:
-        oids = []
         if ids is not None:
             oids = [self._dbc.to_oid(id) for id in ids]
-        if oids:
-            query |= {SceneDef.FIELD_OID: {'$in': oids}}
+            if not oids:
+                # caller explicitly scoped to an empty id list → empty result
+                return []
+            query = dict(query) | {SceneDef.FIELD_OID: {'$in': oids}}
         res = self._dbc.find_documents(self._collection_name, query=query)
         res_ids = [str(doc.get(SceneDef.FIELD_OID, None)) for doc in res]
         return res_ids

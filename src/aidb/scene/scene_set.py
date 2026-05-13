@@ -182,19 +182,31 @@ class SceneSet:
 
     @property
     def imgs(self) -> Generator:
+        return self.imgs_for_query(self.query_img)
+
+    def imgs_for_query(self, query_img: dict) -> Generator:
         from .scene import Scene
 
         excluded = set(self.imgs_exclude)
+        seen: set = set()
         scene: Scene
         for scene in self.scenes:
-            for img in scene.imgs_from_query(self.query_img):
+            for img in scene.imgs_from_query(query_img):
                 if img.id in excluded:
                     continue
+                if img.id in seen:
+                    continue
+                seen.add(img.id)
                 yield img
 
-    def compile(self) -> None:
+    def compile(self, query_img: dict | None = None) -> None:
         from .scene_image import SceneImage
         from .hfdataset import HFDataset
+
+        if query_img:
+            effective_query = {'$and': [self.query_img, query_img]}
+        else:
+            effective_query = self.query_img
 
         # first, make a clean saving location
         root_train = self._ssm.config.train_url / self.name / SceneDef.DIR_TRAIN
@@ -204,7 +216,7 @@ class SceneSet:
         ratios = [float(ratio) for ratio in ratios]
         resolutions = self.data.get(SceneDef.FIELD_RESOLUTIONS, SceneDef.DEFAULT_RESOLUTIONS)
 
-        for img in self.imgs:
+        for img in self.imgs_for_query(effective_query):
             img: SceneImage
             pil = img.pil
             if pil is None:
