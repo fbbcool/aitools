@@ -81,6 +81,20 @@
       ]
     },
     "2512-snofs": {
+      "vae": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/vae/qwen_image_vae.safetensors",
+          "skip": false
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "skip": false
+        }
+      ],
       "diffuser": [
         {
           "repo_id": "Qwen/Qwen-Image-2512",
