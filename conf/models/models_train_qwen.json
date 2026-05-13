@@ -91,7 +91,7 @@
       "text_encoder": [
         {
           "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-          "file": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "file": "split_files/text_encoders/qwen_2.5_vl_7b.safetensors",
           "skip": false
         }
       ],
