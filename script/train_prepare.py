@@ -62,7 +62,8 @@ config_dataset = {
     'num_repeats': 2,
     # The 7 distinct (w, h) pairs in the compiled gts_v3 training set.
     # All max-side 1024, AR bucketed: 1:1, 3:4/4:3, 2:3/3:2, 3:5/5:3.
-    'resolutions': [
+    'resolutions': [1024],
+    'resolutions_arr': [
         [1024, 1024],  # 137 images
         [768, 1024],  # 27
         [1024, 768],  # 12
