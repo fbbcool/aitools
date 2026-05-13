@@ -89,8 +89,8 @@
       ],
       "transformer": [
         {
-          "repo_id": "fbbcool/qwen-2512-snofs-0.50",
-          "file": "qwen-image-2512-snofs0.50-fp8.safetensors",
+          "repo_id": "fbbcool/qwen-2512-snofs-0.65",
+          "file": "qwen-image-2512-snofs0.65-fp8.safetensors",
           "skip": false
         }
       ]
