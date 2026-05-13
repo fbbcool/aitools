@@ -30,7 +30,7 @@ class TemplaterVariable:
         else:
             vcheck = value
         if type(vcheck) not in self._typelist:
-            raise ValueError(f'type is not in {self._typelist}!')
+            raise ValueError(f'value[{vcheck}] of type[{type(vcheck)}] is not in {self._typelist}!')
         if parameter is not None:
             self.parameter = parameter
         else:
