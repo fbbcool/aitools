@@ -84,7 +84,7 @@
       "diffuser": [
         {
           "repo_id": "Qwen/Qwen-Image-2512",
-          "skip": false
+          "skip": true
         }
       ],
       "transformer": [
