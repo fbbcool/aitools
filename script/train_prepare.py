@@ -53,6 +53,13 @@ config_trainer_qwen_h100 = {
     'steps_per_print': 10,
     'adapter___rank': 16,
     'optimizer___lr': 4e-4,  # mild bump for 4× larger effective batch (linear-scaling would suggest 8e-4; LoRA-on-pretrained is less sensitive)
+    # ─── warm-start an adapter from an existing LoRA (qwen-image-compatible) ──
+    # Set when resuming/continuing training of the SAME concept (e.g. extending
+    # gts3-e10 → e30). Leave commented for training a NEW concept on top of a
+    # frozen base. Expects a DIRECTORY containing exactly one .safetensors file.
+    # See diffusion-pipe train.py L507-L508 + models/base.py:load_adapter_weights.
+    # Rank + target_modules of the new adapter must match the loaded one.
+    # 'adapter___init_from_existing': '/workspace/loras/xlasm10',
 }
 
 # Pick which GPU you're training on. Swap this single line to switch configs.
@@ -108,7 +115,7 @@ Trainer(
     'qwen',
     dataset_repo_ids,
     variant='2512-snofs',
-    config_trainer=config_trainer_qwen_h100,
+    config_trainer=config_trainer,
     config_dataset=config_dataset,
     multithread=True,
 )
