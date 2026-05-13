@@ -93,13 +93,6 @@
           "file": "qwen-image-2512-snofs0.50-fp8.safetensors",
           "skip": false
         }
-      ],
-      "lora": [
-        {
-          "repo_id": "fbbcool/qwen-2512-lora",
-          "file": "1gts_xlasm_01-26.safetensors",
-          "skip": true
-        }
       ]
     },
     "2512-1gts": {
