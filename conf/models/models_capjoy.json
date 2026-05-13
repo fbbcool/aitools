@@ -9,7 +9,7 @@
       ],
       "lora": [
         {
-          "repo_id": "fbbcool/joy-gts-lora",
+          "repo_id": "fbbcool/joy-gts-lora-jp",
           "skip": false
         }
       ]

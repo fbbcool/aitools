@@ -73,11 +73,17 @@ class JoyNG:
         # adapter_name → path (for inspection / debugging).
         self.adapters: dict[str, str] = {}
         self._default_adapter = 'default'
+        # HF auth for downloading LoRA adapters from private repos. Prefer
+        # HF_TOKEN_RW (a write-scoped token can read private repos owned by
+        # the same account), fall back to HF_TOKEN, then None (no auth →
+        # works for public repos only).
+        import os as _os
+        hf_token = _os.environ.get('HF_TOKEN_RW') or _os.environ.get('HF_TOKEN') or None
         if lora_path:
             from peft import PeftModel
             self._log(f'applying LoRA (adapter=default) {lora_path!r}')
             self.model = PeftModel.from_pretrained(
-                self.model, lora_path, adapter_name='default',
+                self.model, lora_path, adapter_name='default', token=hf_token,
             )
             self.lora_path = lora_path
             self.adapters['default'] = lora_path
@@ -88,7 +94,7 @@ class JoyNG:
                             "extra_adapter name 'default' collides with the main lora_path"
                         )
                     self._log(f'loading extra adapter {name!r} from {path!r}')
-                    self.model.load_adapter(path, adapter_name=name)
+                    self.model.load_adapter(path, adapter_name=name, token=hf_token)
                     self.adapters[name] = path
             # ensure default is active after all loads
             self.model.set_adapter('default')

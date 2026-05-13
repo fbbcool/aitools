@@ -1,13 +1,17 @@
-"""JoyCaption HINT-LoRA training entrypoint — v3 with held-out val split.
+"""JoyCaption HINT-LoRA training entrypoint — v4 on grown dataset.
 
 v1 (rank 16, 4 ep) hit ~0.22 jaccard but under-fit (loss 0.76).
 v2 (rank 32, 8 ep) memorized (loss 0.04, jaccard 1.00 on train set).
-v3 trains the v2 setup on 100 randomly-selected pairs and HOLDS OUT 15
-pairs for generalization measurement. The held-out val IDs are saved to
-`<output_dir>/val_ids.json` so the post-training smoke test can run on
-truly unseen images.
+v3 (rank 32, 8 ep, 100 train / 15 val) — 0.39 held-out jaccard. Same
+hyperparams as v2 but with proper val split. Used as production hint
+adapter through 2026-05-12.
 
-GPU prerequisite: ≥20 GiB free (~13 min wall-clock at this config).
+v4 — same architecture as v3, retrained on the grown dataset (204 eligible
+pairs vs v3's 119). 174 train / 30 val for a more stable jaccard
+measurement. If v4 jaccard ≥ 0.50 we approach the target; if it
+plateaus near v3 the limit is vision-side, not the LM adapter.
+
+GPU prerequisite: ≥20 GiB free (~15 min wall-clock at this config).
 Requires reachability to prod Mongo and the image filesystem.
 """
 import json
@@ -22,13 +26,10 @@ SET_NAME = 'gts_v3'
 CONFIG = 'prod'
 SKIN_NAME = '1xlasm'
 
-OUTPUT_DIR = Path(os.environ['WORKSPACE']) / 'joy_hint_lora_gts_v3_v3'
+OUTPUT_DIR = Path(os.environ['WORKSPACE']) / 'joy_hint_lora_gts_v3_v4'
 
-# Hyperparams — same shape as v2 (the memorization setup), but on 100
-# pairs with 15 held out. If v3 still memorizes the 100 AND generalizes
-# poorly to the 15, we have proof that the rank-32/8-epoch setup
-# over-fits regardless of split. If it generalizes (val jaccard >> 0.10),
-# v2's apparent memorization was specific to the full-set training.
+# Hyperparams — kept identical to v3 so the train-loss / held-out delta
+# attributable to dataset size is clean. Same rank, alpha, epochs, LR.
 EPOCHS = 8
 LEARNING_RATE = 1e-4
 LORA_R = 32
@@ -39,8 +40,9 @@ MAX_LENGTH = 4096
 MIN_HINT_CHARS = 10
 SEED = 42
 
-# Train/val split — deterministic via seed
-VAL_COUNT = 15
+# Train/val split — deterministic via seed. Bumped val from 15 to 30
+# for a more stable jaccard estimate on the larger dataset.
+VAL_COUNT = 30
 SPLIT_SEED = 42
 
 
