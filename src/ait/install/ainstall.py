@@ -3,8 +3,9 @@ import sys
 from typing import Final, Generator, Literal, Any
 import json
 from huggingface_hub import hf_hub_download, snapshot_download
-from civitai_downloader import login as civitai_login
-from civitai_downloader import civitai_download
+
+# from civitai_downloader import login as civitai_login
+# from civitai_downloader import civitai_download
 import requests
 from tqdm import tqdm
 from git import Repo  # pip install gitpython
