@@ -83,8 +83,8 @@
     "2512-snofs": {
       "vae": [
         {
-          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-          "file": "split_files/vae/qwen_image_vae.safetensors",
+          "repo_id": "Qwen/Qwen-Image",
+          "file": "vae/diffusion_pytorch_model.safetensors",
           "skip": false
         }
       ],
