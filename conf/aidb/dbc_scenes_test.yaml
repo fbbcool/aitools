@@ -7,6 +7,7 @@ url:
   root: "/home/misw/Data/AI/scenes_test"
   thumbnail: "___thumbnails"
   train: "___train"
+  ait_caption: "___ait_caption"
 
 size:
   thumbnail: 256

@@ -72,16 +72,55 @@ end
 
 function ait_img_caption_clipspace
     echo (wl-paste)
-    #python3 $HOME_AIT/script/img_caption.py (wl-paste) | sed 's/\(<prompt>\|<\/prompt>\)//g' | wl-copy
-    set output (python3 $HOME_AIT/script/img_caption.py (wl-paste))
+    set output (python3 $HOME_AIT/script/img_caption.py (wl-paste) $argv)
     set out2 (echo $output | grep -o '<caption>.*</caption>' | sed 's/\(<caption>\|<\/caption>\)//g')
     echo $out2 | wl-copy
     echo -n (wl-paste)
 end
 
 function ait_caption
+    set img (wl-paste)
+    if not test -f "$img"
+        echo "[ait_caption] not a file: $img"
+        return
+    end
+    set ext (string lower (string match -r '\.[^.]+$' -- "$img"))
+    switch $ext
+        case .png .webp .jpg .jpeg .gif
+        case '*'
+            echo "[ait_caption] not an image: $img"
+            return
+    end
     ait_tmp_clipspace
-    ait_img_caption_clipspace
+    set bodies (python3 -c "
+from ait.caption.skin import SkinRegistry
+sk = SkinRegistry().get('1xlasm')
+print('\n'.join(sorted(l.split('.')[-1] for l, g in sk.label_to_group.items() if g == 'primary.attribute')))
+")
+    echo -n "body? (0) none"
+    set i 1
+    for b in $bodies
+        echo -n "  ($i) $b"
+        set i (math $i + 1)
+    end
+    echo ""
+    read -P "> " -n 1 choice
+    set body ""
+    if string match -qr '^[1-9][0-9]*$' -- $choice
+        if test $choice -ge 1 -a $choice -le (count $bodies)
+            set body $bodies[$choice]
+        end
+    end
+
+    read -P "penis? [enter=yes, any other key=no] > " -n 1 pchoice
+    set penis 0
+    if test -z "$pchoice"
+        set penis 1
+    end
+
+    read -P "hint? (enter=none) > " hint
+
+    ait_img_caption_clipspace "$body" "$penis" "$hint"
 end
 
 function ait_prompt

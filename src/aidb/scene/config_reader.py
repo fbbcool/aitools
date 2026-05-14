@@ -94,6 +94,10 @@ class ConfigReader:
     def train_url(self) -> Path:
         return self.root / f'{self.get_param_protected(self.SECTION_URL, "train")}'
 
+    @property
+    def ait_caption_url(self) -> Path:
+        return self.root / f'{self.get_param_protected(self.SECTION_URL, "ait_caption")}'
+
     def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:
             print(f'[config:{level}] {msg}')

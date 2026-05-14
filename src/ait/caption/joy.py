@@ -4,7 +4,7 @@ from PIL import Image
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 
 
-from typing import Final, Optional
+from typing import Final, Optional, Sequence
 
 from ait.install import AInstallerDB
 
@@ -97,6 +97,42 @@ _XLASM_DIRECTIVE: Final = (
     f'they are doing, the environment, lighting, and camera angle. Do not '
     f'invent details that are not visible.'
 )
+
+
+def xlasm_gen_directive(emphases: Sequence[str] = ()) -> str:
+    """Inference-mode directive for ait_caption.
+
+    Asks for an image-generation prompt *inspired* by the input image rather
+    than a faithful transcription. The xlasm woman trigger stays glued to
+    'woman'; the man is the standard xlasm man. `emphases` is a list of
+    sentences (typically pulled from the skin's `primary.attribute.*` or
+    `secondary.attribute.*` renderings) that must surface in the output.
+    """
+    emph_block = ''
+    if emphases:
+        emph_block = ' Must surface: ' + ' '.join(e.strip() for e in emphases)
+    return (
+        'Write a striking image-generation prompt INSPIRED by this image. '
+        'Do NOT transcribe it 1:1 — capture its essence in a form ready to '
+        'feed back into an image generator. '
+        f'Theme: xlasm — a dominant, exaggerated woman with a small, '
+        f'vulnerable {TRIGGER_MAN}. Amplify the visually striking xlasm-'
+        'relevant elements (her body, her dominance, the man’s position, '
+        'their interaction) and DROP incidental detail (mundane props, '
+        'photo-meta, generic clothing, irrelevant background). '
+        f"ALWAYS refer to the woman as '{TRIGGER_WOMAN}' — the "
+        f"'{TRIGGER_WOMAN_TOKEN}' token must sit directly next to 'woman', "
+        f"with no words between them. Always call the man '{TRIGGER_MAN}'. "
+        f"NEVER write '{TRIGGER_MAN_TOKEN} woman' or "
+        f"'{TRIGGER_WOMAN_TOKEN} man' — '{TRIGGER_WOMAN_TOKEN}' is for "
+        f"women ONLY, '{TRIGGER_MAN_TOKEN}' is for men ONLY."
+        f'{emph_block} '
+        'OUTPUT STYLE: a single fluent paragraph of natural-language English '
+        'prose, complete sentences (subject-verb-object), ~60-90 words, '
+        'action-forward. NEVER a comma-separated list of tags, attributes, '
+        'or sentence fragments — write flowing prose like a human describing '
+        'a scene out loud.'
+    )
 
 CONTENT_SYSTEM: Final = {
     'gts_prompter': 'The users are interested propmts for image generation of femdom giantess scenarios. in femdom giantess scenarios, women are always bigger, stronger and super sexy and superior. so always exaggerate any of such aspects to make men the weak, vulnerable and dominated part (the more the better!). always describe a man as a "xlasm man".dont describe styles, they do not matter.',
@@ -427,14 +463,28 @@ def validate_trigger_presence(caption: str) -> list[str]:
 
 
 class Joy:
-    def __init__(self, trigger: str = '', lora: bool = True):
+    def __init__(
+        self,
+        trigger: str = '',
+        lora: bool = True,
+        directive_override: Optional[str] = None,
+    ):
         self._count = 0
         self._tokens = 512
         self._top_p = 0.9
         self._temperature = 0.6
         self._trigger = trigger
+        # `directive_override` replaces BOTH the system content and the per-
+        # call user content when set. Used by ait_caption (inference mode) to
+        # swap in `xlasm_gen_directive(...)` while keeping the '1xlasm' LoRA
+        # active.
+        self._directive_override = directive_override
         # configure
-        content_system = DEFAULT_SYSTEM + CONTENT_SYSTEM.get(self._trigger, '')
+        content_system = (
+            DEFAULT_SYSTEM + directive_override
+            if directive_override is not None
+            else DEFAULT_SYSTEM + CONTENT_SYSTEM.get(self._trigger, '')
+        )
         self._convo = [
             {
                 'role': 'system',
@@ -498,7 +548,10 @@ class Joy:
             if add_hint is not None:
                 label_hint += add_hint
         prompt = DEFAULT_PROMPT
-        prompt += CONTENT_PROMPT.get(trigger, '')
+        if self._directive_override is not None:
+            prompt += self._directive_override
+        else:
+            prompt += CONTENT_PROMPT.get(trigger, '')
         if user_hint:
             prompt += USER_HINT_PREAMBLE.format(hint=user_hint)
         if label_hint:
