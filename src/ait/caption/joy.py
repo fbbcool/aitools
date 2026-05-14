@@ -99,7 +99,7 @@ _XLASM_DIRECTIVE: Final = (
 )
 
 
-def xlasm_gen_directive(emphases: Sequence[str] = ()) -> str:
+def xlasm_gen_directive(emphases: Sequence[str] = (), hint: str = '') -> str:
     """Inference-mode directive for ait_caption.
 
     Asks for an image-generation prompt *inspired* by the input image rather
@@ -107,31 +107,52 @@ def xlasm_gen_directive(emphases: Sequence[str] = ()) -> str:
     'woman'; the man is the standard xlasm man. `emphases` is a list of
     sentences (typically pulled from the skin's `primary.attribute.*` or
     `secondary.attribute.*` renderings) that must surface in the output.
+    `hint` is the user's free-text steering signal; it is integrated inline
+    so the training-flavor USER_HINT_PREAMBLE (which fragments output) can
+    be bypassed by callers in inference mode. OUTPUT STYLE rule is placed
+    last so it sits in the model's recency slot.
     """
     emph_block = ''
     if emphases:
         emph_block = ' Must surface: ' + ' '.join(e.strip() for e in emphases)
+    hint_block = ''
+    h = (hint or '').strip()
+    if h:
+        hint_block = f' User intent: {h}. Reflect this naturally in the generated prompt.'
     return (
-        'Write a striking image-generation prompt INSPIRED by this image. '
-        'Do NOT transcribe it 1:1 — capture its essence in a form ready to '
-        'feed back into an image generator. '
-        f'Theme: xlasm — a dominant, exaggerated woman with a small, '
-        f'vulnerable {TRIGGER_MAN}. Amplify the visually striking xlasm-'
-        'relevant elements (her body, her dominance, the man’s position, '
-        'their interaction) and DROP incidental detail (mundane props, '
-        'photo-meta, generic clothing, irrelevant background). '
-        f"ALWAYS refer to the woman as '{TRIGGER_WOMAN}' — the "
+        'Describe this image in vivid narrative prose, the way a human would '
+        'describe a scene out loud. '
+        f'Theme: xlasm — the {TRIGGER_WOMAN} is the dominant focus; the '
+        f'{TRIGGER_MAN}, when present, is her counterpart. Amplify the '
+        'visually striking xlasm-relevant elements (her body, her dominance, '
+        'the man’s position, their interaction) and SKIP incidental detail '
+        '(mundane props, photo-meta, generic clothing, irrelevant background). '
+        'Capture the essence — do not transcribe every visible thing.'
+        f" ALWAYS refer to the woman as '{TRIGGER_WOMAN}' — the "
         f"'{TRIGGER_WOMAN_TOKEN}' token must sit directly next to 'woman', "
         f"with no words between them. Always call the man '{TRIGGER_MAN}'. "
         f"NEVER write '{TRIGGER_MAN_TOKEN} woman' or "
         f"'{TRIGGER_WOMAN_TOKEN} man' — '{TRIGGER_WOMAN_TOKEN}' is for "
-        f"women ONLY, '{TRIGGER_MAN_TOKEN}' is for men ONLY."
-        f'{emph_block} '
-        'OUTPUT STYLE: a single fluent paragraph of natural-language English '
-        'prose, complete sentences (subject-verb-object), ~60-90 words, '
-        'action-forward. NEVER a comma-separated list of tags, attributes, '
-        'or sentence fragments — write flowing prose like a human describing '
-        'a scene out loud.'
+        f"women ONLY, '{TRIGGER_MAN_TOKEN}' is for men ONLY. "
+        f"There is exactly ONE male figure in any xlasm scene: the "
+        f"{TRIGGER_MAN}. If you see ANY small male-presenting figure "
+        f"(whether it looks like a statue, figurine, doll, toy, statuette, "
+        f"miniature, or anything else), that figure IS the {TRIGGER_MAN} — "
+        f"describe him as '{TRIGGER_MAN}' and nothing else. NEVER describe "
+        f"a second male figure separately. NEVER call him 'tiny', 'little', "
+        f"'small', 'miniature', 'shrunken', 'child', 'boy', 'figurine', "
+        f"'doll', 'statue', 'figure on a base' — he is an adult man and "
+        f"the '{TRIGGER_MAN_TOKEN}' token carries the scale concept. "
+        f"Body attributes below apply ONLY to the entity each description "
+        f"names. NEVER cross-apply between figures (e.g. NEVER say "
+        f"'muscular {TRIGGER_MAN}' — muscularity is the {TRIGGER_WOMAN}'s "
+        f"trait; the {TRIGGER_MAN} is always the weaker, smaller counterpart)."
+        f'{emph_block}'
+        f'{hint_block}'
+        ' Write a single fluent paragraph of complete English sentences '
+        '(subject-verb-object), ~60-90 words, action-forward. ABSOLUTELY '
+        'NO comma-separated tag lists, attribute lists, or sentence '
+        'fragments — this is narrative prose, not Danbooru tags.'
     )
 
 CONTENT_SYSTEM: Final = {

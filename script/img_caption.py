@@ -8,6 +8,7 @@ from PIL import Image
 
 from aidb.scene.db_connect import DBConnection
 from ait.caption import Joy
+from ait.caption import joy_client
 from ait.caption.joy import xlasm_gen_directive
 from ait.caption.skin import SkinRegistry
 from ait.tools.files import is_img
@@ -36,10 +37,27 @@ if __name__ == '__main__':
         if desc:
             emphases.append(desc)
 
-    directive = xlasm_gen_directive(emphases)
-    joy = Joy(trigger='1xlasm', lora=True, directive_override=directive)
-    pil = Image.open(str(url_img))
-    prompt, caption = joy.img_caption(pil, hint=hint)
+    # Hint goes INSIDE the directive (recency slot before OUTPUT STYLE) instead
+    # of through USER_HINT_PREAMBLE, whose training-flavor language fragments
+    # the output.
+    directive = xlasm_gen_directive(emphases, hint=hint)
+
+    # Prefer the persistent joy_server (model stays loaded, ~5-10s per call).
+    # Fall back to in-process Joy (~30s cold load) if the server isn't up.
+    prompt: str
+    caption: str
+    if joy_client.is_running():
+        print('[joy] using joy_server')
+        prompt, caption = joy_client.caption(
+            image_url=str(url_img),
+            user_content=directive,
+            system_content=directive,
+        )
+    else:
+        print('[joy] joy_server not running; loading in-process')
+        joy = Joy(trigger='1xlasm', lora=True, directive_override=directive)
+        pil = Image.open(str(url_img))
+        prompt, caption = joy.img_caption(pil, hint='')
 
     print(f'<caption>\n{caption}\n </caption>')
 

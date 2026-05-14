@@ -123,6 +123,27 @@ print('\n'.join(sorted(l.split('.')[-1] for l, g in sk.label_to_group.items() if
     ait_img_caption_clipspace "$body" "$penis" "$hint"
 end
 
+function ait_server_joy
+    set running (python3 -c "from ait.caption import joy_client; print('1' if joy_client.is_running() else '0')")
+    if test "$running" = "1"
+        set current running
+        set action stop
+    else
+        set current stopped
+        set action start
+    end
+    read -P "joy_server is $current; $action it? [enter=yes, any other key=no] > " -n 1 choice
+    if test -n "$choice"
+        echo "no change"
+        return
+    end
+    if test "$action" = start
+        python3 -c "from ait.caption import joy_client; joy_client.ensure_running(); print(joy_client.status())"
+    else
+        python3 -c "from ait.caption import joy_client; ok = joy_client.shutdown(); print('stopped' if ok else 'shutdown timeout')"
+    end
+end
+
 function ait_prompt
     ait_tmp_clipspace
     ait_img_prompt_clipspace
