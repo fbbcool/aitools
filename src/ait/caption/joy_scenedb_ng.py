@@ -30,11 +30,24 @@ class JoySceneDBNG:
         verbose: int = 0,
         force: bool = False,
         lora: bool = True,
+        use_server: bool = False,
     ):
         self._dbconfig: SceneConfig = config
         self._verbose = verbose
         self._force = force
         self._use_lora = lora
+        # When True, route the per-call caption to the persistent joy_server
+        # over HTTP instead of loading a JoyNG in-process. The server is
+        # spun up on demand via joy_client.ensure_running(). Useful for
+        # interactive UIs (gradio buttons) where the model would otherwise
+        # cold-load ~30s every click and free GPU between clicks.
+        self._use_server = use_server
+        if self._use_server:
+            from . import joy_client
+            joy_client.ensure_running(
+                skin=skin if isinstance(skin, str) and skin else self.SKIN_DEFAULT,
+                config=str(config),
+            )
 
         self._scm: SceneManager = SceneManager(config=self._dbconfig, verbose=self._verbose)
         self._sim: SceneImageManager = self._scm.scene_image_manager()
@@ -135,16 +148,24 @@ class JoySceneDBNG:
                 f'({len(user_content)} chars).'
             )
 
-        prompt, caption = self._joy.caption(
-            img=img,
-            system_content=self.skin.directive,
-            user_content=user_content,
-            default_prompt='',
-            label_prompts=(),
-            user_hint_preamble=None,
-            user_hint='',
-            post_prompt='',
-        )
+        if self._use_server:
+            from . import joy_client
+            prompt, caption = joy_client.caption(
+                image_url=str(url),
+                user_content=user_content,
+                system_content=self.skin.directive,
+            )
+        else:
+            prompt, caption = self._joy.caption(
+                img=img,
+                system_content=self.skin.directive,
+                user_content=user_content,
+                default_prompt='',
+                label_prompts=(),
+                user_hint_preamble=None,
+                user_hint='',
+                post_prompt='',
+            )
         self._log(f'prompt[{prompt}] caption[{caption}]')
 
         for v in self.skin.caption_violations(caption):

@@ -2467,13 +2467,16 @@ class AIDBSceneApp:
         prompt: Optional[str] = None
         try:
             if trigger == '1xlasm':
-                # NG path: skin-driven, uses JoyNG runtime under the hood.
+                # NG path: routes through the persistent joy_server
+                # (auto-spinup on first click via joy_client.ensure_running)
+                # so each click doesn't pay a ~30s in-process cold-load.
                 from ait.caption.joy_scenedb_ng import JoySceneDBNG
                 jdb = JoySceneDBNG(
                     config=cfg_name,
                     skin='1xlasm',
                     verbose=1,
                     force=True,
+                    use_server=True,
                 )
                 prompt, caption = jdb.caption_image(image_id)
             else:
