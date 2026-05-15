@@ -31,12 +31,12 @@ from trainer import Trainer
 # 3K-step test ≈ 4 h.
 config_trainer_qwen_5090 = {
     'epochs': 1000,  # sentinel, manual cancel ~3K steps
-    'micro_batch_size_per_gpu': 2,
+    'micro_batch_size_per_gpu': 2,  # maybe 1
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 3,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 32,
+    'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
     'optimizer___lr': 2e-4,
 }
 
@@ -62,8 +62,6 @@ config_trainer_qwen_h100 = {
     # 'adapter___init_from_existing': '/workspace/loras/xlasm10',
 }
 
-# Pick which GPU you're training on. Swap this single line to switch configs.
-config_trainer = config_trainer_qwen_5090
 # config_trainer = config_trainer_qwen_h100
 config_dataset = {
     'num_repeats': 2,
@@ -115,7 +113,7 @@ Trainer(
     'qwen',
     dataset_repo_ids,
     variant='2512-4xlasm',
-    config_trainer=config_trainer,
+    config_trainer=config_trainer_qwen_5090,
     config_dataset=config_dataset,
     multithread=True,
 )
