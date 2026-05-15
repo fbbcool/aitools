@@ -134,7 +134,7 @@ ${adapter___dtype}
 #init_from_existing = '/data/diffusion_pipe_training_runs/something/epoch50'
 # Experimental. Can fuse LoRAs into the base weights before training. Right now only for Flux.
 # warm start, init with existing lora
-#${adapter___init_with_existing}
+#${adapter___init_from_existing}
 
 [optimizer]
 # AdamW from the optimi library is a good default since it automatically uses Kahan summation when training bfloat16 weights.
