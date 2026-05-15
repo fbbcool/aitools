@@ -108,7 +108,7 @@ ${steps_per_print}
 type = 'qwen_image'
 ${model___transformer_path}
 ${model___text_encoder_path}
-${model___vae}
+${model___vae_path}
 ${model___merge_adapters}
 ${model___dtype}
 ${model___transformer_dtype}
