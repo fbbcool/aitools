@@ -105,23 +105,51 @@ class Trainer:
         for item in self._repo_ids_hfd:
             repo_id = ''
             max_imgs = 0
+            ids_filter: list[str] | None = None
             if isinstance(item, str):
                 repo_id = item
             elif isinstance(item, tuple):
+                # Supported tuple forms:
+                #   (repo_id, max_imgs)            — random sample
+                #   (repo_id, max_imgs, ids_filter) — restrict source pool to
+                #     a hand-picked ID list (regularization sets, etc.).
+                #     pick_chance is computed against the filtered pool, so
+                #     `max_imgs >= len(ids_filter)` (or `0`) picks all of them
+                #     deterministically.
                 repo_id = item[0]
                 max_imgs = item[1]
+                if len(item) >= 3 and item[2]:
+                    ids_filter = list(item[2])
             hfd = HFDataset(repo_id, force_meta_dl=True)
             hfd.cache()
-            if len(hfd) < 60:
+            if len(hfd) < 60 or ids_filter is not None:
+                # Multithreading chunks `hfd.ids` into 8 buckets and assumes
+                # >= 8 images; small filtered pools (e.g. 25) break that.
                 multithread = False
 
-            self._make_dataset_hfd(hfd, multithread=multithread, max_imgs=max_imgs)
+            self._make_dataset_hfd(
+                hfd, multithread=multithread, max_imgs=max_imgs, ids_filter=ids_filter,
+            )
 
     def _make_dataset_hfd(
-        self, hfd: HFDataset, multithread: bool = False, max_imgs: int = 0
+        self,
+        hfd: HFDataset,
+        multithread: bool = False,
+        max_imgs: int = 0,
+        ids_filter: list[str] | None = None,
     ) -> None:
         # non multi-threaded
-        ids_img = [id for id in hfd.ids]
+        if ids_filter is not None:
+            allowed = set(ids_filter)
+            ids_img = [iid for iid in hfd.ids if iid in allowed]
+            missing = allowed - set(ids_img)
+            if missing:
+                print(
+                    f' WARN: ids_filter has {len(missing)} ids not in HF dataset '
+                    f'{hfd.repo_id} — dropping. Sample: {sorted(missing)[:3]}'
+                )
+        else:
+            ids_img = [id for id in hfd.ids]
         if not multithread:
             self._process_imgs(ids_img, hfd, max_imgs=max_imgs)
         else:
@@ -154,9 +182,12 @@ class Trainer:
     def _process_imgs(self, ids: list[str], hfd: HFDataset, max_imgs: int = 0) -> None:
         if not ids:
             return
+        # pick_chance against the iteration pool (which may be filtered
+        # smaller than the full HF dataset via ids_filter). max_imgs=0 means
+        # "take everything in the pool".
         pick_chance = 1.10
         if max_imgs > 0:
-            pick_chance = float(max_imgs) / float(len(hfd))
+            pick_chance = float(max_imgs) / float(len(ids))
 
         lost = 0
         success = 0

@@ -97,8 +97,48 @@ config_dataset = {
 #    ('fbbcool/1legsemp', 0),
 #    ('fbbcool/1fbb_02', 200),
 # ]
+# 25 hand-picked negative-reinforcement images from gts-v3: xlasm-man-visible
+# scenes WITHOUT the `xlbusty` trigger in caption. Mix is 5 visually-busty +
+# 20 non-busty so the LoRA learns "trigger word controls busty direction; no
+# trigger means leave the base alone" — without anti-busty overcorrection.
+# Seed-42 deterministic pick (see chat 2026-05-15). Reusable structure for
+# other child LoRAs: rebuild a separate list keyed to their trigger.
+GTS_V3_NEUTRAL_IDS = [
+    # visually-busty (5)
+    '699819274d0d7eab18d0b74e',
+    '699ff1d6fe4c5b5e9428c3d4',
+    '69a010eee34f3773c3e11627',
+    '69a04fa35d1034e14b4ff9ca',
+    '69ba76acc3661e57c85b5d50',
+    # non-busty (20)
+    '699249a83badfdf5ebc2dec2',
+    '699249f84400748d775af6ed',
+    '699b2f55d9a2092bd3697ba3',
+    '69a03b057d06620c736d5a7e',
+    '69a15a40b4eba93e5a5be5f3',
+    '69aaccab38ae0d7573d34519',
+    '69abfba83a7b447484e8675d',
+    '69abfbe4be8b30e6df2ca05b',
+    '69b46c631492d0320e58b759',
+    '69b55166633fc9d7148052fb',
+    '69b80b6c3c7514168ba3e9a7',
+    '69b91a1a699de0ba852d765b',
+    '69d6628b1ef71f3a869cf13a',
+    '69f1ba2be6f43bff7281e70b',
+    '69f4c536f51e90857c7cc041',
+    '69f4c70cf7b7f5b04564e5f6',
+    '69f4ca43f7b7f5b04564e600',
+    '69f4d0aff7b7f5b04564e609',
+    '69f4f699f7b7f5b04564e625',
+    '6a01834201706560d646e09c',
+]
+
 dataset_repo_ids = [
     ('fbbcool/1busty', 0),
+    # max_imgs=len(ids) so every ID in the filter list gets picked; the 3rd
+    # tuple element is the explicit ID filter (Trainer's _make_dataset_hfd
+    # restricts the source pool to those before pick_chance is applied).
+    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS), GTS_V3_NEUTRAL_IDS),
 ]
 # Trainer(
 #    'qwen',
