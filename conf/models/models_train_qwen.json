@@ -42,7 +42,7 @@
         }
       ]
     },
-    "snofs": {
+    "2512-snofs": {
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",
@@ -51,7 +51,7 @@
         }
       ]
     },
-    "4xlasm": {
+    "2512-4xlasm": {
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",

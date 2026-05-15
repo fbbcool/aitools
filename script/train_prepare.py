@@ -112,7 +112,7 @@ dataset_repo_ids = [
 Trainer(
     'qwen',
     dataset_repo_ids,
-    variant='4xlasm',
+    variant='2512-4xlasm',
     config_trainer=config_trainer_qwen_5090,
     config_dataset=config_dataset,
     multithread=True,
