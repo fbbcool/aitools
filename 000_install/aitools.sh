@@ -22,8 +22,9 @@ ___train_install_trainer() {
   pip install --no-build-isolation flash-attn>=2.8.3
   pip install -r requirements.txt
 
-  pip uninstall diffusers
-  yes | pip install git+https://github.com/huggingface/diffusers
+  #pip uninstall diffusers
+  #yes | pip install git+https://github.com/huggingface/diffusers
+  pip install -U "diffusers==0.35.*"
 }
 train_install() {
   ___train_install_aitools
