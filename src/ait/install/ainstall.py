@@ -331,6 +331,7 @@ class AInstaller:
 
     def _setup_item_diffpipe(self, item: dict) -> dict:
         # build target vars for templater
+        print(f'DEBUG item_diffpipe [{item}]')
         map_target_vars = {
             'ckpt': {
                 'model___ckpt_path': {'type': 'str'},
