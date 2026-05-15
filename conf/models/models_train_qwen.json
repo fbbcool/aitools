@@ -135,7 +135,7 @@
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",
-          "file": "xlasm10-test.safetensors",
+          "file": "qwen/xlasm10-test.safetensors",
           "skip": false
         }
       ]
