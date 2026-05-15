@@ -52,6 +52,27 @@
       ]
     },
     "2512-4xlasm": {
+      "transformer": [
+        {
+          "repo_id": "fbbcool/qwen-2512-snofs-0.65",
+          "file": "qwen-image-2512-snofs0.65-fp8.safetensors",
+          "skip": false
+        }
+      ],
+      "vae": [
+        {
+          "repo_id": "Qwen/Qwen-Image",
+          "file": "vae/diffusion_pytorch_model.safetensors",
+          "skip": false
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
+          "file": "split_files/text_encoders/qwen_2.5_vl_7b.safetensors",
+          "skip": false
+        }
+      ],
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",
