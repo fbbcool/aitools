@@ -338,11 +338,15 @@ class AInstaller:
             },
             'diffuser': {'model___diffusers_path': {'type': 'str'}},
             'vae': {'model___vae_path': {'type': 'str'}, 'model___vae': {'type': 'str'}},
-            'lora': {'model___merge_adapters': {'type': 'list_str'}},
+            'lora': {
+                'model___merge_adapters': {'type': 'list_str'},
+                'adapter___init_from_existing': {'type': 'str'},
+            },
             'clip': {'model___clip_path': {'type': 'str'}},
             'transformer': {'model___transformer_path': {'type': 'str'}},
             'text_encoder': {
                 'model___llm_path': {'type': 'str'},
+                'model___text_encoder_path': {'type': 'str'},
                 'model___text_encoders_zimage': {
                     'type': 'str',
                     'parameter': 'text_encoders',
@@ -526,6 +530,9 @@ class AInstaller:
         os.symlink(str(src), str(target), target_is_directory=directory)
 
     def _install_item_civitai2(self, item: dict) -> dict:
+        print('civitai2 dl DEACTIVATED!')
+        # TODO reimplement, currenlty deactivated
+        return {}
         civitai_login()
         id = item['config'].get('id', None)
         if id is None:
