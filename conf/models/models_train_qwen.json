@@ -42,11 +42,11 @@
         }
       ]
     },
-    "2512-snofs": {
+    "snofs": {
       "lora": [
         {
-          "repo_id": "fbbcool/qwen-2512-snofs-0.65",
-          "file": "xlasm10-test.safetensors",
+          "repo_id": "fbbcool/xlasm",
+          "file": "qwen/xlasm10-test.safetensors",
           "skip": false
         }
       ]
