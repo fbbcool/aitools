@@ -134,7 +134,7 @@
       ],
       "lora": [
         {
-          "repo_id": "fbbcool/qwen-2512-snofs-0.65",
+          "repo_id": "fbbcool/xlasm",
           "file": "xlasm10-test.safetensors",
           "skip": false
         }
