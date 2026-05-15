@@ -1,7 +1,7 @@
 #!/bin/sh
 export REPOS_AIT='https://github.com/fbbcool/aitools.git'
-export REPOS_TRAINER='https://github.com/tdrussell/diffusion-pipe'
-#export REPOS_TRAINER='https://github.com/fbbcool/diffusion-pipe'
+#export REPOS_TRAINER='https://github.com/tdrussell/diffusion-pipe'
+export REPOS_TRAINER='https://github.com/fbbcool/diffusion-pipe'
 export WORKSPACE='/workspace'
 export DIR_TRAIN=$WORKSPACE/train
 export HOME_TRAINER=$WORKSPACE/diffusion-pipe

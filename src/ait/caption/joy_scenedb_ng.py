@@ -15,6 +15,9 @@ from aidb import SceneDef, SceneConfig, SceneManager, SceneImageManager, SceneIm
 from ait.install import AInstallerDB
 from ait.tools.scenes import scene_id_from_url
 
+import time
+
+from . import caption_log
 from .joy_ng import JoyNG
 from .skin import Skin, SkinRegistry, compute_labels_ng
 
@@ -148,6 +151,7 @@ class JoySceneDBNG:
                 f'({len(user_content)} chars).'
             )
 
+        t0 = time.time()
         if self._use_server:
             from . import joy_client
             prompt, caption = joy_client.caption(
@@ -166,7 +170,24 @@ class JoySceneDBNG:
                 user_hint='',
                 post_prompt='',
             )
+        elapsed = time.time() - t0
         self._log(f'prompt[{prompt}] caption[{caption}]')
+
+        # Append the Stage-2 round-trip to the image's caption_log so
+        # /imgs_caption preserves a full audit trail per image. Failures
+        # here are non-fatal: the caption succeeded; logging is bonus.
+        try:
+            caption_log.log_joy_call(
+                simg,
+                stage='caption_joy',
+                user_content=user_content,
+                skin=self.skin,
+                response_caption=caption or '',
+                elapsed_seconds=elapsed,
+                adapter='default',
+            )
+        except Exception as e:
+            self._log(f'caption_log append failed: {e}', 'warn')
 
         for v in self.skin.caption_violations(caption):
             self._log(f'forbidden: {v!r}', 'warn')

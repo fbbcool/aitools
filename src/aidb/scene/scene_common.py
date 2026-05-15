@@ -34,6 +34,7 @@ class SceneDef:
     FIELD_CAPTION: Final = 'caption'
     FIELD_CAPTION_JOY: Final = 'caption_joy'
     FIELD_CAPTION_PROMPT: Final = 'caption_prompt'
+    FIELD_CAPTION_LOG: Final = 'caption_log'
     FIELD_HINTS: Final = 'hints'
     FIELD_PROMPT: Final = 'prompt'
     FIELD_QUERY: Final = 'query'
@@ -46,6 +47,7 @@ class SceneDef:
     FIELD_TIMESTAMP_CAPTION: Final = 'timestamp_caption'
     FIELD_TIMESTAMP_CAPTION_JOY: Final = 'timestamp_caption_joy'
     FIELD_TIMESTAMP_CAPTION_PROMPT: Final = 'timestamp_caption_prompt'
+    FIELD_TIMESTAMP_CAPTION_LOG: Final = 'timestamp_caption_log'
     FIELD_TIMESTAMP_HINTS: Final = 'timestamp_hints'
     FIELD_TIMESTAMP_LABELS_NG: Final = 'timestamp_labels_ng'
 

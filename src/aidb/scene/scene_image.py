@@ -124,6 +124,51 @@ class SceneImage:
             SceneDef.FIELD_TIMESTAMP_CAPTION_PROMPT: SceneDef.now_ts(),
         }
 
+    @property
+    def caption_log(self) -> list[dict]:
+        """Per-image audit trail of joy interactions + audit snapshots.
+
+        Each entry is a dict with at minimum: `ts` (float, epoch seconds),
+        `stage` (string tag such as 'caption_joy', 'audit_before',
+        'audit_after', 'audit_probe', or any future probe label). Stage-2
+        joy calls also include `system`, `user`, `response_prompt`,
+        `response_caption`, `elapsed_seconds`. Audit snapshots include the
+        caption text plus categorised flags (violations / warnings / fixes).
+
+        The list is appended-only by the caption pipeline; cleared by
+        `clear_caption_log` when a fresh run on the same image should not
+        be conflated with prior runs.
+        """
+        return self._data.get(SceneDef.FIELD_CAPTION_LOG, []) or []
+
+    def append_caption_log(self, entry: dict) -> None:
+        """Append a single entry to `caption_log`. Stamps `ts` if missing.
+
+        Caller is responsible for `db_store()` — typically the helper in
+        `ait.caption.caption_log` calls `db_store()` after each append so
+        a crash mid-pipeline leaves a partial-but-readable trace on disk.
+        """
+        if not isinstance(entry, dict):
+            return
+        e = dict(entry)
+        e.setdefault('ts', SceneDef.now_ts())
+        log = list(self.caption_log)
+        log.append(e)
+        self._data |= {
+            SceneDef.FIELD_CAPTION_LOG: log,
+            SceneDef.FIELD_TIMESTAMP_CAPTION_LOG: SceneDef.now_ts(),
+        }
+
+    def clear_caption_log(self) -> None:
+        """Drop all caption-log entries for this image. Used at the top of
+        a fresh `/imgs_caption` run so the new trail is not mixed with
+        the previous one.
+        """
+        self._data |= {
+            SceneDef.FIELD_CAPTION_LOG: [],
+            SceneDef.FIELD_TIMESTAMP_CAPTION_LOG: SceneDef.now_ts(),
+        }
+
     def set_hints(self, value: str) -> None:
         if value is None:
             return

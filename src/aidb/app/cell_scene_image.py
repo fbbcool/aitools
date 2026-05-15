@@ -177,6 +177,21 @@ class AppSceneImageCell:
             value=obj.caption_prompt,
             multiline=True,
         )
+        # caption_log is an append-only audit trail (list of dicts). Render
+        # as pretty JSON, read-only — no setter is plumbed for it.
+        try:
+            caption_log_value = json.dumps(obj.caption_log, indent=2, default=str)
+        except Exception:
+            caption_log_value = str(obj.caption_log)
+        caption_log_field = AppSceneImageCell._html_text_field(
+            obj,
+            attr_setter='caption_log',
+            label='caption_log',
+            value=caption_log_value,
+            multiline=True,
+            with_save=False,
+            rows=12,
+        )
 
         url = obj.url_from_data
         url_str = str(url) if url is not None else ''
@@ -231,7 +246,7 @@ class AppSceneImageCell:
         labels_ng_html = AppSceneImageCell._html_labels_ng(obj)
         suggestions_html = AppSceneImageCell._html_suggestions(obj)
 
-        id_copy_btn = AppSceneImageCell._html_copy_static_button(obj.id, label='id')
+        id_copy_btn = AppSceneImageCell._html_id_clipspace_button(obj.id, label='id')
 
         return f"""
         <div class="image-item simg-edit-cell" id="cell-simg-{obj.id}">
@@ -267,8 +282,9 @@ class AppSceneImageCell:
             </div>
             <div class="image-controls">
                 {caption_joy_field}
-                {prompt_field}
                 {caption_prompt_field}
+                {caption_log_field}
+                {prompt_field}
             </div>
         </div>
         """
@@ -873,6 +889,66 @@ class AppSceneImageCell:
         return (
             f'<button type="button" class="simg-copy-btn" onclick="{js}" '
             f'title="copy URL to clipboard + copy file to $AIT_TMP">'
+            f'{safe_label}</button>'
+        )
+
+    @staticmethod
+    def _html_id_clipspace_button(img_id: str, label: str = 'id') -> str:
+        """id button that (a) copies the image ID to the clipboard AND
+        (b) fires the `image_to_tmp` cmd so the server copies the actual
+        image file to $AIT_TMP (mirrors the url button's tmp-copy behavior).
+        """
+        if img_id is None:
+            img_id = ''
+        value_js = (
+            img_id.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n').replace('\r', '')
+        )
+        elem_id_btn = AppHtml.elem_id_cmd_button()
+        elem_id_bus = AppHtml.elem_id_cmd_databus()
+        cmd_data = AppHtml.make_cmd_data(
+            'image', img_id, 'image_to_tmp', label='id-to-tmp'
+        )
+        cmd_json = json.dumps(cmd_data)
+
+        js = f"""
+        event.stopPropagation();
+        console.log('[id-clipspace] click; img={img_id}');
+        const btnEl = event.currentTarget;
+        const v = '{value_js}';
+        const ok = function() {{
+            const orig = btnEl.textContent;
+            btnEl.textContent = 'copied';
+            btnEl.classList.add('simg-copy-btn-ok');
+            setTimeout(function() {{
+                btnEl.textContent = orig;
+                btnEl.classList.remove('simg-copy-btn-ok');
+            }}, 800);
+        }};
+        try {{
+            if (navigator.clipboard) {{
+                navigator.clipboard.writeText(v).then(ok).catch(function() {{ ok(); }});
+            }} else {{
+                const ta = document.createElement('textarea');
+                ta.value = v; document.body.appendChild(ta);
+                ta.select(); document.execCommand('copy');
+                document.body.removeChild(ta); ok();
+            }}
+        }} catch (e) {{ console.warn('[id-clipspace] clipboard fail', e); ok(); }}
+        try {{
+            const bus = document.querySelector('#{elem_id_bus} textarea');
+            if (bus) {{
+                bus.value = '{cmd_json}';
+                bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                const trig = document.getElementById('{elem_id_btn}');
+                if (trig) {{ trig.click(); console.log('[id-clipspace] cmd-bus fired'); }}
+                else {{ console.warn('[id-clipspace] cmd button not found'); }}
+            }} else {{ console.warn('[id-clipspace] cmd bus textarea not found'); }}
+        }} catch (e) {{ console.warn('[id-clipspace] cmd-bus fail', e); }}
+        """.replace('\n', ' ').replace('"', '&quot;')
+        safe_label = html_lib.escape(label, quote=True)
+        return (
+            f'<button type="button" class="simg-copy-btn" onclick="{js}" '
+            f'title="copy ID to clipboard + copy file to $AIT_TMP">'
             f'{safe_label}</button>'
         )
 

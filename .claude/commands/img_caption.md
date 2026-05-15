@@ -28,22 +28,32 @@ GPU prerequisite: `nvidia-smi --query-gpu=memory.free` ≥ 16 GiB. If not, ask t
 **Preferred path — via the persistent `joy_server`** (reuses the loaded model across invocations; ~5-10s per caption after the first):
 
 ```python
-from ait.caption import joy_client
+import time
+from ait.caption import joy_client, caption_log
 from ait.caption.skin import SkinRegistry
 
 joy_client.ensure_running()   # ~23s on first call; ~0s if already up
 sk = SkinRegistry().get('1xlasm')
 simg = sim.img_from_id(image_id)
+caption_log.start_run(simg, run_tag='img_caption')
 stored_prompt = (simg.data.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
+t0 = time.time()
 prompt, caption = joy_client.caption(
     image_url=str(simg.url_from_data),
     user_content=stored_prompt,
     system_content=sk.directive,
 )
+elapsed = time.time() - t0
 if not caption:
     abort('captioner returned no caption')
 simg.set_caption_joy(caption)
 simg.db_store()
+caption_log.log_joy_call(
+    simg, stage='caption_joy',
+    user_content=stored_prompt, skin=sk,
+    response_caption=caption,
+    elapsed_seconds=elapsed,
+)
 ```
 
 **Fallback path — in-process load** (when the server can't be started, e.g. GPU contested at the moment of startup):
@@ -66,6 +76,8 @@ Either path: the stored caption_prompt from Stage 1 is sent verbatim. `force=Tru
 ### 3. Validate + auto-fix
 
 Use the single-image pipeline from `/imgs_validate_captions`: audit `caption_joy` against `skin.caption_violations` / `skin.body_type_warnings` / `skin.missing_triggers` / opener / naked-multi, then auto-fix the mechanically tractable categories (naked-multi, body-type, opener, forbidden vocab). Missing-trigger is flagged only — no auto-fix.
+
+Bracket the audit with `caption_log.log_audit(simg, when='audit_before', ...)` and `caption_log.log_audit(simg, when='audit_after', ...)` so the persisted log has the full before/after state — categorised flags on the 'before' entry, applied fix labels on the 'after' entry. Future audit probes (Stage 3.5 visual audit) should call `caption_log.log_joy_call(simg, stage='audit_probe', ...)` once per probe round-trip.
 
 If a fix is applied, persist `simg.set_caption_joy(fixed)`. When `FIELD_CAPTION` was identical to `FIELD_CAPTION_JOY` before stage 2, also update `set_caption(fixed)` so the manual caption stays in sync.
 

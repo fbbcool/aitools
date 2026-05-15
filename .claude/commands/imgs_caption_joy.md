@@ -158,7 +158,15 @@ The selection filter guarantees `caption_prompt` is non-empty for every pending 
 
 ### Stage 2 — caption
 
+The captioning call goes through `JoySceneDBNG.caption_image` (server-backed when joy_server is up). That path already writes one `caption_log` entry per image — stage tag `caption_joy`, including the user prompt, a skin reference (name + source hash, not the full directive), the response caption, and elapsed seconds. If you bypass it and call `joy_client.caption()` directly, also call `ait.caption.caption_log.log_joy_call(simg, stage='caption_joy', ...)` so the trail is consistent across paths.
+
+Before Stage 2 runs, call `ait.caption.caption_log.start_run(simg, run_tag='imgs_caption_joy')` to clear any prior trail and stamp a `run_start` marker. (This protects against conflating two independent /imgs_caption runs on the same image.)
+
 ```python
+from ait.caption import caption_log
+
+caption_log.start_run(simg, run_tag='imgs_caption_joy')
+
 stored_prompt = (simg.data.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
 prompt, caption = joy_client.caption(
     image_url=str(simg.url_from_data),
@@ -169,11 +177,45 @@ if not caption:
     record_failure(iid, 'no caption returned'); continue
 simg.set_caption_joy(caption)
 simg.db_store()
+
+# Manual log path (only if you bypassed JoySceneDBNG.caption_image):
+caption_log.log_joy_call(
+    simg, stage='caption_joy',
+    user_content=stored_prompt, skin=sk,
+    response_caption=caption,
+    elapsed_seconds=elapsed,
+)
 ```
 
 ### Stage 3 — validate + auto-fix
 
 Reuse the single-image audit-and-fix pipeline from `/imgs_validate_captions`. Mechanically tractable categories (naked-multi, body-type, opener, forbidden vocab) auto-fix. Missing-trigger is flagged only.
+
+Bracket the audit with two `caption_log` entries: `audit_before` (the caption as it came out of Stage 2 plus the flag set you ran against it) and `audit_after` (the post-fix caption plus the list of fix labels applied). The two entries form the audit diff in the persisted log.
+
+```python
+caption_log.log_audit(
+    simg, when='audit_before',
+    caption=caption,
+    violations=skin_violations,
+    body_warnings=body_warnings,
+    missing_triggers=missing_triggers,
+    extra_flags={'pose_mandate_present': pose_present, 'naked_attributions': naked_attrs},
+)
+
+fixed = run_auto_fixes(caption)        # mechanical fixes
+
+caption_log.log_audit(
+    simg, when='audit_after',
+    caption=fixed,
+    violations=skin_violations_after,
+    body_warnings=body_warnings_after,
+    missing_triggers=missing_triggers_after,
+    fixes_applied=fix_labels,
+)
+```
+
+If any probe round-trips through joy_server are added in the future (Stage 3.5 visual audit), call `caption_log.log_joy_call(simg, stage='audit_probe', ...)` for each — same shape as Stage 2's entry.
 
 If a fix is applied, persist `simg.set_caption_joy(fixed)`. When `FIELD_CAPTION` was identical to `FIELD_CAPTION_JOY` before Stage 2, also update `set_caption(fixed)` so the manual caption stays in sync.
 
