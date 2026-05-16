@@ -48,7 +48,7 @@ config_trainer_qwen_h100 = {
     'epochs': 1000,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': 8,  # H100 80GB has the headroom; 4× the 5090 mb=2
     'warmup_steps': 100,  # longer warmup for 1.5× LR and 4× effective batch
-    'save_every_n_epochs': 2,  # mb=8 → ~56 steps/epoch; 10 epochs = ~560 steps → ~5 ckpts at 3K
+    'save_every_n_epochs': 1,  # mb=8 → ~56 steps/epoch; 10 epochs = ~560 steps → ~5 ckpts at 3K
     'caching_batch_size': 8,  # match mb for fast initial latent cache pass
     'steps_per_print': 10,
     'adapter___rank': 16,
@@ -223,7 +223,7 @@ dataset_xlhairy = [
 # )
 Trainer(
     'qwen',
-    dataset_xlfbb,
+    dataset_xlhairy,
     variant='2512-4xlasm',
     config_trainer=config_trainer_qwen_5090,
     config_dataset=config_dataset,
