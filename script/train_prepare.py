@@ -33,7 +33,7 @@ config_trainer_qwen_5090 = {
     'epochs': 1000,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': 2,  # maybe 1
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
-    'save_every_n_epochs': 3,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'save_every_n_epochs': 2,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'caching_batch_size': 4,
     'steps_per_print': 10,
     'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
@@ -64,7 +64,7 @@ config_trainer_qwen_h100 = {
 
 # config_trainer = config_trainer_qwen_h100
 config_dataset = {
-    'num_repeats': 2,
+    'num_repeats': 1,
     # The 7 distinct (w, h) pairs in the compiled gts_v3 training set.
     # All max-side 1024, AR bucketed: 1:1, 3:4/4:3, 2:3/3:2, 3:5/5:3.
     'resolutions': [1024],
@@ -98,12 +98,12 @@ config_dataset = {
 #    ('fbbcool/1fbb_02', 200),
 # ]
 # 25 hand-picked negative-reinforcement images from gts-v3: xlasm-man-visible
-# scenes WITHOUT the `xlbusty` trigger in caption. Mix is 5 visually-busty +
-# 20 non-busty so the LoRA learns "trigger word controls busty direction; no
-# trigger means leave the base alone" — without anti-busty overcorrection.
-# Seed-42 deterministic pick (see chat 2026-05-15). Reusable structure for
-# other child LoRAs: rebuild a separate list keyed to their trigger.
-GTS_V3_NEUTRAL_IDS = [
+# scenes WITHOUT the trigger in caption. Mix is 5 visually-<trait> + 20 non-<trait>
+# so the LoRA learns "trigger word controls direction; no trigger means leave
+# the base alone" — without anti-<trait> overcorrection.
+# Seed-42 deterministic picks (see chat 2026-05-15 / 2026-05-16). One list per
+# child LoRA trigger; reusable structure for future variants.
+GTS_V3_NEUTRAL_IDS_XLBUSTY = [
     # visually-busty (5)
     '699819274d0d7eab18d0b74e',
     '699ff1d6fe4c5b5e9428c3d4',
@@ -133,13 +133,49 @@ GTS_V3_NEUTRAL_IDS = [
     '6a01834201706560d646e09c',
 ]
 
-dataset_repo_ids = [
+GTS_V3_NEUTRAL_IDS_XLFBB = [
+    # visually-muscular (5) — top muscle-vocab scores in caption
+    '69b7ce8912e8afd94e30a7aa',
+    '69e733fd5786b77c674f03c5',
+    '69a0b39a60d12c61bf20cf3c',
+    '6985aec92cfffda31ac30177',
+    '69a0a47a1cb05ee4c46856e4',
+    # non-muscular (20) — zero muscle-vocab hits
+    '69924a9b384cdb179424498f',
+    '69924ab43fa460b64d3e0fa5',
+    '69924ac7da9f782aa6b027da',
+    '699b2efefc58e585ac50316c',
+    '699b2f55d9a2092bd3697ba3',
+    '699d84049e97b6ad8d907b5f',
+    '699fec7a7ea0a6b3ad6d2ba3',
+    '699fefda7488868ef9fff6c5',
+    '69a02284b5f1df6db04bd2a9',
+    '69a03289d2eaae22ae7d7b63',
+    '69a039d7de5bd8d5d0cfb1ce',
+    '69a054415a1ed000dc67b233',
+    '69a07074b442fc21c04557d5',
+    '69b5f91dc44371f1c8fd9c1e',
+    '69f1b9e4dd176af24c7c43aa',
+    '69f4c17447f2f7cb69ea4779',
+    '69f4f5e0f7b7f5b04564e622',
+    '69f5ee1a2ace974433a05899',
+    '69fcdab1fa205eb4e836a73a',
+    '69fd0eb66954ff47171d2a25',
+]
+
+dataset_xlbusty = [
     ('fbbcool/1busty', 0),
     # max_imgs=len(ids) so every ID in the filter list gets picked; the 3rd
     # tuple element is the explicit ID filter (Trainer's _make_dataset_hfd
     # restricts the source pool to those before pick_chance is applied).
-    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS), GTS_V3_NEUTRAL_IDS),
+    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLBUSTY), GTS_V3_NEUTRAL_IDS_XLBUSTY),
 ]
+
+dataset_xlfbb = [
+    ('fbbcool/1fbb_02', 0),
+    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLFBB), GTS_V3_NEUTRAL_IDS_XLFBB),
+]
+
 # Trainer(
 #    'qwen',
 #    dataset_repo_ids,
@@ -151,7 +187,7 @@ dataset_repo_ids = [
 # )
 Trainer(
     'qwen',
-    dataset_repo_ids,
+    dataset_xlfbb,
     variant='2512-4xlasm',
     config_trainer=config_trainer_qwen_5090,
     config_dataset=config_dataset,
