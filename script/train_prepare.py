@@ -163,6 +163,37 @@ GTS_V3_NEUTRAL_IDS_XLFBB = [
     '69fd0eb66954ff47171d2a25',
 ]
 
+GTS_V3_NEUTRAL_IDS_XLHAIRY = [
+    # visually-hairy (5) — top body-hair-vocab scores; mostly "hairy vagina" /
+    # "pubic hair" — the dominant body-hair signal in gts-v3
+    '69924d8809529408668e3fae',
+    '699d726bd3279c7d6d664e29',
+    '69a06f268ef8ca9601240b41',
+    '69d65e329cf7031b2f76a866',
+    '69f4d0aff7b7f5b04564e609',
+    # non-hairy (20) — zero body-hair-vocab hits
+    '699249f84400748d775af6ed',
+    '699249f84400748d775af6ee',
+    '69924a763047462eed28448b',
+    '69984f68eb78023edc3f7d5a',
+    '6999e4e9849eb45a408f1d73',
+    '699b2efefc58e585ac50316c',
+    '699d7cc7265f47abbf93bc92',
+    '699fefb0d0027a60909d56ec',
+    '69a039d7de5bd8d5d0cfb1ce',
+    '69a04f56aea6c37833a7a42b',
+    '69a054415a1ed000dc67b233',
+    '69a056d15296c46da2b12233',
+    '69a0af479d4bfb80e1fc9dac',
+    '69b6953643ce44f7ed645e7c',
+    '69f4b1f8f94a40ee841afc06',
+    '69f4ca43f7b7f5b04564e600',
+    '69f5155af7b7f5b04564e63c',
+    '69fc4ff6a1bb53c7b873f998',
+    '69ff04df963c529e79b984f3',
+    '6a00c12e91745ea668752f19',
+]
+
 dataset_xlbusty = [
     ('fbbcool/1busty', 0),
     # max_imgs=len(ids) so every ID in the filter list gets picked; the 3rd
@@ -174,6 +205,11 @@ dataset_xlbusty = [
 dataset_xlfbb = [
     ('fbbcool/1fbb_02', 0),
     ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLFBB), GTS_V3_NEUTRAL_IDS_XLFBB),
+]
+
+dataset_xlhairy = [
+    ('fbbcool/xlhairy', 0),
+    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLHAIRY), GTS_V3_NEUTRAL_IDS_XLHAIRY),
 ]
 
 # Trainer(
