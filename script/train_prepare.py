@@ -45,14 +45,14 @@ config_trainer_qwen_5090 = {
 # 10× higher samples-per-second throughput vs 5090 mb=1.
 # 3K-step test ≈ 1 h, 24K samples seen (= ~107 effective epochs over 225 imgs × 2).
 config_trainer_qwen_h100 = {
-    'epochs': 1000,  # sentinel, manual cancel ~3K steps
+    'epochs': 80,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': 8,  # H100 80GB has the headroom; 4× the 5090 mb=2
     'warmup_steps': 100,  # longer warmup for 1.5× LR and 4× effective batch
-    'save_every_n_epochs': 1,  # mb=8 → ~56 steps/epoch; 10 epochs = ~560 steps → ~5 ckpts at 3K
+    'save_every_n_epochs': 2,  # mb=8 → ~56 steps/epoch; 10 epochs = ~560 steps → ~5 ckpts at 3K
     'caching_batch_size': 8,  # match mb for fast initial latent cache pass
     'steps_per_print': 10,
-    'adapter___rank': 16,
-    'optimizer___lr': 4e-4,  # mild bump for 4× larger effective batch (linear-scaling would suggest 8e-4; LoRA-on-pretrained is less sensitive)
+    'adapter___rank': 32,
+    'optimizer___lr': 1e-4,  # mild bump for 4× larger effective batch (linear-scaling would suggest 8e-4; LoRA-on-pretrained is less sensitive)
     # ─── warm-start an adapter from an existing LoRA (qwen-image-compatible) ──
     # Set when resuming/continuing training of the SAME concept (e.g. extending
     # gts3-e10 → e30). Leave commented for training a NEW concept on top of a
@@ -64,7 +64,7 @@ config_trainer_qwen_h100 = {
 
 # config_trainer = config_trainer_qwen_h100
 config_dataset = {
-    'num_repeats': 1,
+    'num_repeats': 2,
     # The 7 distinct (w, h) pairs in the compiled gts_v3 training set.
     # All max-side 1024, AR bucketed: 1:1, 3:4/4:3, 2:3/3:2, 3:5/5:3.
     'resolutions': [1024],
