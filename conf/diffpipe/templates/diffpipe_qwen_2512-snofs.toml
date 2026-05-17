@@ -106,15 +106,11 @@ ${steps_per_print}
 # details on the configuration and options for each model.
 [model]
 type = 'qwen_image'
-#${model___diffusers_path}
 ${model___transformer_path}
 ${model___text_encoder_path}
-${model___vae}
-#merge_adapters
+${model___vae_path}
 #${model___merge_adapters}
-#dtype = 'bfloat16'
 ${model___dtype}
-#transformer_dtype = 'float8'
 ${model___transformer_dtype}
 timestep_sample_method = 'logit_normal'
 #min_t = 0.875
