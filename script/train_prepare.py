@@ -46,7 +46,7 @@ config_trainer_qwen_5090 = {
 # 3K-step test ≈ 1 h, 24K samples seen (= ~107 effective epochs over 225 imgs × 2).
 config_trainer_qwen_h100 = {
     'epochs': 80,  # sentinel, manual cancel ~3K steps
-    'micro_batch_size_per_gpu': 16,  # H100 80GB has the headroom; 4× the 5090 mb=2
+    'micro_batch_size_per_gpu': 12,  # H100 80GB has the headroom; 4× the 5090 mb=2
     'warmup_steps': 100,  # longer warmup for 1.5× LR and 4× effective batch
     'save_every_n_epochs': 2,  # mb=8 → ~56 steps/epoch; 10 epochs = ~560 steps → ~5 ckpts at 3K
     'caching_batch_size': 8,  # match mb for fast initial latent cache pass
