@@ -51,8 +51,8 @@ config_trainer_qwen_h100 = {
     'save_every_n_epochs': 2,  # mb=8 → ~56 steps/epoch; 10 epochs = ~560 steps → ~5 ckpts at 3K
     'caching_batch_size': 8,  # match mb for fast initial latent cache pass
     'steps_per_print': 10,
-    'adapter___rank': 32,
-    'optimizer___lr': 1.5e-4,  # mild bump for 4× larger effective batch (linear-scaling would suggest 8e-4; LoRA-on-pretrained is less sensitive)
+    'adapter___rank': 16,
+    'optimizer___lr': 1.0e-4,  # mild bump for 4× larger effective batch (linear-scaling would suggest 8e-4; LoRA-on-pretrained is less sensitive)
     # ─── warm-start an adapter from an existing LoRA (qwen-image-compatible) ──
     # Set when resuming/continuing training of the SAME concept (e.g. extending
     # gts3-e10 → e30). Leave commented for training a NEW concept on top of a
