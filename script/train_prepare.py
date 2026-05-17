@@ -229,6 +229,10 @@ GTS_V3_NEUTRAL_IDS_XLLEGGY = [
     '69f727d19f03180e9df1e288',
 ]
 
+dataset_xlasm = [
+    ('fbbcool/gts-v3', 0),
+]
+
 dataset_xlbusty = [
     ('fbbcool/1busty', 0),
     # max_imgs=len(ids) so every ID in the filter list gets picked; the 3rd
@@ -263,9 +267,10 @@ dataset_xlleggy = [
 # )
 Trainer(
     'qwen',
-    dataset_xlleggy,
-    variant='2512-4xlasm',
-    config_trainer=config_trainer_qwen_5090,
+    dataset_xlasm,
+    # variant='2512-4xlasm',
+    variant='2512-snofs',
+    config_trainer=config_trainer_qwen_h100,
     config_dataset=config_dataset,
     multithread=True,
 )
