@@ -30,10 +30,10 @@ from trainer import Trainer
 # Local card. mb=2 fits tight at 1024² rank=32 float8. ~5-7 s/step.
 # 3K-step test ≈ 4 h.
 config_trainer_qwen_5090 = {
-    'epochs': 1000,  # sentinel, manual cancel ~3K steps
+    'epochs': 10,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': 2,  # maybe 1
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
-    'save_every_n_epochs': 2,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'caching_batch_size': 4,
     'steps_per_print': 10,
     'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
@@ -194,6 +194,41 @@ GTS_V3_NEUTRAL_IDS_XLHAIRY = [
     '6a00c12e91745ea668752f19',
 ]
 
+GTS_V3_NEUTRAL_IDS_XLLEGGY = [
+    # visually-leggy (5) — only 2 are explicitly labeled `primary.attribute.leggy`
+    # in gts-v3 (it's a thin label), so we round out with 3 `primary.attribute.slim`
+    # images whose pose visually codes leg-prominent (standing/towering or
+    # pantyhose+legs-spread). Same pedagogical purpose as the other sets: teach
+    # "leggy aesthetic can occur without my trigger."
+    '69ab30ca1acf6dfd69c33b25',  # labeled leggy; man embraces her calf
+    '69a0b39a60d12c61bf20cf3c',  # labeled leggy + muscular, big calves
+    '69890c7e6b0f7355de70e792',  # slim athletic standing
+    '699249175a67682b0e40735b',  # slim athletic, towering pose
+    '69924ac7da9f782aa6b027da',  # slim, pantyhose, legs spread
+    # non-leggy (20) — excluded both `primary.attribute.leggy` and
+    # `primary.attribute.slim` labels, then seed=42 random pick
+    '699249f84400748d775af6ee',
+    '69924a763047462eed28448b',
+    '69924a9b384cdb179424498f',
+    '699826f00eaf60eef719a303',
+    '69984f68eb78023edc3f7d5a',
+    '699b2ed64c23aa1ee21496c9',
+    '699b2f55d9a2092bd3697ba3',
+    '699fed1043950c1b1939c335',
+    '69a017de528db275bb9d5aee',
+    '69a01bbfbedc65ea2f80331c',
+    '69a01dcfd36d82175984a6e7',
+    '69a03289d2eaae22ae7d7b63',
+    '69a056a3e505da2507125762',
+    '69abfbe4be8b30e6df2ca05b',
+    '69d65e228aaa547684912022',
+    '69f1ba08b23149eaada60a0e',
+    '69f4b223f94a40ee841afc09',
+    '69f4d0aff7b7f5b04564e609',
+    '69f5ee1a2ace974433a05899',
+    '69f727d19f03180e9df1e288',
+]
+
 dataset_xlbusty = [
     ('fbbcool/1busty', 0),
     # max_imgs=len(ids) so every ID in the filter list gets picked; the 3rd
@@ -212,6 +247,11 @@ dataset_xlhairy = [
     ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLHAIRY), GTS_V3_NEUTRAL_IDS_XLHAIRY),
 ]
 
+dataset_xlleggy = [
+    ('fbbcool/xlleggy', 0),
+    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLLEGGY), GTS_V3_NEUTRAL_IDS_XLLEGGY),
+]
+
 # Trainer(
 #    'qwen',
 #    dataset_repo_ids,
@@ -223,7 +263,7 @@ dataset_xlhairy = [
 # )
 Trainer(
     'qwen',
-    dataset_xlhairy,
+    dataset_xlleggy,
     variant='2512-4xlasm',
     config_trainer=config_trainer_qwen_5090,
     config_dataset=config_dataset,
