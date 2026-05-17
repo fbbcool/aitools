@@ -31,7 +31,7 @@ train_install() {
   ___train_install_trainer
 }
 train_prepare() {
-  python $HOME_AIT/script/train_prepare.py
+  python3 $HOME_AIT/script/train_prepare.py
   cp $DIR_TRAIN/train.sh $HOME_TRAINER
 }
 train_run() {
