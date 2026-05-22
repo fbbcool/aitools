@@ -5,7 +5,7 @@ argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> |
 
 `$ARGUMENTS` is an optional space-separated list of bare-word flags and `key=value` / `key<op>value` filter terms (connectives like `for` / `and` / `where` ignored). Empty → all curated images with stale `caption_prompt`, DB-wide. Supported terms:
 
-- `force` — bare flag. Process every eligible image regardless of `caption_prompt` freshness (the recency check is skipped). Useful after a prompt-compile-recipe edit when the curator wants every existing prompt rebuilt.
+- `force` — bare flag. Process every eligible image regardless of `caption_prompt` freshness (the recency check is skipped) AND bypass the **rating>=3 guard** (see below) so production-grade images are included. Useful after a prompt-compile-recipe edit when the curator wants every existing prompt rebuilt.
 - `ignore_curated` — bare flag. Drop the suggestion-non-empty requirement. Eligible image becomes "labels_ng non-empty AND hints non-empty" (the minimum needed to compose a prompt). Useful for legacy images that pre-date the `_SUGGESTION` workflow but still carry curator labels+hints, or images promoted to canonical without ever running `/img_suggest`.
 - `set=<name>` — restrict to a SceneSet's active members.
 - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
@@ -13,7 +13,11 @@ argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> |
 
 Flags compose with the filters — e.g. `force set=gts_v3 limit=10` rebuilds prompts for the first 10 curated images in `gts_v3` whether or not they have a current caption_prompt; `ignore_curated rating==1` picks up the entire done cohort regardless of suggestion provenance.
 
-**Single-image mode**: if `$ARGUMENTS` is (or contains) a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`), the command processes just that image. The eligibility filter (`is_curated` / `is_labeled`) is **skipped** — the curator named it explicitly, so the only precondition is that `labels_ng` and `hints` are both non-empty (the structural minimum to compose any prompt). The freshness check is also skipped (single-image = implicit `force`). If `labels_ng` or `hints` is empty, abort with a short message.
+**Single-image mode**: if `$ARGUMENTS` is (or contains) a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`), the command processes just that image. The eligibility filter (`is_curated` / `is_labeled`) is **skipped** — the curator named it explicitly, so the only precondition is that `labels_ng` and `hints` are both non-empty (the structural minimum to compose any prompt). The freshness check is also skipped (single-image = implicit `force`). The **rating>=3 guard is also bypassed** in single-image mode for the same reason. If `labels_ng` or `hints` is empty, abort with a short message.
+
+## Rating>=3 guard
+
+Images with `rating>=3` are treated as production-grade — by default they are **skipped** in batch mode to prevent accidental mutation of curator-finalized prompts. To process them, pass the bare `force` flag. Single-image ObjectId mode is an implicit force for this guard.
 
 Same parser as `/imgs_update_caption_prompt`, extended with the `force` and `ignore_curated` bare-word flags and bare-ObjectId single-image mode.
 
@@ -51,7 +55,7 @@ def is_labeled(img) -> bool:
 def is_prompt_compile_pending(img, *, force: bool = False,
                                      ignore_curated: bool = False) -> bool:
     """Default: curated AND upstream-edit ts > caption_prompt ts (or caption_prompt empty).
-    With force=True: skip the freshness check.
+    With force=True: skip the freshness check AND the rating>=3 guard.
     With ignore_curated=True: require only `is_labeled` (drop the suggestion check).
 
     Upstream-edit ts = max(ts_labels_ng, ts_hints, ts_labels_ng_SUGGESTION,
@@ -64,6 +68,9 @@ def is_prompt_compile_pending(img, *, force: bool = False,
     else:
         if not is_curated(img):
             return False
+    # rating>=3 guard — production-grade images require explicit `force`
+    if (img.data.get(SceneDef.FIELD_RATING) or SceneDef.RATING_INIT) >= 3 and not force:
+        return False
     if force:
         return True
     d = img.data

@@ -1,6 +1,6 @@
 ---
 description: Run JoySceneDBNG('1xlasm') against one image (with id) OR a filtered batch (scope by set, rating, etc.). Only images whose caption_prompt is newer than caption_joy are captioned. Empty caption_prompt skips. Same argument grammar as /imgs_update_caption_prompt.
-argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
+argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
 ---
 
 `$ARGUMENTS` is parsed in three layers (same grammar as `/imgs_update_caption_prompt`):
@@ -8,9 +8,14 @@ argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
 1. **`$ARGUMENTS` is empty** → batch over every non-prototype image with non-empty `caption_prompt` that's newer than `caption_joy` (DB-wide, all sets).
 2. **`$ARGUMENTS` matches a 24-char hex MongoDB ObjectId** → single-image: caption that one image (force=True bypasses the freshness check; the stored `caption_prompt` is sent verbatim if non-empty, else fresh skin-compose).
 3. **`$ARGUMENTS` is a space-separated list of `key=value` / `key<op>value` filter terms** (connectives like `for` / `and` / `where` ignored) → batch restricted to matching images. Supported terms:
+    - `force` — bare flag. Bypass the **rating>=3 guard** (see below) so production-grade images are included.
     - `set=<name>` — restrict to a SceneSet's active members (excluded ids skipped).
     - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
     - Multiple terms AND together.
+
+## Rating>=3 guard
+
+Images with `rating>=3` are treated as production-grade — by default they are **skipped** in batch mode to prevent accidental re-captioning of curator-finalized images. Pass the bare `force` flag to include them. Single-image ObjectId mode is an implicit force for this guard.
 
 In every batch mode the **stale-prompt** filter applies on top: only caption images where `caption_prompt` is non-empty AND (`caption_joy` empty OR `timestamp_caption_prompt > timestamp_caption_joy`). Images with empty `caption_prompt` are skipped (the upstream is `/imgs_update_caption_prompt`).
 
@@ -23,23 +28,25 @@ Reuse the parser from `/imgs_update_caption_prompt`:
 ```python
 import re
 
-ID_RE   = re.compile(r'^[0-9a-f]{24}$')
-TERM_RE = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
+ID_RE    = re.compile(r'^[0-9a-f]{24}$')
+TERM_RE  = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
+FORCE_RE = re.compile(r'\bforce\b', re.IGNORECASE)
 
 def parse_args(s: str):
     s = (s or '').strip()
     if not s:
-        return ('batch', {})
+        return ('batch', {}, False)
     if ID_RE.match(s):
-        return ('id', s)
+        return ('id', s, True)   # single-image = implicit force
     filters = {}
+    force = bool(FORCE_RE.search(s))
     for kw, op, val in TERM_RE.findall(s):
         op = '==' if op == '=' else op
         if kw == 'rating':
             filters[('rating', op)] = int(val)
         elif kw == 'set':
             filters[('set', op)] = val
-    return ('batch', filters)
+    return ('batch', filters, force)
 ```
 
 ## Batch mode
@@ -50,6 +57,7 @@ Iterator selection:
 
 For each candidate:
 - Apply remaining filters (e.g. `rating` op).
+- Apply the **rating>=3 guard**: skip if `(img.data.get(FIELD_RATING) or RATING_INIT) >= 3` AND `force` is False.
 - Apply the stale-prompt check: skip if `caption_prompt` empty; include if `caption_joy` empty; otherwise include only when `timestamp_caption_prompt > timestamp_caption_joy`.
 
 Then run the captioner once and loop:

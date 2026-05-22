@@ -1,9 +1,11 @@
 ---
 description: Audit and fix captions where hints/labels are not correctly integrated.
-argument-hint: "[set-name (default: gts_v3)]"
+argument-hint: "[set-name (default: gts_v3)] [force]"
 ---
 
 Audit and fix `caption_joy` fields in the prod `aidb` DB for the set named `$ARGUMENTS` (default `gts_v3`) where hints or labels are not correctly integrated. The human-edited `caption` field is out of scope and must not be modified.
+
+Pass the bare `force` flag in `$ARGUMENTS` to disable the **rating>=3 guard** (see "Skip rules" below). Default behavior continues to skip rating>=3 images.
 
 ## Setup
 
@@ -37,7 +39,7 @@ The main purpose is to fix discrepancies between `caption_joy` and the ground-tr
 
 ## Skip rules
 - Skip if `hints` or `labels` are empty — there's nothing to verify against.
-- Skip if image rating > 2
+- **Rating>=3 guard.** Skip if `(img.data.get(FIELD_RATING) or RATING_INIT) >= 3` UNLESS the bare `force` flag was passed in `$ARGUMENTS`. Rationale: rating>=3 are production-grade and should not be auto-mutated by default.
 
 ## Proposal pass
 

@@ -1,9 +1,16 @@
 ---
 description: Batch /img_suggest. Picks the newest active image from each scene that has no done image, restricted to images whose labels_ng_SUGGESTION AND hints_SUGGESTION are both empty, and runs the full suggestion loop on the top N. Never mutates canonical fields.
-argument-hint: "[num]"
+argument-hint: "[num] [force]"
 ---
 
-`$ARGUMENTS` is an optional positive integer `num` (default `20`). Anything else is rejected with a short error.
+`$ARGUMENTS` is an optional positive integer `num` (default `20`), optionally followed by the bare flag `force`. Anything else is rejected with a short error.
+
+- `num` — batch size cap (default `20`).
+- `force` — bare flag. Bypass the **rating>=3 guard** (see below) so production-grade images are eligible suggestion targets. (Normally these are skipped because rating>=3 implies the curator has already finalized labels+hints and there's nothing to suggest.)
+
+## Rating>=3 guard
+
+Even though `imgs_suggest` only writes `_SUGGESTION` fields (canonical labels_ng / hints / caption are never touched), suggestion fields on rating>=3 images are still considered curator-finalized state. By default any candidate with `rating>=3` is **skipped**. Pass `force` to include them.
 
 ## Why this exists
 
@@ -50,6 +57,10 @@ for scene in sm.scenes():
     # active = non-prototype; scene.imgs already filters excluded
     active = [i for i in imgs if not i.prototype]
     active = [i for i in active if has_empty_suggestions(i)]
+    # rating>=3 guard — skip production-grade images unless `force`
+    if not force:
+        active = [i for i in active
+                  if (i.data.get(SceneDef.FIELD_RATING) or SceneDef.RATING_INIT) < 3]
     if not active:
         continue
     # newest active by timestamp_created desc

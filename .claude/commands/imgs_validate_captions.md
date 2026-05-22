@@ -1,6 +1,6 @@
 ---
 description: Audit caption_joy in a scope (default whole DB) against the skin's rules (forbidden vocab, body-type authorization, missing triggers, naked-multi, opener) and auto-fix the mechanically tractable issues. Same argument grammar as /imgs_update_caption_prompt and /imgs_update_caption_joy.
-argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | …]"
+argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | …]"
 ---
 
 `$ARGUMENTS` is parsed by the shared filter grammar:
@@ -8,10 +8,15 @@ argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name>
 1. **`$ARGUMENTS` is empty** → audit every non-prototype image with non-empty `caption_joy`, DB-wide.
 2. **`$ARGUMENTS` matches a 24-char hex MongoDB ObjectId** → audit just that one image.
 3. **`$ARGUMENTS` is a space-separated list of `key=value` / `key<op>value` filter terms** (connectives like `for` / `and` / `where` ignored) → audit restricted to matching images. Supported terms:
+    - `force` — bare flag. Bypass the **rating>=3 guard** (see below) so auto-fix is allowed to mutate production-grade captions.
     - `set=<name>` — restrict to a SceneSet's active members (excluded ids skipped).
     - `rating==<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
     - `skin=<name>` — which skin to audit against (default `1xlasm`).
     - Multiple terms AND together.
+
+## Rating>=3 guard
+
+Images with `rating>=3` are treated as production-grade. The audit **still reports issues** on them so the curator sees the state, but the **auto-fix passes are skipped** by default — no mutation. Pass the bare `force` flag to let auto-fix run on rating>=3 images. Single-image ObjectId mode is an implicit force for this guard.
 
 If neither a `set=` filter nor an ObjectId is given, the iterator scans the whole `images` collection. The `skin=` term is special: it picks the rule set used for validation (not a row filter); default `1xlasm`.
 
@@ -20,17 +25,19 @@ If neither a `set=` filter nor an ObjectId is given, the iterator scans the whol
 ```python
 import re
 
-ID_RE   = re.compile(r'^[0-9a-f]{24}$')
-TERM_RE = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
+ID_RE    = re.compile(r'^[0-9a-f]{24}$')
+TERM_RE  = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
+FORCE_RE = re.compile(r'\bforce\b', re.IGNORECASE)
 
 def parse_args(s: str):
     s = (s or '').strip()
     if not s:
-        return ('batch', {}, '1xlasm')
+        return ('batch', {}, '1xlasm', False)
     if ID_RE.match(s):
-        return ('id', s, '1xlasm')   # skin override via filter form only
+        return ('id', s, '1xlasm', True)   # single-image = implicit force
     filters = {}
     skin = '1xlasm'
+    force = bool(FORCE_RE.search(s))
     for kw, op, val in TERM_RE.findall(s):
         op = '==' if op == '=' else op
         if kw == 'skin':
@@ -39,7 +46,7 @@ def parse_args(s: str):
             filters[('rating', op)] = int(val)
         elif kw == 'set':
             filters[('set', op)] = val
-    return ('batch', filters, skin)
+    return ('batch', filters, skin, force)
 ```
 
 ## Iterator selection (batch mode)
@@ -70,6 +77,8 @@ For each image with non-empty `caption_joy`:
 - **missing trigger** → no auto-fix; flag only. (Re-captioning the image — `/imgs_update_caption_joy <id>` — is the right path.)
 
 For each modified caption, persist via `simg.set_caption_joy(fixed)` (which bumps `timestamp_caption_joy`). When `FIELD_CAPTION` was identical to `FIELD_CAPTION_JOY` before the fix, also update `set_caption(fixed)`.
+
+**Rating>=3 guard applies to writes.** Before persisting any auto-fix, check `(img.data.get(FIELD_RATING) or RATING_INIT) >= 3 and not force` — if true, skip the write (the audit row still reports the issue but the caption is left intact). The image is counted under a `skipped_rating>=3` bucket in the report.
 
 ## Single-image mode
 

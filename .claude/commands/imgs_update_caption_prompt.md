@@ -1,6 +1,6 @@
 ---
 description: Compile a focused caption_prompt for one image (with id) OR bulk-refresh many images with optional scope filters (set, rating). Reads labels_ng + hints + skin rules; writes the result back to FIELD_CAPTION_PROMPT. Caption workflow then picks it up verbatim.
-argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
+argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
 ---
 
 `$ARGUMENTS` is parsed in three layers:
@@ -8,10 +8,15 @@ argument-hint: "[<image-id> | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
 1. **`$ARGUMENTS` is empty** → bulk-refresh every non-prototype image with non-empty `labels_ng` and `hints`.
 2. **`$ARGUMENTS` matches a 24-char hex MongoDB ObjectId** (regex `^[0-9a-f]{24}$`) → per-image, judgment-driven compile (Claude hand-crafts one prompt). Recipe in §"Per-image mode" below.
 3. **`$ARGUMENTS` is a space-separated list of `key=value` / `key<op>value` filter terms** (with optional connective words like "for", "and", "where" the parser ignores) → bulk-refresh restricted to images matching every filter. Supported terms:
+    - `force` — bare flag. Bypass the **rating>=3 guard** (see below) so production-grade images are included in the bulk refresh.
     - `set=<name>` — restrict to images that are members of the named SceneSet (loaded via `SceneSetManager.set_from_id_or_name`). Excluded images of that set are skipped.
     - `rating==<n>` / `rating=<n>` — exact rating match (integer; -2..5).
     - `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
     - Multiple terms combine with AND (no OR support).
+
+## Rating>=3 guard
+
+Images with `rating>=3` are treated as production-grade — by default they are **skipped** in bulk mode to prevent accidental rebuild of curator-finalized prompts. Pass the bare `force` flag to include them. Single-image ObjectId mode is an implicit force for this guard.
 
 Mode 1 and mode 3 use the same deterministic Python recipe — only the source-of-truth iterator differs.
 
@@ -22,23 +27,25 @@ In every mode the resulting prompt is stored in `FIELD_CAPTION_PROMPT`; the next
 ```python
 import re
 
-ID_RE = re.compile(r'^[0-9a-f]{24}$')
-TERM_RE = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
+ID_RE    = re.compile(r'^[0-9a-f]{24}$')
+TERM_RE  = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
+FORCE_RE = re.compile(r'\bforce\b', re.IGNORECASE)
 
 def parse_args(s: str):
     s = (s or '').strip()
     if not s:
-        return ('bulk', {})
+        return ('bulk', {}, False)
     if ID_RE.match(s):
-        return ('id', s)
+        return ('id', s, True)   # single-image = implicit force
     filters = {}
+    force = bool(FORCE_RE.search(s))
     for kw, op, val in TERM_RE.findall(s):
         op = '==' if op == '=' else op
         if kw == 'rating':
             filters[('rating', op)] = int(val)
         elif kw == 'set':
             filters[('set', op)] = val
-    return ('bulk', filters)
+    return ('bulk', filters, force)
 ```
 
 ## Bulk mode
@@ -49,6 +56,7 @@ Iterator selection:
 
 For each candidate, apply remaining filters client-side:
 - `('rating', op)` — compare `img.data.get(FIELD_RATING, RATING_INIT)` against the value using `op`.
+- **rating>=3 guard** — if `(img.data.get(FIELD_RATING) or RATING_INIT) >= 3` AND `force` is False, skip the image.
 
 Hint sentinel: if the SceneImage's `hints` field is the literal string `'none'` (case-insensitive after `.strip()`), treat it as no hint — skip the `Preserve every verb…` line in the composed prompt. The runtime (`JoySceneDBNG`, `Skin.compile_user_prompt`) does the same normalization, so caption-time and prompt-compile-time stay in sync.
 

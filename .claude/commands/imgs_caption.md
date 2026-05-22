@@ -6,7 +6,7 @@ argument-hint: "[<image-id> | force | ignore_curated | set=<name> | rating[==|>=
 `$ARGUMENTS` is forwarded verbatim to both subcommands. The grammar is shared with `/imgs_caption_prompt` and `/imgs_caption_joy` — see those specs for the full term list. Quick reference:
 
 - bare 24-char hex ObjectId → single-image mode (skips eligibility, both stages run on just that image)
-- `force` — process every eligible image regardless of freshness (skip recency checks)
+- `force` — process every eligible image regardless of freshness (skip recency checks) AND bypass the **rating>=3 guard** (both subcommands skip production-grade images otherwise)
 - `ignore_curated` — drop the suggestion-non-empty requirement
 - `set=<name>` — restrict to a SceneSet's active members
 - `rating<op><n>` — relational rating filter (`rating==1`, `rating>=0`, etc.)
@@ -38,6 +38,10 @@ For every image now with a non-empty `caption_prompt` and matching the filters, 
 - Caption via `joy_client.caption()` with the stored prompt + skin directive.
 - Stage 3 mechanical fixes: forbidden vocab, body-type unauthorized, `has a build` strip, meta-sentence drop, naked-multi per-figure attribution.
 - Persists `FIELD_CAPTION_JOY` (and `FIELD_CAPTION` if it was previously identical to caption_joy).
+
+## Rating>=3 guard
+
+Inherited from both subcommands: images with `rating>=3` are skipped in batch mode unless `force` is passed (or the curator targets a single image by ObjectId, which is an implicit force). See `/imgs_caption_prompt` and `/imgs_caption_joy` for the full clause.
 
 ## When NOT to use this
 

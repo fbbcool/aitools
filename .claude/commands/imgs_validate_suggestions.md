@@ -1,6 +1,6 @@
 ---
 description: Validate the /img_suggest process against curator-authored labels+hints on done images (used as ground truth). Picks N random done images, runs the suggestion loop on each with canonical fields hidden, compares the suggestion output to the curator's stored labels_ng + hints, reports aggregate metrics. Read-only by default.
-argument-hint: "[count=N] [set=gts_v3] [iters=5] [persist=true|false]"
+argument-hint: "[count=N] [set=gts_v3] [iters=5] [persist=true|false] [force]"
 ---
 
 `$ARGUMENTS` may contain optional `key=value` pairs:
@@ -8,6 +8,11 @@ argument-hint: "[count=N] [set=gts_v3] [iters=5] [persist=true|false]"
 - `set=NAME` (default `gts_v3`) — which SceneSet to sample from
 - `iters=N` (default `5`) — max iterations per image (matches `/img_suggest`)
 - `persist=true|false` (default `false`) — if true, ALSO write the produced suggestions to the SceneImage's `_SUGGESTION` fields. Default false = pure read-only validation.
+- `force` — bare flag. Bypass the **rating>=3 guard** (see below) so production-grade images can be written to when `persist=true`. Has no effect in the default read-only mode.
+
+## Rating>=3 guard
+
+The validation set is drawn from done images (rating>=1) — by design, rating>=3 images are part of the ground-truth pool. **The guard only applies when `persist=true`**: in that case, any sampled image with `rating>=3` is excluded from the write step (it still contributes to the read-only metrics computation, just nothing is persisted to its `_SUGGESTION` fields). Pass the bare `force` flag to allow `_SUGGESTION` writes on rating>=3 images. Default read-only mode (`persist=false`) is unaffected — no writes happen anywhere, so the guard is moot.
 
 ## Why this exists
 
@@ -81,7 +86,7 @@ suggested_hint   = compose_hint_text(state['hint_fragments'], skin=sk)
 iter_count       = len(state['iter_traces'])
 ```
 
-If `persist=true`: also call `simg.set_labels_ng_suggestion(...)`, `simg.set_hints_suggestion(...)`, `simg.db_store()`. Default false = nothing written.
+If `persist=true`: also call `simg.set_labels_ng_suggestion(...)`, `simg.set_hints_suggestion(...)`, `simg.db_store()` — BUT apply the **rating>=3 guard** first: if `(simg.data.get(SceneDef.FIELD_RATING) or SceneDef.RATING_INIT) >= 3 and not force`, skip the write (record the image under a `skipped_rating>=3` bucket in the report). Default `persist=false` = nothing written.
 
 ### 3. Compute per-image metrics
 

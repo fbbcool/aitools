@@ -195,14 +195,14 @@ class AIDBSceneApp:
                         allow_custom_value=False,
                         interactive=True,
                     )
-                with gr.Row():
                     mode = gr.Dropdown(
-                        label='Mode Operation',
+                        label='Mode',
                         choices=['info', 'rate', 'label', 'set'],
                         value='info',
                         allow_custom_value=False,
                         interactive=True,
                     )
+                with gr.Row():
                     label_dropdown = gr.Dropdown(
                         label='Label',
                         choices=['Ignore', 'Empty'] + editor_labels(),
@@ -213,6 +213,13 @@ class AIDBSceneApp:
                     set_dropdown = gr.Dropdown(
                         label='Set',
                         choices=['Ignore', 'Empty'] + list(SceneDef.TAG_SETS),
+                        value='Ignore',
+                        allow_custom_value=False,
+                        interactive=True,
+                    )
+                    subdir_dropdown = gr.Dropdown(
+                        label='Subdir',
+                        choices=['Ignore'] + self._scene_subdirs(),
                         value='Ignore',
                         allow_custom_value=False,
                         interactive=True,
@@ -249,6 +256,7 @@ class AIDBSceneApp:
                         mode,
                         label_dropdown,
                         set_dropdown,
+                        subdir_dropdown,
                         search_show_active,
                         search_show_prototype,
                     ],
@@ -1864,6 +1872,22 @@ class AIDBSceneApp:
             f'</div>'
         )
 
+    def _scene_subdirs(self) -> list[str]:
+        """Return all unique subdirectory names (Path(scene.url).parent.name)
+        across the scenes collection, sorted ascending."""
+        coll = self._dbc._get_collection(SceneDef.COLLECTION_SCENES)
+        if coll is None:
+            return []
+        urls = coll.distinct(SceneDef.FIELD_URL)
+        subdirs = set()
+        for u in urls:
+            if not u:
+                continue
+            name = os.path.basename(os.path.dirname(str(u)))
+            if name:
+                subdirs.add(name)
+        return sorted(subdirs)
+
     def _html_scenes_search_and_op(
         self,
         rating_min: Optional[str],
@@ -1871,6 +1895,7 @@ class AIDBSceneApp:
         mode: Optional[AppOpMmode],
         opt_label: Optional[str],
         opt_set: Optional[str],
+        opt_subdir: Optional[str],
         show_active: bool = True,
         show_prototype: bool = True,
     ) -> str:
@@ -1916,6 +1941,12 @@ class AIDBSceneApp:
                 )
             ]
         scenes = [self._scm.scene_from_id_or_url(id) for id in ids]
+        if opt_subdir is not None and opt_subdir not in ('Ignore', 'None', ''):
+            scenes = [
+                s for s in scenes
+                if s is not None
+                and os.path.basename(os.path.dirname(str(s.url_from_data))) == opt_subdir
+            ]
         SceneDef.sort_by_rating(scenes)
         print(f'Found {len(scenes)} scenes matching advanced search criteria.')
 

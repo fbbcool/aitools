@@ -5,7 +5,7 @@ argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> |
 
 `$ARGUMENTS` is an optional space-separated list of bare-word flags and `key=value` / `key<op>value` filter terms (connectives like `for` / `and` / `where` ignored). Empty → all curated images with a non-empty `caption_prompt` and stale `caption_joy`, DB-wide. Supported terms:
 
-- `force` — bare flag. Caption every eligible image with a non-empty `caption_prompt` regardless of `caption_joy` freshness (the recency check is skipped). Useful after a captioner refresh (LoRA swap, skin rule change) when every existing caption should be regenerated against the current prompts.
+- `force` — bare flag. Caption every eligible image with a non-empty `caption_prompt` regardless of `caption_joy` freshness (the recency check is skipped) AND bypass the **rating>=3 guard** (see below) so production-grade images are included. Useful after a captioner refresh (LoRA swap, skin rule change) when every existing caption should be regenerated against the current prompts.
 - `ignore_curated` — bare flag. Drop the suggestion-non-empty requirement. Eligibility becomes "labels_ng non-empty AND hints non-empty AND caption_prompt non-empty". Mirrors the `/imgs_caption_prompt ignore_curated` flag — needed when that upstream was used to compile prompts for non-curator-promoted images (legacy data, manual labels+hints without `_SUGGESTION`).
 - `set=<name>` — restrict to a SceneSet's active members.
 - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
@@ -13,7 +13,11 @@ argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> |
 
 Flags compose with the filters — e.g. `force set=gts_v3 limit=10` recaptions the 10 newest curated images in `gts_v3` whether or not their captions were already fresh; `ignore_curated rating==0` captions the rating-0 cohort regardless of suggestion provenance.
 
-**Single-image mode**: if `$ARGUMENTS` is (or contains) a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`), the command processes just that image. The eligibility filter (`is_curated` / `is_labeled`) is **skipped** — the curator named it explicitly. The freshness check is also skipped (single-image = implicit `force`). The non-empty-`caption_prompt` precondition still applies (Stage 2 needs a prompt to forward to joy_server); if `caption_prompt` is empty, abort with `caption_prompt is empty — run /imgs_caption_prompt or /imgs_update_caption_prompt first`.
+**Single-image mode**: if `$ARGUMENTS` is (or contains) a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`), the command processes just that image. The eligibility filter (`is_curated` / `is_labeled`) is **skipped** — the curator named it explicitly. The freshness check is also skipped (single-image = implicit `force`). The **rating>=3 guard is also bypassed** in single-image mode for the same reason. The non-empty-`caption_prompt` precondition still applies (Stage 2 needs a prompt to forward to joy_server); if `caption_prompt` is empty, abort with `caption_prompt is empty — run /imgs_caption_prompt or /imgs_update_caption_prompt first`.
+
+## Rating>=3 guard
+
+Images with `rating>=3` are treated as production-grade — by default they are **skipped** in batch mode to prevent accidental re-captioning of curator-finalized images. To process them, pass the bare `force` flag. Single-image ObjectId mode is an implicit force for this guard.
 
 **An eligible image with an EMPTY `caption_prompt` is NEVER in scope** — even with `force` or `ignore_curated`. Run `/imgs_caption_prompt` first to compile the prompt; that's this command's upstream. The report counts and lists such images so the curator knows.
 
@@ -65,8 +69,8 @@ def is_curated_pending(img, *, force: bool = False,
       - default: is_curated(img)
       - ignore_curated=True: is_labeled(img)   (no suggestion required)
 
-    With force=True the recency check is skipped — eligibility + non-empty
-    caption_prompt are still required.
+    With force=True the recency check AND the rating>=3 guard are both
+    skipped — eligibility + non-empty caption_prompt are still required.
     """
     if ignore_curated:
         if not is_labeled(img):
@@ -78,6 +82,9 @@ def is_curated_pending(img, *, force: bool = False,
     cap_prompt = (d.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
     if not cap_prompt:
         return False                     # upstream is /imgs_caption_prompt
+    # rating>=3 guard — production-grade images require explicit `force`
+    if (d.get(SceneDef.FIELD_RATING) or SceneDef.RATING_INIT) >= 3 and not force:
+        return False
     if force:
         return True
     cap_joy = (d.get(SceneDef.FIELD_CAPTION_JOY) or '').strip()
