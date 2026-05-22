@@ -1,5 +1,5 @@
-set -xg WORKSPACE $HOME/Workspace
-set -xg AIT_TMP $HOME/Downloads/000_tmp/
+set -xg AIT_WORKSPACE $WORKSPACE/aitools
+set -xg AIT_TMP $HOME/Downloads/000_tmp
 set -xg AIDB_SCENE_DEFAULT 0000
 set -xg AIDB_SCENE_CONFIG default
 
@@ -125,7 +125,7 @@ end
 
 function ait_server_joy
     set running (python3 -c "from ait.caption import joy_client; print('1' if joy_client.is_running() else '0')")
-    if test "$running" = "1"
+    if test "$running" = 1
         set current running
         set action stop
     else

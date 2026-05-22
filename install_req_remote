@@ -1,0 +1,2 @@
+uv pip install -r $HOME_AIT/requirements_remote.txt
+
