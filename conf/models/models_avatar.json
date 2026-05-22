@@ -1,0 +1,16 @@
+{
+  "avatar": {
+    "common": {
+      "face_detector": [
+        {
+          "repo_id": "public-data/insightface",
+          "file": "models/buffalo_l/det_10g.onnx",
+          "subdir": "buffalo_l",
+          "method_download": "huggingface",
+          "rename": "det_10g",
+          "skip": false
+        }
+      ]
+    }
+  }
+}

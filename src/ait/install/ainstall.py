@@ -289,6 +289,7 @@ class AInstaller:
             'transformer': 'models/diffusion_models',
             'text_encoder': 'models/text_encoders',
             'latent_upscale': 'models/latent_upscale_models',
+            'face_detector': 'models/face_detector',
         }
         target = item.get('target', 'unknown')
         target_dir = map_target_dirs.get(target, '')
@@ -371,6 +372,7 @@ class AInstaller:
             'diffuser': 'data/diffusion_models',
             'transformer': 'data/diffusion_models',
             'text_encoder': 'data/text_encoders',
+            'face_detector': 'data/face_detector',
         }
         target_dir = map_target_dirs.get(item.get('target', 'unknown'), '')
         target_var = map_target_vars.get(item.get('target', 'unknown'), '')
