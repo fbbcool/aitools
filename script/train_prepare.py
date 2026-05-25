@@ -64,7 +64,7 @@ config_trainer_qwen_h100 = {
 
 # config_trainer = config_trainer_qwen_h100
 config_dataset = {
-    'num_repeats': 8,
+    'num_repeats': 4,
     # The 7 distinct (w, h) pairs in the compiled gts_v3 training set.
     # All max-side 1024, AR bucketed: 1:1, 3:4/4:3, 2:3/3:2, 3:5/5:3.
     'resolutions': [1024],
