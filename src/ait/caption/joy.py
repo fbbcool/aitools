@@ -1,485 +1,270 @@
-import re
+"""Joy: pure captioning runtime.
+
+Loads a base captioning model + optional LoRA at construction. At call time
+receives **already-rendered** prompt components (system content, user content,
+list of label-prompt sentences, optional hint, etc.) and returns
+`(composed_prompt, generated_caption)`. Stateless w.r.t. captioning recipes:
+Joy never reads the skin JSON, never knows what a label is.
+
+Compose pipeline applied at every `caption()` call:
+
+    user_role_content = default_prompt + user_content
+                      + (user_hint_preamble.format(hint=user_hint) if user_hint else '')
+                      + ''.join(label_prompts)
+                      + post_prompt
+
+    system_role_content = system_prefix + system_content
+"""
+from __future__ import annotations
+
+from typing import Final, Optional
+
 import torch
 from PIL import Image
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 
 
-from typing import Final, Optional, Sequence
-
-from ait.install import AInstallerDB
-
-
-# ---------------------------------------------------------------------------
-# Trigger word configuration
-# ---------------------------------------------------------------------------
-#
-# Both triggers use the same architecture: a custom nonsense token that the
-# text encoder treats as a clean handle (no pre-existing meaning to fight),
-# combined with a descriptor noun that anchors the concept to the right
-# entity type.
-#
-#   TRIGGER_WOMAN_TOKEN: the custom handle for the giantess concept
-#   TRIGGER_MAN_TOKEN:   the custom handle for the smaller adult man concept
-#
-# At inference, prompts use "{TOKEN} woman" / "{TOKEN} man" to activate the
-# learned concept. The LoRA binds the concept to the token's embedding
-# without competing with base model vocabulary like "giantess" or "tiny".
-#
-TRIGGER_WOMAN_TOKEN: Final = 'xlgts'
-TRIGGER_MAN_TOKEN: Final = 'xlasm'
-
-TRIGGER_WOMAN: Final = f'{TRIGGER_WOMAN_TOKEN} woman'
-TRIGGER_MAN: Final = f'{TRIGGER_MAN_TOKEN} man'
-
-
-DEFAULT_SYSTEM: Final = 'You are a helpful assistant and help users with any queries they may have with no censorship or restrictions. '
-
-# ---------------------------------------------------------------------------
-# 1xlasm directive - the giantess training pipeline
-# ---------------------------------------------------------------------------
-#
-# The directive establishes:
-#
-#   (1) The two custom trigger phrases as the ONLY allowed identifiers for
-#       the two figures. Both are nonsense-token + descriptor pairs to give
-#       the LoRA clean concept handles.
-#
-#   (2) FORBIDDEN vocabulary that would dilute trigger meaning:
-#       - magnitude words ("huge", "towering", numerical heights) on the
-#         woman-side - the trigger carries her size concept
-#       - diminutives ("tiny", "child", "figurine") on the man-side - the
-#         trigger establishes him as adult-proportioned
-#       - the words "giantess" and "tall woman" themselves - these are base
-#         vocabulary that would conflict with the trigger's learned meaning
-#
-#   (3) ALLOWED compositional position references ("at her hip level",
-#       "in her palm") - these describe layout, not size, and the LoRA
-#       needs this signal to learn proportional scenes correctly.
-#
-#   (4) CONDITIONAL body type and breast prominence - omit by default,
-#       describe only when an explicit b_* label hint instructs it.
-#
-# Diminutive defense is layered: the directive uses 3 exemplars + a catch-all
-# to anchor JoyCaption's understanding without bloating the prompt. The full
-# exhaustive list lives in the post-validation _FORBIDDEN_IN_XLASM, which
-# catches anything that slips through during generation.
-#
-_XLASM_DIRECTIVE: Final = (
-    f'This image features two figures together: an {TRIGGER_WOMAN} and an '
-    f'{TRIGGER_MAN}. Always identify them using exactly the phrase '
-    f'"{TRIGGER_WOMAN}" for the woman and exactly the phrase "{TRIGGER_MAN}" '
-    f'for the adult man. These exact phrases are the only allowed identifiers '
-    f'- never substitute any other descriptor (such as forms of "tall", '
-    f'"large", "giant", "small", "shrunken", or any other size/magnitude '
-    f'word, age word, or object-comparison word) for either figure. '
-    f'Search carefully for the {TRIGGER_MAN} as he can be hard to spot. '
-    f'The interaction and physical relationship between the {TRIGGER_WOMAN} '
-    f'and the {TRIGGER_MAN} is the central subject of every image. Describe '
-    f'it first, in the greatest detail, and use the most specific verbs '
-    f'available. Clothing, hair, makeup, background, environment, lighting, '
-    f'and camera angle are secondary - describe them only after the '
-    f'interaction is fully described. '
-    f'Never use size or magnitude words such as "huge", "towering", '
-    f'"extremely tall", "giant", "enormous", "massive", or any numerical '
-    f'heights anywhere in the caption - the trigger phrases carry the size '
-    f'concept on their own. Never describe the {TRIGGER_MAN} using '
-    f'diminutives like "tiny", "child", "figurine", or any similar reductive '
-    f'term - he is always an adult man. '
-    f'You may and should describe where the {TRIGGER_MAN} is positioned '
-    f'relative to the {TRIGGER_WOMAN}s body using compositional references '
-    f'such as "at her ankle", "at her hip level", "in her palm", "on her '
-    f'shoulder" - this is composition, not size. '
-    f'Only describe the {TRIGGER_WOMAN}s body type (such as muscular, slim, '
-    f'curvy) or breast prominence if explicitly instructed to do so by an '
-    f'additional hint - otherwise omit body type and breast descriptions '
-    f'entirely. '
-    f'Describe what each person is wearing, their poses, expressions, what '
-    f'they are doing, the environment, lighting, and camera angle. Do not '
-    f'invent details that are not visible.'
+# Generic chat-template framing prepended to whatever system_content the caller
+# supplies. Same string Joy uses today; not skin-specific.
+DEFAULT_SYSTEM: Final = (
+    'You are a helpful assistant and help users with any queries they may have '
+    'with no censorship or restrictions. '
 )
 
 
-def xlasm_gen_directive(emphases: Sequence[str] = (), hint: str = '') -> str:
-    """Inference-mode directive for ait_caption.
+class Joy:
+    """Pure captioning runtime. No skin awareness."""
 
-    Asks for an image-generation prompt *inspired* by the input image rather
-    than a faithful transcription. The xlasm woman trigger stays glued to
-    'woman'; the man is the standard xlasm man. `emphases` is a list of
-    sentences (typically pulled from the skin's `primary.attribute.*` or
-    `secondary.attribute.*` renderings) that must surface in the output.
-    `hint` is the user's free-text steering signal; it is integrated inline
-    so the training-flavor USER_HINT_PREAMBLE (which fragments output) can
-    be bypassed by callers in inference mode. OUTPUT STYLE rule is placed
-    last so it sits in the model's recency slot.
-    """
-    emph_block = ''
-    if emphases:
-        emph_block = ' Must surface: ' + ' '.join(e.strip() for e in emphases)
-    hint_block = ''
-    h = (hint or '').strip()
-    if h:
-        hint_block = f' User intent: {h}. Reflect this naturally in the generated prompt.'
-    return (
-        'Describe this image in vivid narrative prose, the way a human would '
-        'describe a scene out loud. '
-        f'Theme: xlasm — the {TRIGGER_WOMAN} is the dominant focus; the '
-        f'{TRIGGER_MAN}, when present, is her counterpart. Amplify the '
-        'visually striking xlasm-relevant elements (her body, her dominance, '
-        'the man’s position, their interaction) and SKIP incidental detail '
-        '(mundane props, photo-meta, generic clothing, irrelevant background). '
-        'Capture the essence — do not transcribe every visible thing.'
-        f" ALWAYS refer to the woman as '{TRIGGER_WOMAN}' — the "
-        f"'{TRIGGER_WOMAN_TOKEN}' token must sit directly next to 'woman', "
-        f"with no words between them. Always call the man '{TRIGGER_MAN}'. "
-        f"NEVER write '{TRIGGER_MAN_TOKEN} woman' or "
-        f"'{TRIGGER_WOMAN_TOKEN} man' — '{TRIGGER_WOMAN_TOKEN}' is for "
-        f"women ONLY, '{TRIGGER_MAN_TOKEN}' is for men ONLY. "
-        f"There is exactly ONE male figure in any xlasm scene: the "
-        f"{TRIGGER_MAN}. If you see ANY small male-presenting figure "
-        f"(whether it looks like a statue, figurine, doll, toy, statuette, "
-        f"miniature, or anything else), that figure IS the {TRIGGER_MAN} — "
-        f"describe him as '{TRIGGER_MAN}' and nothing else. NEVER describe "
-        f"a second male figure separately. NEVER call him 'tiny', 'little', "
-        f"'small', 'miniature', 'shrunken', 'child', 'boy', 'figurine', "
-        f"'doll', 'statue', 'figure on a base' — he is an adult man and "
-        f"the '{TRIGGER_MAN_TOKEN}' token carries the scale concept. "
-        f"Body attributes below apply ONLY to the entity each description "
-        f"names. NEVER cross-apply between figures (e.g. NEVER say "
-        f"'muscular {TRIGGER_MAN}' — muscularity is the {TRIGGER_WOMAN}'s "
-        f"trait; the {TRIGGER_MAN} is always the weaker, smaller counterpart)."
-        f'{emph_block}'
-        f'{hint_block}'
-        ' Write a single fluent paragraph of complete English sentences '
-        '(subject-verb-object), ~60-90 words, action-forward. ABSOLUTELY '
-        'NO comma-separated tag lists, attribute lists, or sentence '
-        'fragments — this is narrative prose, not Danbooru tags.'
-    )
+    @classmethod
+    def from_skin(cls, skin, *, use_lora: bool = True, verbose: int = 0) -> 'Joy':
+        """Construct a `Joy` configured per a `Skin`'s model + LoRA refs.
 
-CONTENT_SYSTEM: Final = {
-    'gts_prompter': 'The users are interested propmts for image generation of femdom giantess scenarios. in femdom giantess scenarios, women are always bigger, stronger and super sexy and superior. so always exaggerate any of such aspects to make men the weak, vulnerable and dominated part (the more the better!). always describe a man as a "xlasm man".dont describe styles, they do not matter.',
-    '1xlasm': _XLASM_DIRECTIVE,
-    '1gts': 'The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess with a small adult man.',
-    '1woman': 'The users are interested in women with big breasts and hairy women and how they present their bodies.',
-    '1fem': "The users are interested in body and face characteristics of this female character. always call the female character 'giantess woman'",
-    '1fbb': 'This is a real image of a very muscular female bodybuilder woman, but do not mention her muscularity, just call her "strong woman" and describe her flexing poses without mentioning the size of her muscles',
-    '1hairy': 'This is a real image of a very hairy woman, but do not mention her body hair or pubic hair, just call her "hairy woman"',
-    '1pussy_insert': "a giantess woman is inserting a small adult man into her vagina. if you want to use 'the small man is positioned between her legs', use 'inserted in her vagina' instead and describe wether the lower or upper bodypart of the small man is inserted and not visible.",
-    '1man': "The image is about a small man with an erect penis on a grey background. describe the man as a 'small man'. if the small man takes most of the image, call it a closeup, if not, call it a photograph.",
-    '1legsemp': "The image is tall giantess woman with muscular legs. describe the woman as a 'giantess woman'. they all have muscular legs and calves",
-    '1calves': 'The image is about a woman showing off her muscular calves. do not describe anything about her muscularity since this is already known. instead, describe how she is showing off her calves and the overall scene.',
-    '1leggy': 'The image is about a woman showing off her muscular calves. do not describe anything about her muscularity and her calves since this is already known. instead, describe how she she poses and the overall scene and always call her "leggy woman".',
-    '1busty': 'The image is about a woman showing off their large breasts and asses. do not describe anything about her breasts size (especially when they are large), cleavage or body shape since this is already known! instead, describe how she she poses and the overall scene. always call her "busty woman".',
-    '1busty-gts': 'This is a giantess theme image but avoid any size difference description between the woman and the man. just use "giantess busty woman" and "xlasm man". definitly avoid any "child","figurine","small","tiny","young","boy" captions as this is always an interaction between a giantess busty woman and a xlasm man. avoid any description of her large breasts size, just use "breasts"! if there is any prominent bodypart of the xlasm man, then explicitly describe its interaction with it.',
-    '1face': 'This is a real image of a woman with focus on her face.do not describe her face or her facial features since this is already known. describe everything else but her face!',
-    '1tongue': 'This is a real image of a woman with close-up on her face.she shows off her long tongue. do not describe the size of her tongue since this is already known.',
-}
+        Resolves `skin.model_key` and `skin.lora_key` through `AInstallerDB`,
+        attaches `skin.lora_hint_path` as the `'hint'` adapter when set.
+        This is the canonical way to bring up a captioner from a skin;
+        the joy_server uses it directly, and `JoySceneDB` no longer
+        constructs its own Joy (it routes through the server instead).
+        """
+        from ait.install import AInstallerDB
 
-# Tightened from "very long detailed description" - shorter captions concentrate
-# trigger weight and train cleaner LoRAs.
-DEFAULT_PROMPT: Final = 'Write a detailed description of this image.'
-
-# ---------------------------------------------------------------------------
-# User-hint authoritative-override block
-# ---------------------------------------------------------------------------
-#
-# A user-provided hint (stored on the SceneImage as FIELD_HINTS) is human
-# ground truth: it says exactly what action and posture is visible in the
-# image. JoyCaption's most consistent failure modes drift around this
-# axis - active female-driven verbs get softened to passive male-positioning
-# verbs ("squeeze" -> "cup", "sit on her arm" -> "held in her hand"),
-# body-part references shift one level down ("arm" -> "hand"), and
-# qualifiers like "half" get dropped.
-#
-# To counter that, the user hint is wrapped in this preamble and inserted
-# *after* the directive (which sets the rules) but *before* the label-derived
-# hint expansions (which add concept activation). The preamble explicitly
-# tells the model that the hint overrides its visual interpretation when the
-# two conflict, and to preserve the hint's verbs and body-part references
-# verbatim.
-#
-USER_HINT_PREAMBLE: Final = (
-    ' In this image, the central interaction is: {hint} Describe this '
-    'interaction first and in full detail, reflecting every verb and spatial '
-    'relationship it names (do not collapse "wrapping around" into "between", '
-    'do not collapse "inserted" into "positioned", do not collapse "squeeze" '
-    'into "cup"). Use the same body-part references it gives you (arm vs '
-    'hand, palm vs hand). Do not quote, restate, or comment on this note - '
-    'just write the caption.'
-)
-
-CONTENT_PROMPT: Final = {
-    'gts_prompter': 'The users are interested propmts for image generation of femdom giantess scenarios. in femdom giantess scenarios, women are always bigger, stronger and super sexy and superior. so always exaggerate any of such aspects to make men the weak, vulnerable and dominated part (the more the better!). always describe a man as a "xlasm man".dont describe styles, they do not matter.',
-    '1xlasm': _XLASM_DIRECTIVE,
-    '1gts': 'The users are interested in the giantess theme and mostly interested in the interaction of a tall female giantess and a man with a massive size difference. the giantess woman is always much taller. avoid child,figurine,small,tiny captions as this is always an interaction between a giantess woman and a xsmall man. the aspect of size difference and the xsmall man itself is always described as xsmall man.',
-    '1woman': 'The users are interested in women with big breasts and hairy women and how they present their bodies.',
-    '1fem': "The users are interested in body and face characteristics of this female character. always call the female character 'giantess woman'",
-    '1fbb': 'This is a real image of a very muscular female bodybuilder woman, but do not mention her muscularity, just call her "strong woman" and describe her flexing poses without mentioning the size of her muscles',
-    '1hairy': 'This is a real image of a very hairy woman, but do not mention her body hair or pubic hair, just call her "hairy woman"',
-    '1pussy_insert': "a giantess woman is inserting a small adult man into her vagina. if you want to use 'the small man is positioned between her legs', use 'inserted in her vagina' instead and describe wether the lower or upper bodypart of the small man is inserted and not visible.",
-    '1man': "The image is about a small man with an erect penis on a grey background. describe the man as a 'small man'. if the small man takes most of the image, call it a closeup, if not, call it a photograph.",
-    '1legsemp': "The image is tall giantess woman with muscular legs. describe the woman as a 'giantess woman'. they all have muscular legs and calves",
-    '1calves': 'The image is about a woman showing off her muscular calves. do not describe anything about her muscularity since this is already known. instead, describe how she is showing off her calves and the overall scene.',
-    '1leggy': 'The image is about a woman showing off her muscular calves. do not describe anything about her muscularity and her calves since this is already known. instead, describe how she she poses and the overall scene and always call her "leggy woman".',
-    '1busty': 'The image is about a woman showing off their large breasts and asses. do not describe anything about her breasts size (especially when they are large), cleavage or body shape since this is already known! instead, describe how she she poses and the overall scene. always call her "busty woman".',
-    '1busty-gts': 'This is a giantess theme image but avoid any size difference description between the woman and the man. just use "giantess busty woman" and "xlasm man". definitly avoid any "child","figurine","small","tiny","young","boy" captions as this is always an interaction between a giantess busty woman and a xlasm man. avoid any description of her large breasts size, just use "breasts"! if there is any prominent bodypart of the xlasm man, then explicitly describe its interaction with it.',
-    '1face': 'This is a real image of a woman with focus on her face.do not describe her face or her facial features since this is already known. describe everything else but her face!',
-    '1tongue': 'This is a real image of a woman with close-up on her face.she shows off her long tongue. do not describe the size of her tongue since this is already known.',
-}
-
-# ---------------------------------------------------------------------------
-# Labels - compose orthogonally with the trigger
-# ---------------------------------------------------------------------------
-#
-# For 1xlasm training, three orthogonal label dimensions in the captioner:
-#
-#   - BODY TYPE (b_*): muscular / busty / slim / curvy. Opt-in only - apply
-#     when the trait is unmistakable, omit when ambiguous.
-#   - POSITION (pos_*): where the {TRIGGER_MAN} is located relative to her body
-#     for non-interaction images.
-#   - ACTION (the originals): what is happening between them.
-#
-# NOTE on SCALE: scale tags (s_small_gts, s_mid_gts, s_large_gts, s_mega_gts)
-# are NOT in LABEL_PROMPT. They are CSV-only metadata used for dataset
-# balance auditing - making sure you have enough training images at each
-# scale tier. They deliberately do not feed into JoyCaption because:
-#
-#   - Any caption-time scale description either uses forbidden magnitude
-#     words ("many times larger") or anchors to body parts ("his head reaches
-#     her knee"), which contradicts the actual visible posture in many
-#     images (man in palm, sitting on shoulder, etc.).
-#   - The LoRA learns scale from the visual statistics across training
-#     images. A mid-scale dataset image looks proportionally different from
-#     a large-scale one in many subtle visual ways that the model picks up
-#     directly from pixels.
-#   - At inference, scale is controlled implicitly through position phrasing
-#     ("at her ankle" implies large scale), camera angle ("low-angle shot
-#     looking up"), and scene context ("walking past skyscrapers").
-#
-# Pick at most one from POSITION, any number from BODY TYPE, and one ACTION
-# (or none). Combinations that contradict (e.g. pos_at_feet + pos_in_palm)
-# should be avoided in tagging.
-#
-# All label strings reference the trigger phrases via f-string interpolation
-# so changing TRIGGER_WOMAN_TOKEN / TRIGGER_MAN_TOKEN updates every label
-# consistently.
-#
-LABEL_PROMPT: Final = {
-    # --- BODY TYPE labels ---
-    # Opt-in only. The directive omits these by default; these labels enable
-    # description. Apply only when the trait is unmistakable in the image.
-    # Multiple body type labels can apply to the same image (e.g. muscular
-    # AND busty).
-    'b_muscular': f'The {TRIGGER_WOMAN} has a muscular bodybuilder physique with visible muscle definition.',
-    'b_busty': f'The {TRIGGER_WOMAN} has prominently large breasts.',
-    'b_slim': f'The {TRIGGER_WOMAN} has a slim athletic build.',
-    'b_curvy': f'The {TRIGGER_WOMAN} has curvy hourglass proportions.',
-    'b_hairy': f'The {TRIGGER_WOMAN}s pubic area is hairy.',
-    'all4': f'The {TRIGGER_WOMAN} is on her all fours.',
-    'ass': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s ass.',
-    'blowjob': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} a blowjob, with his erect penis inserted into her mouth and her lips closed on his penis. The blowjob is the central content of the image.',
-    'body': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s body.',
-    'breast': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s breasts.',
-    'cum': f'The {TRIGGER_MAN} ejaculates and cums.',
-    'face': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s face.',
-    'foot': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s foot.',
-    'hand': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s hand.',
-    'handjob': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} a handjob, stimulating and stroking his penis with her hand. The handjob is the central content of the image.',
-    'hanging': f'The {TRIGGER_MAN} is in a hanging position.',
-    'heap': '',
-    'holding': f'The {TRIGGER_MAN} is held by the {TRIGGER_WOMAN}.',
-    'insert': f'The {TRIGGER_MAN} is partly inserted into one of the {TRIGGER_WOMAN}s orifices: her vagina, her anus, or her mouth. When the insertion is vaginal, the inserted body part is his head, his upper body, or his lower body, and that part is not visible.',
-    'i_ass_low': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s ass. his lower body is inserted, only his upper body is visible.',
-    'i_ass_up': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s ass. his upper body is inserted, only his lower body is visible.',
-    'i_ass_head': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s ass. his head is inserted, only the rest of his body is visible.',
-    'i_vagina_low': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s vagina. his lower body is inserted, only his upper body is visible.',
-    'i_vagina_up': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s vagina. his upper body is inserted, only his lower body is visible.',
-    'i_vagina_head': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s vagina. his head is inserted, only the rest of his body is visible.',
-    'i_breasts_low': f'The {TRIGGER_MAN} is partly inserted into between the {TRIGGER_WOMAN}s breasts. his lower body is inserted, only his upper body is visible.',
-    'i_breasts_up': f'The {TRIGGER_MAN} is partly inserted into between the {TRIGGER_WOMAN}s breasts. his upper body is inserted, only his lower body is visible.',
-    'i_breasts_head': f'The {TRIGGER_MAN} is partly inserted into between the {TRIGGER_WOMAN}s breasts. his head is inserted, only the rest of his body is visible.',
-    'i_breasts_body': f'The {TRIGGER_MAN} is inserted into between the {TRIGGER_WOMAN}s breasts with his body partly obscured by her breasts.',
-    'i_mouth_low': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s mouth. his lower body is inserted, only his upper body is visible.',
-    'i_mouth_up': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s mouth. his upper body is inserted, only his lower body is visible.',
-    'i_mouth_head': f'The {TRIGGER_MAN} is partly inserted into the {TRIGGER_WOMAN}s mouth. his head is inserted, only the rest of his body is visible.',
-    'i_mouth_body': f'The {TRIGGER_MAN} is inserted into the {TRIGGER_WOMAN}s mouth with his body partly obscured by her mouth.',
-    'woman_front': f'The {TRIGGER_WOMAN} is seen from the front.',
-    'woman_back': f'The {TRIGGER_WOMAN} is seen from the back.',
-    'woman_side': f'The {TRIGGER_WOMAN} is seen from the side.',
-    'woman_sitting': f'The {TRIGGER_WOMAN} is sitting.',
-    'woman_on_back': f'The {TRIGGER_WOMAN} is on his back.',
-    'man_front': f'The {TRIGGER_MAN} is seen from the front.',
-    'man_back': f'The {TRIGGER_MAN} is seen from the back.',
-    'man_side': f'The {TRIGGER_MAN} is seen from the side.',
-    'man_sitting': f'The {TRIGGER_MAN} is sitting.',
-    'man_on_back': f'The {TRIGGER_MAN} is on his back.',
-    'job': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} either a handjob or a blowjob.',
-    'leg': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s leg.',
-    'masturbating': f'The {TRIGGER_MAN} is masturbating, gripping and stroking his erect penis. This masturbation is the central content of the image.',
-    'mouth': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s mouth.',
-    'panties': f'The {TRIGGER_MAN} is inserted into the {TRIGGER_WOMAN}s panties. the fabric of her panties is over his body and traps him below.',
-    'penis': f'The {TRIGGER_MAN} has an erect penis.',
-    'penis_no': f'The {TRIGGER_MAN}s penis is not visible in the image.',
-    'pussy': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s vagina.',
-    'sex': f'The {TRIGGER_MAN} has sex with the {TRIGGER_WOMAN}, inserting his erect penis into her vagina.',
-    'sitting': f'The {TRIGGER_MAN} is in a sitting position, typically seated on a body part of the {TRIGGER_WOMAN}.',
-    'step': f'The {TRIGGER_WOMAN} is stepping on the {TRIGGER_MAN} with her foot.',
-    'teasing_hj': f'The {TRIGGER_WOMAN} is giving the {TRIGGER_MAN} a teasing handjob, stimulating and stroking his penis delicately with her fingers. The teasing handjob is the central content of the image.',
-    'thigh': f'The {TRIGGER_MAN} is positioned between the thighs of the {TRIGGER_WOMAN}.',
-    'tower': f'The {TRIGGER_WOMAN} stands directly above the {TRIGGER_MAN}, with him positioned at her feet or lower leg level.',
-    'tongue': f'The {TRIGGER_MAN} interacts with the {TRIGGER_WOMAN}s tongue.',
-    'none': '',
-}
-
-POST_PROMPT: Final = ''
-
-
-# ---------------------------------------------------------------------------
-# Caption validation helpers
-# ---------------------------------------------------------------------------
-#
-# Two-layer defense strategy:
-#   - The directive uses a SHORT diminutive list (3 exemplars + catch-all) to
-#     anchor JoyCaption's understanding without bloating the prompt.
-#   - This validator uses an EXHAUSTIVE list to catch anything that slips
-#     through during generation. Reject or hand-fix flagged captions before
-#     they enter LoRA training.
-
-# Magnitude vocabulary, diminutives, and base-vocabulary collisions - exhaustive
-# list. Always forbidden in 1xlasm captions regardless of labels.
-#
-# Includes "giantess" and "tall woman" themselves, since the trigger phrase
-# TRIGGER_WOMAN replaces them - any leakage of these base-vocabulary terms
-# would compete with the trigger's learned meaning.
-_FORBIDDEN_IN_XLASM: Final = (
-    # Diminutive size words
-    'tiny',
-    'little',
-    'small man',
-    'miniature',
-    'mini',
-    'minute',
-    # Object/toy reductions
-    'figurine',
-    'figure',
-    'doll',
-    'action figure',
-    'toy',
-    'puppet',
-    'mannequin',
-    'statuette',
-    # Age reductions
-    'child',
-    'kid',
-    'boy',
-    'young man',
-    'youth',
-    'youngster',
-    'teenager',
-    'teen',
-    'adolescent',
-    'juvenile',
-    # Other person-size reductions
-    'dwarf',
-    'midget',
-    'pygmy',
-    'gnome',
-    'imp',
-    # Magnitude vocabulary (woman-side)
-    'towering',
-    'huge woman',
-    'giant woman',
-    'enormous',
-    'massive woman',
-    'colossal',
-    'gigantic',
-    'titanic',
-    'monstrous',
-    'immense',
-    'extremely tall',
-    'super tall',
-    'incredibly tall',
-    # Base-vocabulary collisions with TRIGGER_WOMAN - these compete with the
-    # trigger's learned meaning if they appear in captions
-    'giantess',
-    'tall woman',
-    'large woman',
-    'big woman',
-    'amazon',
-    # Base-vocabulary collisions with TRIGGER_MAN
-    'shrunken man',
-    'shrunk man',
-    'shrunken person',
-)
-
-
-_FORBIDDEN_IN_XLASM_RE: Final = re.compile(
-    r'\b(?:' + '|'.join(re.escape(p) for p in _FORBIDDEN_IN_XLASM) + r')\b',
-    re.IGNORECASE,
-)
-
-
-def caption_has_xlasm_violations(caption: str) -> list[str]:
-    """Return forbidden phrases found in the caption (empty list = clean).
-
-    Uses word-boundary matching so 'figures' does not trigger 'figure',
-    'simple' does not trigger 'imp', 'leaning' does not trigger 'lean',
-    etc. Multi-word phrases like 'small man' still match correctly because
-    \\b only fires at word/non-word transitions.
-    """
-    return [m.group(0).lower() for m in _FORBIDDEN_IN_XLASM_RE.finditer(caption)]
-
-
-# Body-type words that should ONLY appear in captions when the corresponding
-# b_* label was provided. Used by validate_body_type_consistency() to catch
-# JoyCaption hallucinating body-type descriptions without label authorization.
-_BODY_TYPE_WORDS: Final = {
-    'b_muscular': ('muscular', 'muscle', 'bodybuilder', 'ripped', 'defined'),
-    'b_busty': ('busty', 'large breasts', 'big breasts', 'voluptuous'),
-    'b_slim': ('slim', 'slender', 'athletic build', 'lean'),
-    'b_curvy': ('curvy', 'hourglass', 'voluptuous'),
-}
-
-
-_BODY_TYPE_WORD_RES: Final = {
-    label: re.compile(
-        r'\b(?:' + '|'.join(re.escape(w) for w in words) + r')\b',
-        re.IGNORECASE,
-    )
-    for label, words in _BODY_TYPE_WORDS.items()
-}
-
-
-def validate_body_type_consistency(caption: str, labels: list[str]) -> list[str]:
-    """Flag body-type words appearing in caption without their authorizing label.
-
-    Returns one warning per unauthorized body-type word found. Empty list
-    means the caption is consistent with the provided labels. Uses word-
-    boundary matching so 'leaning' does not trigger 'lean'.
-    """
-    warnings = []
-    for label, regex in _BODY_TYPE_WORD_RES.items():
-        if label in labels:
-            continue  # this label authorizes its body-type words
-        for m in regex.finditer(caption):
-            warnings.append(
-                f'caption contains "{m.group(0).lower()}" but {label} label was not set'
+        base_ids = AInstallerDB().repo_ids(*skin.model_key)
+        if not base_ids:
+            raise IndexError(
+                f'AInstallerDB: no model configured for {skin.model_key}'
             )
-    return warnings
+        base_repo = base_ids[0]
+        lora_path = None
+        if use_lora and skin.lora_key is not None:
+            lora_ids = AInstallerDB().repo_ids(*skin.lora_key)
+            if lora_ids:
+                lora_path = lora_ids[0]
+        extra_adapters: dict[str, str] = {}
+        if use_lora and skin.lora_hint_path:
+            extra_adapters['hint'] = skin.lora_hint_path
+        return cls(
+            model_repo=base_repo,
+            lora_path=lora_path,
+            extra_adapters=extra_adapters or None,
+            verbose=verbose,
+        )
 
+    def __init__(
+        self,
+        model_repo: str,
+        lora_path: Optional[str] = None,
+        *,
+        device_map: int | str = 0,
+        dtype: torch.dtype = torch.bfloat16,
+        system_prefix: str = DEFAULT_SYSTEM,
+        max_new_tokens: int = 512,
+        top_p: float = 0.9,
+        temperature: float = 0.6,
+        extra_adapters: Optional[dict[str, str]] = None,
+        verbose: int = 0,
+    ):
+        """`extra_adapters` is a `{name: path}` map of additional LoRA
+        adapters to load alongside the main `lora_path`. The main adapter
+        is registered as `'default'` (PEFT convention); switching to an
+        extra one at call time uses `caption(..., adapter=name)`.
 
-def validate_trigger_presence(caption: str) -> list[str]:
-    """Flag captions that don't use the required trigger phrases.
+        Multi-adapter is currently used to route /img_suggest's iter-5
+        through the hint-specific LoRA while iters 1-4 + all of
+        /img_caption use the captioning LoRA.
+        """
+        self._verbose = verbose
+        self._system_prefix = system_prefix
+        self._max_new_tokens = max_new_tokens
+        self._top_p = top_p
+        self._temperature = temperature
 
-    A clean 1xlasm caption must mention both TRIGGER_WOMAN and TRIGGER_MAN
-    at least once, since they are the LoRA's concept anchors. Returns a
-    list of missing triggers (empty list = both present).
-    """
-    lowered = caption.lower()
-    missing = []
-    if TRIGGER_WOMAN.lower() not in lowered:
-        missing.append(TRIGGER_WOMAN)
-    if TRIGGER_MAN.lower() not in lowered:
-        missing.append(TRIGGER_MAN)
-    return missing
+        self._log(f'loading base model {model_repo!r}')
+        self.model = LlavaForConditionalGeneration.from_pretrained(
+            model_repo, torch_dtype=dtype, device_map=device_map
+        )
 
+        self.lora_path: Optional[str] = None
+        # adapter_name → path (for inspection / debugging).
+        self.adapters: dict[str, str] = {}
+        self._default_adapter = 'default'
+        # HF auth for downloading LoRA adapters from private repos. Prefer
+        # HF_TOKEN_RW (a write-scoped token can read private repos owned by
+        # the same account), fall back to HF_TOKEN, then None (no auth →
+        # works for public repos only).
+        import os as _os
+        hf_token = _os.environ.get('HF_TOKEN_RW') or _os.environ.get('HF_TOKEN') or None
+        if lora_path:
+            from peft import PeftModel
+            self._log(f'applying LoRA (adapter=default) {lora_path!r}')
+            self.model = PeftModel.from_pretrained(
+                self.model, lora_path, adapter_name='default', token=hf_token,
+            )
+            self.lora_path = lora_path
+            self.adapters['default'] = lora_path
+            if extra_adapters:
+                for name, path in extra_adapters.items():
+                    if name == 'default':
+                        raise ValueError(
+                            "extra_adapter name 'default' collides with the main lora_path"
+                        )
+                    self._log(f'loading extra adapter {name!r} from {path!r}')
+                    self.model.load_adapter(path, adapter_name=name, token=hf_token)
+                    self.adapters[name] = path
+            # ensure default is active after all loads
+            self.model.set_adapter('default')
 
+        self.model.eval()
+        self.processor = AutoProcessor.from_pretrained(model_repo, use_fast=False)
+        self.model_repo = model_repo
+
+    def caption(
+        self,
+        img: Image.Image,
+        *,
+        system_content: str,
+        user_content: str,
+        default_prompt: str = 'Write a detailed description of this image.',
+        label_prompts: list[str] = (),
+        user_hint_preamble: Optional[str] = None,
+        user_hint: str = '',
+        post_prompt: str = '',
+        gen_kwargs: Optional[dict] = None,
+        adapter: str = 'default',
+    ) -> tuple[str, str]:
+        """Compose the prompt, run generation, return `(prompt, caption)`.
+
+        `adapter` selects which PEFT adapter is active for this call. The
+        main `lora_path` is registered as `'default'`. Extra adapters
+        passed to `__init__(extra_adapters={...})` can be selected by
+        their name. The adapter is restored to `'default'` after the call
+        so concurrent callers in the same process don't see leftover state.
+        """
+        prompt = default_prompt + user_content
+        hint = (user_hint or '').strip()
+        if hint:
+            if user_hint_preamble is None:
+                raise ValueError('user_hint provided but user_hint_preamble is None')
+            prompt += user_hint_preamble.format(hint=hint)
+        if label_prompts:
+            prompt += ''.join(label_prompts)
+        prompt += post_prompt
+
+        # Adapter switch (no-op when single-adapter or adapter='default')
+        active_adapter = self._set_adapter(adapter)
+        try:
+            caption = self._process(
+                img,
+                prompt=prompt,
+                system_content=self._system_prefix + system_content,
+                gen_kwargs=gen_kwargs or {},
+            )
+        finally:
+            # Restore the default to keep behaviour deterministic for next caller.
+            if active_adapter != self._default_adapter:
+                self._set_adapter(self._default_adapter)
+        return prompt, caption
+
+    def _set_adapter(self, adapter: str) -> str:
+        """Switch the active LoRA adapter. Returns the name set.
+        No-op when no adapters are loaded. Raises on unknown name."""
+        if not self.adapters:
+            # Single-LoRA or no-LoRA mode; nothing to switch.
+            return adapter
+        if adapter not in self.adapters:
+            raise ValueError(
+                f'unknown adapter {adapter!r}; available: {sorted(self.adapters)}'
+            )
+        self.model.set_adapter(adapter)
+        return adapter
+
+    def compose_prompt(
+        self,
+        *,
+        user_content: str,
+        default_prompt: str = 'Write a detailed description of this image.',
+        label_prompts: list[str] = (),
+        user_hint_preamble: Optional[str] = None,
+        user_hint: str = '',
+        post_prompt: str = '',
+    ) -> str:
+        """Compose the user-role prompt without running the model.
+
+        Useful for prompt-equality tests and offline inspection.
+        """
+        prompt = default_prompt + user_content
+        hint = (user_hint or '').strip()
+        if hint:
+            if user_hint_preamble is None:
+                raise ValueError('user_hint provided but user_hint_preamble is None')
+            prompt += user_hint_preamble.format(hint=hint)
+        if label_prompts:
+            prompt += ''.join(label_prompts)
+        prompt += post_prompt
+        return prompt
+
+    # ---- internals ----
+
+    def _process(
+        self,
+        img: Image.Image,
+        *,
+        prompt: str,
+        system_content: str,
+        gen_kwargs: dict,
+    ) -> str:
+        convo = [
+            {'role': 'system', 'content': system_content},
+            {'role': 'user', 'content': prompt},
+        ]
+        convo_string = self.processor.apply_chat_template(
+            convo, tokenize=False, add_generation_prompt=True
+        )
+        assert isinstance(convo_string, str)
+
+        inputs = self.processor(
+            text=[convo_string], images=[img], return_tensors='pt'
+        ).to('cuda')
+        inputs['pixel_values'] = inputs['pixel_values'].to(torch.bfloat16)
+
+        do_sample = self._temperature > 0
+        gen_args = dict(
+            max_new_tokens=self._max_new_tokens,
+            do_sample=do_sample,
+            suppress_tokens=None,
+            use_cache=True,
+            temperature=self._temperature,
+            top_k=None,
+            top_p=self._top_p if do_sample else None,
+        )
+        gen_args.update(gen_kwargs)
+
+        generate_ids = self.model.generate(**inputs, **gen_args)[0]
+        generate_ids = generate_ids[inputs['input_ids'].shape[1]:]
+
+        caption = self.processor.tokenizer.decode(
+            generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        return caption.strip()
+
+    def _log(self, msg: str, level: str = 'info') -> None:
+        if self._verbose > 0:
+            print(f'[joy:{level}] {msg}')

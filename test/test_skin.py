@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from ait.caption import joy
+from ait.caption import xlasm as joy   # legacy aliased as `joy` for in-test parity
 from ait.caption.skin import Skin, SkinRegistry, _compute_source_hash
 
 

@@ -18,7 +18,7 @@ image_id = id_m.group(1)
 skin     = sk_m.group(1) if sk_m else '1xlasm'
 ```
 
-The skin name is used for: `SkinRegistry().get(skin)`, `joy_client.ensure_running(skin=skin)`, `JoySceneDBNG(..., skin=skin, ...)`, validator selection (the same skin's `caption_violations` / `body_type_warnings` / `missing_triggers` / opener rules drive Stage 3). Default `1xlasm` preserves existing behavior bit-exact.
+The skin name is used for: `SkinRegistry().get(skin)`, `joy_client.ensure_running(skin=skin)`, `JoySceneDB(..., skin=skin, ...)`, validator selection (the same skin's `caption_violations` / `body_type_warnings` / `missing_triggers` / opener rules drive Stage 3). Default `1xlasm` preserves existing behavior bit-exact.
 
 ## Pipeline
 
@@ -71,11 +71,11 @@ caption_log.log_joy_call(
 )
 ```
 
-**Convenience path — `JoySceneDBNG` wraps the same flow + the DB read/write**:
+**Convenience path — `JoySceneDB` wraps the same flow + the DB read/write**:
 
 ```python
-from ait.caption.joy_scenedb_ng import JoySceneDBNG
-db = JoySceneDBNG(config='prod', skin=skin, verbose=1, force=True)
+from ait.caption.joy_scenedb import JoySceneDB
+db = JoySceneDB(config='prod', skin=skin, verbose=1, force=True)
 prompt, caption = db.caption_image(image_id)
 if not caption:
     abort('captioner returned no caption')
@@ -86,7 +86,7 @@ simg.set_caption_joy(caption)
 simg.db_store()
 ```
 
-Both paths route through the same persistent `joy_server` — `JoySceneDBNG.__init__` calls `joy_client.ensure_running(skin=...)` internally and never loads model weights itself. `JoySceneDBNG.caption_image` is the convenience wrapper that pulls labels/hint from the SceneImage, composes the prompt (or uses the stored `caption_prompt`), and persists nothing — the caller writes `caption_joy` back via `simg.set_caption_joy`. The stored caption_prompt from Stage 1 is sent verbatim; `force=True` semantics are implicit (always runs the caption regardless of freshness).
+Both paths route through the same persistent `joy_server` — `JoySceneDB.__init__` calls `joy_client.ensure_running(skin=...)` internally and never loads model weights itself. `JoySceneDB.caption_image` is the convenience wrapper that pulls labels/hint from the SceneImage, composes the prompt (or uses the stored `caption_prompt`), and persists nothing — the caller writes `caption_joy` back via `simg.set_caption_joy`. The stored caption_prompt from Stage 1 is sent verbatim; `force=True` semantics are implicit (always runs the caption regardless of freshness).
 
 ### 3. Validate + auto-fix
 

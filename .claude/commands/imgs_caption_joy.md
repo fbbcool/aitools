@@ -166,7 +166,7 @@ The selection filter guarantees `caption_prompt` is non-empty for every pending 
 
 ### Stage 2 — caption
 
-The captioning call goes through `JoySceneDBNG.caption_image` (server-backed when joy_server is up). That path already writes one `caption_log` entry per image — stage tag `caption_joy`, including the user prompt, a skin reference (name + source hash, not the full directive), the response caption, and elapsed seconds. If you bypass it and call `joy_client.caption()` directly, also call `ait.caption.caption_log.log_joy_call(simg, stage='caption_joy', ...)` so the trail is consistent across paths.
+The captioning call goes through `JoySceneDB.caption_image` (server-backed when joy_server is up). That path already writes one `caption_log` entry per image — stage tag `caption_joy`, including the user prompt, a skin reference (name + source hash, not the full directive), the response caption, and elapsed seconds. If you bypass it and call `joy_client.caption()` directly, also call `ait.caption.caption_log.log_joy_call(simg, stage='caption_joy', ...)` so the trail is consistent across paths.
 
 Before Stage 2 runs, call `ait.caption.caption_log.start_run(simg, run_tag='imgs_caption_joy')` to clear any prior trail and stamp a `run_start` marker. (This protects against conflating two independent /imgs_caption runs on the same image.)
 
@@ -186,7 +186,7 @@ if not caption:
 simg.set_caption_joy(caption)
 simg.db_store()
 
-# Manual log path (only if you bypassed JoySceneDBNG.caption_image):
+# Manual log path (only if you bypassed JoySceneDB.caption_image):
 caption_log.log_joy_call(
     simg, stage='caption_joy',
     user_content=stored_prompt, skin=sk,

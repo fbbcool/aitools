@@ -1,14 +1,14 @@
-"""JoySceneDBNG: enrichment layer over a running joy_server.
+"""JoySceneDB: enrichment layer over a running joy_server.
 
 At construction: resolve a skin by name from `SkinRegistry` and ensure
 the persistent `joy_server` is running with that skin (spawning it on
 demand via `joy_client.ensure_running`). At call time: pull labels and
 hint from the SceneImage, ask the skin to render label-prompt
 sentences, route the caption call through `joy_client.caption` to the
-running JoyNG instance, and run the skin's post-caption validators
+running Joy instance, and run the skin's post-caption validators
 (forbidden / body-type / trigger presence) as logged warnings.
 
-JoySceneDBNG NEVER loads model weights itself. The captioner lives in
+JoySceneDB NEVER loads model weights itself. The captioner lives in
 the joy_server process; this class is a thin enrichment + persistence
 client.
 """
@@ -25,7 +25,7 @@ from . import caption_log, joy_client
 from .skin import Skin, SkinRegistry, compute_labels_ng
 
 
-class JoySceneDBNG:
+class JoySceneDB:
     SKIN_DEFAULT: Final = '1xlasm'
 
     def __init__(
@@ -209,4 +209,4 @@ class JoySceneDBNG:
 
     def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:
-            print(f'[JoySceneDBNG:{level}] {msg}')
+            print(f'[JoySceneDB:{level}] {msg}')

@@ -6,7 +6,7 @@ from typing import Optional
 
 from aidb.scene.db_connect import DBConnection
 from ait.caption import joy_client
-from ait.caption.joy import xlasm_gen_directive
+from ait.caption.xlasm import xlasm_gen_directive
 from ait.caption.skin import SkinRegistry
 from ait.tools.files import is_img
 

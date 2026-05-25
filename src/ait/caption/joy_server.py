@@ -1,9 +1,8 @@
 """Persistent JoyCaption HTTP server.
 
-Loads `JoyNG` (configured per `Skin` via `joy_factory.build_joy`, which
-resolves the base model + LoRA paths through `AInstallerDB`) exactly
-ONCE at startup, then listens on a local HTTP socket for caption/probe
-requests. Clients (slash commands, batch tools) reach the server via
+Loads `Joy` (configured per `Skin` via `Joy.from_skin`, which resolves
+the base model + LoRA paths through `AInstallerDB`) exactly ONCE at
+startup, then listens on a local HTTP socket for caption/probe requests. Clients (slash commands, batch tools) reach the server via
 `joy_client.py` to avoid the ~23s model-load cost on every invocation.
 
 The server is intentionally DB-free: it loads from disk (model cache,
@@ -86,18 +85,18 @@ class _State:
         self.last_request_at: float = 0.0
         self.request_count: int = 0
         self._lock = threading.Lock()
-        self._joy = None     # JoyNG instance
+        self._joy = None     # Joy instance
         self._skin = None    # Skin instance
         self._shutdown_event = threading.Event()
 
     def load(self) -> None:
         # Imported lazily so `--help` doesn't pay the import cost.
-        from ait.caption.joy_ng import JoyNG
+        from ait.caption.joy import Joy
         from ait.caption.skin import SkinRegistry
 
         t0 = time.time()
         self._skin = SkinRegistry().get(self.skin_name)
-        self._joy = JoyNG.from_skin(self._skin, use_lora=True, verbose=1)
+        self._joy = Joy.from_skin(self._skin, use_lora=True, verbose=1)
         self.loaded_at = time.time()
         print(f'[joy_server] loaded skin={self.skin_name!r} '
               f'in {self.loaded_at - t0:.1f}s', flush=True)

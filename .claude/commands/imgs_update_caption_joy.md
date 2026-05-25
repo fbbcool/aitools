@@ -1,5 +1,5 @@
 ---
-description: Run JoySceneDBNG(<skin>) against one image (with id) OR a filtered batch (scope by set, rating, etc.). Only images whose caption_prompt is newer than caption_joy are captioned. Empty caption_prompt skips. Same argument grammar as /imgs_update_caption_prompt. The skin defaults to `1xlasm`; override with `skin=<name>`.
+description: Run JoySceneDB(<skin>) against one image (with id) OR a filtered batch (scope by set, rating, etc.). Only images whose caption_prompt is newer than caption_joy are captioned. Empty caption_prompt skips. Same argument grammar as /imgs_update_caption_prompt. The skin defaults to `1xlasm`; override with `skin=<name>`.
 argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | …]"
 ---
 
@@ -69,8 +69,8 @@ For each candidate:
 Then run the captioner once and loop:
 
 ```python
-from ait.caption.joy_scenedb_ng import JoySceneDBNG
-db = JoySceneDBNG(config='prod', skin=skin, verbose=0, force=True)
+from ait.caption.joy_scenedb import JoySceneDB
+db = JoySceneDB(config='prod', skin=skin, verbose=0, force=True)
 # Construction ensures the persistent joy_server is up with `skin` loaded
 # (auto-restart on skin mismatch). The captioner lives in the server
 # process; this object is the per-batch enrichment client only.
@@ -96,7 +96,7 @@ caption_joy batch [filters: set=…, rating==…]: N captioned, M failed in {sec
 
 ## Single-image mode
 
-When `$ARGUMENTS` is an ObjectId, skip the stale-prompt check (the user explicitly asked for this image), instantiate `JoySceneDBNG(force=True)`, run `caption_image(image_id)`, persist both fields.
+When `$ARGUMENTS` is an ObjectId, skip the stale-prompt check (the user explicitly asked for this image), instantiate `JoySceneDB(force=True)`, run `caption_image(image_id)`, persist both fields.
 
 Report: `image_id`, prompt length used, caption text, and a one-line validator summary (forbidden / body-type / missing-trigger).
 

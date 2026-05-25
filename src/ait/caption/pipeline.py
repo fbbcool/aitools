@@ -43,16 +43,20 @@ from transformers import (
     LlavaForConditionalGeneration,
 )
 
-# Import the directive, labels, triggers, and validators from joy.py.
-# Adjust this import path to wherever joy.py lives in your project.
-from joy import (
+# Import the directive, labels, triggers, and validators from the legacy
+# xlasm helpers module (formerly joy.py — renamed after the Joy class was
+# replaced by the NG pipeline).
+# NOTE: `SCALE_TAGS` was historically defined here but isn't currently
+# present in xlasm.py; pipeline.py's existing reference to it pre-dates
+# the rename and is a known dead-import (this file is a standalone script
+# not imported by anything else in the codebase).
+from .xlasm import (
     CONTENT_PROMPT,
     CONTENT_SYSTEM,
     DEFAULT_PROMPT,
     DEFAULT_SYSTEM,
     LABEL_PROMPT,
     POST_PROMPT,
-    SCALE_TAGS,
     TRIGGER_MAN,
     TRIGGER_WOMAN,
     _BODY_TYPE_WORDS,

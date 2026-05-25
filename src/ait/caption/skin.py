@@ -43,7 +43,7 @@ class _SafeFormatDict(dict):
     """str.format_map mapping that returns `{key}` literally for missing keys.
 
     Used so `{hint}` survives directive/label interpolation (it is resolved at
-    caption time inside JoyNG with a separate format call), while
+    caption time inside Joy with a separate format call), while
     `{entities.primary.phrase}` and similar are filled in at build time.
     """
 
@@ -234,7 +234,7 @@ class Skin:
     def compile_user_prompt(self, applied_paths: list[str], hint: str = '') -> str:
         """Compose the FULL user-role prompt for one image.
 
-        Mirrors the assembly inside `JoyNG.caption`:
+        Mirrors the assembly inside `Joy.caption`:
             default_prompt + directive
             + (user_hint_preamble.format(hint=…) if hint else '')
             + ''.join(render_label_prompts(applied_paths))

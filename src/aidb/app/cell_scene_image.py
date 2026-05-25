@@ -9,7 +9,7 @@ from aidb.app.html import AppHtml, HtmlHelper
 from aidb.scene import Scene, SceneDef
 from aidb.scene.scene_image import SceneImage
 
-from ait.caption.joy import LABEL_PROMPT
+from ait.caption.xlasm import LABEL_PROMPT
 from ait.caption.skin import Skin, SkinRegistry
 from ait.tools.images import image_from_url, _image_extract_prompt_from_info_ext
 
@@ -1474,7 +1474,7 @@ class AppSceneImageCell:
         Behaviour:
           - If the caption_joy textarea has non-empty content, copy it into
             the caption textarea (DOM-only, not persisted).
-          - Otherwise, ask the backend to generate a caption via JoySceneDBNG
+          - Otherwise, ask the backend to generate a caption via JoySceneDB
             (active skin). The result is then written into BOTH the
             caption_joy and caption textareas. The user can save explicitly.
         """

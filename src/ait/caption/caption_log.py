@@ -19,7 +19,7 @@ Storage choices (audit-trail vs noise):
   `source_hash`, which lets you reconstruct the directive at any time
   by loading that skin version.
 - The captioner's `prompt` echo (which equals `user` for the joy_server
-  path used by JoySceneDBNG) is dropped; only `response_caption` is
+  path used by JoySceneDB) is dropped; only `response_caption` is
   recorded.
 
 Callers pass the SceneImage instance plus the payload kwargs. The helper

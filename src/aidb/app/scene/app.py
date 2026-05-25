@@ -32,7 +32,7 @@ class AIDBSceneApp:
         Initializes the Gradio application with a reference to the SceneManager.
 
         `skin` is the captioning skin used for the whole UI session — caption
-        buttons, JoySceneDBNG calls, and the labels-ng editor all lock to it.
+        buttons, JoySceneDB calls, and the labels-ng editor all lock to it.
         Passed through to `cell_scene_image.set_active_skin` so per-cell
         renders use the same skin.
         """
@@ -104,7 +104,7 @@ class AIDBSceneApp:
             )
 
             # Hidden trigger + databus for captioning a registered SceneImage
-            # via JoySceneDBNG (routing through the persistent joy_server).
+            # via JoySceneDB (routing through the persistent joy_server).
             button_hidden_simg_editor_caption = gr.Button(
                 'Hidden SceneImage Editor Caption',
                 visible='hidden',
@@ -553,7 +553,7 @@ class AIDBSceneApp:
                 outputs=editor_outputs,
             )
 
-            # Batch caption: for the currently-loaded scene, run JoySceneDBNG
+            # Batch caption: for the currently-loaded scene, run JoySceneDB
             # (active skin) on every registered image whose caption_joy is
             # empty, store each result to the DB, then refresh. Preserves
             # the scene-id textbox during the clear step (same reason).
@@ -601,7 +601,7 @@ class AIDBSceneApp:
                 show_progress='hidden',
             )
 
-            # Caption a registered SceneImage via JoySceneDBNG (routing
+            # Caption a registered SceneImage via JoySceneDB (routing
             # through the persistent joy_server). The caption is copied to
             # the clipboard. For non-clip flows the
             # backend force-stores caption_prompt (and caption_joy for the
@@ -1189,8 +1189,8 @@ class AIDBSceneApp:
         n_done = 0
         n_failed = 0
         try:
-            from ait.caption.joy_scenedb_ng import JoySceneDBNG
-            jdb = JoySceneDBNG(
+            from ait.caption.joy_scenedb import JoySceneDB
+            jdb = JoySceneDB(
                 config=cfg_name,
                 skin=self._skin_name,
                 verbose=1,
@@ -2264,10 +2264,10 @@ class AIDBSceneApp:
         Pipeline:
           1. Query the DB for all SceneImage ids belonging to this scene
              whose `caption_joy` field is missing / null / empty string.
-          2. Construct a single JoySceneDBNG(skin=<active>, force=True);
+          2. Construct a single JoySceneDB(skin=<active>, force=True);
              the persistent joy_server is brought up on first call and
              reused for the whole loop. force=True is required because our
-             query already filtered the ids; JoySceneDBNG's own skip check
+             query already filtered the ids; JoySceneDB's own skip check
              would otherwise refuse to caption images whose caption_joy is
              the empty string ('' is not None -> skip).
           3. For every id, call `jdb._id_caption(id)` -> (prompt, caption)
@@ -2309,7 +2309,7 @@ class AIDBSceneApp:
             gr.Info('All registered images already have a caption_joy.')
             return self._html_simg_editor_open(scene_id)
 
-        # 2. Caption the ids with a single JoySceneDBNG run (active skin).
+        # 2. Caption the ids with a single JoySceneDB run (active skin).
         gr.Info(
             f"Batch captioning {len(ids_empty)} image(s) with skin '{self._skin_name}'...",
             duration=3.0,
@@ -2322,20 +2322,19 @@ class AIDBSceneApp:
         n_failed = 0
         try:
             # IMPORTANT: force=True. Our query already filtered for empty
-            # caption_joy; JoySceneDBNG.caption_image's internal skip check
+            # caption_joy; JoySceneDB.caption_image's internal skip check
             # would otherwise skip images whose caption_joy is the empty
             # string '' (`'' is not None` is True), so trust our filter.
-            from ait.caption.joy_scenedb_ng import JoySceneDBNG
-            jdb = JoySceneDBNG(
+            from ait.caption.joy_scenedb import JoySceneDB
+            jdb = JoySceneDB(
                 config=cfg_name,
                 skin=self._skin_name,
                 verbose=1,
                 force=True,
             )
-            # 3. For every id, run a single inference (the underlying JoyNG
-            #    model is lazy-loaded once on the JoySceneDBNG instance and
-            #    reused for the rest of the loop) and persist the result
-            #    EXPLICITLY to caption_joy via set_caption_joy + db_store.
+            # 3. For every id, run a single inference (routed through the
+            #    persistent joy_server) and persist the caption EXPLICITLY
+            #    to caption_joy via set_caption_joy + db_store.
             for img_id in ids_empty:
                 try:
                     prompt, caption = jdb.caption_image(img_id)
@@ -2344,7 +2343,7 @@ class AIDBSceneApp:
                     n_failed += 1
                     continue
                 if not caption:
-                    # JoySceneDBNG returns (None, None) when it could not
+                    # JoySceneDB returns (None, None) when it could not
                     # open the image (`simg.pil` was None) or when the
                     # model produced nothing.
                     print(f'WARN: caption-empty produced no caption for [{img_id}]')
@@ -2388,13 +2387,13 @@ class AIDBSceneApp:
     # ------------------------------------------------------------------
     #
     # The captioner itself lives in the persistent joy_server (started on
-    # demand via joy_client.ensure_running). Per-click JoySceneDBNG
+    # demand via joy_client.ensure_running). Per-click JoySceneDB
     # instances are lightweight DB-bound enrichment clients — they do NOT
     # own model weights and creating them is cheap.
 
     def _html_simg_editor_caption(self, data_str: Optional[str]) -> str:
         """
-        Generates a caption for a registered SceneImage via JoySceneDBNG,
+        Generates a caption for a registered SceneImage via JoySceneDB,
         which routes through the persistent joy_server.
 
         Returns a JSON string `{image_id, caption_joy?, caption_prompt?}`
@@ -2489,8 +2488,8 @@ class AIDBSceneApp:
                 # NG path: routes through the persistent joy_server
                 # (auto-spinup on first call via joy_client.ensure_running)
                 # so each click doesn't pay a ~30s in-process cold-load.
-                from ait.caption.joy_scenedb_ng import JoySceneDBNG
-                jdb = JoySceneDBNG(
+                from ait.caption.joy_scenedb import JoySceneDB
+                jdb = JoySceneDB(
                     config=cfg_name,
                     skin=self._skin_name,
                     verbose=1,
@@ -2730,7 +2729,7 @@ class AIDBSceneApp:
     def _caption_set_generate(self, image_id_str: Optional[str]) -> str:
         """
         Backend handler for the per-cell 'set' button when caption_joy is
-        empty: generates a caption via JoySceneDBNG (routing through the
+        empty: generates a caption via JoySceneDB (routing through the
         persistent joy_server) and returns a JSON `{image_id, caption}`.
 
         The frontend `.then()` JS callback writes the returned caption into
@@ -2742,7 +2741,7 @@ class AIDBSceneApp:
         if not image_id:
             return ''
 
-        # 'set' always captions with the active skin via JoySceneDBNG.
+        # 'set' always captions with the active skin via JoySceneDB.
         trigger = self._skin_name
         gr.Info(
             f"Generating caption for image {image_id} (set, skin '{trigger}')...",
@@ -2752,8 +2751,8 @@ class AIDBSceneApp:
         jdb: Any = None
         caption: Optional[str] = None
         try:
-            from ait.caption.joy_scenedb_ng import JoySceneDBNG
-            jdb = JoySceneDBNG(
+            from ait.caption.joy_scenedb import JoySceneDB
+            jdb = JoySceneDB(
                 config=cfg_name,
                 skin=trigger,
                 verbose=1,
