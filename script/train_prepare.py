@@ -36,7 +36,7 @@ config_trainer_qwen_5090 = {
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
     'optimizer___lr': 1e-4,
 }
 
@@ -64,7 +64,7 @@ config_trainer_qwen_h100 = {
 
 # config_trainer = config_trainer_qwen_h100
 config_dataset = {
-    'num_repeats': 2,
+    'num_repeats': 8,
     # The 7 distinct (w, h) pairs in the compiled gts_v3 training set.
     # All max-side 1024, AR bucketed: 1:1, 3:4/4:3, 2:3/3:2, 3:5/5:3.
     'resolutions': [1024],
@@ -256,6 +256,10 @@ dataset_xlleggy = [
     ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLLEGGY), GTS_V3_NEUTRAL_IDS_XLLEGGY),
 ]
 
+dataset_xlface_jez = [
+    ('fbbcool/face-jez', 0),
+]
+
 # Trainer(
 #    'qwen',
 #    dataset_repo_ids,
@@ -267,10 +271,10 @@ dataset_xlleggy = [
 # )
 Trainer(
     'qwen',
-    dataset_xlasm,
-    # variant='2512-4xlasm',
-    variant='2512-snofs',
-    config_trainer=config_trainer_qwen_h100,
+    dataset_xlface_jez,
+    variant='2512-4xlasm',
+    # variant='2512-snofs',
+    config_trainer=config_trainer_qwen_5090,
     config_dataset=config_dataset,
     multithread=True,
 )
