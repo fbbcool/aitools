@@ -89,6 +89,10 @@
       "oneOf": [{ "type": "string" }, { "type": "null" }],
       "description": "SceneSet most associated with this skin; default for /v1-status and /todo-ai."
     },
+    "standalone": {
+      "oneOf": [{ "$ref": "#/$defs/standalone" }, { "type": "null" }],
+      "description": "OPTIONAL — 1xlasm-style skins only. Directive template used by the standalone single-image inference script (`script/img_caption.py`), which asks the model to produce a GENERATION-style prompt inspired by an input image (NOT a faithful caption — distinct from `directive`/`default_prompt`). Skins that don't ship a generation workflow (e.g. 1xlface) omit this section or set it to null; `Skin.standalone_directive()` raises a clear error in that case. Composed at runtime as: directive_head + (emphasis_preamble + emphases joined) + (hint_preamble.format(hint=…)) + directive_tail. {entities.*} placeholders inside the fields are resolved at build time; {hint} is the only runtime slot."
+    },
     "_built": {
       "oneOf": [{ "$ref": "#/$defs/built" }, { "type": "null" }],
       "description": "Derived state written by the build phase. Optional; loader warns if missing or stale."
@@ -289,6 +293,36 @@
       }
     },
 
+    "standalone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directive_head", "emphasis_preamble", "hint_preamble", "directive_tail"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable note about what this block is for. Not consumed by code."
+        },
+        "directive_head": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Opening prose of the standalone directive — persona, theme, trigger-phrase rules, identity guards. {entities.primary.token|phrase} and {entities.secondary.token|phrase} placeholders are resolved at build time."
+        },
+        "emphasis_preamble": {
+          "type": "string",
+          "description": "Lead-in string prepended to the joined emphases list when the caller supplies at least one emphasis. Skipped entirely when no emphases. Example: ' Must surface: '."
+        },
+        "hint_preamble": {
+          "type": "string",
+          "description": "Format string used when the caller supplies a hint. Must contain {hint}; skipped when the caller's hint is empty. Example: ' User intent: {hint}. Reflect this naturally in the generated prompt.'"
+        },
+        "directive_tail": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Closing prose of the standalone directive — OUTPUT STYLE rule. Sits in the model's recency slot."
+        }
+      }
+    },
+
     "built": {
       "type": "object",
       "additionalProperties": false,
@@ -300,6 +334,10 @@
         "directive": {
           "description": "Composed canonical recipe text sent to both system and user roles.",
           "type": "string"
+        },
+        "standalone": {
+          "oneOf": [{ "$ref": "#/$defs/standalone" }, { "type": "null" }],
+          "description": "Derived (placeholder-interpolated) standalone directive fields, mirroring the source `standalone` block. Present iff the source has the section. Loader exposes via `Skin.standalone_directive()`."
         },
         "labels": {
           "description": "Flat lookup of label PATH -> rendered (placeholder-interpolated) sentence. Paths are `<entity>.<group>.<leaf>`.",

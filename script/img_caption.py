@@ -6,7 +6,6 @@ from typing import Optional
 
 from aidb.scene.db_connect import DBConnection
 from ait.caption import joy_client
-from ait.caption.xlasm import xlasm_gen_directive
 from ait.caption.skin import SkinRegistry
 from ait.tools.files import is_img
 
@@ -35,9 +34,10 @@ if __name__ == '__main__':
             emphases.append(desc)
 
     # Hint goes INSIDE the directive (recency slot before OUTPUT STYLE) instead
-    # of through USER_HINT_PREAMBLE, whose training-flavor language fragments
-    # the output.
-    directive = xlasm_gen_directive(emphases, hint=hint)
+    # of through user_hint_preamble, whose training-flavor language fragments
+    # the output. The directive template lives in 1xlasm.json's optional
+    # `standalone` block (1xlasm-specific generation-mode prompt engineering).
+    directive = sk.standalone_directive(emphases=tuple(emphases), hint=hint)
 
     # Route through the persistent joy_server (model stays loaded, ~5-10s
     # per call). The server is auto-started on first call if not already up.

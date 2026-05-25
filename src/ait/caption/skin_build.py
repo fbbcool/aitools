@@ -155,12 +155,29 @@ def compose_built(
                 seen.add(term)
                 forbidden.append(term)
 
+    # ---- Standalone (1xlasm-style skins only) ----
+    # Optional: skins that ship a generation-mode directive (script/img_caption.py)
+    # carry a top-level `standalone` block; resolve {entities.*} placeholders
+    # at build time, leave {hint} untouched (caller-side runtime slot).
+    standalone_src = data.get('standalone')
+    standalone_built: Optional[dict] = None
+    if standalone_src is not None:
+        standalone_built = {
+            'directive_head':    interp(standalone_src['directive_head']),
+            'emphasis_preamble': interp(standalone_src['emphasis_preamble']),
+            'hint_preamble':     interp(standalone_src['hint_preamble']),
+            'directive_tail':    interp(standalone_src['directive_tail']),
+        }
+        desc = standalone_src.get('description')
+        if desc is not None:
+            standalone_built['description'] = desc
+
     # ---- Hash + timestamp ----
     if source_hash is None:
         source_hash = _compute_source_hash(data)
     built_at = _now_cet_iso()
 
-    return {
+    built: dict[str, Any] = {
         'version':         1,
         'built_at':        built_at,
         'source_hash':     source_hash,
@@ -170,6 +187,9 @@ def compose_built(
         'label_to_entity': label_to_entity,
         'forbidden':       forbidden,
     }
+    if standalone_built is not None:
+        built['standalone'] = standalone_built
+    return built
 
 
 # ---------------------------------------------------------------------------

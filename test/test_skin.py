@@ -1,16 +1,16 @@
 """Tests for the Skin loader.
 
-Verify byte-equality of the rebuilt skin against today's `joy.py` constants
-for labels, forbidden vocab, body-type rules, and the user-hint preamble.
-Validators (caption_violations / body_type_warnings / missing_triggers) are
-checked against the legacy free functions on a small fixture.
+Structural checks of the rebuilt 1xlasm skin: label paths, forbidden vocab,
+body-type rules, validators, concept matching, render order, and the
+compute_labels_ng legacy → path migration helper. (The byte-equality tests
+that asserted parity with the deleted `xlasm.py` constants were retired
+after the legacy module was removed.)
 """
 import os
 from pathlib import Path
 
 import pytest
 
-from ait.caption import xlasm as joy   # legacy aliased as `joy` for in-test parity
 from ait.caption.skin import Skin, SkinRegistry, _compute_source_hash
 
 
@@ -57,7 +57,6 @@ LEGACY_NAME_TO_PATH: dict[str, str] = {
     'job':        'primary.action.job',
     # secondary attributes
     'penis':    'secondary.attribute.penis',
-    'penis_no': 'secondary.attribute.penis_no',
     # secondary poses
     'man_front':   'secondary.pose.front',
     'man_back':    'secondary.pose.back',
@@ -103,7 +102,7 @@ LEGACY_NAME_TO_PATH: dict[str, str] = {
 }
 
 
-# Paths that exist only in the new schema (no legacy joy.LABEL_PROMPT entry).
+# Paths that exist only in the new schema (no legacy entry).
 # Listed separately so the no-extras test stays an explicit allow-list rather
 # than a permissive “anything goes” check.
 NEW_PATHS_NOT_IN_LEGACY: set[str] = {
@@ -128,6 +127,13 @@ NEW_PATHS_NOT_IN_LEGACY: set[str] = {
     'interaction.act.look_at_each',
     'interaction.act.she_look_at_him',
     'interaction.act.she_look_at_penis',
+    # interaction.proximity group (added after the legacy schema)
+    'interaction.proximity.ass',
+    'interaction.proximity.breasts',
+    'interaction.proximity.face',
+    'interaction.proximity.mouth',
+    'interaction.proximity.thighs',
+    'interaction.proximity.vagina',
 }
 
 
@@ -148,20 +154,16 @@ def test_default_set(skin):
     assert skin.default_set == 'gts_v3'
 
 
-# --- byte equality vs legacy constants ---
+# --- label coverage (every legacy path resolves to a populated label) ---
 
 
-def test_labels_byte_equal_legacy(skin):
-    """Every label in joy.LABEL_PROMPT (minus heap/none placeholders) must be
-    represented in skin.labels (path-keyed) with identical interpolated
-    content. The legacy-name→path map encodes the body-attribute and pose
-    rename history."""
-    for legacy_name, expected in joy.LABEL_PROMPT.items():
-        if legacy_name in {'heap', 'none'}:
-            continue
-        path = LEGACY_NAME_TO_PATH[legacy_name]
-        assert path in skin.labels, f'missing path: {path}'
-        assert skin.labels[path] == expected, f'mismatch on {path}'
+def test_label_paths_present(skin):
+    """Every legacy-name → path mapping resolves to a populated entry in
+    skin.labels. Catches schema/path-rename regressions without depending on
+    the deleted xlasm.LABEL_PROMPT constants."""
+    for legacy_name, path in LEGACY_NAME_TO_PATH.items():
+        assert path in skin.labels, f'missing path: {path} (legacy: {legacy_name})'
+        assert skin.labels[path].strip(), f'empty expansion for {path}'
 
 
 def test_no_extra_labels(skin):
@@ -170,27 +172,36 @@ def test_no_extra_labels(skin):
     assert not extras
 
 
-def test_forbidden_set_equal_legacy(skin):
-    """Forbidden vocab is order-insensitive; assert as set equality."""
-    assert set(skin.forbidden) == set(joy._FORBIDDEN_IN_XLASM)
+def test_forbidden_covers_known_words(skin):
+    """The legacy 1xlasm forbidden list collapsed to set semantics — we now
+    only assert that the load-bearing vocabulary is present (specific words
+    the captioner is known to slip; matches the original test_caption_violations
+    fixture data below)."""
+    forbidden_lower = {w.lower() for w in skin.forbidden}
+    for term in ('tiny', 'figurine', 'giantess', 'doll', 'enormous',
+                 'towering', 'child'):
+        assert term in forbidden_lower, f'expected forbidden word missing: {term!r}'
 
 
-def test_body_type_words_equal_legacy(skin):
-    # body_type_words uses leaf names (the validator authorizes by label key,
-    # not full path). Map the legacy `b_<x>` keys to their renamed leaves.
-    leaf_map = {
-        'b_muscular': 'muscular', 'b_busty': 'busty',
-        'b_slim': 'slim',         'b_curvy': 'curvy',
-    }
-    expected = {leaf_map.get(k, k): tuple(v) for k, v in joy._BODY_TYPE_WORDS.items()}
-    assert skin.body_type_words == expected
+def test_body_type_words_shape(skin):
+    """The four body-type leaves each have their authorizing word list."""
+    expected_leaves = {'muscular', 'busty', 'slim', 'curvy'}
+    assert set(skin.body_type_words.keys()) >= expected_leaves
+    for leaf in expected_leaves:
+        words = skin.body_type_words[leaf]
+        assert isinstance(words, tuple)
+        assert len(words) >= 1, f'body_type_words[{leaf!r}] is empty'
+        # leaf-name itself should be one of the authorized words
+        assert leaf in {w.lower() for w in words}
 
 
-def test_user_hint_preamble_equal_legacy(skin):
-    assert skin.user_hint_preamble == joy.USER_HINT_PREAMBLE
+def test_user_hint_preamble_format_slot(skin):
+    """The preamble must contain a `{hint}` slot so compile_user_prompt
+    can interpolate per-image hints."""
+    assert '{hint}' in skin.user_hint_preamble
 
 
-# --- validators match legacy behavior on fixtures ---
+# --- validators (structural assertions on fixture text) ---
 
 
 CLEAN = (
@@ -208,49 +219,39 @@ MISSING_TRIGGER_MAN = 'The xlgts woman holds him in her hand.'
 
 
 def test_caption_violations_clean(skin):
-    assert skin.caption_violations(CLEAN) == joy.caption_has_xlasm_violations(CLEAN)
     assert skin.caption_violations(CLEAN) == []
 
 
 def test_caption_violations_dirty(skin):
-    new = sorted(skin.caption_violations(CONTAINS_FORBIDDEN))
-    old = sorted(joy.caption_has_xlasm_violations(CONTAINS_FORBIDDEN))
-    assert new == old
-    assert 'tiny' in new
-    assert 'figurine' in new
-    assert 'giantess' in new
+    violations = sorted(skin.caption_violations(CONTAINS_FORBIDDEN))
+    assert 'tiny' in violations
+    assert 'figurine' in violations
+    assert 'giantess' in violations
 
 
-def test_body_type_warnings_match_legacy(skin):
-    new = skin.body_type_warnings(WITH_BODY_TYPE, applied_labels=[])
-    old = joy.validate_body_type_consistency(WITH_BODY_TYPE, labels=[])
-    # Same warnings, but the skin uses the renamed (un-prefixed) label name
-    # in the message text. Translate legacy `b_<name>` mentions before comparing.
-    old_translated = sorted(
-        msg.replace('b_muscular', 'muscular')
-           .replace('b_busty', 'busty')
-           .replace('b_slim', 'slim')
-           .replace('b_curvy', 'curvy')
-        for msg in old
-    )
-    assert sorted(new) == old_translated
-    assert new  # at least one warning expected (busty/muscular without labels)
+def test_body_type_warnings_unauthorized(skin):
+    """Body-type words appearing without their authorizing label → warnings."""
+    warnings = skin.body_type_warnings(WITH_BODY_TYPE, applied_labels=[])
+    assert warnings, 'expected at least one warning (busty/muscular without label)'
+    joined = ' '.join(warnings).lower()
+    assert 'busty' in joined or 'muscular' in joined
 
 
 def test_body_type_warnings_authorized(skin):
-    # Skin uses unprefixed names; legacy joy.py still uses b_ prefix.
-    new = skin.body_type_warnings(WITH_BODY_TYPE, applied_labels=['busty', 'muscular'])
-    old = joy.validate_body_type_consistency(
-        WITH_BODY_TYPE, labels=['b_busty', 'b_muscular']
-    )
-    assert sorted(new) == sorted(old) == []
+    """Same body-type text, but with authorizing labels → no warnings."""
+    warnings = skin.body_type_warnings(WITH_BODY_TYPE, applied_labels=['busty', 'muscular'])
+    assert warnings == []
 
 
-def test_missing_triggers_match_legacy(skin):
-    assert skin.missing_triggers(CLEAN) == joy.validate_trigger_presence(CLEAN) == []
-    assert skin.missing_triggers(MISSING_TRIGGER_MAN) == joy.validate_trigger_presence(
-        MISSING_TRIGGER_MAN
-    )
+def test_missing_triggers_clean(skin):
+    assert skin.missing_triggers(CLEAN) == []
+
+
+def test_missing_triggers_missing_man(skin):
+    missing = skin.missing_triggers(MISSING_TRIGGER_MAN)
+    assert missing  # non-empty: 'xlasm man' is absent
+    joined = ' '.join(missing).lower()
+    assert 'xlasm' in joined
 
 
 # --- concept matching ---

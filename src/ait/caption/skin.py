@@ -194,6 +194,14 @@ class Skin:
     label_to_group: dict[str, str]       # 'b_muscular' -> 'primary.attribute'
     label_to_entity: dict[str, str]      # 'b_muscular' -> 'primary' / 'ass' -> 'interaction'
     forbidden: tuple[str, ...]           # union of all forbidden lists, deduplicated
+    # Optional 1xlasm-style standalone-script generation directive block.
+    # Present when the skin ships a `standalone` section (currently only
+    # 1xlasm). `None` on skins that don't (e.g. 1xlface). Built form:
+    # {directive_head, emphasis_preamble, hint_preamble, directive_tail}
+    # — all `{entities.*}` placeholders resolved at build time; `{hint}` is
+    # the only remaining slot in `hint_preamble`, filled at call time by
+    # `Skin.standalone_directive()`.
+    standalone: Optional[dict[str, str]] = None
     # raw source dict (for skin_build / inspection)
     source: dict[str, Any] = field(default_factory=dict)
     # Theme briefing — verbatim contents of the sibling `conf/skins/<name>.md`
@@ -254,6 +262,37 @@ class Skin:
             parts.append(self.user_hint_preamble.format(hint=h))
         parts.extend(self.render_label_prompts(applied_paths))
         parts.append(self.post_prompt)
+        return ''.join(parts)
+
+    def standalone_directive(self, emphases: tuple[str, ...] = (), hint: str = '') -> str:
+        """Compose the standalone-mode (generation-prompt) directive.
+
+        OPTIONAL — only available on skins that ship a `standalone` block
+        (currently 1xlasm). Used by the standalone single-image inference
+        script `script/img_caption.py` (and its `ait_img_caption_clipspace`
+        shell wrapper) to ask the model to write a generation prompt
+        inspired by an input image — NOT a faithful caption.
+
+        Raises ValueError on skins without a standalone block.
+
+        Composition: directive_head + (emphasis_preamble + emphases joined)
+        + (hint_preamble.format(hint=…) if hint) + directive_tail.
+        """
+        if self.standalone is None:
+            raise ValueError(
+                f'Skin {self.name!r} has no `standalone` block — only '
+                f'1xlasm-style skins ship one. Update the skin JSON or '
+                f'pick a different skin.'
+            )
+        sa = self.standalone
+        parts = [sa['directive_head']]
+        emphases = tuple(e.strip() for e in emphases if e and e.strip())
+        if emphases:
+            parts.append(sa['emphasis_preamble'] + ' '.join(emphases))
+        h = (hint or '').strip()
+        if h:
+            parts.append(sa['hint_preamble'].format(hint=h))
+        parts.append(sa['directive_tail'])
         return ''.join(parts)
 
     def render_label_prompts(self, applied: list[str]) -> list[str]:
@@ -532,6 +571,7 @@ class Skin:
             label_to_group=dict(built['label_to_group']),
             label_to_entity=dict(built['label_to_entity']),
             forbidden=tuple(built['forbidden']),
+            standalone=(dict(built['standalone']) if built.get('standalone') else None),
             source=data,
             theme_md=theme_md,
             theme_md_suggestions=theme_md_suggestions,

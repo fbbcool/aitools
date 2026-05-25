@@ -9,7 +9,6 @@ from aidb.app.html import AppHtml, HtmlHelper
 from aidb.scene import Scene, SceneDef
 from aidb.scene.scene_image import SceneImage
 
-from ait.caption.xlasm import LABEL_PROMPT
 from ait.caption.skin import Skin, SkinRegistry
 from ait.tools.images import image_from_url, _image_extract_prompt_from_info_ext
 
@@ -48,15 +47,6 @@ def _skin(name: Optional[str] = None) -> Optional[Skin]:
         return None
     _SKIN_CACHE[name] = s
     return s
-
-
-def editor_labels() -> list[str]:
-    """
-    Returns the canonical list of labels available in the editor UI:
-    the keys of `LABEL_PROMPT` from the captioner, with 'none' removed.
-    Dict insertion order is preserved.
-    """
-    return [k for k in LABEL_PROMPT.keys() if k != 'none']
 
 
 class AppSceneImageCell:
@@ -533,29 +523,6 @@ class AppSceneImageCell:
             f'  {hint_row}'
             f'</div>'
         )
-
-    @staticmethod
-    def _html_labels(obj: SceneImage) -> str:
-        """
-        Toggleable label buttons (mirrors the Scene 'label' operation).
-        Clicking a label sends a `switch_label` cmd which flips its membership.
-        """
-        current_labels = obj.labels
-        html = ''
-        for label in editor_labels():
-            checked = label in current_labels
-            html += AppHtml.html_make_cmd_button(
-                AppHtml.make_cmd_data(
-                    'image',
-                    obj.id,
-                    'db_query',
-                    payload={'switch_label': label},
-                    label=label,
-                ),
-                checked=checked,
-                toggle=True,
-            )
-        return html
 
     @staticmethod
     def _html_text_field(
@@ -1122,22 +1089,7 @@ class AppSceneImageCell:
                 checked=checked,
             )
 
-        labels_html = ''
         current_labels = scene.labels
-        for label in editor_labels():
-            checked = label in current_labels
-            labels_html += AppHtml.html_make_cmd_button(
-                AppHtml.make_cmd_data(
-                    'scene',
-                    scene.id,
-                    'db_query',
-                    payload={'switch_label': label},
-                    label=label,
-                ),
-                checked=checked,
-                toggle=True,
-            )
-
         sets_html = ''
         for label in SceneDef.label_sets():
             checked = label in current_labels
@@ -1159,12 +1111,6 @@ class AppSceneImageCell:
                 <label class="simg-edit-label">scene rating</label>
                 <div class="operation-radio-group">
                     {rating_html}
-                </div>
-            </div>
-            <div class="simg-edit-field">
-                <label class="simg-edit-label">scene labels</label>
-                <div class="operation-radio-group">
-                    {labels_html}
                 </div>
             </div>
             <div class="simg-edit-field">

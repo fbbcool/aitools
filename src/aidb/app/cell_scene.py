@@ -1,6 +1,5 @@
 import html as html_lib
 
-from aidb.app.cell_scene_image import editor_labels
 from aidb.app.html import AppHtml, AppOpMmode, HtmlHelper
 from aidb.scene import Scene, SceneDef
 
@@ -115,8 +114,6 @@ class AppSceneCell:
                 extras = f'<div class="scene-cell-subdir">{safe}</div>'
         elif mode == 'rate':
             html = AppSceneCell._html_op_rate(obj)
-        elif mode == 'label':
-            html = AppSceneCell._html_op_label(obj)
         elif mode == 'set':
             html = AppSceneCell._html_op_set(obj)
 
@@ -162,26 +159,6 @@ class AppSceneCell:
         html += AppHtml.html_make_cmd_button(
             AppHtml.make_cmd_data('scene', obj.id, 'to_clipspace', payload='url', label='url')
         )
-        return html
-
-    @staticmethod
-    def _html_op_label(obj: Scene) -> str:
-        current_labels = obj.labels
-
-        html = ''
-        for label in editor_labels():
-            checked = True if label in current_labels else False
-            html += AppHtml.html_make_cmd_button(
-                AppHtml.make_cmd_data(
-                    'scene',
-                    obj.id,
-                    'db_query',
-                    payload={'switch_label': label},
-                    label=label,
-                ),
-                checked=checked,
-                toggle=True,
-            )
         return html
 
     @staticmethod

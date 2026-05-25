@@ -9,11 +9,7 @@ from typing import Any, Optional
 from aidb import SceneManager, SceneDef
 from aidb.scene.scene_set_manager import SceneSetManager
 from aidb.app.cell_scene import AppSceneCell
-from aidb.app.cell_scene_image import (
-    AppSceneImageCell,
-    editor_labels,
-    set_active_skin,
-)
+from aidb.app.cell_scene_image import AppSceneImageCell, set_active_skin
 from aidb.app.html import AppHtml, AppOpMmode, AppHelper, HtmlHelper
 
 from ait.tools.files import imgs_from_url
@@ -208,19 +204,12 @@ class AIDBSceneApp:
                     )
                     mode = gr.Dropdown(
                         label='Mode',
-                        choices=['info', 'rate', 'label', 'set'],
+                        choices=['info', 'rate', 'set'],
                         value='info',
                         allow_custom_value=False,
                         interactive=True,
                     )
                 with gr.Row():
-                    label_dropdown = gr.Dropdown(
-                        label='Label',
-                        choices=['Ignore', 'Empty'] + editor_labels(),
-                        value='Ignore',
-                        allow_custom_value=False,
-                        interactive=True,
-                    )
                     set_dropdown = gr.Dropdown(
                         label='Set',
                         choices=['Ignore', 'Empty'] + list(SceneDef.TAG_SETS),
@@ -265,7 +254,6 @@ class AIDBSceneApp:
                         rating_min,
                         rating_max,
                         mode,
-                        label_dropdown,
                         set_dropdown,
                         subdir_dropdown,
                         search_show_active,
@@ -1904,7 +1892,6 @@ class AIDBSceneApp:
         rating_min: Optional[str],
         rating_max: Optional[str],
         mode: Optional[AppOpMmode],
-        opt_label: Optional[str],
         opt_set: Optional[str],
         opt_subdir: Optional[str],
         show_active: bool = True,
@@ -1921,14 +1908,7 @@ class AIDBSceneApp:
         r_max = SceneDef.RATING_MAX
         if rating_max is not None:
             r_max = int(rating_max)
-        if opt_label is None:
-            labels = None
-        elif opt_label in ['Ignore', 'None']:
-            labels = None
-        elif opt_label in ['Empty']:
-            labels = []
-        else:
-            labels = [opt_label]
+        labels = None  # legacy FIELD_LABELS filter UI was removed
 
         if opt_set is None or opt_set in ['Ignore', 'None']:
             set_query = None

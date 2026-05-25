@@ -117,22 +117,17 @@ def test_compose_full_pipeline():
     assert p == expected
 
 
-def test_skin_to_joy_compose_components_match_legacy():
-    """Compose a prompt the way JoySceneDB would. The directive (user_content)
-    is rebuilt from entities/interaction so it deliberately differs from
-    legacy CONTENT_PROMPT (per plan); label render order is by group rather
-    than input list. We assert the structural components match: default
-    prompt, hint preamble, label-prompt set, and post prompt are all present.
-    """
-    from ait.caption import xlasm as legacy
+def test_skin_to_joy_compose_components():
+    """Compose a prompt the way JoySceneDB would. Verify the structural
+    components are present (default prompt prefix, directive, hint preamble
+    with interpolated hint, both label expansions) and that render order
+    follows the skin's group declaration order (primary.attribute before
+    primary.action)."""
     from ait.caption.joy import Joy
     from ait.caption.skin import SkinRegistry
 
     skin = SkinRegistry().get('1xlasm')
-    # Skin uses the renamed (un-prefixed) `busty` label; the legacy LABEL_PROMPT
-    # in xlasm.py still uses `b_busty`. Map below correlates them.
     labels_new = ['blowjob', 'busty']
-    labels_legacy = ['blowjob', 'b_busty']
     hint = 'large breasts visible'
 
     rendered = skin.render_label_prompts(labels_new)
@@ -146,15 +141,17 @@ def test_skin_to_joy_compose_components_match_legacy():
         post_prompt=skin.post_prompt,
     )
 
-    # default_prompt unchanged
-    assert new.startswith(legacy.DEFAULT_PROMPT)
-    # directive present (rebuilt — not byte-equal to CONTENT_PROMPT)
+    # default_prompt is the prefix
+    assert new.startswith(skin.default_prompt)
+    # directive present
     assert skin.directive in new
     # hint preamble interpolated correctly
-    assert legacy.USER_HINT_PREAMBLE.format(hint=hint) in new
-    # every applied label's prompt appears verbatim, byte-equal to LABEL_PROMPT
-    for label in labels_legacy:
-        assert legacy.LABEL_PROMPT[label] in new
+    assert skin.user_hint_preamble.format(hint=hint) in new
+    # both label expansions present verbatim
+    busty_expansion = skin.labels['primary.attribute.busty']
+    blowjob_expansion = skin.labels['primary.action.blowjob']
+    assert busty_expansion in new
+    assert blowjob_expansion in new
     # render order is group-declaration order: busty (primary.attribute) BEFORE
-    # blowjob (primary.action) — opposite of legacy input-order behavior.
-    assert new.index(legacy.LABEL_PROMPT['b_busty']) < new.index(legacy.LABEL_PROMPT['blowjob'])
+    # blowjob (primary.action) — opposite of input-list order.
+    assert new.index(busty_expansion) < new.index(blowjob_expansion)
