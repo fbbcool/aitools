@@ -53,6 +53,17 @@ if has_canonical:
           'but will NOT touch the canonical fields.')
 ```
 
+**Prior — `labels_ng_extraction`** (face-skin only, optional). When the SceneImage has labels in `FIELD_LABELS_NG_EXTRACTION` (auto-populated by `script/imgs_extract_face_meta.py` from aip's `face_meta` PNG chunk), those are deterministic geometric/structural facts (gaze direction, eye/mouth state, framing, composition for 1xlface). Use them as a prior:
+
+```python
+extraction = set(simg.labels_ng_extraction or [])
+
+# Groups already covered by extraction — skip the corresponding joy probes
+groups_covered = {p.rsplit('.', 1)[0] for p in extraction}  # e.g. {'primary.framing', 'primary.eye_state'}
+```
+
+The judgment-driven probe loop below can skip iter-3 (pose/gaze) / iter-4 (body details) targets whose groups appear in `groups_covered`, and the final-suggestion composition starts with `state['labels_candidate'] |= extraction` so the extraction labels survive into `labels_ng_SUGGESTION` for curator review. Extraction is read-only here — `/img_suggest` never mutates `FIELD_LABELS_NG_EXTRACTION`.
+
 Ensure the joy server is running with the requested skin (auto-restarts if a different skin is currently loaded):
 
 ```python

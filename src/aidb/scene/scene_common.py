@@ -75,6 +75,13 @@ class SceneDef:
     FIELD_HINTS_SUGGESTION: Final = 'hints_SUGGESTION'
     FIELD_TIMESTAMP_LABELS_NG_SUGGESTION: Final = 'timestamp_labels_ng_SUGGESTION'
     FIELD_TIMESTAMP_HINTS_SUGGESTION: Final = 'timestamp_hints_SUGGESTION'
+    # Labels bucketed from the aip avatar project's `face_meta.structural`
+    # measurements (geometric / image-stats — gaze, eye_state, mouth_state,
+    # framing, composition). Separate from `_SUGGESTION` to keep provenance
+    # clean: extraction labels are deterministic and load-bearing for the
+    # 1xlface skin; JoyCaption `_SUGGESTION` fills the affect-heavy gaps.
+    FIELD_LABELS_NG_EXTRACTION: Final = 'labels_ng_EXTRACTION'
+    FIELD_TIMESTAMP_LABELS_NG_EXTRACTION: Final = 'timestamp_labels_ng_EXTRACTION'
     FIELD_PROTOTYPE: Final = 'prototype'
 
     TAG_PREFIX_SET: Final = f'set{SEPERATOR_ID}'

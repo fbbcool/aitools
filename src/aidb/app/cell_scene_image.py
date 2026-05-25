@@ -344,6 +344,7 @@ class AppSceneImageCell:
 
         applied = set(obj.labels_ng)
         suggested = set(obj.labels_ng_suggestion or [])
+        extracted = set(obj.labels_ng_extraction or [])
         blocks: list[tuple[str, str, dict]] = []  # (entity_tag, title, label_groups)
         primary = skin.entities_primary
         blocks.append(('primary', primary.phrase or 'primary', primary.label_groups))
@@ -374,12 +375,18 @@ class AppSceneImageCell:
                         checked=path in applied,
                         toggle=True,
                     )
-                    # Suggested-but-not-yet-on-canonical → wrap with the
-                    # pink-framed marker so the curator sees joy's
-                    # candidates inline with the regular taxonomy. The
-                    # frame is independent of the checked state, so it
-                    # persists after the curator accepts (until the
-                    # _SUGGESTION field is cleared).
+                    # Inline markers (independent of the checked state, so
+                    # the curator sees each source at a glance regardless
+                    # of whether the label is already on canonical):
+                    #  - blue (innermost) — aip's face_meta extractor
+                    #    deterministically inferred this from geometry /
+                    #    image stats.
+                    #  - pink (outermost) — joy suggested it via /img_suggest.
+                    # Nesting order: button → blue → pink, so a label
+                    # confirmed by BOTH sources shows both borders, with
+                    # the extractor wrapper visually contained by joy's.
+                    if path in extracted:
+                        btn = f'<span class="simg-labels-ng-extraction">{btn}</span>'
                     if path in suggested:
                         btn = f'<span class="simg-labels-ng-suggested">{btn}</span>'
                     btn_html += btn
@@ -1982,6 +1989,23 @@ class AppSceneImageCell:
                 padding: 0 1px;
                 margin: 1px;
                 background-color: rgba(216, 112, 156, 0.08);
+            }
+            /* ---- _EXTRACTION inline marker on labels_ng buttons ---- */
+            /* Mirror of the pink suggestion wrapper, in blue. Wraps each
+               label that aip's face_meta extractor populated into the
+               FIELD_LABELS_NG_EXTRACTION field — geometric / structural
+               facts (gaze, eye_state, mouth_state, framing, composition)
+               that are deterministic given the same face_meta + skin.
+               Nests INSIDE the suggested wrapper when both fire, so the
+               curator sees blue (extractor) wrapped by pink (joy) for
+               labels confirmed by both sources. */
+            .simg-labels-ng-extraction {
+                display: inline-block;
+                border: 1.5px solid #709cd8;
+                border-radius: 5px;
+                padding: 0 1px;
+                margin: 1px;
+                background-color: rgba(112, 156, 216, 0.08);
             }
             /* ---- _SUGGESTION panel (compact, always rendered) ---- */
             /* Carries top-line accept/clear actions for labels (when

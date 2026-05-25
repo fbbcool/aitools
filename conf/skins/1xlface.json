@@ -204,6 +204,16 @@
               "expansion": "The {entities.primary.phrase} has a sultry expression, lids low and lips slightly parted."
             },
             {
+              "name": "seductive",
+              "description": "Deliberate enticement: half-lidded eyes, parted lips, often a tilted head — actively inviting the viewer. More overt than `sultry`.",
+              "expansion": "The {entities.primary.phrase} wears a seductive expression, gaze half-lidded and lips parted in invitation."
+            },
+            {
+              "name": "ahegao",
+              "description": "Stylised expression of overwhelming arousal: eyes rolled back or crossed, mouth open (often with tongue out), exaggerated overwhelm. Anime-origin trope; specific stylized form, distinct from generic `surprised` or `sultry`. Often co-occurs with `mouth_state.wide` or `mouth_state.tongue_out`.",
+              "expansion": "The {entities.primary.phrase} pulls an ahegao expression — eyes rolled back, mouth open in exaggerated overwhelm."
+            },
+            {
               "name": "dreamy",
               "description": "Soft eyes, faraway look, slight smile.",
               "expansion": "The {entities.primary.phrase} wears a dreamy, faraway expression."
@@ -232,6 +242,11 @@
               "name": "disdainful",
               "description": "Slight lip curl, narrowed eyes, look of contempt or disapproval.",
               "expansion": "The {entities.primary.phrase} looks disdainful — lips slightly curled, eyes narrowed."
+            },
+            {
+              "name": "disgusted",
+              "description": "Visceral aversion: wrinkled nose, raised upper lip, mouth corners pulled down or back. More physical than `disdainful` (which is colder contempt).",
+              "expansion": "The {entities.primary.phrase} wears a disgusted expression — nose wrinkled, upper lip raised."
             },
             {
               "name": "mocking",
@@ -300,8 +315,13 @@
             },
             {
               "name": "open",
-              "description": "Mouth clearly open, teeth or interior visible.",
-              "expansion": "The {entities.primary.phrase}'s mouth is open, teeth visible."
+              "description": "Mouth clearly open (medium gape). MAR-bucketable; whether teeth or interior are visible is a separate detail and not part of this label's geometric definition. Distinct from `wide` (extreme gape).",
+              "expansion": "The {entities.primary.phrase}'s mouth is open."
+            },
+            {
+              "name": "wide",
+              "description": "Mouth open very wide (extreme gape — yawn, scream, gasp, surprised wide-open). Top end of the MAR distribution. Distinct from `open` (medium gape).",
+              "expansion": "The {entities.primary.phrase}'s mouth is open wide."
             },
             {
               "name": "tongue_out",
@@ -341,7 +361,7 @@
           ]
         },
         "framing": {
-          "description": "Shot composition / crop. One label per image.",
+          "description": "Shot crop / distance bucket. One label per image. Bucketable from face bbox area as a fraction of the frame.",
           "labels": [
             {
               "name": "extreme_close_up",
@@ -367,7 +387,12 @@
               "name": "three_quarter",
               "description": "Head to mid-torso.",
               "expansion": "Framed as a three-quarter portrait, head down to mid-torso."
-            },
+            }
+          ]
+        },
+        "composition": {
+          "description": "Compositional modifiers, orthogonal to `framing` (the distance bucket). Zero or more labels per image; can co-occur with any framing leaf. Bucketable from face-bbox centroid normalised coords.",
+          "labels": [
             {
               "name": "off_center",
               "description": "Subject positioned distinctly off the frame's vertical centerline.",
@@ -534,6 +559,11 @@
               "expansion": "A facial piercing is visible."
             },
             {
+              "name": "piercing_nose",
+              "description": "Visible nose piercing (stud, ring, septum).",
+              "expansion": "A nose piercing is visible."
+            },
+            {
               "name": "collar",
               "description": "Neck collar (leather, studded, posture collar, choker). Distinct from a fashion necklace — describes a deliberate neck-restraint or fetish accessory.",
               "expansion": "A collar is fastened around the neck."
@@ -621,8 +651,8 @@
   "default_set": null,
   "_built": {
     "version": 1,
-    "built_at": "2026-05-25T14:12:04+02:00",
-    "source_hash": "sha256:ee50bb64aa52753bfb1332f9c548a1bb67d8bb5dd21868ec0c40c8563321c85a",
+    "built_at": "2026-05-25T16:28:19+02:00",
+    "source_hash": "sha256:59a08c6348575cccf61a38ce30df2dad8324fd544ef1dbc95d975ef4e57f5092",
     "directive": "This image features one figure: a woman.\n\nThe portrait subject — a specific ADULT woman whose face the LoRA learns. PERSONA: she is a dominatrix; the dataset typically includes variable wardrobe (mask on/off, different collars, harnesses, sometimes civilian shots). Captioner refers to her as 'the woman' / 'she' / 'her' — NEVER as 'the dominatrix', 'domme', or 'mistress' (persona is identity, not state). Three hard constraints: (1) ADULT-ONLY: she is always an adult woman; teen / schoolgirl / child / minor descriptors must NEVER appear in captions regardless of what the captioner thinks it sees. (2) PERSONA WORD BAN: 'dominatrix' and synonyms are hard-forbidden — describe what is visually present (mask, collar, harness, stern expression), not the role. (3) IDENTITY SUPPRESSION: hair color, eye color, skin tone, age descriptors, ethnicity, face geometry, freckles, moles must NEVER appear in captions — anything described in the caption gets disentangled from the identity trigger, defeating the avatar-LoRA goal. Refer to the subject as 'the woman' in the opening sentence, then naturally as 'her' / 'she'. Do not repeat 'woman' every sentence. Describe what is visible in the face and immediate framing only. Do not invent backstory, mood narratives, or scene context that the image does not show. ADULT-ONLY (load-bearing safety rule). The subject is ALWAYS an adult woman. Refer to her ONLY as 'woman' (or 'her' / 'she'). Do NOT use 'girl', 'young woman', 'teen', 'teenage', 'teenager', 'schoolgirl', 'child', 'kid', 'youth', 'minor', 'underage', 'pre-teen', 'tween', 'juvenile', 'adolescent', 'youthful', or any other descriptor that suggests or implies she is under 18, regardless of what the captioner thinks it sees in the image. If JoyCaption's vision drifts younger than adult, override it: render as 'woman'. PERSONA WORD BAN. The subject is a dominatrix BUT the persona word and its synonyms must NEVER appear in captions: do NOT write 'dominatrix', 'domme', 'mistress', or 'dominant woman' to describe her. The persona is identity (constant across the dataset, encoded into the LoRA visually); naming it in captions attaches the role to the variable signal and breaks LoRA decoupling. Describe what is VISIBLE in this particular shot — a leather mask, a studded collar, a stern expression, intense gaze — without ever naming the role. IDENTITY SUPPRESSION (load-bearing rule for avatar-LoRA datasets). Do NOT describe the subject's permanent identity features: hair color, eye color, skin tone, age, ethnicity, face shape, lip shape, nose shape, freckles, moles, scars, or any specific physical attribute that does not change across the dataset. Describe ONLY the variable state of this particular image: expression, gaze, mouth state, lighting, framing, hair style (up/down/wet/braided — not color), accessories (including dominatrix-typical mask / collar / harness when visible), makeup style. Anything the captioner describes gets associated with the variable signal, not the identity trigger; describing identity features teaches the LoRA to recombine them away from the trigger, which is the opposite of what an avatar LoRA must do. Do not use these meta-photography fillers: 'professional photograph', 'high quality', 'highly detailed', 'masterpiece', 'studio quality'. The caption should describe the subject, not the medium.",
     "labels": {
       "primary.expression.neutral": "The woman shows a neutral, relaxed expression.",
@@ -637,12 +667,15 @@
       "primary.expression.angry": "The woman shows anger, jaw tense and gaze hardened.",
       "primary.expression.focused": "The woman is focused, eyes attentive and brows level.",
       "primary.expression.sultry": "The woman has a sultry expression, lids low and lips slightly parted.",
+      "primary.expression.seductive": "The woman wears a seductive expression, gaze half-lidded and lips parted in invitation.",
+      "primary.expression.ahegao": "The woman pulls an ahegao expression — eyes rolled back, mouth open in exaggerated overwhelm.",
       "primary.expression.dreamy": "The woman wears a dreamy, faraway expression.",
       "primary.expression.contemplative": "The woman looks contemplative, gaze turned inward.",
       "primary.expression.serene": "The woman has a serene, calm expression.",
       "primary.expression.dominant": "The woman has a dominant, commanding expression — brow raised, head tilted slightly up.",
       "primary.expression.stern": "The woman wears a stern expression, jaw set and eyes hard.",
       "primary.expression.disdainful": "The woman looks disdainful — lips slightly curled, eyes narrowed.",
+      "primary.expression.disgusted": "The woman wears a disgusted expression — nose wrinkled, upper lip raised.",
       "primary.expression.mocking": "The woman wears a small mocking smile, brow raised.",
       "primary.expression.cold": "The woman has a cold, distant expression — no warmth in the eyes.",
       "primary.expression.intense_gaze": "The woman holds an intense, unbroken gaze locked on the viewer.",
@@ -654,7 +687,8 @@
       "primary.gaze.eyes_closed": "The woman has eyes closed.",
       "primary.mouth_state.closed": "The woman's mouth is closed.",
       "primary.mouth_state.slightly_parted": "The woman's lips are slightly parted.",
-      "primary.mouth_state.open": "The woman's mouth is open, teeth visible.",
+      "primary.mouth_state.open": "The woman's mouth is open.",
+      "primary.mouth_state.wide": "The woman's mouth is open wide.",
       "primary.mouth_state.tongue_out": "The woman's tongue is visible, extended past the lips.",
       "primary.mouth_state.biting_lip": "The woman bites the lower lip lightly.",
       "primary.eye_state.open": "The woman's eyes are fully open.",
@@ -666,7 +700,7 @@
       "primary.framing.headshot": "Framed as a headshot, head and top of neck visible.",
       "primary.framing.head_and_shoulders": "Framed as a head-and-shoulders portrait.",
       "primary.framing.three_quarter": "Framed as a three-quarter portrait, head down to mid-torso.",
-      "primary.framing.off_center": "The woman is composed off-center within the frame.",
+      "primary.composition.off_center": "The woman is composed off-center within the frame.",
       "primary.lighting.soft_diffuse": "The portrait is lit with soft, diffuse light producing minimal hard shadows.",
       "primary.lighting.hard_directional": "The portrait is lit by a hard directional source, producing crisp shadow edges.",
       "primary.lighting.backlit": "The subject is backlit, the main light source positioned behind them.",
@@ -696,6 +730,7 @@
       "primary.accessory.mask": "A face mask covers the nose and mouth.",
       "primary.accessory.headband": "A headband sits across the head.",
       "primary.accessory.piercing": "A facial piercing is visible.",
+      "primary.accessory.piercing_nose": "A nose piercing is visible.",
       "primary.accessory.collar": "A collar is fastened around the neck.",
       "primary.accessory.harness": "Harness straps are visible across the upper chest and neckline.",
       "primary.accessory.gag": "A gag is fitted in the mouth.",
@@ -721,12 +756,15 @@
       "primary.expression.angry": "primary.expression",
       "primary.expression.focused": "primary.expression",
       "primary.expression.sultry": "primary.expression",
+      "primary.expression.seductive": "primary.expression",
+      "primary.expression.ahegao": "primary.expression",
       "primary.expression.dreamy": "primary.expression",
       "primary.expression.contemplative": "primary.expression",
       "primary.expression.serene": "primary.expression",
       "primary.expression.dominant": "primary.expression",
       "primary.expression.stern": "primary.expression",
       "primary.expression.disdainful": "primary.expression",
+      "primary.expression.disgusted": "primary.expression",
       "primary.expression.mocking": "primary.expression",
       "primary.expression.cold": "primary.expression",
       "primary.expression.intense_gaze": "primary.expression",
@@ -739,6 +777,7 @@
       "primary.mouth_state.closed": "primary.mouth_state",
       "primary.mouth_state.slightly_parted": "primary.mouth_state",
       "primary.mouth_state.open": "primary.mouth_state",
+      "primary.mouth_state.wide": "primary.mouth_state",
       "primary.mouth_state.tongue_out": "primary.mouth_state",
       "primary.mouth_state.biting_lip": "primary.mouth_state",
       "primary.eye_state.open": "primary.eye_state",
@@ -750,7 +789,7 @@
       "primary.framing.headshot": "primary.framing",
       "primary.framing.head_and_shoulders": "primary.framing",
       "primary.framing.three_quarter": "primary.framing",
-      "primary.framing.off_center": "primary.framing",
+      "primary.composition.off_center": "primary.composition",
       "primary.lighting.soft_diffuse": "primary.lighting",
       "primary.lighting.hard_directional": "primary.lighting",
       "primary.lighting.backlit": "primary.lighting",
@@ -780,6 +819,7 @@
       "primary.accessory.mask": "primary.accessory",
       "primary.accessory.headband": "primary.accessory",
       "primary.accessory.piercing": "primary.accessory",
+      "primary.accessory.piercing_nose": "primary.accessory",
       "primary.accessory.collar": "primary.accessory",
       "primary.accessory.harness": "primary.accessory",
       "primary.accessory.gag": "primary.accessory",
@@ -805,12 +845,15 @@
       "primary.expression.angry": "primary",
       "primary.expression.focused": "primary",
       "primary.expression.sultry": "primary",
+      "primary.expression.seductive": "primary",
+      "primary.expression.ahegao": "primary",
       "primary.expression.dreamy": "primary",
       "primary.expression.contemplative": "primary",
       "primary.expression.serene": "primary",
       "primary.expression.dominant": "primary",
       "primary.expression.stern": "primary",
       "primary.expression.disdainful": "primary",
+      "primary.expression.disgusted": "primary",
       "primary.expression.mocking": "primary",
       "primary.expression.cold": "primary",
       "primary.expression.intense_gaze": "primary",
@@ -823,6 +866,7 @@
       "primary.mouth_state.closed": "primary",
       "primary.mouth_state.slightly_parted": "primary",
       "primary.mouth_state.open": "primary",
+      "primary.mouth_state.wide": "primary",
       "primary.mouth_state.tongue_out": "primary",
       "primary.mouth_state.biting_lip": "primary",
       "primary.eye_state.open": "primary",
@@ -834,7 +878,7 @@
       "primary.framing.headshot": "primary",
       "primary.framing.head_and_shoulders": "primary",
       "primary.framing.three_quarter": "primary",
-      "primary.framing.off_center": "primary",
+      "primary.composition.off_center": "primary",
       "primary.lighting.soft_diffuse": "primary",
       "primary.lighting.hard_directional": "primary",
       "primary.lighting.backlit": "primary",
@@ -864,6 +908,7 @@
       "primary.accessory.mask": "primary",
       "primary.accessory.headband": "primary",
       "primary.accessory.piercing": "primary",
+      "primary.accessory.piercing_nose": "primary",
       "primary.accessory.collar": "primary",
       "primary.accessory.harness": "primary",
       "primary.accessory.gag": "primary",

@@ -286,6 +286,28 @@ class SceneImage:
             SceneDef.FIELD_TIMESTAMP_HINTS_SUGGESTION: SceneDef.now_ts(),
         }
 
+    # ---- labels_ng_EXTRACTION (deterministic labels bucketed from the
+    #      aip avatar project's `face_meta.structural` measurements) ----
+
+    @property
+    def labels_ng_extraction(self) -> list[str]:
+        return self._data.get(SceneDef.FIELD_LABELS_NG_EXTRACTION, []) or []
+
+    def set_labels_ng_extraction(self, value: list[str]) -> None:
+        if not isinstance(value, list):
+            return
+        seen: set[str] = set()
+        out: list[str] = []
+        for v in value:
+            if v in seen:
+                continue
+            seen.add(v)
+            out.append(v)
+        self._data |= {
+            SceneDef.FIELD_LABELS_NG_EXTRACTION: out,
+            SceneDef.FIELD_TIMESTAMP_LABELS_NG_EXTRACTION: SceneDef.now_ts(),
+        }
+
     def db_store(self) -> bool:
         return self._dbstore()
 
