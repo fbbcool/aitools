@@ -1,12 +1,13 @@
 ---
 description: Validate the /img_suggest process against curator-authored labels+hints on done images (used as ground truth). Picks N random done images, runs the suggestion loop on each with canonical fields hidden, compares the suggestion output to the curator's stored labels_ng + hints, reports aggregate metrics. Read-only by default.
-argument-hint: "[count=N] [set=gts_v3] [iters=5] [persist=true|false] [force]"
+argument-hint: "[count=N] [set=gts_v3] [iters=5] [skin=<name>] [persist=true|false] [force]"
 ---
 
 `$ARGUMENTS` may contain optional `key=value` pairs:
 - `count=N` (default `30`) — number of done images to sample
 - `set=NAME` (default `gts_v3`) — which SceneSet to sample from
 - `iters=N` (default `5`) — max iterations per image (matches `/img_suggest`)
+- `skin=<name>` (default `1xlasm`) — which skin's `theme_md_suggestions` drives the probe templates and which `directive` is sent as `system_content`.
 - `persist=true|false` (default `false`) — if true, ALSO write the produced suggestions to the SceneImage's `_SUGGESTION` fields. Default false = pure read-only validation.
 - `force` — bare flag. Bypass the **rating>=3 guard** (see below) so production-grade images can be written to when `persist=true`. Has no effect in the default read-only mode.
 
@@ -16,7 +17,7 @@ The validation set is drawn from done images (rating>=1) — by design, rating>=
 
 ## Why this exists
 
-The captioning workflow has a refinement loop driven by comparing `caption_joy` against curator-edited `caption` on done images. We need the same for the suggestion process: a way to *measure* whether the suggestion procedure is improving (or regressing) as we tune `1xlasm_suggestions.md`.
+The captioning workflow has a refinement loop driven by comparing `caption_joy` against curator-edited `caption` on done images. We need the same for the suggestion process: a way to *measure* whether the suggestion procedure is improving (or regressing) as we tune `<skin>_suggestions.md` (e.g. `1xlasm_suggestions.md`).
 
 Curator-authored `labels_ng` and `hints` on done images function as **ground truth (with caveats — see plan)**: the curator decided which labels apply and observed the central interaction. The 119 done images in `gts_v3` (rating ≥ 1) are sufficient for a meaningful 30-image validation pass.
 
@@ -52,8 +53,8 @@ For each image:
 from ait.caption import joy_client
 from ait.caption.skin import SkinRegistry
 
-joy_client.ensure_running()
-sk = SkinRegistry().get('1xlasm')
+joy_client.ensure_running(skin=skin)   # `skin` is the parsed arg, default '1xlasm'
+sk = SkinRegistry().get(skin)
 
 truth_labels = set(simg.labels_ng)
 truth_hint   = (simg.data.get(SceneDef.FIELD_HINTS) or '').strip()
@@ -138,20 +139,20 @@ metrics = {
 Print under ~40 lines:
 
 1. **header** — set, N images, iters cap, persist flag
-2. **aggregate metrics** — table format with current numbers vs initial acceptance criteria (per `1xlasm_suggestions.md` §7)
+2. **aggregate metrics** — table format with current numbers vs initial acceptance criteria (per `<skin>_suggestions.md` §7)
 3. **per-label-group recall** — table; flag groups below 0.60 with `XX`
 4. **iter distribution** — how many images converged at iter 1, 2, 3, 4, 5
 5. **outliers** — bottom 3 images by F1 (likely surface bias or mapping bugs); top 1 case where suggestion CORRECTLY surfaced a label the curator MISSED (the "curator-omitted labels" caveat from the plan)
-6. **suggested MD refinements** — if any group is below target, point at the specific `1xlasm_suggestions.md` section (§3 probe templates, §5 mapping rules) that likely needs editing
+6. **suggested MD refinements** — if any group is below target, point at the specific `<skin>_suggestions.md` section (§3 probe templates, §5 mapping rules) that likely needs editing
 7. one-line summary: `validate_suggestions n=N: f1=X, hint_jacc=Y, median_iter=Z, groups_below_target=[…]`
 
 ### 6. (Optional) Persist findings to the MD
 
-If invoked with `persist=true`, also append a dated entry to `conf/skins/1xlasm_suggestions.md` §7 "Most recent validation run" with the metrics. This makes the validation results auditable across MD-refinement cycles.
+If invoked with `persist=true`, also append a dated entry to `conf/skins/<skin>_suggestions.md` §7 "Most recent validation run" with the metrics. This makes the validation results auditable across MD-refinement cycles.
 
 ## When to run
 
-- After authoring or editing `1xlasm_suggestions.md` §3 (probe templates) or §5 (mapping rules) — confirm the change moved the targeted metric
+- After authoring or editing `<skin>_suggestions.md` §3 (probe templates) or §5 (mapping rules) — confirm the change moved the targeted metric
 - Periodically as the curator adds more done images (the test set grows)
 - Before declaring `/img_suggest` ready for production use
 
@@ -162,5 +163,5 @@ Pure read by default (`persist=false`). With `persist=true`, writes to `_SUGGEST
 ## See also
 
 - `/img_suggest <id>` — the suggestion procedure under test.
-- `1xlasm_suggestions.md` §7 — the validation methodology and current acceptance criteria.
+- `<skin>_suggestions.md` §7 — the validation methodology and current acceptance criteria.
 - Plan file `/home/misw/.claude/plans/elegant-brewing-dawn.md` — full methodology, refinement-loop pattern, ground-truth caveats.

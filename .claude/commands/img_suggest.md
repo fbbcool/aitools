@@ -1,15 +1,30 @@
 ---
 description: Iteratively probe JoyCaption to suggest labels_ng + hints for an image. Persists labels_ng_SUGGESTION / hints_SUGGESTION on the SceneImage. Never mutates canonical labels_ng, hints, or caption fields. Max 5 iterations, converge early.
-argument-hint: "<image-id>"
+argument-hint: "<image-id> [skin=<name>]"
 ---
 
-`$ARGUMENTS` must be a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`). Anything else (empty, filter expression, multiple ids) is rejected with a short error — this command is explicitly single-image.
+`$ARGUMENTS` must contain a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`), optionally followed by `skin=<name>` (default `1xlasm`). Anything else (empty, filter expression, multiple ids) is rejected with a short error — this command is explicitly single-image.
+
+Parse the args:
+
+```python
+import re
+raw = ($ARGUMENTS or '').strip()
+id_m = re.search(r'\b([0-9a-f]{24})\b', raw)
+sk_m = re.search(r'\bskin\s*=\s*(\S+)', raw, re.IGNORECASE)
+if not id_m:
+    abort('usage: /img_suggest <24-hex-id> [skin=<name>]')
+image_id = id_m.group(1)
+skin     = sk_m.group(1) if sk_m else '1xlasm'
+```
+
+Default `1xlasm` preserves existing behavior bit-exact. The skin name drives `SkinRegistry().get(skin)`, `joy_client.ensure_running(skin=skin)`, and the abort status string (`not-<skin>-shape`).
 
 ## Why this exists
 
 The captioning workflow assumes `labels_ng` and `hints` are already populated. For a fresh imported image both are blank, and manually filling them is the slowest curator step. This command produces a **first-pass suggestion** by iteratively probing JoyCaption (acting as Claude's "eyes") and parsing each response into label-candidates and hint-material. Output goes to dedicated `_SUGGESTION` fields so the curator can review and edit before promoting.
 
-**Primary input for compose** is `skin.theme_md_suggestions` (the briefing in `conf/skins/1xlasm_suggestions.md`) plus the image itself (via joy probes). Read the MD before composing probes — §3 has the probe templates, §5 has the response→label mapping rules.
+**Primary input for compose** is `skin.theme_md_suggestions` (the briefing in `conf/skins/<skin>_suggestions.md`, e.g. `1xlasm_suggestions.md` by default) plus the image itself (via joy probes). Read the MD before composing probes — §3 has the probe templates, §5 has the response→label mapping rules.
 
 ## Pipeline
 
@@ -22,7 +37,7 @@ from ait.caption import joy_client
 
 scm = SceneManager(config='prod', verbose=0)
 sim = scm.scene_image_manager()
-sk = SkinRegistry().get('1xlasm')
+sk = SkinRegistry().get(skin)
 simg = sim.img_from_id(image_id)
 if simg is None:
     abort('image not found')
@@ -38,10 +53,10 @@ if has_canonical:
           'but will NOT touch the canonical fields.')
 ```
 
-Ensure the joy server is running:
+Ensure the joy server is running with the requested skin (auto-restarts if a different skin is currently loaded):
 
 ```python
-joy_client.ensure_running()
+joy_client.ensure_running(skin=skin)
 ```
 
 GPU prereq: at least 16 GiB free for the server's startup. If `ensure_running` raises, surface the same "free the GPU" guidance as `/img_caption` Stage 2.
@@ -78,11 +93,15 @@ for i in range(5):
     state['labels_candidate'] |= new_labels
     state['hint_fragments'].extend(new_hint_fragments)
 
-    # First probe also checks for not-1xlasm-shape:
-    if i == 0 and not is_1xlasm_shape(response, sk):
-        # Joy didn't identify either trigger; image likely isn't this theme.
-        # Abort early — do NOT persist anything.
-        abort('status=not-1xlasm-shape — joy did not identify the trigger phrases')
+    # First probe also checks for not-<skin>-shape: each skin's
+    # `<skin>_suggestions.md` §3.1 defines the abort condition. For
+    # 1xlasm the test is trigger-phrase compliance; for 1xlface it
+    # is "single adult woman in a face shot". Both surface as
+    # `status=not-<skin>-shape` for uniform downstream handling.
+    if i == 0 and not is_in_skin_shape(response, sk):
+        # Image doesn't fit this skin's domain. Abort early — do
+        # NOT persist anything.
+        abort(f'status=not-{sk.name}-shape — joy did not identify the skin shape')
 
     # Convergence: at least 2 iterations + nothing new on the last probe
     if i >= 1 and not new_labels and not new_hint_fragments:
@@ -99,7 +118,7 @@ for i in range(5):
 
 Adapt order based on what each iteration reveals. Skip an iteration's probe if its target was already resolved by a prior iter (e.g. skip iter 4 if iter 1's response was unambiguous about insertion vs touch).
 
-**Iter-5 uses the hint-specific LoRA adapter** (when `skin.lora_hint_path` is set, e.g. for 1xlasm). The captioning LoRA is the wrong distribution for terse curator-style hint generation; iter-5 routes through a separately-trained hint LoRA that closes the hint-jaccard gap from ~0.10 to ~0.39 on held-out validation:
+**Iter-5 uses the hint-specific LoRA adapter** (when `skin.lora_hint_path` is set, e.g. for 1xlasm). The captioning LoRA is the wrong distribution for terse curator-style hint generation; iter-5 routes through a separately-trained hint LoRA that closes the hint-jaccard gap from ~0.10 to ~0.39 on held-out validation. Skins without a hint LoRA (e.g. 1xlface as of 2026-05-25) silently fall back to the default adapter — degraded hint quality but the loop still runs:
 
 ```python
 # iters 1-4 use the default (captioning) LoRA
@@ -134,7 +153,7 @@ final_hint   = compose_hint_text(state['hint_fragments'], skin=sk)  # curator st
 - 1 iteration mentioned, no contradiction → include with `?` flag in report
 - contradicted → drop, list in report under "considered but dropped"
 
-`compose_hint_text` produces curator-style hint text from the fragments — see `1xlasm.md` §4.4 for the curator hint style (verbatim verbs + body parts, no setting filler, terse).
+`compose_hint_text` produces curator-style hint text from the fragments — see `<skin>.md` §4 (e.g. `1xlasm.md` §4.4 for giantess hints, `1xlface.md` §4.3 for face-shot hints) for the per-skin curator hint style.
 
 ### 4. Persist
 
@@ -156,7 +175,7 @@ Print under ~30 lines:
    - `labels_ng_SUGGESTION`: list of paths (high-confidence ones plain, medium-confidence flagged with `?`)
    - `hints_SUGGESTION`: composed hint text verbatim
 4. **considered but dropped** — labels that were probed but didn't make the cut, with reason
-5. one-line summary: `suggest_image <id>: iters=N, labels=N (high=N, ?=N), hint=N chars, status=ok|not-1xlasm-shape`
+5. one-line summary: `suggest_image <id>: iters=N, labels=N (high=N, ?=N), hint=N chars, status=ok|not-<skin>-shape`
 
 ## Re-running
 

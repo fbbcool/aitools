@@ -25,6 +25,12 @@ from .joy_server import pid_file, log_file
 
 DEFAULT_PORT: int = int(os.environ.get('JOY_SERVER_PORT', '7862'))
 DEFAULT_HOST: str = '127.0.0.1'
+DEFAULT_SKIN: str = '1xlasm'
+
+# Remembers the skin last requested via ensure_running(). Used by the
+# caption() retry path so a connection-loss recovery re-starts the
+# server with the right skin (default '1xlasm' preserves legacy behavior).
+_LAST_SKIN: Optional[str] = None
 
 
 def _base_url(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> str:
@@ -95,25 +101,39 @@ def status(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> dict:
     return data
 
 
-def ensure_running(*, skin: str = '1xlasm', config: str = 'prod',
+def ensure_running(*, skin: str = DEFAULT_SKIN,
                    port: int = DEFAULT_PORT, idle_timeout: int = 1800,
                    ready_timeout: int = 90, log_to_file: bool = True) -> None:
-    """If the server is already running, return immediately. Otherwise
-    spawn `python -m ait.caption.joy_server`, wait for /healthz to
-    return 200, and return when ready.
+    """If the server is already running WITH THE REQUESTED SKIN, return
+    immediately. If it is running with a different skin, shut it down
+    first and then respawn with the requested skin (only one skin's
+    weights fit in VRAM at a time). Otherwise spawn
+    `python -m ait.caption.joy_server`, wait for /healthz to return 200,
+    and return when ready.
 
     Raises RuntimeError if the server fails to come up within
     `ready_timeout` seconds.
     """
+    global _LAST_SKIN
     if is_running(port=port):
-        return
+        current = status(port=port)
+        running_skin = current.get('skin')
+        if running_skin == skin:
+            _LAST_SKIN = skin
+            return
+        print(f'[joy_client] joy_server running with skin={running_skin!r}; '
+              f'restarting with skin={skin!r}...', flush=True)
+        shutdown(port=port)
+        # Wait briefly for the port to free
+        t_stop = time.time()
+        while is_running(port=port) and time.time() - t_stop < 10:
+            time.sleep(0.1)
 
     # Compose argv
     py = sys.executable
     cmd = [
         py, '-m', 'ait.caption.joy_server',
         '--skin', skin,
-        '--config', config,
         '--port', str(port),
         '--idle-timeout', str(idle_timeout),
     ]
@@ -140,6 +160,7 @@ def ensure_running(*, skin: str = '1xlasm', config: str = 'prod',
     while time.time() - t0 < ready_timeout:
         if is_running(port=port):
             print(f'[joy_client] server ready after {time.time()-t0:.1f}s', flush=True)
+            _LAST_SKIN = skin
             return
         time.sleep(1)
     raise RuntimeError(
@@ -176,7 +197,7 @@ def caption(image_url: str, user_content: str, *,
 
     s, data = _http_post('/caption', body, host=host, port=port, timeout=timeout)
     if s != 200 and retry_once and 'connection refused' in data.get('error', ''):
-        ensure_running(port=port)
+        ensure_running(skin=_LAST_SKIN or DEFAULT_SKIN, port=port)
         s, data = _http_post('/caption', body, host=host, port=port, timeout=timeout)
     if s != 200:
         raise RuntimeError(f'/caption failed: {data}')

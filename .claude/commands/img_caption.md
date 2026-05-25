@@ -1,9 +1,24 @@
 ---
 description: Run the full caption pipeline (compose prompt → caption → validate) for ONE image by ObjectId. No batch mode — single-image only.
-argument-hint: "<image-id>"
+argument-hint: "<image-id> [skin=<name>]"
 ---
 
-`$ARGUMENTS` must be a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`). Anything else (empty, filter expression like `set=…`, multiple ids) is rejected with a short error — this command is explicitly single-image.
+`$ARGUMENTS` must contain a 24-char hex MongoDB ObjectId (regex `^[0-9a-f]{24}$`), optionally followed by `skin=<name>` (default `1xlasm`). Anything else (empty, filter expression like `set=…`, multiple ids) is rejected with a short error — this command is explicitly single-image.
+
+Parse the args:
+
+```python
+import re
+raw = ($ARGUMENTS or '').strip()
+id_m = re.search(r'\b([0-9a-f]{24})\b', raw)
+sk_m = re.search(r'\bskin\s*=\s*(\S+)', raw, re.IGNORECASE)
+if not id_m:
+    abort('usage: /img_caption <24-hex-id> [skin=<name>]')
+image_id = id_m.group(1)
+skin     = sk_m.group(1) if sk_m else '1xlasm'
+```
+
+The skin name is used for: `SkinRegistry().get(skin)`, `joy_client.ensure_running(skin=skin)`, `JoySceneDBNG(..., skin=skin, ...)`, validator selection (the same skin's `caption_violations` / `body_type_warnings` / `missing_triggers` / opener rules drive Stage 3). Default `1xlasm` preserves existing behavior bit-exact.
 
 ## Pipeline
 
@@ -11,9 +26,9 @@ For the given image id, run these three stages in order. If any stage hard-error
 
 ### 1. Compose caption_prompt (per-image judgment mode)
 
-Use the per-image recipe from `/imgs_update_caption_prompt`'s "Per-image mode": pull `labels_ng` + `hints` + `Skin('1xlasm')`, hand-craft a tight prompt (~400-1000 chars) that bakes in only the rules that matter for this image, persist via `simg.set_caption_prompt(p) + simg.db_store()`.
+Use the per-image recipe from `/imgs_update_caption_prompt`'s "Per-image mode": pull `labels_ng` + `hints` + `Skin(skin)` (where `skin` is the parsed arg), hand-craft a tight prompt (~400-1000 chars) that bakes in only the rules that matter for this image, persist via `simg.set_caption_prompt(p) + simg.db_store()`.
 
-**Primary inputs are the curator's `hints` and `skin.theme_md`** (the theme briefing in `conf/skins/1xlasm.md`). The hint is the source of contextual truth for the interaction — its verbs, body parts, and spatial relationships are precise. Labels are coarse approximations and confirm/refine specific aspects of what the hint already describes; the compile is hint-driven narrative with labels filling gaps the hint is silent on. **NOT** `expand(labels) + hint` — read MD §4.1 first for the hint-spine workflow. JSON/MD split: structured taxonomy + mechanical validators live in the JSON; theme/world knowledge (archetypes, anti-pattern principles, captioner quirks) lives in the MD. See `/imgs_update_caption_prompt` per-image mode steps 2-4 for the full recipe.
+**Primary inputs are the curator's `hints` and `skin.theme_md`** (the theme briefing in `conf/skins/<skin>.md`). The hint is the source of contextual truth for the interaction — its verbs, body parts, and spatial relationships are precise. Labels are coarse approximations and confirm/refine specific aspects of what the hint already describes; the compile is hint-driven narrative with labels filling gaps the hint is silent on. **NOT** `expand(labels) + hint` — read MD §4.1 first for the hint-spine workflow. JSON/MD split: structured taxonomy + mechanical validators live in the JSON; theme/world knowledge (archetypes, anti-pattern principles, captioner quirks) lives in the MD. See `/imgs_update_caption_prompt` per-image mode steps 2-4 for the full recipe.
 
 Use `skin.render_label_prompts(labels_ng)` (context-aware via `compose` tables) for the label sentence pool — but use those sentences as a *candidate set to confirm/drop against the hint*, not as a scaffold to concatenate.
 
@@ -32,8 +47,8 @@ import time
 from ait.caption import joy_client, caption_log
 from ait.caption.skin import SkinRegistry
 
-joy_client.ensure_running()   # ~23s on first call; ~0s if already up
-sk = SkinRegistry().get('1xlasm')
+joy_client.ensure_running(skin=skin)   # ~23s on first call; ~0s if already up; auto-restart on skin mismatch
+sk = SkinRegistry().get(skin)
 simg = sim.img_from_id(image_id)
 caption_log.start_run(simg, run_tag='img_caption')
 stored_prompt = (simg.data.get(SceneDef.FIELD_CAPTION_PROMPT) or '').strip()
@@ -56,11 +71,11 @@ caption_log.log_joy_call(
 )
 ```
 
-**Fallback path — in-process load** (when the server can't be started, e.g. GPU contested at the moment of startup):
+**Convenience path — `JoySceneDBNG` wraps the same flow + the DB read/write**:
 
 ```python
 from ait.caption.joy_scenedb_ng import JoySceneDBNG
-db = JoySceneDBNG(config='prod', skin='1xlasm', verbose=1, force=True, lora=True)
+db = JoySceneDBNG(config='prod', skin=skin, verbose=1, force=True)
 prompt, caption = db.caption_image(image_id)
 if not caption:
     abort('captioner returned no caption')
@@ -71,7 +86,7 @@ simg.set_caption_joy(caption)
 simg.db_store()
 ```
 
-Either path: the stored caption_prompt from Stage 1 is sent verbatim. `force=True` semantics are implicit in the joy_client path (it always runs the caption regardless of freshness).
+Both paths route through the same persistent `joy_server` — `JoySceneDBNG.__init__` calls `joy_client.ensure_running(skin=...)` internally and never loads model weights itself. `JoySceneDBNG.caption_image` is the convenience wrapper that pulls labels/hint from the SceneImage, composes the prompt (or uses the stored `caption_prompt`), and persists nothing — the caller writes `caption_joy` back via `simg.set_caption_joy`. The stored caption_prompt from Stage 1 is sent verbatim; `force=True` semantics are implicit (always runs the caption regardless of freshness).
 
 ### 3. Validate + auto-fix
 

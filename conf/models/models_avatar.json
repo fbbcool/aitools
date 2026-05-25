@@ -9,6 +9,53 @@
           "method_download": "huggingface",
           "rename": "det_10g",
           "skip": false
+        },
+        {
+          "repo_id": "public-data/insightface",
+          "file": "models/buffalo_l/w600k_r50.onnx",
+          "subdir": "buffalo_l",
+          "method_download": "huggingface",
+          "rename": "w600k_r50",
+          "skip": false
+        },
+        {
+          "repo_id": "onnxmodelzoo/emotion-ferplus-8",
+          "file": "emotion-ferplus-8.onnx",
+          "subdir": "ferplus",
+          "method_download": "huggingface",
+          "rename": "emotion-ferplus-8",
+          "skip": false
+        }
+      ],
+      "voice": [
+        {
+          "repo_id": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+          "method_download": "huggingface",
+          "skip": false
+        }
+      ],
+      "asr": [
+        {
+          "repo_id": "Systran/faster-whisper-large-v3",
+          "method_download": "huggingface",
+          "skip": false
+        }
+      ],
+      "diarize": [
+        {
+          "repo_id": "pyannote/speaker-diarization-community-1",
+          "method_download": "huggingface",
+          "skip": false
+        },
+        {
+          "repo_id": "pyannote/segmentation-community-1",
+          "method_download": "huggingface",
+          "skip": false
+        },
+        {
+          "repo_id": "pyannote/wespeaker-voxceleb-resnet34-LM",
+          "method_download": "huggingface",
+          "skip": false
         }
       ]
     }

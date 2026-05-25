@@ -1,14 +1,18 @@
 """Persistent JoyCaption HTTP server.
 
-Loads `JoySceneDBNG` (which configures `JoyNG` with the right model + LoRA
-paths via `AInstallerDB`) exactly ONCE at startup, then listens on a
-local HTTP socket for caption/probe requests. Clients (slash commands,
-batch tools) reach the server via `joy_client.py` to avoid the ~23s
-model-load cost on every invocation.
+Loads `JoyNG` (configured per `Skin` via `joy_factory.build_joy`, which
+resolves the base model + LoRA paths through `AInstallerDB`) exactly
+ONCE at startup, then listens on a local HTTP socket for caption/probe
+requests. Clients (slash commands, batch tools) reach the server via
+`joy_client.py` to avoid the ~23s model-load cost on every invocation.
+
+The server is intentionally DB-free: it loads from disk (model cache,
+skin JSON, AInstallerDB YAML) only — no MongoDB connection. Scene-image
+lookups happen on the client side; the HTTP API takes raw `image_url`
+strings.
 
 CLI:
     python -m ait.caption.joy_server [--skin NAME] [--port PORT]
-                                     [--config prod|test]
                                      [--idle-timeout SECONDS]
 
 Endpoints:
@@ -75,9 +79,8 @@ def log_file() -> Path:
 class _State:
     """Holds the loaded captioner + activity bookkeeping."""
 
-    def __init__(self, skin_name: str, config: str = 'prod', idle_timeout: int = 1800):
+    def __init__(self, skin_name: str, idle_timeout: int = 1800):
         self.skin_name = skin_name
-        self.config = config
         self.idle_timeout = idle_timeout
         self.loaded_at: float = 0.0
         self.last_request_at: float = 0.0
@@ -89,19 +92,12 @@ class _State:
 
     def load(self) -> None:
         # Imported lazily so `--help` doesn't pay the import cost.
-        from ait.caption.joy_scenedb_ng import JoySceneDBNG
+        from ait.caption.joy_ng import JoyNG
         from ait.caption.skin import SkinRegistry
 
         t0 = time.time()
-        db = JoySceneDBNG(
-            config=self.config,
-            skin=self.skin_name,
-            verbose=1,
-            force=True,
-            lora=True,
-        )
-        self._joy = db._joy
         self._skin = SkinRegistry().get(self.skin_name)
+        self._joy = JoyNG.from_skin(self._skin, use_lora=True, verbose=1)
         self.loaded_at = time.time()
         print(f'[joy_server] loaded skin={self.skin_name!r} '
               f'in {self.loaded_at - t0:.1f}s', flush=True)
@@ -139,7 +135,6 @@ class _State:
         return {
             'status': 'ok' if self._joy is not None else 'loading',
             'skin': self.skin_name,
-            'config': self.config,
             'loaded_at': self.loaded_at,
             'last_request_at': self.last_request_at,
             'request_count': self.request_count,
@@ -300,7 +295,6 @@ def _remove_pid_file() -> None:
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--skin', default='1xlasm')
-    ap.add_argument('--config', default=os.environ.get('AIDB_SCENE_CONFIG', 'prod'))
     ap.add_argument('--port', type=int, default=int(os.environ.get('JOY_SERVER_PORT', '7862')))
     ap.add_argument('--idle-timeout', type=int, default=1800,
                     help='Self-shutdown after this many seconds of no caption requests (default 1800 = 30 min)')
@@ -320,8 +314,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     signal.signal(signal.SIGINT, _sig_handler)
 
     try:
-        _STATE = _State(skin_name=args.skin, config=args.config,
-                        idle_timeout=args.idle_timeout)
+        _STATE = _State(skin_name=args.skin, idle_timeout=args.idle_timeout)
         _STATE.load()
         _STATE.start_idle_watchdog()
 

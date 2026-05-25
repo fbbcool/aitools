@@ -133,10 +133,11 @@ def images_rate(params: Any, clipspace: Any, config: SceneConfig) -> None:
     return None
 
 
-def start_app(params: Any, clipspace: Any, config: SceneConfig) -> None:
+def start_app(params: Any, clipspace: Any, config: SceneConfig,
+              skin: str = '1xlasm') -> None:
     scm = SceneManager(config=config)  # type: ignore
     scm.scenes_update()
-    app = AIDBSceneApp(scm)
+    app = AIDBSceneApp(scm, skin=skin)
     app.launch(server_port=7861)
     return None
 
@@ -197,7 +198,11 @@ if __name__ == '__main__':
     if func is None:
         print(f'cmd [{cmd}] unknown!')
         exit()
-    ret = func(params, clipspace, config)  # type: ignore
+    if cmd == 'app':
+        ret = start_app(params, clipspace, config,  # type: ignore
+                        skin=keyval.get('skin', '1xlasm'))
+    else:
+        ret = func(params, clipspace, config)  # type: ignore
     if ret is not None:
         try:
             new_clipspace = str(ret)

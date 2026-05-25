@@ -1,6 +1,6 @@
 ---
-description: Run JoySceneDBNG('1xlasm') against one image (with id) OR a filtered batch (scope by set, rating, etc.). Only images whose caption_prompt is newer than caption_joy are captioned. Empty caption_prompt skips. Same argument grammar as /imgs_update_caption_prompt.
-argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
+description: Run JoySceneDBNG(<skin>) against one image (with id) OR a filtered batch (scope by set, rating, etc.). Only images whose caption_prompt is newer than caption_joy are captioned. Empty caption_prompt skips. Same argument grammar as /imgs_update_caption_prompt. The skin defaults to `1xlasm`; override with `skin=<name>`.
+argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | …]"
 ---
 
 `$ARGUMENTS` is parsed in three layers (same grammar as `/imgs_update_caption_prompt`):
@@ -11,6 +11,7 @@ argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | …
     - `force` — bare flag. Bypass the **rating>=3 guard** (see below) so production-grade images are included.
     - `set=<name>` — restrict to a SceneSet's active members (excluded ids skipped).
     - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
+    - `skin=<name>` — which skin (and matching JoyCaption LoRA, if wired) to caption with. Default `1xlasm`. Not a row filter — it picks the captioner config.
     - Multiple terms AND together.
 
 ## Rating>=3 guard
@@ -35,19 +36,24 @@ FORCE_RE = re.compile(r'\bforce\b', re.IGNORECASE)
 def parse_args(s: str):
     s = (s or '').strip()
     if not s:
-        return ('batch', {}, False)
+        return ('batch', {}, '1xlasm', False)
     if ID_RE.match(s):
-        return ('id', s, True)   # single-image = implicit force
+        return ('id', s, '1xlasm', True)   # single-image = implicit force
     filters = {}
+    skin = '1xlasm'
     force = bool(FORCE_RE.search(s))
     for kw, op, val in TERM_RE.findall(s):
         op = '==' if op == '=' else op
-        if kw == 'rating':
+        if kw == 'skin':
+            skin = val
+        elif kw == 'rating':
             filters[('rating', op)] = int(val)
         elif kw == 'set':
             filters[('set', op)] = val
-    return ('batch', filters, force)
+    return ('batch', filters, skin, force)
 ```
+
+The ObjectId form accepts the `skin=` term too — parse `re.search(r'\bskin\s*=\s*(\S+)', s)` separately so a call like `/imgs_update_caption_joy 69a... skin=1xlface` picks up both. Default `1xlasm` preserves bit-exact existing behavior.
 
 ## Batch mode
 
@@ -64,8 +70,10 @@ Then run the captioner once and loop:
 
 ```python
 from ait.caption.joy_scenedb_ng import JoySceneDBNG
-db = JoySceneDBNG(config='prod', skin='1xlasm', verbose=0, force=True, lora=True)
-_ = db._joy   # eager-load model
+db = JoySceneDBNG(config='prod', skin=skin, verbose=0, force=True)
+# Construction ensures the persistent joy_server is up with `skin` loaded
+# (auto-restart on skin mismatch). The captioner lives in the server
+# process; this object is the per-batch enrichment client only.
 for iid in ids:
     prompt, caption = db.caption_image(iid)
     if not caption:

@@ -290,6 +290,9 @@ class AInstaller:
             'text_encoder': 'models/text_encoders',
             'latent_upscale': 'models/latent_upscale_models',
             'face_detector': 'models/face_detector',
+            'voice': 'models/voice',
+            'asr': 'models/asr',
+            'diarize': 'models/diarize',
         }
         target = item.get('target', 'unknown')
         target_dir = map_target_dirs.get(target, '')
@@ -373,6 +376,9 @@ class AInstaller:
             'transformer': 'data/diffusion_models',
             'text_encoder': 'data/text_encoders',
             'face_detector': 'data/face_detector',
+            'voice': 'data/voice',
+            'asr': 'data/asr',
+            'diarize': 'data/diarize',
         }
         target_dir = map_target_dirs.get(item.get('target', 'unknown'), '')
         target_var = map_target_vars.get(item.get('target', 'unknown'), '')

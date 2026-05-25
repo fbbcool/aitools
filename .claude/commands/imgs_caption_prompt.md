@@ -1,6 +1,6 @@
 ---
 description: Run the per-image judgment-mode caption_prompt compile (the same Stage 1 as /img_caption) on curated images. Default: only those whose caption_prompt is out of date (suggestion newer than caption_prompt, or caption_prompt empty). With `force`: every curated image regardless of freshness. With `ignore_curated`: drop the suggestion requirement and accept any image with non-empty labels_ng + hints (legacy / non-curator-promoted cohort). Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Produces tight ~400-1000 char prompts, NOT the ~5000 char deterministic kind. Persists FIELD_CAPTION_PROMPT only; downstream /imgs_caption_joy picks them up.
-argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> | limit=<n> | …]"
+argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | limit=<n> | …]"
 ---
 
 `$ARGUMENTS` is an optional space-separated list of bare-word flags and `key=value` / `key<op>value` filter terms (connectives like `for` / `and` / `where` ignored). Empty → all curated images with stale `caption_prompt`, DB-wide. Supported terms:
@@ -9,6 +9,7 @@ argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> |
 - `ignore_curated` — bare flag. Drop the suggestion-non-empty requirement. Eligible image becomes "labels_ng non-empty AND hints non-empty" (the minimum needed to compose a prompt). Useful for legacy images that pre-date the `_SUGGESTION` workflow but still carry curator labels+hints, or images promoted to canonical without ever running `/img_suggest`.
 - `set=<name>` — restrict to a SceneSet's active members.
 - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
+- `skin=<name>` — which skin to compose against. Default `1xlasm`. Drives `SkinRegistry().get(skin)`; theme briefing read from `conf/skins/<skin>.md`. Not a row filter.
 - `limit=<n>` — cap the batch at N images (default unlimited). Use when the pending list is large and the curator wants to review the first batch before continuing.
 
 Flags compose with the filters — e.g. `force set=gts_v3 limit=10` rebuilds prompts for the first 10 curated images in `gts_v3` whether or not they have a current caption_prompt; `ignore_curated rating==1` picks up the entire done cohort regardless of suggestion provenance.
@@ -141,7 +142,7 @@ If `len(pending) > 0`, print the count and the first ~5 ids before starting so t
 For each `iid` in `pending`, run the **`/img_caption` Stage 1 recipe verbatim** (see `.claude/commands/img_caption.md` step 1 and `.claude/commands/imgs_update_caption_prompt.md` "Per-image mode" steps 1-6):
 
 1. Pull `labels_ng` + `hints` from the SceneImage. If `hints == 'none'` (case-insensitive), use the label-driven compose path.
-2. Read `Skin('1xlasm').theme_md`. This is the primary briefing — archetypes, anti-patterns, captioner quirks, hint-spine workflow (§4.1).
+2. Read `Skin(skin).theme_md` (where `skin` is the parsed arg, default `1xlasm`). This is the primary briefing — archetypes, anti-patterns, captioner quirks, hint-spine workflow (e.g. 1xlasm §4.1, 1xlface §3 / §4 / §5).
 3. Identify scene archetype (MD §3.2), anti-patterns at risk for this image (MD §5), captioner quirks to guard against (MD §6).
 4. Hand-craft a tight prompt (~400-1000 chars) using the hint-threading pattern (verbatim vs prefused per MD §4.1 heuristic). Apply `skin.render_label_prompts(labels_ng)` as a candidate set, dropping label expansions the hint already covers.
 5. Persist via `simg.set_caption_prompt(p) + simg.db_store()`. This bumps `timestamp_caption_prompt` past the suggestion timestamps, removing this image from future runs of this command.

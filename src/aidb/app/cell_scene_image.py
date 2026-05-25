@@ -14,13 +14,31 @@ from ait.caption.skin import Skin, SkinRegistry
 from ait.tools.images import image_from_url, _image_extract_prompt_from_info_ext
 
 
+# Active skin for the running gradio app. Set once at AIDBSceneApp startup
+# via `set_active_skin(name)`. Cells (labels-ng editor, caption buttons)
+# pick this up so the whole UI is locked to the startup skin.
 _DEFAULT_SKIN_NAME = '1xlasm'
 _SKIN_CACHE: dict[str, Skin] = {}
 
 
-def _skin(name: str = _DEFAULT_SKIN_NAME) -> Optional[Skin]:
+def set_active_skin(name: str) -> None:
+    """Set the skin used by every cell rendered after this call. Called
+    once from `AIDBSceneApp.__init__`. Subsequent calls to `_skin()` and
+    `active_skin_name()` reflect the new value."""
+    global _DEFAULT_SKIN_NAME
+    _DEFAULT_SKIN_NAME = name
+
+
+def active_skin_name() -> str:
+    """Return the skin name the running app was started with."""
+    return _DEFAULT_SKIN_NAME
+
+
+def _skin(name: Optional[str] = None) -> Optional[Skin]:
     """Lazily load a Skin from the registry. Returns None if loading fails
     (e.g. CONF_AIT not set, file missing) so the editor degrades gracefully."""
+    if name is None:
+        name = _DEFAULT_SKIN_NAME
     if name in _SKIN_CACHE:
         return _SKIN_CACHE[name]
     try:
@@ -207,24 +225,19 @@ class AppSceneImageCell:
         goto_scene_btn = AppSceneImageCell._html_goto_scene_button(obj.scene_id)
         refresh_btn = AppSceneImageCell._html_refresh_button(obj.id, set_id)
 
-        caption_btn_1xlasm = AppSceneImageCell._html_caption_button(
+        skin_name = active_skin_name()
+        caption_btn_skin = AppSceneImageCell._html_caption_button(
             target_type='registered',
             target=obj.id,
-            trigger='1xlasm',
-            label='caption 1xlasm',
+            trigger=skin_name,
+            label=f'caption {skin_name}',
         )
-        caption_btn_1xlasm_clip = AppSceneImageCell._html_caption_button(
+        caption_btn_skin_clip = AppSceneImageCell._html_caption_button(
             target_type='registered',
             target=obj.id,
-            trigger='1xlasm',
-            label='caption 1xlasm clip',
+            trigger=skin_name,
+            label=f'caption {skin_name} clip',
             clip_only=True,
-        )
-        caption_btn_gts = AppSceneImageCell._html_caption_button(
-            target_type='registered',
-            target=obj.id,
-            trigger='gts_prompter',
-            label='caption gts_prompter',
         )
 
         thumb_onclick = AppSceneImageCell._html_lightbox_onclick(
@@ -268,9 +281,8 @@ class AppSceneImageCell:
                         {goto_scene_btn}
                     </div>
                     <div class="simg-cell-actions-col">
-                        {caption_btn_1xlasm}
-                        {caption_btn_1xlasm_clip}
-                        {caption_btn_gts}
+                        {caption_btn_skin}
+                        {caption_btn_skin_clip}
                         <span class="simg-cell-actions-refresh">{refresh_btn}</span>
                     </div>
                 </div>
@@ -1462,8 +1474,8 @@ class AppSceneImageCell:
         Behaviour:
           - If the caption_joy textarea has non-empty content, copy it into
             the caption textarea (DOM-only, not persisted).
-          - Otherwise, ask the backend to generate a caption via JoySceneDB
-            (default trigger). The result is then written into BOTH the
+          - Otherwise, ask the backend to generate a caption via JoySceneDBNG
+            (active skin). The result is then written into BOTH the
             caption_joy and caption textareas. The user can save explicitly.
         """
         elem_id_btn = AppHtml.elem_id_simg_editor_set_button()
@@ -1637,12 +1649,6 @@ class AppSceneImageCell:
             prompt_value, label='prompt'
         )
 
-        caption_btn = AppSceneImageCell._html_caption_button(
-            target_type='unregistered',
-            target=url_str,
-            trigger='gts_prompter',
-            label='caption gts_prompter',
-        )
         thumb_onclick = AppSceneImageCell._html_lightbox_onclick(
             target_type='unregistered', target=url_str
         )
@@ -1656,7 +1662,6 @@ class AppSceneImageCell:
                 </div>
                 <div class="simg-unreg-actions">
                     {prompt_copy_btn}
-                    {caption_btn}
                     <button type="button" class="simg-register-btn" onclick="{onclick_js}">
                         register
                     </button>

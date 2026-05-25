@@ -124,21 +124,26 @@ print('\n'.join(sorted(l.split('.')[-1] for l, g in sk.label_to_group.items() if
 end
 
 function ait_server_joy
+    set skin $argv[1]
+    test -z "$skin"; and set skin 1xlasm
+
     set running (python3 -c "from ait.caption import joy_client; print('1' if joy_client.is_running() else '0')")
     if test "$running" = 1
-        set current running
+        set current_skin (python3 -c "from ait.caption import joy_client; print(joy_client.status().get('skin') or '')")
+        set msg "joy_server is running with skin=$current_skin; stop it?"
         set action stop
     else
-        set current stopped
+        set msg "joy_server is stopped; start it with skin=$skin?"
         set action start
     end
-    read -P "joy_server is $current; $action it? [enter=yes, any other key=no] > " -n 1 choice
+
+    read -P "$msg [enter=yes, any other key=no] > " -n 1 choice
     if test -n "$choice"
         echo "no change"
         return
     end
     if test "$action" = start
-        python3 -c "from ait.caption import joy_client; joy_client.ensure_running(); print(joy_client.status())"
+        python3 -c "from ait.caption import joy_client; joy_client.ensure_running(skin='$skin'); print(joy_client.status())"
     else
         python3 -c "from ait.caption import joy_client; ok = joy_client.shutdown(); print('stopped' if ok else 'shutdown timeout')"
     end

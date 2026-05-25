@@ -35,6 +35,39 @@ DEFAULT_SYSTEM: Final = (
 class JoyNG:
     """Pure captioning runtime. No skin awareness."""
 
+    @classmethod
+    def from_skin(cls, skin, *, use_lora: bool = True, verbose: int = 0) -> 'JoyNG':
+        """Construct a `JoyNG` configured per a `Skin`'s model + LoRA refs.
+
+        Resolves `skin.model_key` and `skin.lora_key` through `AInstallerDB`,
+        attaches `skin.lora_hint_path` as the `'hint'` adapter when set.
+        This is the canonical way to bring up a captioner from a skin;
+        the joy_server uses it directly, and `JoySceneDBNG` no longer
+        constructs its own JoyNG (it routes through the server instead).
+        """
+        from ait.install import AInstallerDB
+
+        base_ids = AInstallerDB().repo_ids(*skin.model_key)
+        if not base_ids:
+            raise IndexError(
+                f'AInstallerDB: no model configured for {skin.model_key}'
+            )
+        base_repo = base_ids[0]
+        lora_path = None
+        if use_lora and skin.lora_key is not None:
+            lora_ids = AInstallerDB().repo_ids(*skin.lora_key)
+            if lora_ids:
+                lora_path = lora_ids[0]
+        extra_adapters: dict[str, str] = {}
+        if use_lora and skin.lora_hint_path:
+            extra_adapters['hint'] = skin.lora_hint_path
+        return cls(
+            model_repo=base_repo,
+            lora_path=lora_path,
+            extra_adapters=extra_adapters or None,
+            verbose=verbose,
+        )
+
     def __init__(
         self,
         model_repo: str,

@@ -1,6 +1,6 @@
 ---
 description: Caption curated images whose caption_joy is stale wrt caption_prompt. Default: caption_prompt non-empty AND (caption_joy empty OR ts_caption_prompt > ts_caption_joy). With `force`: every curated image with a non-empty caption_prompt, regardless of freshness. With `ignore_curated`: drop the suggestion requirement, accept any image with non-empty labels_ng + hints + caption_prompt (legacy / non-curator-promoted cohort). Curated = non-empty labels_ng AND non-empty hints AND non-empty suggestion. Uses the STORED caption_prompt verbatim (Stage 1 is a no-op); Stage 2 captions via joy_server; Stage 3 validates + auto-fixes. Upstream is /imgs_caption_prompt.
-argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> | limit=<n> | …]"
+argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | limit=<n> | …]"
 ---
 
 `$ARGUMENTS` is an optional space-separated list of bare-word flags and `key=value` / `key<op>value` filter terms (connectives like `for` / `and` / `where` ignored). Empty → all curated images with a non-empty `caption_prompt` and stale `caption_joy`, DB-wide. Supported terms:
@@ -9,6 +9,7 @@ argument-hint: "[force] [ignore_curated] [set=<name> | rating[==|>=|<=|>|<]<n> |
 - `ignore_curated` — bare flag. Drop the suggestion-non-empty requirement. Eligibility becomes "labels_ng non-empty AND hints non-empty AND caption_prompt non-empty". Mirrors the `/imgs_caption_prompt ignore_curated` flag — needed when that upstream was used to compile prompts for non-curator-promoted images (legacy data, manual labels+hints without `_SUGGESTION`).
 - `set=<name>` — restrict to a SceneSet's active members.
 - `rating==<n>` / `rating=<n>` / `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
+- `skin=<name>` — which skin (and matching joy_server skin) to caption with. Default `1xlasm`. Drives `SkinRegistry().get(skin)` for directive + Stage-3 validators, and `joy_client.ensure_running(skin=skin)` (auto-restarts the server if a different skin is currently loaded). Not a row filter.
 - `limit=<n>` — cap the batch at N images (default unlimited). Use when the pending list is large and the curator wants to review the first batch before continuing.
 
 Flags compose with the filters — e.g. `force set=gts_v3 limit=10` recaptions the 10 newest curated images in `gts_v3` whether or not their captions were already fresh; `ignore_curated rating==0` captions the rating-0 cohort regardless of suggestion provenance.
@@ -151,8 +152,8 @@ from ait.caption import joy_client
 from ait.caption.skin import SkinRegistry
 from aidb import SceneDef
 
-joy_client.ensure_running()
-sk = SkinRegistry().get('1xlasm')
+joy_client.ensure_running(skin=skin)   # `skin` is the parsed arg, default '1xlasm'
+sk = SkinRegistry().get(skin)
 ```
 
 For each `iid` in `pending`:

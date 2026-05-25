@@ -1,12 +1,23 @@
 ---
 description: Batch /img_suggest. Picks the newest active image from each scene that has no done image, restricted to images whose labels_ng_SUGGESTION AND hints_SUGGESTION are both empty, and runs the full suggestion loop on the top N. Never mutates canonical fields.
-argument-hint: "[num] [force]"
+argument-hint: "[num] [force] [skin=<name>]"
 ---
 
-`$ARGUMENTS` is an optional positive integer `num` (default `20`), optionally followed by the bare flag `force`. Anything else is rejected with a short error.
+`$ARGUMENTS` is an optional positive integer `num` (default `20`), optionally followed by the bare flag `force` and/or `skin=<name>`. Anything else is rejected with a short error.
+
+```python
+import re
+raw = ($ARGUMENTS or '').strip()
+n_m = re.search(r'\b(\d+)\b', raw)
+sk_m = re.search(r'\bskin\s*=\s*(\S+)', raw, re.IGNORECASE)
+num   = int(n_m.group(1)) if n_m else 20
+force = bool(re.search(r'\bforce\b', raw, re.IGNORECASE))
+skin  = sk_m.group(1) if sk_m else '1xlasm'
+```
 
 - `num` — batch size cap (default `20`).
 - `force` — bare flag. Bypass the **rating>=3 guard** (see below) so production-grade images are eligible suggestion targets. (Normally these are skipped because rating>=3 implies the curator has already finalized labels+hints and there's nothing to suggest.)
+- `skin=<name>` — which skin to run suggestions against (default `1xlasm`). Drives `SkinRegistry().get(skin)` and `joy_client.ensure_running(skin=skin)`.
 
 ## Rating>=3 guard
 
@@ -27,7 +38,7 @@ from ait.caption.skin import SkinRegistry
 scm = SceneManager(config='prod', verbose=0)
 sm  = scm  # set manager
 sim = scm.scene_image_manager()
-sk  = SkinRegistry().get('1xlasm')
+sk  = SkinRegistry().get(skin)
 
 def is_done(img) -> bool:
     """v1-status done-rule: hints + labels_ng (or labels) + caption_joy + caption all non-empty,
@@ -84,7 +95,7 @@ If `len(batch) < num` continue with what was found, and report the shortfall.
 
 ```python
 from ait.caption import joy_client
-joy_client.ensure_running()
+joy_client.ensure_running(skin=skin)   # auto-restarts the server if a different skin is currently loaded
 ```
 
 GPU prereq: ≥16 GiB free for the server's startup. If `ensure_running` raises, surface the same "free the GPU" guidance as `/img_caption` Stage 2.
@@ -95,7 +106,7 @@ Pre-warming once amortizes the ~23s model load across the whole batch — at ~25
 
 For each `simg` in `batch`, run **the full `/img_suggest` pipeline** verbatim (sections 2-4 of `.claude/commands/img_suggest.md`): iteration loop (max 5, converge early), final-suggestion composition, persist via `set_labels_ng_suggestion` / `set_hints_suggestion` + `db_store()`. Iter-5 uses the hint LoRA via `adapter='hint'` when `sk.lora_hint_path` is set.
 
-`not-1xlasm-shape` images are skipped (no persist) and counted in the report; processing continues to the next image.
+`not-<skin>-shape` images (e.g. `not-1xlasm-shape`, `not-1xlface-shape`) are skipped (no persist) and counted in the report; processing continues to the next image. The shape check is skin-specific — `<skin>_suggestions.md` §3.1 defines the abort condition.
 
 A per-image hard error (joy server crash, image fetch fails, etc.) is caught, logged with the image id, and the batch continues. The final report flags failures.
 
@@ -106,8 +117,8 @@ A per-image hard error (joy server crash, image fetch fails, etc.) is caught, lo
 Print under ~40 lines:
 
 1. **header** — `num` requested, `len(batch)` selected, scenes scanned, scenes-without-done count
-2. **per-image one-liner table** — `<id>  iters=N  labels=N  hint=N chars  status=ok|not-1xlasm-shape|error`
-3. one-line summary: `imgs_suggest <num>: ok=N, not_1xlasm=N, errors=N, total_seconds=N`
+2. **per-image one-liner table** — `<id>  iters=N  labels=N  hint=N chars  status=ok|not-<skin>-shape|error`
+3. one-line summary: `imgs_suggest <num> skin=<skin>: ok=N, not_shape=N, errors=N, total_seconds=N`
 
 Per-image iteration traces are NOT printed here — only the summary line. For a deep trace, the curator can re-run `/img_suggest <id>` on any individual image.
 

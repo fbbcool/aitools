@@ -1,6 +1,6 @@
 ---
 description: Orchestrator that runs Stage 1 (`/imgs_caption_prompt`) followed by Stage 2+3 (`/imgs_caption_joy`) on the same `$ARGUMENTS`. Saves the curator one round-trip when both stages need to run. Same argument grammar as both subcommands.
-argument-hint: "[<image-id> | force | ignore_curated | set=<name> | rating[==|>=|<=|>|<]<n> | limit=<n>]"
+argument-hint: "[<image-id> | force | ignore_curated | set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | limit=<n>]"
 ---
 
 `$ARGUMENTS` is forwarded verbatim to both subcommands. The grammar is shared with `/imgs_caption_prompt` and `/imgs_caption_joy` — see those specs for the full term list. Quick reference:
@@ -10,6 +10,7 @@ argument-hint: "[<image-id> | force | ignore_curated | set=<name> | rating[==|>=
 - `ignore_curated` — drop the suggestion-non-empty requirement
 - `set=<name>` — restrict to a SceneSet's active members
 - `rating<op><n>` — relational rating filter (`rating==1`, `rating>=0`, etc.)
+- `skin=<name>` — which skin to compose / caption against (default `1xlasm`; forwarded verbatim to both subcommands so Stage 1 and Stage 2 use the same skin)
 - `limit=<n>` — cap the batch at N images
 
 ## Pipeline

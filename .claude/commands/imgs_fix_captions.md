@@ -1,11 +1,25 @@
 ---
 description: Audit and fix captions where hints/labels are not correctly integrated.
-argument-hint: "[set-name (default: gts_v3)] [force]"
+argument-hint: "[set-name (default: gts_v3)] [force] [skin=<name>]"
 ---
 
 Audit and fix `caption_joy` fields in the prod `aidb` DB for the set named `$ARGUMENTS` (default `gts_v3`) where hints or labels are not correctly integrated. The human-edited `caption` field is out of scope and must not be modified.
 
 Pass the bare `force` flag in `$ARGUMENTS` to disable the **rating>=3 guard** (see "Skip rules" below). Default behavior continues to skip rating>=3 images.
+
+Parse the args:
+
+```python
+import re
+raw = ($ARGUMENTS or '').strip()
+sk_m  = re.search(r'\bskin\s*=\s*(\S+)', raw, re.IGNORECASE)
+skin  = sk_m.group(1) if sk_m else '1xlasm'
+force = bool(re.search(r'\bforce\b', raw, re.IGNORECASE))
+rest = re.sub(r'\bforce\b|\bskin\s*=\s*\S+', '', raw, flags=re.IGNORECASE).strip()
+set_name = rest.split()[0] if rest else 'gts_v3'
+```
+
+Default `skin=1xlasm` preserves existing behavior bit-exact. The skin selects which validators back the audit (`Skin(skin).caption_violations` / `missing_triggers`). NOTE: the issue classes 1-10 below are **tuned for the `1xlasm` xlgts woman / xlasm man domain** — the verb-softening, trigger-absence, and per-rule fixes (handjob/blowjob/penis/naked) only make sense there. For face-shot skins like `1xlface`, prefer `/imgs_validate_captions skin=<name>` (which is fully skin-agnostic and uses the JSON `forbidden` + `missing_triggers` rules directly).
 
 ## Setup
 

@@ -1,6 +1,6 @@
 ---
-description: Compile a focused caption_prompt for one image (with id) OR bulk-refresh many images with optional scope filters (set, rating). Reads labels_ng + hints + skin rules; writes the result back to FIELD_CAPTION_PROMPT. Caption workflow then picks it up verbatim.
-argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | …]"
+description: Compile a focused caption_prompt for one image (with id) OR bulk-refresh many images with optional scope filters (set, rating). Reads labels_ng + hints + skin rules; writes the result back to FIELD_CAPTION_PROMPT. Caption workflow then picks it up verbatim. The skin defaults to `1xlasm`; override with `skin=<name>`.
+argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | skin=<name> | …]"
 ---
 
 `$ARGUMENTS` is parsed in three layers:
@@ -12,6 +12,7 @@ argument-hint: "[<image-id> | force | set=<name> | rating[==|>=|<=|>|<]<n> | …
     - `set=<name>` — restrict to images that are members of the named SceneSet (loaded via `SceneSetManager.set_from_id_or_name`). Excluded images of that set are skipped.
     - `rating==<n>` / `rating=<n>` — exact rating match (integer; -2..5).
     - `rating>=<n>` / `rating<=<n>` / `rating><n>` / `rating<<n>` — relational rating filter.
+    - `skin=<name>` — which skin to compose against. Default `1xlasm`. Not a row filter — picks the skin whose JSON `directive` + `render_label_prompts` + `theme_md` / `theme_md_suggestions` drive the compose recipe.
     - Multiple terms combine with AND (no OR support).
 
 ## Rating>=3 guard
@@ -20,7 +21,11 @@ Images with `rating>=3` are treated as production-grade — by default they are 
 
 Mode 1 and mode 3 use the same deterministic Python recipe — only the source-of-truth iterator differs.
 
-In every mode the resulting prompt is stored in `FIELD_CAPTION_PROMPT`; the next click of `caption 1xlasm` (or set-editor batch) reads this field and sends it verbatim to JoyCaption.
+In every mode the resulting prompt is stored in `FIELD_CAPTION_PROMPT`; the next click of `caption <skin>` (or set-editor batch) reads this field and sends it verbatim to JoyCaption.
+
+## Skin-awareness
+
+The bulk-mode recipe below is **hand-tuned for `1xlasm`** (its inline constraints — "tall/huge/giantess", noun-phrase nudity rule with `{P}` / `{S}`, body-build guards — are giantess-genre specific). When `skin != '1xlasm'`, drop the 1xlasm-specific constraint lines and instead compose `default_prompt + opener + skin.render_label_prompts(labels) + skin.user_hint_preamble.format(hint=…)` — i.e. a generic skin-agnostic compose driven by the skin JSON's own `directive` and `user_hint_preamble`. Per-image mode (below) is judgment-driven and already skin-aware: it reads `skin.theme_md` for whichever skin was selected and lets Claude apply the right inline guards.
 
 ## Argument parser (tiny, written inline in the script)
 
@@ -30,23 +35,33 @@ import re
 ID_RE    = re.compile(r'^[0-9a-f]{24}$')
 TERM_RE  = re.compile(r'(\w+)\s*(==|>=|<=|=|>|<)\s*(\S+)')
 FORCE_RE = re.compile(r'\bforce\b', re.IGNORECASE)
+SKIN_RE  = re.compile(r'\bskin\s*=\s*(\S+)', re.IGNORECASE)
 
 def parse_args(s: str):
     s = (s or '').strip()
-    if not s:
-        return ('bulk', {}, False)
+    skin = (SKIN_RE.search(s).group(1) if SKIN_RE.search(s) else '1xlasm')
+    if not s or s == f'skin={skin}':
+        return ('bulk', {}, skin, False)
     if ID_RE.match(s):
-        return ('id', s, True)   # single-image = implicit force
+        return ('id', s, skin, True)   # single-image = implicit force
+    # In id-form-with-skin, e.g. "69a... skin=1xlface":
+    id_m = ID_RE.match(s.split()[0]) if s.split() else None
+    if id_m:
+        return ('id', id_m.group(0), skin, True)
     filters = {}
     force = bool(FORCE_RE.search(s))
     for kw, op, val in TERM_RE.findall(s):
         op = '==' if op == '=' else op
+        if kw == 'skin':
+            continue   # already pulled
         if kw == 'rating':
             filters[('rating', op)] = int(val)
         elif kw == 'set':
             filters[('set', op)] = val
-    return ('bulk', filters, force)
+    return ('bulk', filters, skin, force)
 ```
+
+Default `1xlasm` preserves bit-exact existing behavior.
 
 ## Bulk mode
 
@@ -92,7 +107,7 @@ bulk update [filters: set=…, rating==…]: N images refreshed (avg {chars} cha
 
 This is a **judgment task**: programmatic concatenation of every skin rule + every label sentence produces a 2000-3000 char prompt, which dilutes the model's attention. Your job is to compose a tight, image-specific prompt (~400-1000 chars) that bakes in **only the rules that matter for this image** and inlines the hint and applied-label content into natural prose.
 
-**Primary input.** This is where the **JSON/MD split** (see `conf/skins/_schema.json` top description) becomes operative. The structured surface (entities, labels, compose tables, validators) lives in `1xlasm.json` and is auto-applied by `Skin.render_label_prompts`. The **theme/world knowledge** — scene archetypes, anti-pattern principles, captioner quirks, stylistic intuition — lives in `conf/skins/1xlasm.md`, loaded into `skin.theme_md`. Read the MD before composing; it's the briefing that lets you *think* about this image instead of mechanically concatenating expansions.
+**Primary input.** This is where the **JSON/MD split** (see `conf/skins/_schema.json` top description) becomes operative. The structured surface (entities, labels, compose tables, validators) lives in `<skin>.json` (e.g. `1xlasm.json` by default) and is auto-applied by `Skin.render_label_prompts`. The **theme/world knowledge** — scene archetypes, anti-pattern principles, captioner quirks, stylistic intuition — lives in `conf/skins/<skin>.md`, loaded into `skin.theme_md`. Read the MD before composing; it's the briefing that lets you *think* about this image instead of mechanically concatenating expansions.
 
 ### Steps
 
@@ -109,11 +124,11 @@ hints     = simg.data.get(SceneDef.FIELD_HINTS, '') or ''
 
 If the image is missing or `labels_ng` is empty, abort with a short message.
 
-2. **Read the skin AND the theme briefing.** `Skin('1xlasm')` exposes:
-   - `entities_primary.phrase`, `entities_secondary.phrase` — the trigger phrases
+2. **Read the skin AND the theme briefing.** `Skin(skin)` (where `skin` is the parsed arg, default `1xlasm`) exposes:
+   - `entities_primary.phrase`, `entities_secondary.phrase` — the trigger phrases (note: `entities_secondary` is `None` for single-entity skins like `1xlface`; check before accessing)
    - `labels` (path → rendered sentence) — for static fallback rendering
-   - `render_label_prompts(applied_paths)` — context-aware rendering (uses `compose` tables when a group has one, e.g. proximity verb selection by secondary pose)
-   - `theme_md` — verbatim contents of `conf/skins/1xlasm.md`; primary input for theme/style judgment, captioner-quirk awareness, and anti-pattern reasoning
+   - `render_label_prompts(applied_paths)` — context-aware rendering (uses `compose` tables when a group has one, e.g. proximity verb selection by secondary pose in 1xlasm)
+   - `theme_md` — verbatim contents of `conf/skins/<skin>.md`; primary input for theme/style judgment, captioner-quirk awareness, and anti-pattern reasoning
 
    Use `skin.render_label_prompts(labels_ng)` rather than indexing `skin.labels[path]` directly, so compose-aware expansions are applied.
 

@@ -1,24 +1,27 @@
-"""JoySceneDBNG: orchestrator that wires `Skin` to `JoyNG` and the SceneDB.
+"""JoySceneDBNG: enrichment layer over a running joy_server.
 
-At construction: resolve a skin by name from `SkinRegistry`, look up the
-base-model and (optional) LoRA paths via `AInstallerDB`, and lazily build a
-`JoyNG` runtime against them. At call time: pull labels and hint from the
-SceneImage, ask the skin to render label-prompt sentences, call `JoyNG`, and
-run the skin's post-caption validators (forbidden / body-type / trigger
-presence) as logged warnings.
+At construction: resolve a skin by name from `SkinRegistry` and ensure
+the persistent `joy_server` is running with that skin (spawning it on
+demand via `joy_client.ensure_running`). At call time: pull labels and
+hint from the SceneImage, ask the skin to render label-prompt
+sentences, route the caption call through `joy_client.caption` to the
+running JoyNG instance, and run the skin's post-caption validators
+(forbidden / body-type / trigger presence) as logged warnings.
+
+JoySceneDBNG NEVER loads model weights itself. The captioner lives in
+the joy_server process; this class is a thin enrichment + persistence
+client.
 """
 from __future__ import annotations
 
 from typing import Final, Optional, Union, cast
 
 from aidb import SceneDef, SceneConfig, SceneManager, SceneImageManager, SceneImage, Scene
-from ait.install import AInstallerDB
 from ait.tools.scenes import scene_id_from_url
 
 import time
 
-from . import caption_log
-from .joy_ng import JoyNG
+from . import caption_log, joy_client
 from .skin import Skin, SkinRegistry, compute_labels_ng
 
 
@@ -32,25 +35,10 @@ class JoySceneDBNG:
         *,
         verbose: int = 0,
         force: bool = False,
-        lora: bool = True,
-        use_server: bool = False,
     ):
         self._dbconfig: SceneConfig = config
         self._verbose = verbose
         self._force = force
-        self._use_lora = lora
-        # When True, route the per-call caption to the persistent joy_server
-        # over HTTP instead of loading a JoyNG in-process. The server is
-        # spun up on demand via joy_client.ensure_running(). Useful for
-        # interactive UIs (gradio buttons) where the model would otherwise
-        # cold-load ~30s every click and free GPU between clicks.
-        self._use_server = use_server
-        if self._use_server:
-            from . import joy_client
-            joy_client.ensure_running(
-                skin=skin if isinstance(skin, str) and skin else self.SKIN_DEFAULT,
-                config=str(config),
-            )
 
         self._scm: SceneManager = SceneManager(config=self._dbconfig, verbose=self._verbose)
         self._sim: SceneImageManager = self._scm.scene_image_manager()
@@ -63,38 +51,9 @@ class JoySceneDBNG:
             else SkinRegistry(log=lambda m: self._log(m, 'warn')).get(skin)
         )
 
-        self.__joy: Optional[JoyNG] = None
-
-    @property
-    def _joy(self) -> JoyNG:
-        if self.__joy is None:
-            base_ids = AInstallerDB().repo_ids(*self.skin.model_key)
-            if not base_ids:
-                raise IndexError(
-                    f'AInstallerDB: no model configured for {self.skin.model_key}'
-                )
-            base_repo = base_ids[0]
-            lora_path: Optional[str] = None
-            if self._use_lora and self.skin.lora_key is not None:
-                lora_ids = AInstallerDB().repo_ids(*self.skin.lora_key)
-                if lora_ids:
-                    lora_path = lora_ids[0]
-                    self._log(f'applying LoRA: {lora_path}')
-            # Optional extra adapter (currently: hint LoRA for /img_suggest
-            # iter-5). Loaded as `adapter='hint'`. Skin's `lora_hint_path`
-            # is a direct local path or HF repo id, decoupled from
-            # AInstallerDB. None → single-adapter mode (default behavior).
-            extra_adapters: dict[str, str] = {}
-            if self._use_lora and self.skin.lora_hint_path:
-                extra_adapters['hint'] = self.skin.lora_hint_path
-                self._log(f'applying extra adapter hint: {self.skin.lora_hint_path}')
-            self.__joy = JoyNG(
-                model_repo=base_repo,
-                lora_path=lora_path,
-                extra_adapters=extra_adapters or None,
-                verbose=self._verbose,
-            )
-        return self.__joy
+        # Bring up the persistent joy_server with this skin (no-op if
+        # already running with the same skin; auto-restart on mismatch).
+        joy_client.ensure_running(skin=self.skin.name)
 
     # ---- public API ----
 
@@ -103,20 +62,17 @@ class JoySceneDBNG:
     ) -> tuple[Optional[str], Optional[str]]:
         """Caption a single SceneImage. Returns (prompt, caption) or (None, None).
 
-        Mirrors `JoySceneDB._id_caption` semantics:
         - skips if SceneImage already has caption_joy and `force=False`,
         - prefers per-image labels; falls back to scene-level labels,
         - forwards user hint verbatim,
+        - routes the caption call through joy_client to the running
+          joy_server,
         - runs post-caption validators as logged warnings.
         """
         try:
             simg = cast(SceneImage, self._sim.img_from_id(image_id))
         except Exception as e:
             self._log(f'id [{image_id}]: {e}', 'warn')
-            return None, None
-
-        img = simg.pil
-        if img is None:
             return None, None
 
         caption_joy_current = simg.data.get(SceneDef.FIELD_CAPTION_JOY, None)
@@ -152,24 +108,11 @@ class JoySceneDBNG:
             )
 
         t0 = time.time()
-        if self._use_server:
-            from . import joy_client
-            prompt, caption = joy_client.caption(
-                image_url=str(url),
-                user_content=user_content,
-                system_content=self.skin.directive,
-            )
-        else:
-            prompt, caption = self._joy.caption(
-                img=img,
-                system_content=self.skin.directive,
-                user_content=user_content,
-                default_prompt='',
-                label_prompts=(),
-                user_hint_preamble=None,
-                user_hint='',
-                post_prompt='',
-            )
+        prompt, caption = joy_client.caption(
+            image_url=str(url),
+            user_content=user_content,
+            system_content=self.skin.directive,
+        )
         elapsed = time.time() - t0
         self._log(f'prompt[{prompt}] caption[{caption}]')
 
@@ -200,7 +143,7 @@ class JoySceneDBNG:
 
     def caption_images(self, image_ids: list[str]) -> dict[str, dict[str, str]]:
         """Batch helper: returns {image_id: {prompt, caption}} for every
-        successfully captioned image. Mirrors `JoySceneDB._ids_caption`.
+        successfully captioned image.
         """
         ret: dict[str, dict[str, str]] = {}
         for iid in image_ids:

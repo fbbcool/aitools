@@ -9,7 +9,11 @@ from typing import Any, Optional
 from aidb import SceneManager, SceneDef
 from aidb.scene.scene_set_manager import SceneSetManager
 from aidb.app.cell_scene import AppSceneCell
-from aidb.app.cell_scene_image import AppSceneImageCell, editor_labels
+from aidb.app.cell_scene_image import (
+    AppSceneImageCell,
+    editor_labels,
+    set_active_skin,
+)
 from aidb.app.html import AppHtml, AppOpMmode, AppHelper, HtmlHelper
 
 from ait.tools.files import imgs_from_url
@@ -23,15 +27,22 @@ class AIDBSceneApp:
     with the DBManager.
     """
 
-    def __init__(self, scm: SceneManager) -> None:
+    def __init__(self, scm: SceneManager, skin: str = '1xlasm') -> None:
         """
         Initializes the Gradio application with a reference to the SceneManager.
+
+        `skin` is the captioning skin used for the whole UI session — caption
+        buttons, JoySceneDBNG calls, and the labels-ng editor all lock to it.
+        Passed through to `cell_scene_image.set_active_skin` so per-cell
+        renders use the same skin.
         """
 
         self._scm = scm
         self._dbc = self._scm._dbc
         self._ssm = SceneSetManager(dbc=self._dbc, verbose=0)
         self._apphelper = AppHelper(self._dbc)
+        self._skin_name = skin
+        set_active_skin(skin)
 
         self._interface = self._create_interface()
 
@@ -92,8 +103,8 @@ class AIDBSceneApp:
                 elem_id=AppHtml.elem_id_simg_editor_register_prototype_databus(),
             )
 
-            # Hidden trigger + databus for captioning an image (registered or
-            # unregistered) using Joy / JoySceneDB.
+            # Hidden trigger + databus for captioning a registered SceneImage
+            # via JoySceneDBNG (routing through the persistent joy_server).
             button_hidden_simg_editor_caption = gr.Button(
                 'Hidden SceneImage Editor Caption',
                 visible='hidden',
@@ -542,8 +553,8 @@ class AIDBSceneApp:
                 outputs=editor_outputs,
             )
 
-            # Batch caption: for the currently-loaded scene, run JoySceneDB
-            # ('1xlasm') on every registered image whose caption_joy is
+            # Batch caption: for the currently-loaded scene, run JoySceneDBNG
+            # (active skin) on every registered image whose caption_joy is
             # empty, store each result to the DB, then refresh. Preserves
             # the scene-id textbox during the clear step (same reason).
             simg_editor_caption_empty_button.click(
@@ -590,11 +601,11 @@ class AIDBSceneApp:
                 show_progress='hidden',
             )
 
-            # Caption an image (registered SceneImage via JoySceneDBNG /
-            # legacy JoySceneDB, or an unregistered file via Joy directly).
-            # The caption is copied to the clipboard. For non-clip flows the
+            # Caption a registered SceneImage via JoySceneDBNG (routing
+            # through the persistent joy_server). The caption is copied to
+            # the clipboard. For non-clip flows the
             # backend force-stores caption_prompt (and caption_joy for the
-            # 1xlasm skin); the JSON written to the out-databus drives a JS
+            # active skin); the JSON written to the out-databus drives a JS
             # .then() callback that mirrors those writes into the per-cell
             # textareas so the DOM matches the DB without a manual reload.
             button_hidden_simg_editor_caption.click(
@@ -1168,7 +1179,7 @@ class AIDBSceneApp:
             return self._html_set_editor_open(*refresh_args)
 
         gr.Info(
-            f"Batch captioning {len(ids_empty)} image(s) with skin '1xlasm'...",
+            f"Batch captioning {len(ids_empty)} image(s) with skin '{self._skin_name}'...",
             duration=3.0,
         )
 
@@ -1181,7 +1192,7 @@ class AIDBSceneApp:
             from ait.caption.joy_scenedb_ng import JoySceneDBNG
             jdb = JoySceneDBNG(
                 config=cfg_name,
-                skin='1xlasm',
+                skin=self._skin_name,
                 verbose=1,
                 force=True,
             )
@@ -2253,12 +2264,12 @@ class AIDBSceneApp:
         Pipeline:
           1. Query the DB for all SceneImage ids belonging to this scene
              whose `caption_joy` field is missing / null / empty string.
-          2. Construct a single JoySceneDB(trigger='1xlasm', force=True);
-             its underlying Joy model is loaded lazily once and reused for
-             the whole loop. force=True is required because our query
-             already filtered the ids; JoySceneDB's own skip check would
-             otherwise refuse to caption images whose caption_joy is the
-             empty string ('' is not None -> skip).
+          2. Construct a single JoySceneDBNG(skin=<active>, force=True);
+             the persistent joy_server is brought up on first call and
+             reused for the whole loop. force=True is required because our
+             query already filtered the ids; JoySceneDBNG's own skip check
+             would otherwise refuse to caption images whose caption_joy is
+             the empty string ('' is not None -> skip).
           3. For every id, call `jdb._id_caption(id)` -> (prompt, caption)
              and persist the caption EXPLICITLY to FIELD_CAPTION_JOY via
              `simg.set_caption_joy(caption)` + `simg.db_store()`. We never
@@ -2298,9 +2309,9 @@ class AIDBSceneApp:
             gr.Info('All registered images already have a caption_joy.')
             return self._html_simg_editor_open(scene_id)
 
-        # 2. Caption the ids with a single JoySceneDBNG run (1xlasm skin).
+        # 2. Caption the ids with a single JoySceneDBNG run (active skin).
         gr.Info(
-            f"Batch captioning {len(ids_empty)} image(s) with skin '1xlasm'...",
+            f"Batch captioning {len(ids_empty)} image(s) with skin '{self._skin_name}'...",
             duration=3.0,
         )
 
@@ -2317,7 +2328,7 @@ class AIDBSceneApp:
             from ait.caption.joy_scenedb_ng import JoySceneDBNG
             jdb = JoySceneDBNG(
                 config=cfg_name,
-                skin='1xlasm',
+                skin=self._skin_name,
                 verbose=1,
                 force=True,
             )
@@ -2376,23 +2387,20 @@ class AIDBSceneApp:
     # captioning
     # ------------------------------------------------------------------
     #
-    # IMPORTANT: caption models are *not* cached. A fresh Joy / JoySceneDB
-    # instance is created for every click and explicitly destroyed afterwards
-    # so the GPU memory is freed for other (external) tasks. We never write
-    # captions back to the DB - the result is only copied to the clipboard
-    # and the user can decide what to do with it.
+    # The captioner itself lives in the persistent joy_server (started on
+    # demand via joy_client.ensure_running). Per-click JoySceneDBNG
+    # instances are lightweight DB-bound enrichment clients — they do NOT
+    # own model weights and creating them is cheap.
 
     def _html_simg_editor_caption(self, data_str: Optional[str]) -> str:
         """
-        Generates a caption for either a registered SceneImage (uses a fresh
-        JoySceneDBNG / JoySceneDB instance) or an unregistered image file
-        (uses a fresh Joy instance), copies the result to the clipboard and
-        frees the model.
+        Generates a caption for a registered SceneImage via JoySceneDBNG,
+        which routes through the persistent joy_server.
 
         Returns a JSON string `{image_id, caption_joy?, caption_prompt?}`
         that the click's `.then()` JS callback uses to mirror the server-side
         save into the per-cell textareas. Empty string when nothing was
-        persisted (clip-only flow, unregistered target, or failure).
+        persisted (clip-only flow or failure).
         """
         if not data_str or not isinstance(data_str, str):
             gr.Warning('Caption: invalid request.')
@@ -2415,49 +2423,29 @@ class AIDBSceneApp:
 
         if target_type == 'registered':
             return self._caption_registered(target, trigger, clip_only=clip_only) or ''
-        if target_type == 'unregistered':
-            self._caption_unregistered(target, trigger)
-            return ''
-        gr.Warning(f'Caption: unknown target type [{target_type}].')
+        # Captioning unregistered images is not supported (the legacy Joy
+        # path was removed). Files must be registered as SceneImages first.
+        gr.Warning(f'Caption: unsupported target type [{target_type}]; '
+                   f'only registered SceneImages can be captioned.')
         return ''
 
     @staticmethod
     def _release_gpu(obj: Any) -> None:
         """
-        Best-effort destruction of a captioner instance and its underlying
-        torch model so VRAM is released for other tasks.
+        Drop the local reference and run a GC + CUDA cache sweep. After
+        the move to the persistent joy_server (which owns the model in a
+        separate process) the captioner instances handed to this function
+        no longer own torch weights — this is now best-effort housekeeping
+        on whatever auxiliary CUDA state lingers in *this* process.
         """
-        try:
-            # If it's a JoySceneDB / JoySceneDBNG it owns a Joy / JoyNG via
-            # .__joy / ._joy.
-            inner = getattr(obj, '_JoySceneDB__joy', None)
-            if inner is None:
-                inner = getattr(obj, '_JoySceneDBNG__joy', None)
-            if inner is None:
-                inner = getattr(obj, '_joy', None)
-            for o in (inner, obj):
-                if o is None:
-                    continue
-                for attr in ('model', 'processor'):
-                    try:
-                        if hasattr(o, attr):
-                            setattr(o, attr, None)
-                    except Exception:
-                        pass
-        except Exception as e:
-            print(f'WARN: caption release pre-cleanup: {e}')
-
         del obj
-
         try:
             import gc
-
             gc.collect()
         except Exception:
             pass
         try:
             import torch
-
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.ipc_collect()
@@ -2470,26 +2458,26 @@ class AIDBSceneApp:
         """Return JSON `{image_id, caption_joy?, caption_prompt?}` describing
         the server-side save so the click's .then() callback can mirror the
         write into the DOM textareas. Empty string when nothing was persisted
-        (clip_only / non-1xlasm without prompt / failures).
+        (clip_only / unknown trigger without prompt / failures).
         """
-        # 1xlasm auto-persists into caption_joy, so refuse if a stored
-        # caption_joy would be overwritten. clip_only paths skip persistence
-        # entirely, so the guard does not apply.
-        if trigger == '1xlasm' and not clip_only:
+        # The active skin auto-persists into caption_joy, so refuse if a
+        # stored caption_joy would be overwritten. clip_only paths skip
+        # persistence entirely, so the guard does not apply.
+        if trigger == self._skin_name and not clip_only:
             try:
                 sim = self._scm.scene_image_manager()
                 existing = sim.img_from_id(image_id)
                 if existing is not None and (existing.caption_joy or '').strip():
                     gr.Warning(
-                        f'1xlasm rejected: caption_joy already set for {image_id}. '
+                        f'{self._skin_name} rejected: caption_joy already set for {image_id}. '
                         f'Clear it first to re-caption.'
                     )
                     return ''
             except Exception as e:
-                print(f'WARN: 1xlasm pre-check failed [{image_id}]: {e}')
+                print(f'WARN: {self._skin_name} pre-check failed [{image_id}]: {e}')
 
         gr.Info(
-            f'Captioning image {image_id} with trigger [{trigger}]...',
+            f'Captioning image {image_id} with skin [{trigger}]...',
             duration=2.0,
         )
         cfg_name = self._scm._dbc.config.config
@@ -2497,30 +2485,25 @@ class AIDBSceneApp:
         caption: Optional[str] = None
         prompt: Optional[str] = None
         try:
-            if trigger == '1xlasm':
+            if trigger == self._skin_name:
                 # NG path: routes through the persistent joy_server
-                # (auto-spinup on first click via joy_client.ensure_running)
+                # (auto-spinup on first call via joy_client.ensure_running)
                 # so each click doesn't pay a ~30s in-process cold-load.
                 from ait.caption.joy_scenedb_ng import JoySceneDBNG
                 jdb = JoySceneDBNG(
                     config=cfg_name,
-                    skin='1xlasm',
+                    skin=self._skin_name,
                     verbose=1,
                     force=True,
-                    use_server=True,
                 )
                 prompt, caption = jdb.caption_image(image_id)
             else:
-                # Legacy path for other triggers (gts_prompter, …) until they
-                # migrate to the JSON-skin pipeline.
-                from ait.caption.joy_scenedb import JoySceneDB
-                jdb = JoySceneDB(
-                    config=cfg_name,
-                    trigger=trigger,
-                    verbose=1,
-                    force=True,
-                )
-                prompt, caption = jdb._id_caption(image_id)
+                # No UI path emits a non-active-skin trigger anymore (the
+                # legacy gts_prompter button was removed). Anything firing
+                # here is an unexpected payload — log and refuse.
+                gr.Warning(f'Caption: unknown trigger [{trigger}]; only the active skin '
+                           f'[{self._skin_name}] is supported.')
+                return ''
         except Exception as e:
             print(f'ERROR: caption registered [{image_id}]: {e}')
             gr.Warning(f'Caption failed: {e}')
@@ -2539,10 +2522,8 @@ class AIDBSceneApp:
 
         # Persistence: every caption flow that is NOT clip-only force-stores
         # the prompt that was sent to the model (FIELD_CAPTION_PROMPT) so the
-        # exact inputs are auditable. 1xlasm additionally writes caption_joy
-        # (the canonical model output for that recipe). Other triggers leave
-        # caption_joy alone — they're prompt-shaping helpers, not
-        # caption-source-of-truth.
+        # exact inputs are auditable. The active skin additionally writes
+        # caption_joy (the canonical model output for that recipe).
         result: dict[str, Any] = {'image_id': image_id}
         if not clip_only:
             try:
@@ -2552,11 +2533,11 @@ class AIDBSceneApp:
                     if prompt:
                         simg.set_caption_prompt(prompt)
                         result['caption_prompt'] = prompt
-                    if trigger == '1xlasm':
+                    if trigger == self._skin_name:
                         simg.set_caption_joy(caption)
                         result['caption_joy'] = caption
                     simg.db_store()
-                    if trigger == '1xlasm':
+                    if trigger == self._skin_name:
                         gr.Info(
                             f'caption_joy + prompt saved for {image_id}.',
                             duration=1.5,
@@ -2749,8 +2730,8 @@ class AIDBSceneApp:
     def _caption_set_generate(self, image_id_str: Optional[str]) -> str:
         """
         Backend handler for the per-cell 'set' button when caption_joy is
-        empty: generates a caption with a fresh JoySceneDB instance (then
-        destroys it) and returns a JSON `{image_id, caption}` string.
+        empty: generates a caption via JoySceneDBNG (routing through the
+        persistent joy_server) and returns a JSON `{image_id, caption}`.
 
         The frontend `.then()` JS callback writes the returned caption into
         both the caption_joy and caption textareas (DOM only - no DB write).
@@ -2761,8 +2742,8 @@ class AIDBSceneApp:
         if not image_id:
             return ''
 
-        # 'set' always captions with the '1xlasm' skin via JoySceneDBNG.
-        trigger = '1xlasm'
+        # 'set' always captions with the active skin via JoySceneDBNG.
+        trigger = self._skin_name
         gr.Info(
             f"Generating caption for image {image_id} (set, skin '{trigger}')...",
             duration=2.0,
@@ -2807,51 +2788,6 @@ class AIDBSceneApp:
             duration=2.5,
         )
         return json.dumps({'image_id': image_id, 'caption': caption})
-
-    def _caption_unregistered(self, url_str: str, trigger: str) -> None:
-        url = Path(url_str.strip())
-        if not url.exists():
-            gr.Warning(f'Caption: file does not exist: {url}')
-            return None
-
-        try:
-            from ait.caption.joy import Joy
-        except Exception as e:
-            print(f'ERROR: Joy import failed: {e}')
-            gr.Warning(f'Caption init failed: {e}')
-            return None
-
-        gr.Info(
-            f'Captioning {url.name} with trigger [{trigger}]...',
-            duration=2.0,
-        )
-        joy = None
-        caption: Optional[str] = None
-        try:
-            joy = Joy(trigger=trigger)
-            _prompt, caption = joy.imgurl_caption(str(url))
-        except Exception as e:
-            print(f'ERROR: caption unregistered [{url}]: {e}')
-            gr.Warning(f'Caption failed: {e}')
-        finally:
-            if joy is not None:
-                self._release_gpu(joy)
-
-        if not caption:
-            gr.Warning(f'No caption produced for {url.name}.')
-            return None
-
-        try:
-            pyperclip.copy(caption)
-        except Exception as e:
-            print(f'WARN: clipboard copy failed: {e}')
-
-        preview = caption if len(caption) <= 80 else caption[:77] + '...'
-        gr.Info(
-            f'Caption copied to clipboard: {preview}',
-            duration=2.5,
-        )
-        return None
 
     def launch(self, **kwargs):
         print('Launching Gradio application...')
