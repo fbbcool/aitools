@@ -724,11 +724,26 @@ class AppSceneImageCell:
         )
 
     @staticmethod
-    def _html_copy_static_button(value: Optional[str], label: str = 'copy') -> str:
+    def _html_copy_static_button(
+        value: Optional[str],
+        label: str = 'copy',
+        *,
+        enabled: bool = True,
+    ) -> str:
         """
         Small copy-to-clipboard button that copies a fixed string value (no
         dependency on a DOM input element).
+
+        When `enabled` is False, the button is rendered with the `disabled`
+        attribute and the `simg-copy-btn-disabled` class — non-clickable,
+        greyed-out. Layout stays consistent vs. omitting the button entirely.
         """
+        safe_label = html_lib.escape(label, quote=True)
+        if not enabled:
+            return (
+                f'<button type="button" disabled '
+                f'class="simg-copy-btn simg-copy-btn-disabled">{safe_label}</button>'
+            )
         if value is None:
             value = ''
         # Escape value for embedding in a JS single-quoted string literal.
@@ -763,7 +778,6 @@ class AppSceneImageCell:
             document.body.removeChild(ta); ok();
         }}
         """.replace('\n', ' ').replace('"', '&quot;')
-        safe_label = html_lib.escape(label, quote=True)
         return (
             f'<button type="button" class="simg-copy-btn" onclick="{js}">{safe_label}</button>'
         )
@@ -1588,11 +1602,12 @@ class AppSceneImageCell:
         url_copy_btn = AppSceneImageCell._html_copy_static_button(url_str, label='url')
 
         # Extract the embedded prompt from the image (if any). When no prompt
-        # can be extracted, fall back to the file url as the value to copy.
+        # is present, render the button disabled (greyed-out, non-clickable)
+        # so the layout stays stable but the user can't accidentally copy
+        # nothing — or a stale URL fallback.
         prompt = AppSceneImageCell._extract_prompt_from_url(url)
-        prompt_value = prompt if prompt else url_str
         prompt_copy_btn = AppSceneImageCell._html_copy_static_button(
-            prompt_value, label='prompt'
+            prompt or '', label='prompt', enabled=bool(prompt),
         )
 
         thumb_onclick = AppSceneImageCell._html_lightbox_onclick(

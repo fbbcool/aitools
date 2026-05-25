@@ -406,6 +406,11 @@ class AppHtml:
                 text-align: center;
                 word-break: break-all;
             }}
+            .simg-copy-btn-disabled {{
+                opacity: 0.4;
+                cursor: not-allowed;
+                pointer-events: none;
+            }}
         </style>
         <div class="image-grid"{grid_inline_style}>
         {inner_html}
