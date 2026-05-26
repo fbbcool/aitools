@@ -40,9 +40,18 @@ train_run() {
   cd $HOME_TRAINER
   ./train.sh
 }
-train_clean() {
+clean_train() {
   rm -rf $DIR_TRAIN
 }
+
+clean_dataset() {
+  rm -rf $DIR_TRAIN/dataset
+}
+
+clean_output() {
+  rm -rf $DIR_TRAIN/dataset
+}
+
 
 alias t='vi $HOME_AIT/script/train_prepare.py'
 
