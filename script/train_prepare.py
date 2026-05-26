@@ -36,7 +36,7 @@ config_trainer_qwen_5090 = {
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
     'optimizer___lr': 1e-4,
 }
 
@@ -271,10 +271,10 @@ dataset_xlface_jez = [
 # )
 Trainer(
     'qwen',
-    dataset_xlface_jez,
+    dataset_xlasm,
     # variant='2512-4xlasm',
-    # variant='2512-snofs',
-    variant='2512-snofs-frozen-base-lora',
+    variant='2512-snofs',
+    # variant='2512-snofs-frozen-base-lora',
     config_trainer=config_trainer_qwen_5090,
     config_dataset=config_dataset,
     multithread=True,
