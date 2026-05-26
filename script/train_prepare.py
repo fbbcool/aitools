@@ -50,6 +50,7 @@ config_trainer_qwen_5090_gts_atomic = {
     'caching_batch_size': 4,
     'steps_per_print': 10,
     'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___alpha': 4,  # 32 for xlasm, 16 for xlasm-childs
     'optimizer___lr': 5e-5,
 }
 

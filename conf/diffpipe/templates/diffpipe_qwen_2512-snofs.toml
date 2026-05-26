@@ -124,6 +124,7 @@ ${model___max_t}
 type = 'lora'
 #rank = {int(self._config_train['netdim'])}
 ${adapter___rank}
+${adapter___alpha}
 # Dtype for the LoRA weights you are training.
 #dtype = 'bfloat16'
 ${adapter___dtype}
