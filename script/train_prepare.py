@@ -34,6 +34,7 @@ config_trainer_qwen_5090 = {
     'micro_batch_size_per_gpu': 2,  # maybe 1
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
     'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
