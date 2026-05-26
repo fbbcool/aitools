@@ -49,7 +49,7 @@ clean_dataset() {
 }
 
 clean_output() {
-  rm -rf $DIR_TRAIN/dataset
+  rm -rf $DIR_TRAIN/output
 }
 
 
