@@ -37,8 +37,20 @@ config_trainer_qwen_5090 = {
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
     'optimizer___lr': 1e-4,
+}
+
+config_trainer_qwen_5090_gts_atomic = {
+    'epochs': 40,  # sentinel, manual cancel ~3K steps
+    'micro_batch_size_per_gpu': 2,  # maybe 1
+    'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
+    'optimizer___lr': 5e-5,
 }
 
 # ─── qwen-H100 80GB ──────────────────────────────────────────────────────
@@ -276,7 +288,7 @@ Trainer(
     # variant='2512-4xlasm',
     variant='2512-snofs',
     # variant='2512-snofs-frozen-base-lora',
-    config_trainer=config_trainer_qwen_5090,
+    config_trainer=config_trainer_qwen_5090_gts_atomic,
     config_dataset=config_dataset,
     multithread=True,
 )
