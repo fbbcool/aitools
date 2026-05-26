@@ -51,6 +51,15 @@
         }
       ]
     },
+    "2512-snofs-frozen-base-lora": {
+      "lora": [
+        {
+          "repo_id": "fbbcool/xlasm",
+          "file": "qwen/xlasm10-test.safetensors",
+          "skip": false
+        }
+      ]
+    },
     "2512-4xlasm": {
       "lora": [
         {

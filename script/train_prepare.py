@@ -272,8 +272,9 @@ dataset_xlface_jez = [
 Trainer(
     'qwen',
     dataset_xlface_jez,
-    variant='2512-4xlasm',
+    # variant='2512-4xlasm',
     # variant='2512-snofs',
+    variant='2512-snofs-frozen-base-lora',
     config_trainer=config_trainer_qwen_5090,
     config_dataset=config_dataset,
     multithread=True,

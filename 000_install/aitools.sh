@@ -2,6 +2,7 @@
 export REPOS_AIT='https://github.com/fbbcool/aitools.git'
 #export REPOS_TRAINER='https://github.com/tdrussell/diffusion-pipe'
 export REPOS_TRAINER='https://github.com/fbbcool/diffusion-pipe'
+export REPOS_TRAINER_BRANCH='feature-xlasm-frozen'
 export WORKSPACE='/workspace'
 export DIR_TRAIN=$WORKSPACE/train
 export HOME_TRAINER=$WORKSPACE/diffusion-pipe
@@ -15,7 +16,7 @@ ___train_install_aitools() {
 }
 ___train_install_trainer() {
   rm -rf $HOME_TRAINER
-  git clone $REPOS_TRAINER $HOME_TRAINER
+  git clone ${REPOS_TRAINER_BRANCH:+--branch $REPOS_TRAINER_BRANCH} $REPOS_TRAINER $HOME_TRAINER
   cd $HOME_TRAINER
   git submodule update --init --recursive
 

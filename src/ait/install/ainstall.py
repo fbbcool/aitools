@@ -346,6 +346,11 @@ class AInstaller:
             'lora': {
                 'model___merge_adapters': {'type': 'list_str'},
                 'adapter___init_from_existing': {'type': 'str'},
+                'path___lora': {
+                    'type': 'str',
+                    'parameter': 'path',
+                    'format': '${parameter} = ${value}',
+                },
             },
             'clip': {'model___clip_path': {'type': 'str'}},
             'transformer': {'model___transformer_path': {'type': 'str'}},
