@@ -120,23 +120,6 @@ config_dataset = {
 }
 
 
-# dataset_repo_ids = [('fbbcool/1gts-xlasm-01', 0)]
-# dataset_repo_ids = [('fbbcool/1fbb_02', 150)]
-# dataset_repo_ids = [
-#    ('fbbcool/1busty', 100),
-#    ('fbbcool/1legsemp', 100),
-#    ('fbbcool/1fem', 100),
-#    ('fbbcool/1fbb_02', 100),
-# ]
-# dataset_repo_ids = [
-#    ('fbbcool/1busty', 150),
-#    ('fbbcool/1busty-gts', 150),
-#    ('fbbcool/1fem', 150),
-# ]
-# dataset_repo_ids = [
-#    ('fbbcool/1legsemp', 0),
-#    ('fbbcool/1fbb_02', 200),
-# ]
 # 25 hand-picked negative-reinforcement images from gts-v3: xlasm-man-visible
 # scenes WITHOUT the trigger in caption. Mix is 5 visually-<trait> + 20 non-<trait>
 # so the LoRA learns "trigger word controls direction; no trigger means leave
@@ -312,9 +295,8 @@ dataset_xlface_jez = [
 Trainer(
     'qwen',
     dataset_xlhairy,
-    # variant='2512-4xlasm',
-    variant='2512-gts-atomic',
-    config_trainer=config_trainer_qwen_5090_gts_atomic,
+    variant='2512-gts-app',
+    config_trainer=config_trainer_qwen_5090_gts_app,
     config_dataset=config_dataset,
     multithread=True,
 )
