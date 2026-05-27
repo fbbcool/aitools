@@ -42,7 +42,7 @@ config_trainer_qwen_5090 = {
 }
 
 config_trainer_qwen_5090_gts_atomic = {
-    'epochs': 40,  # sentinel, manual cancel ~3K steps
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': 2,  # maybe 1
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
@@ -285,10 +285,9 @@ dataset_xlface_jez = [
 # )
 Trainer(
     'qwen',
-    dataset_xlasm,
+    dataset_xlhairy,
     # variant='2512-4xlasm',
-    variant='2512-snofs',
-    # variant='2512-snofs-frozen-base-lora',
+    variant='2512-gts-atomic',
     config_trainer=config_trainer_qwen_5090_gts_atomic,
     config_dataset=config_dataset,
     multithread=True,

@@ -51,6 +51,15 @@
         }
       ]
     },
+    "2512-gts-atomic": {
+      "lora": [
+        {
+          "repo_id": "fbbcool/xlasm",
+          "file": "qwen/gts-atomic/25.safetensors",
+          "skip": false
+        }
+      ]
+    },
     "2512-snofs-frozen-base-lora": {
       "lora": [
         {
