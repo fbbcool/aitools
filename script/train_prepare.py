@@ -54,6 +54,32 @@ config_trainer_qwen_5090_gts_atomic = {
     'optimizer___lr': 5e-5,
 }
 
+config_trainer_qwen_5090_gts_domain = {
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
+    'micro_batch_size_per_gpu': 2,  # maybe 1
+    'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
+    #'adapter___alpha': 4,  # will break; is set automatically!
+    'optimizer___lr': 5e-5,
+}
+
+config_trainer_qwen_5090_gts_app = {
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
+    'micro_batch_size_per_gpu': 2,  # maybe 1
+    'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
+    #'adapter___alpha': 4,  # will break; is set automatically!
+    'optimizer___lr': 5e-5,
+}
+
 # ─── qwen-H100 80GB ──────────────────────────────────────────────────────
 # Rental ($2-3/hr). mb=8 with full 80 GB headroom. ~3-4 s/step at mb=8,
 # 10× higher samples-per-second throughput vs 5090 mb=1.

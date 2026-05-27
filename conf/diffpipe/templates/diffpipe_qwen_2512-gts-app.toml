@@ -132,9 +132,9 @@ ${adapter___dtype}
 # warm start, init with existing lora
 #${adapter___init_from_existing}
 
-#[[adapter.runtime_adapters]]
-#${path___lora}
-#weight = 0.8
+[[adapter.runtime_adapters]]
+${path___lora}
+weight = 0.8
 
 [optimizer]
 # AdamW from the optimi library is a good default since it automatically uses Kahan summation when training bfloat16 weights.

@@ -42,16 +42,8 @@
         }
       ]
     },
-    "2512-snofs": {
-      "lora": [
-        {
-          "repo_id": "fbbcool/xlasm",
-          "file": "qwen/xlasm10-test.safetensors",
-          "skip": false
-        }
-      ]
-    },
-    "2512-gts-atomic": {
+    "2512-gts-atomic": {},
+    "2512-gts-domain": {
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",
@@ -60,20 +52,11 @@
         }
       ]
     },
-    "2512-snofs-frozen-base-lora": {
+    "2512-gts-app": {
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",
-          "file": "qwen/xlasm10-test.safetensors",
-          "skip": false
-        }
-      ]
-    },
-    "2512-4xlasm": {
-      "lora": [
-        {
-          "repo_id": "fbbcool/xlasm",
-          "file": "qwen/xlasm10-test.safetensors",
+          "file": "qwen/gts-atomic/25.safetensors",
           "skip": false
         }
       ]
