@@ -31,7 +31,7 @@ model = 'qwen'
 variant = '2512-gts-app'
 # gpu = '5090'
 gpu = 'h100-nvl'
-trigger = 'xlhairy'
+trigger = 'xlface_jez'
 num_repeats = 1
 
 # ──────────────────────────────────────────────────────
