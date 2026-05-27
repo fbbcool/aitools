@@ -26,24 +26,40 @@ from trainer import Trainer
 #    'optimizer___weight_decay': 0.01,
 #    'optimizer___type': 'adamw_optimi',
 # }
-# ─── qwen-5090 (32 GB) ───────────────────────────────────────────────────
-# Local card. mb=2 fits tight at 1024² rank=32 float8. ~5-7 s/step.
-# 3K-step test ≈ 4 h.
-config_trainer_qwen_5090 = {
+
+model = 'qwen'
+variant = '2512-gts-app'
+gpu = '5090'
+# gpu = 'h100'
+trigger = 'xlhairy'
+num_repeats = 1
+
+# ──────────────────────────────────────────────────────
+gpu_config = {
+    '5090': {
+        'micro_batch_size_per_gpu': 2,  # maybe 1
+    },
+    'h100': {
+        'micro_batch_size_per_gpu': 12,  # maybe 1
+    },
+}
+
+# ──────────────────────────────────────────────────────
+config_trainer_qwen_default = {
     'epochs': 30,  # sentinel, manual cancel ~3K steps
-    'micro_batch_size_per_gpu': 2,  # maybe 1
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
-    'optimizer___lr': 1e-4,
+    'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
+    'optimizer___lr': 5e-5,
 }
 
-config_trainer_qwen_5090_gts_atomic = {
+config_trainer_qwen_gts_atomic = {
     'epochs': 30,  # sentinel, manual cancel ~3K steps
-    'micro_batch_size_per_gpu': 2,  # maybe 1
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'checkpoint_every_n_epochs': 1,
@@ -54,9 +70,9 @@ config_trainer_qwen_5090_gts_atomic = {
     'optimizer___lr': 5e-5,
 }
 
-config_trainer_qwen_5090_gts_domain = {
+config_trainer_qwen_gts_domain = {
     'epochs': 30,  # sentinel, manual cancel ~3K steps
-    'micro_batch_size_per_gpu': 2,  # maybe 1
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'checkpoint_every_n_epochs': 1,
@@ -67,9 +83,9 @@ config_trainer_qwen_5090_gts_domain = {
     'optimizer___lr': 5e-5,
 }
 
-config_trainer_qwen_5090_gts_app = {
+config_trainer_qwen_gts_app = {
     'epochs': 30,  # sentinel, manual cancel ~3K steps
-    'micro_batch_size_per_gpu': 2,  # maybe 1
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'checkpoint_every_n_epochs': 1,
@@ -80,31 +96,15 @@ config_trainer_qwen_5090_gts_app = {
     'optimizer___lr': 5e-5,
 }
 
-# ─── qwen-H100 80GB ──────────────────────────────────────────────────────
-# Rental ($2-3/hr). mb=8 with full 80 GB headroom. ~3-4 s/step at mb=8,
-# 10× higher samples-per-second throughput vs 5090 mb=1.
-# 3K-step test ≈ 1 h, 24K samples seen (= ~107 effective epochs over 225 imgs × 2).
-config_trainer_qwen_h100 = {
-    'epochs': 80,  # sentinel, manual cancel ~3K steps
-    'micro_batch_size_per_gpu': 12,  # H100 80GB has the headroom; 4× the 5090 mb=2
-    'warmup_steps': 100,  # longer warmup for 1.5× LR and 4× effective batch
-    'save_every_n_epochs': 2,  # mb=8 → ~56 steps/epoch; 10 epochs = ~560 steps → ~5 ckpts at 3K
-    'caching_batch_size': 8,  # match mb for fast initial latent cache pass
-    'steps_per_print': 10,
-    'adapter___rank': 32,
-    'optimizer___lr': 5e-5,  # mild bump for 4× larger effective batch (linear-scaling would suggest 8e-4; LoRA-on-pretrained is less sensitive)
-    # ─── warm-start an adapter from an existing LoRA (qwen-image-compatible) ──
-    # Set when resuming/continuing training of the SAME concept (e.g. extending
-    # gts3-e10 → e30). Leave commented for training a NEW concept on top of a
-    # frozen base. Expects a DIRECTORY containing exactly one .safetensors file.
-    # See diffusion-pipe train.py L507-L508 + models/base.py:load_adapter_weights.
-    # Rank + target_modules of the new adapter must match the loaded one.
-    # 'adapter___init_from_existing': '/workspace/loras/xlasm10',
+config_trainer = {
+    'gts-atomic': config_trainer_qwen_gts_atomic,
+    'gts-domain': config_trainer_qwen_gts_domain,
+    'gts-app': config_trainer_qwen_gts_app,
 }
 
 # config_trainer = config_trainer_qwen_h100
 config_dataset = {
-    'num_repeats': 1,
+    'num_repeats': num_repeats,
     # The 7 distinct (w, h) pairs in the compiled gts_v3 training set.
     # All max-side 1024, AR bucketed: 1:1, 3:4/4:3, 2:3/3:2, 3:5/5:3.
     'resolutions': [1024],
@@ -252,51 +252,39 @@ GTS_V3_NEUTRAL_IDS_XLLEGGY = [
     '69f727d19f03180e9df1e288',
 ]
 
-dataset_xlasm = [
-    ('fbbcool/gts-v3', 0),
-]
+datasets = {
+    'xlasm': [
+        ('fbbcool/gts-v3', 0),
+    ],
+    'xlbusty': [
+        ('fbbcool/1busty', 0),
+        # max_imgs=len(ids) so every ID in the filter list gets picked; the 3rd
+        # tuple element is the explicit ID filter (Trainer's _make_dataset_hfd
+        # restricts the source pool to those before pick_chance is applied).
+        ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLBUSTY), GTS_V3_NEUTRAL_IDS_XLBUSTY),
+    ],
+    'xlfbb': [
+        ('fbbcool/1fbb_02', 0),
+        ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLFBB), GTS_V3_NEUTRAL_IDS_XLFBB),
+    ],
+    'xlhairy': [
+        ('fbbcool/xlhairy', 0),
+        ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLHAIRY), GTS_V3_NEUTRAL_IDS_XLHAIRY),
+    ],
+    'xlleggy': [
+        ('fbbcool/xlleggy', 0),
+        ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLLEGGY), GTS_V3_NEUTRAL_IDS_XLLEGGY),
+    ],
+    'xlface_jez': [
+        ('fbbcool/face-jez', 0),
+    ],
+}
 
-dataset_xlbusty = [
-    ('fbbcool/1busty', 0),
-    # max_imgs=len(ids) so every ID in the filter list gets picked; the 3rd
-    # tuple element is the explicit ID filter (Trainer's _make_dataset_hfd
-    # restricts the source pool to those before pick_chance is applied).
-    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLBUSTY), GTS_V3_NEUTRAL_IDS_XLBUSTY),
-]
-
-dataset_xlfbb = [
-    ('fbbcool/1fbb_02', 0),
-    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLFBB), GTS_V3_NEUTRAL_IDS_XLFBB),
-]
-
-dataset_xlhairy = [
-    ('fbbcool/xlhairy', 0),
-    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLHAIRY), GTS_V3_NEUTRAL_IDS_XLHAIRY),
-]
-
-dataset_xlleggy = [
-    ('fbbcool/xlleggy', 0),
-    ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLLEGGY), GTS_V3_NEUTRAL_IDS_XLLEGGY),
-]
-
-dataset_xlface_jez = [
-    ('fbbcool/face-jez', 0),
-]
-
-# Trainer(
-#    'qwen',
-#    dataset_repo_ids,
-#    # variant='2512-1gts',
-#    variant='2512',
-#    config_trainer=config_trainer,
-#    config_dataset=config_dataset,
-#    multithread=True,
-# )
 Trainer(
-    'qwen',
-    dataset_xlhairy,
-    variant='2512-gts-app',
-    config_trainer=config_trainer_qwen_5090_gts_app,
+    model,
+    datasets[trigger],
+    variant=variant,
+    config_trainer=config_trainer_qwen_gts_app,
     config_dataset=config_dataset,
     multithread=True,
 )
