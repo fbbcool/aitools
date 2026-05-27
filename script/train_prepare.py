@@ -32,7 +32,7 @@ variant = '2512-gts-app'
 # gpu = '5090'
 gpu = 'h100-nvl'
 trigger = 'xlface_jez'
-num_repeats = 1
+num_repeats = 4
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
