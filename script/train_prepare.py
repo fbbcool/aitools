@@ -30,7 +30,7 @@ from trainer import Trainer
 # Local card. mb=2 fits tight at 1024² rank=32 float8. ~5-7 s/step.
 # 3K-step test ≈ 4 h.
 config_trainer_qwen_5090 = {
-    'epochs': 10,  # sentinel, manual cancel ~3K steps
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': 2,  # maybe 1
     'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
