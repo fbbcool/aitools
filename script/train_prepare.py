@@ -29,8 +29,8 @@ from trainer import Trainer
 
 model = 'qwen'
 variant = '2512-gts-app'
-gpu = '5090'
-# gpu = 'h100'
+# gpu = '5090'
+gpu = 'h100-nvl'
 trigger = 'xlhairy'
 num_repeats = 1
 
@@ -41,6 +41,9 @@ gpu_config = {
     },
     'h100': {
         'micro_batch_size_per_gpu': 12,  # maybe 1
+    },
+    'h100-nvl': {
+        'micro_batch_size_per_gpu': 16,  # maybe 1
     },
 }
 
