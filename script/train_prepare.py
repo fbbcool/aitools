@@ -28,11 +28,11 @@ from trainer import Trainer
 # }
 
 model = 'qwen'
-variant = '2512-gts-app'
-# gpu = '5090'
-gpu = 'h100-nvl'
-trigger = 'xlface_jez'
-num_repeats = 4
+variant = '2512-gts-domain'
+gpu = '5090'
+# gpu = 'h100-nvl'
+trigger = 'xlasm'
+num_repeats = 1
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
