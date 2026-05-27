@@ -91,7 +91,7 @@ config_trainer_qwen_gts_app = {
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
     #'adapter___alpha': 4,  # will break; is set automatically!
     'optimizer___lr': 5e-5,
 }
