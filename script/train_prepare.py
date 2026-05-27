@@ -43,7 +43,7 @@ gpu_config = {
         'micro_batch_size_per_gpu': 12,  # maybe 1
     },
     'h100-nvl': {
-        'micro_batch_size_per_gpu': 16,  # maybe 1
+        'micro_batch_size_per_gpu': 20,  # maybe 1
     },
 }
 
