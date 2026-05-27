@@ -42,8 +42,8 @@
         }
       ]
     },
-    "2512-gts-atomic": {},
-    "2512-gts-domain": {
+    "gts-atomic": {},
+    "gts-domain": {
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",
@@ -52,7 +52,7 @@
         }
       ]
     },
-    "2512-gts-app": {
+    "gts-app": {
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",

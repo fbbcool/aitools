@@ -28,7 +28,7 @@ from trainer import Trainer
 # }
 
 model = 'qwen'
-variant = '2512-gts-domain'
+variant = 'gts-domain'
 gpu = '5090'
 # gpu = 'h100-nvl'
 trigger = 'xlasm'
@@ -296,7 +296,7 @@ Trainer(
     model,
     datasets[trigger],
     variant=variant,
-    config_trainer=config_trainer_qwen_gts_app,
+    config_trainer=config_trainer[variant],
     config_dataset=config_dataset,
     multithread=True,
 )
