@@ -44,6 +44,7 @@ gpu_config = {
     },
     'h100-nvl': {
         'micro_batch_size_per_gpu': 20,  # maybe 1
+        'warmup_steps': 5,  # small cushion for LR=2e-4 early-spike risk
     },
 }
 
@@ -51,7 +52,9 @@ gpu_config = {
 config_trainer_qwen_default = {
     'epochs': 30,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
-    'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
@@ -63,7 +66,9 @@ config_trainer_qwen_default = {
 config_trainer_qwen_gts_atomic = {
     'epochs': 30,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
-    'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
@@ -76,7 +81,9 @@ config_trainer_qwen_gts_atomic = {
 config_trainer_qwen_gts_domain = {
     'epochs': 30,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
-    'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
@@ -89,7 +96,9 @@ config_trainer_qwen_gts_domain = {
 config_trainer_qwen_gts_app = {
     'epochs': 30,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
-    'warmup_steps': 50,  # small cushion for LR=2e-4 early-spike risk
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
