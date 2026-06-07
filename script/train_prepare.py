@@ -31,8 +31,8 @@ model = 'qwen'
 variant = 'gts-domain'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlface-jez'
-num_repeats = 8
+trigger = 'xlasm'
+num_repeats = 1
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
