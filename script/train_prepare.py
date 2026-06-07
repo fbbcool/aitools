@@ -31,8 +31,8 @@ model = 'qwen'
 variant = 'gts-domain'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlasm'
-num_repeats = 1
+trigger = 'xlface-jez'
+num_repeats = 8
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -103,7 +103,7 @@ config_trainer_qwen_gts_app = {
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
     #'adapter___alpha': 4,  # will break; is set automatically!
     'optimizer___lr': 5e-5,
 }
@@ -287,7 +287,7 @@ datasets = {
         ('fbbcool/xlleggy', 0),
         ('fbbcool/gts-v3', len(GTS_V3_NEUTRAL_IDS_XLLEGGY), GTS_V3_NEUTRAL_IDS_XLLEGGY),
     ],
-    'xlface_jez': [
+    'xlface-jez': [
         ('fbbcool/face-jez', 0),
     ],
 }
