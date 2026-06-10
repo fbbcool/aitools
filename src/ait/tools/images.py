@@ -68,6 +68,11 @@ def image_info_from_url(url: Path | str, include_info_ext: bool = False) -> dict
     if prompt is not None:
         info |= {'prompt': prompt}
 
+    # loras + seed (Power Lora Loader rgthree slots only)
+    loras_info = _image_extract_loras_from_info_ext(pil.info)
+    if loras_info is not None:
+        info |= {'seed': loras_info['seed'], 'loras': loras_info['loras']}
+
     # info_ext
     if include_info_ext:
         info |= {'info_ext': pil.info}
@@ -184,6 +189,69 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
             print('prompt is empty')
         return None
     return prompt
+
+
+def _image_extract_loras_from_info_ext(
+    info_ext: dict, verbose: bool = False
+) -> dict | None:
+    """Walk the ComfyUI workflow JSON in the PNG `prompt` chunk and return the
+    Power Lora Loader (rgthree) slots that were toggled on, plus the sampler
+    seed.
+
+    Returns `{'seed': int | None, 'loras': [{'name', 'strength', 'source'},
+    ...]}`, or `None` if the workflow JSON isn't present.
+
+    Only `Power Lora Loader (rgthree)` slots with `on: True` and `strength !=
+    0` are emitted. Single-LoRA loader nodes (`LoraLoader`,
+    `LoraLoaderModelOnly`) are intentionally ignored — they typically hold
+    fixed infrastructure LoRAs (step distillation, etc.) that aren't
+    variables of interest in testset reviews.
+    """
+    info_prompt = info_ext.get('prompt', None)
+    if info_prompt is None:
+        return None
+    try:
+        data = json.loads(info_prompt)
+    except (json.JSONDecodeError, TypeError):
+        if verbose:
+            print('prompt chunk is not valid JSON')
+        return None
+
+    seed: int | None = None
+    loras: list[dict] = []
+
+    for node_id, node in data.items():
+        if not isinstance(node, dict):
+            continue
+        class_type = node.get('class_type', '')
+        inputs = node.get('inputs', {}) or {}
+
+        if class_type in ('KSampler', 'KSamplerAdvanced'):
+            s = inputs.get('seed', inputs.get('noise_seed'))
+            if isinstance(s, int):
+                seed = s
+
+        if class_type == 'Power Lora Loader (rgthree)':
+            for key, val in inputs.items():
+                if not key.startswith('lora_'):
+                    continue
+                if not isinstance(val, dict):
+                    continue
+                if not val.get('on', False):
+                    continue
+                name = val.get('lora')
+                strength = val.get('strength')
+                if not name or not isinstance(strength, (int, float)) or strength == 0:
+                    continue
+                loras.append(
+                    {
+                        'name': name,
+                        'strength': float(strength),
+                        'source': f'node-{node_id}/{key}',
+                    }
+                )
+
+    return {'seed': seed, 'loras': loras}
 
 
 def train_from_image(

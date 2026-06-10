@@ -52,7 +52,9 @@ def scene_new(params: Any, clipspace: Any, config: SceneConfig) -> Optional[Path
         scene: Scene
         scene = scm.scene_from_id_or_url(oids[0])
         if scene is not None:
-            return scene.url
+            print(f'scene url: {scene.url}')
+            print(f'scene id:  {scene.id}')
+            return scene.id
     return None
 
 

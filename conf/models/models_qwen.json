@@ -41,15 +41,9 @@
     "image": {
       "transformer": [
         {
-          "repo_id": "fbbcool/qwen-2512-snofs-0.50",
-          "file": "qwen-image-2512-snofs0.50-fp8-scaled.safetensors",
+          "repo_id": "fbbcool/qwen-2512-snofs-0.65",
+          "file": "qwen-image-2512-snofs0.65-fp8-scaled.safetensors",
           "rename": "2512-snofs",
-          "skip": false
-        },
-        {
-          "repo_id": "Comfy-Org/Qwen-Image_ComfyUI",
-          "file": "split_files/diffusion_models/qwen_image_2512_fp8_e4m3fn.safetensors",
-          "rename": "2512_fp8",
           "skip": false
         }
       ],
@@ -81,25 +75,25 @@
           "id": 2108245,
           "rename": "realism-nice-girls-v1",
           "method_download": "civitai2",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2106185,
           "rename": "realism-lenovo-v1",
           "method_download": "civitai2",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2289403,
           "rename": "realism-smartphone-v1",
           "method_download": "civitai2",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2270374,
           "rename": "realism-samsung-cam-v1",
           "method_download": "civitai2",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2510724?type=Model&format=SafeTensor",
@@ -130,10 +124,6 @@
           "method_download": "civitai",
           "rename": "facesitting",
           "skip": true
-        },
-        {
-          "repo_id": "fbbcool/qwen-2512-lora",
-          "skip": false
         }
       ]
     },
@@ -149,7 +139,7 @@
           "repo_id": "Phr00t/Qwen-Image-Edit-Rapid-AIO",
           "file": "v19/Qwen-Rapid-AIO-NSFW-v19.safetensors",
           "rename": "Rapid-AIO-v19",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "Comfy-Org/Qwen-Image-Edit_ComfyUI",
@@ -161,7 +151,7 @@
           "repo_id": "Comfy-Org/Qwen-Image-Edit_ComfyUI",
           "file": "split_files/diffusion_models/qwen_image_edit_2509_fp8_e4m3fn.safetensors",
           "rename": "fp8",
-          "skip": false
+          "skip": true
         }
       ],
       "lora": [
@@ -169,31 +159,31 @@
           "repo_id": "lightx2v/Qwen-Image-Edit-2511-Lightning",
           "file": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
           "rename": "4steps-2511-v1",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "lightx2v/Qwen-Image-Lightning",
           "file": "Qwen-Image-Edit-2509/Qwen-Image-Edit-2509-Lightning-8steps-V1.0-bf16.safetensors",
           "rename": "8steps-v1",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "lightx2v/Qwen-Image-Lightning",
           "file": "Qwen-Image-Edit-2509/Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors",
           "rename": "4steps-v1",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "lovis93/next-scene-qwen-image-lora-2509",
           "file": "next-scene_lora-v2-3000.safetensors",
           "rename": "next-scene-v2",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "valiantcat/Qwen-Image-Edit-2509-photous",
           "file": "QwenEdit2509_photous_000010000.safetensors",
           "rename": "photo-us",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2297143?type=Model&format=SafeTensor",
@@ -205,7 +195,7 @@
           "link": "https://civitai.com/api/download/models/2376235?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "skin-edit-v11",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "dx8152/Qwen-Edit-2509-Multiple-angles",
@@ -217,7 +207,7 @@
           "repo_id": "fbbcool/qwen-image-edit_lora",
           "file": "multi_angle.safetensors",
           "rename": "multi_angle",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "dx8152/Qwen-Image-Edit-2509-Light_restoration",
@@ -229,7 +219,7 @@
           "repo_id": "fbbcool/qwen-image-edit_lora",
           "file": "light-restore-v2.safetensors",
           "rename": "light-restore-v2",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "dx8152/Qwen-Image-Edit-2509-Fusion",
@@ -241,7 +231,7 @@
           "repo_id": "fbbcool/qwen-image-edit_lora",
           "file": "fusion.safetensors",
           "rename": "fusion",
-          "skip": false
+          "skip": true
         }
       ]
     }

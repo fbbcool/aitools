@@ -346,7 +346,7 @@ class AInstaller:
             'lora': {
                 'model___merge_adapters': {'type': 'list_str'},
                 'adapter___init_from_existing': {'type': 'str'},
-                'path___lora': {
+                'adapter___frozen_loras': {
                     'type': 'str',
                     'parameter': 'path',
                     'format': '${parameter} = ${value}',
