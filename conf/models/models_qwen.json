@@ -145,7 +145,7 @@
           "repo_id": "Comfy-Org/Qwen-Image-Edit_ComfyUI",
           "file": "split_files/diffusion_models/qwen_image_edit_2511_fp8mixed.safetensors",
           "rename": "fp8_2511",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "Comfy-Org/Qwen-Image-Edit_ComfyUI",
@@ -155,6 +155,12 @@
         }
       ],
       "lora": [
+        {
+          "repo_id": "fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA",
+          "file": "qwen-image-edit-2511-multiple-angles-lora.safetensors",
+          "rename": "multi-angle",
+          "skip": false
+        },
         {
           "repo_id": "lightx2v/Qwen-Image-Edit-2511-Lightning",
           "file": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
@@ -189,7 +195,7 @@
           "link": "https://civitai.com/api/download/models/2297143?type=Model&format=SafeTensor",
           "method_download": "civitai",
           "rename": "ainme2real",
-          "skip": false
+          "skip": true
         },
         {
           "link": "https://civitai.com/api/download/models/2376235?type=Model&format=SafeTensor",
