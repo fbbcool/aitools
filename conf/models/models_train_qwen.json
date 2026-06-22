@@ -48,7 +48,7 @@
         {
           "repo_id": "fbbcool/xlasm",
           "file": "qwen/gts-atomic/25.safetensors",
-          "strength": 0.85,
+          "weight": 0.85,
           "skip": false
         }
       ]
@@ -58,13 +58,13 @@
         {
           "repo_id": "fbbcool/xlasm",
           "file": "qwen/gts-atomic/25.safetensors",
-          "strength": 0.85,
+          "weight": 0.85,
           "skip": false
         },
         {
           "repo_id": "fbbcool/xlasm",
           "file": "qwen/gts-domain/31.safetensors",
-          "strength": 0.85,
+          "weight": 0.80,
           "skip": false
         }
       ]

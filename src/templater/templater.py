@@ -12,35 +12,51 @@ class TemplaterVariable:
     def __init__(
         self,
         name: str,
-        value: str | int | float | list[str] | list[int] | list[float],
+        value: str | int | float | list[str] | list[int] | list[float] | None = None,
         disable: bool = False,
         parameter: str | None = None,
         format: str | None = None,
+        items: list[dict[str, Any]] | None = None,
+        join: str = '\n\n',
     ) -> None:
         self._typelist = [str, int, float]
         self.name = name
+        self._items = items
+        self._join = join
         if format is None:
             self._format = '${parameter} = ${value}'
         else:
             self._format = format
-        if isinstance(value, list):
-            if not value:
-                raise ValueError('Empty lists not allowed!')
-            vcheck = value[0]
+        if items is not None:
+            # items mode: per-item rendering. `value` is ignored.
+            if not isinstance(items, list):
+                raise ValueError(f'items must be a list of dicts, got {type(items).__name__}')
+            for i, it in enumerate(items):
+                if not isinstance(it, dict):
+                    raise ValueError(f'items[{i}] must be a dict, got {type(it).__name__}')
+            self.value = items
+            self._disable = disable or (not items)
         else:
-            vcheck = value
-        if type(vcheck) not in self._typelist:
-            raise ValueError(f'value[{vcheck}] of type[{type(vcheck)}] is not in {self._typelist}!')
+            if value is None:
+                raise ValueError('value required when items is not provided')
+            if isinstance(value, list):
+                if not value:
+                    raise ValueError('Empty lists not allowed!')
+                vcheck = value[0]
+            else:
+                vcheck = value
+            if type(vcheck) not in self._typelist:
+                raise ValueError(f'value[{vcheck}] of type[{type(vcheck)}] is not in {self._typelist}!')
+            self.value = value
+            self._disable = disable
+            # empty str also disables
+            if isinstance(self.value, str):
+                if not self.value:
+                    self._disable = True
         if parameter is not None:
             self.parameter = parameter
         else:
             self.parameter = self.name.split(self.PARAMETER_SPITTER)[-1]
-        self.value = value
-        self._disable = disable
-        # empty str also disables
-        if isinstance(self.value, str):
-            if not self.value:
-                self._disable = True
 
     @property
     def enable(self):
@@ -52,6 +68,14 @@ class TemplaterVariable:
 
     @property
     def format_substitution(self) -> str:
+        if self._items is not None:
+            if self._disable:
+                return f'#{self.parameter} = []'
+            rendered = [
+                Template(self._format).safe_substitute(item) for item in self._items
+            ]
+            return self._join.join(rendered)
+
         # setup value
         if isinstance(self.value, str):
             value = f"'{self.value}'"
@@ -183,18 +207,24 @@ class Templater:
         ret = {}
         for key, data in vars.items():
             if isinstance(data, dict):
-                val = data.get('value', '')
+                items = data.get('items', None)
+                val = data.get('value', '') if items is None else None
                 parameter = data.get('parameter', '')
                 if not parameter:
                     parameter = None
                 format = data.get('format', '')
                 if not format:
                     format = None
+                join = data.get('join', '\n\n')
             else:
                 val = data
                 format = None
                 parameter = None
-            v = TemplaterVariable(key, val, format=format, parameter=parameter)
+                items = None
+                join = '\n\n'
+            v = TemplaterVariable(
+                key, val, format=format, parameter=parameter, items=items, join=join
+            )
             ret |= v.substitute
         return ret
 

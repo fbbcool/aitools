@@ -122,10 +122,31 @@ class AInstaller:
 
             target_var_dict = item.get('target_var', {})
             for var_bound, data in target_var_dict.items():
+                var_type = data.get('type', 'str')
+
+                if var_type == 'items':
+                    link = item.get('link', None)
+                    if link is None:
+                        continue
+                    # Record = resolved download path + raw config dict.
+                    # Format must reference only keys present in the JSON entry
+                    # (or 'path' for the resolved download). No mapping layer.
+                    record: dict = {'path': str(link), **item.get('config', {})}
+                    existing = self._vars_bound.get(var_bound)
+                    if existing is None or 'items' not in existing:
+                        self._vars_bound[var_bound] = {
+                            'items': [record],
+                            'format': data.get('format', ''),
+                            'parameter': data.get('parameter', ''),
+                            'join': data.get('join', '\n\n'),
+                        }
+                    else:
+                        existing['items'].append(record)
+                    continue
+
                 var_value = item.get('link', None)
                 if var_value is None:
                     continue
-                var_type = data.get('type', 'str')
 
                 if var_type == 'str':
                     var_value = str(var_value)
@@ -347,9 +368,12 @@ class AInstaller:
                 'model___merge_adapters': {'type': 'list_str'},
                 'adapter___init_from_existing': {'type': 'str'},
                 'adapter___frozen_loras': {
-                    'type': 'str',
-                    'parameter': 'path',
-                    'format': '${parameter} = ${value}',
+                    'type': 'items',
+                    'format': (
+                        "[[adapter.runtime_adapters]]\n"
+                        "path = '${path}'\n"
+                        "weight = ${weight}"
+                    ),
                 },
             },
             'clip': {'model___clip_path': {'type': 'str'}},
