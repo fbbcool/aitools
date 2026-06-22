@@ -14,55 +14,17 @@ ___train_install_aitools() {
   git clone $REPOS_AIT $HOME_AIT
   pip install -r $HOME_AIT/requirements_remote.txt
 }
-___train_install_torch_pin() {
-  # Vast.AI's pytorch:cuda-*-auto images can ship torch versions newer than the
-  # flash-attn wheel matrix covers (e.g. torch 2.11 → no wheel in flash-attn 2.8.3).
-  # Pin torch to a version with a known flash-attn wheel BEFORE the flash-attn install.
-  # Override via TORCH_PIN_VER. Empty value disables the pin entirely.
-  local pin="${TORCH_PIN_VER-2.9.*}"
-  local current
-  if [ -z "$pin" ]; then
-    echo "[torch pin] disabled (TORCH_PIN_VER is empty)"
-    return 0
-  fi
-  current=$(python3 -c 'import torch; print(torch.__version__.split("+")[0])' 2>/dev/null || echo "none")
-
-  echo
-  echo "================================================================="
-  echo "  torch pin  (target: ${pin})"
-  echo "================================================================="
-  echo "  current : ${current}"
-  echo "  target  : ${pin}"
-
-  # Cheap match check: if current already satisfies the pin's major.minor, no-op.
-  local pin_mm="${pin%.*}"  # strip trailing ".*" → "2.9"
-  case "$current" in
-    "${pin_mm}".*)
-      echo "  ✓ already on ${pin_mm} family, skipping install"
-      echo "================================================================="
-      echo
-      return 0
-      ;;
-  esac
-
-  echo "  installing 'torch==${pin}' (this overwrites the image's torch) ..."
-  if pip install "torch==${pin}"; then
-    current=$(python3 -c 'import torch; print(torch.__version__.split("+")[0])')
-    echo "  ✓ torch pinned to ${current}"
-  else
-    echo "  ✗ torch pin FAILED — leaving image's torch in place (${current})"
-    echo "  flash-attn install may fall through to source compile"
-  fi
-  echo "================================================================="
-  echo
-}
 ___train_install_flash_attn() {
-  # Pull the prebuilt flash-attn wheel matching the active torch/cuda/python/cxx-abi
-  # combo. Wheels live on GitHub Releases (not PyPI), so a direct URL pull avoids
-  # the ~30 min source compile. Falls back to source compile if no matching wheel
-  # exists for the detected combo. Override version via FLASH_ATTN_VER env var.
+  # Install flash-attn with three-tier precedence:
+  #   (1) LOCAL STASH    — wheel previously stashed at ${FLASH_ATTN_STASH}/<axes>/
+  #   (2) UPSTREAM WHEEL — prebuilt wheel from GitHub Releases, also saved to stash
+  #   (3) SOURCE COMPILE — pip wheel into stash dir, then install (~20-40 min once,
+  #                        free on subsequent runs of any box with matching axes)
+  # Override version via FLASH_ATTN_VER, stash root via FLASH_ATTN_STASH (default
+  # ${WORKSPACE}/wheels — Vast.AI's /workspace is persistent across container restarts).
   local ver="${FLASH_ATTN_VER:-2.8.3}"
-  local cuda torch_ver py_ver cxx_abi wheel http_code
+  local cuda torch_ver py_ver cxx_abi wheel http_code wheel_basename
+  local stash_root stash_dir stash_pattern stash_hit
   local t_start t_end elapsed compile_start compile_elapsed
 
   t_start=$(date +%s)
@@ -72,32 +34,67 @@ ___train_install_flash_attn() {
   echo "  flash-attn install  (target version: ${ver})"
   echo "================================================================="
 
-  echo "[1/4] detecting environment ..."
+  echo "[1/5] detecting environment ..."
   cuda=$(python3 -c 'import torch; v=torch.version.cuda or ""; print(v.split(".")[0])')
   torch_ver=$(python3 -c 'import torch; v=torch.__version__.split("+")[0].split("."); print(f"{v[0]}.{v[1]}")')
   py_ver=$(python3 -c 'import sys; print(f"cp{sys.version_info.major}{sys.version_info.minor}")')
   cxx_abi=$(python3 -c 'import torch; print("TRUE" if torch.compiled_with_cxx11_abi() else "FALSE")')
   echo "      cuda=cu${cuda}  torch=${torch_ver}  python=${py_ver}  cxx11abi=${cxx_abi}"
 
+  # Stash layout: one subdir per (cuda, torch, python, cxx_abi) combo
+  stash_root="${FLASH_ATTN_STASH:-${WORKSPACE:-/workspace}/wheels}"
+  stash_dir="${stash_root}/flash_attn/cu${cuda}-torch${torch_ver}-${py_ver}-abi${cxx_abi}"
+  stash_pattern="${stash_dir}/flash_attn-${ver}*-${py_ver}-${py_ver}-linux_x86_64.whl"
+
+  echo "[2/5] checking local stash ..."
+  echo "      $stash_dir"
+  stash_hit=$(ls $stash_pattern 2>/dev/null | head -1)
+  if [ -n "$stash_hit" ]; then
+    echo "      ✓ STASH HIT: $(basename "$stash_hit")"
+    echo "[3/5] installing from stash ..."
+    if pip install "$stash_hit"; then
+      t_end=$(date +%s)
+      elapsed=$((t_end - t_start))
+      echo "[5/5] ✓ flash-attn ${ver} installed from STASH (${elapsed}s total)"
+      echo "================================================================="
+      echo
+      return 0
+    fi
+    echo "      ✗ stash install FAILED — falling through to upstream/source"
+  else
+    echo "      (no stash hit, miss is fine for first run on this combo)"
+  fi
+
   wheel="https://github.com/Dao-AILab/flash-attention/releases/download/v${ver}/flash_attn-${ver}+cu${cuda}torch${torch_ver}cxx11abi${cxx_abi}-${py_ver}-${py_ver}-linux_x86_64.whl"
-  echo "[2/4] probing wheel availability ..."
+  wheel_basename=$(basename "$wheel")
+  echo "[3/5] probing upstream wheel availability ..."
   echo "      $wheel"
   http_code=$(curl -sIL -o /dev/null -w '%{http_code}' "$wheel" 2>/dev/null || echo "000")
   echo "      HTTP $http_code"
 
   if [ "$http_code" = "200" ]; then
-    echo "[3/4] WHEEL FOUND → installing from prebuilt wheel (~10-30s) ..."
-    if pip install "$wheel"; then
-      t_end=$(date +%s)
-      elapsed=$((t_end - t_start))
-      echo "[4/4] ✓ flash-attn ${ver} installed from prebuilt wheel (${elapsed}s total)"
+    echo "[4/5] WHEEL FOUND → downloading + stashing + installing (~10-30s) ..."
+    mkdir -p "$stash_dir"
+    if curl -L -f -o "${stash_dir}/${wheel_basename}" "$wheel"; then
+      echo "      ✓ stashed at ${stash_dir}/${wheel_basename}"
+      if pip install "${stash_dir}/${wheel_basename}"; then
+        t_end=$(date +%s)
+        elapsed=$((t_end - t_start))
+        echo "[5/5] ✓ flash-attn ${ver} installed from prebuilt wheel (${elapsed}s)"
+        echo "      future runs on this combo will hit the stash and skip download"
+      else
+        t_end=$(date +%s)
+        elapsed=$((t_end - t_start))
+        echo "[5/5] ✗ wheel install FAILED (${elapsed}s)"
+        return 1
+      fi
     else
-      t_end=$(date +%s)
-      elapsed=$((t_end - t_start))
-      echo "[4/4] ✗ wheel install FAILED (${elapsed}s)"
-      return 1
+      echo "      ✗ wheel download FAILED — falling through to source compile"
+      http_code="000"  # force the compile branch below
     fi
-  else
+  fi
+
+  if [ "$http_code" != "200" ]; then
     echo
     echo "      ┌──────────────────────────────────────────────────────────┐"
     echo "      │  NO PREBUILT WHEEL (HTTP $http_code) for this combo:             │"
@@ -111,26 +108,43 @@ ___train_install_flash_attn() {
     echo "      │  Expected wall-clock: ~20-40 min on H100, ~10 min once   │"
     echo "      │  NVCC parallel build kicks in. Do NOT interrupt.         │"
     echo "      │                                                          │"
-    echo "      │  To get a wheel instead: check the four axes against     │"
-    echo "      │  https://github.com/Dao-AILab/flash-attention/releases/  │"
-    echo "      │  and pin FLASH_ATTN_VER to one whose wheel matrix covers │"
-    echo "      │  this combo.                                             │"
+    echo "      │  The compiled wheel will be saved to the stash dir, so   │"
+    echo "      │  subsequent boxes with matching axes install in ~10s.    │"
+    echo "      │  Stash: ${stash_dir}"
     echo "      └──────────────────────────────────────────────────────────┘"
     echo
-    echo "[3/4] SOURCE COMPILE → starting at $(date '+%Y-%m-%d %H:%M:%S') ..."
+    echo "[4/5] SOURCE COMPILE → starting at $(date '+%Y-%m-%d %H:%M:%S') ..."
+    mkdir -p "$stash_dir"
     compile_start=$(date +%s)
-    if pip install --no-build-isolation "flash-attn==${ver}"; then
+    if pip wheel --no-build-isolation -w "$stash_dir" "flash-attn==${ver}"; then
       t_end=$(date +%s)
       compile_elapsed=$((t_end - compile_start))
-      elapsed=$((t_end - t_start))
-      echo "[4/4] ✓ flash-attn ${ver} installed via SOURCE COMPILE"
-      echo "      compile time:  ${compile_elapsed}s ($((compile_elapsed / 60))m $((compile_elapsed % 60))s)"
-      echo "      total elapsed: ${elapsed}s"
+      stash_hit=$(ls ${stash_dir}/flash_attn-${ver}*-${py_ver}-${py_ver}-linux_x86_64.whl 2>/dev/null | head -1)
+      if [ -z "$stash_hit" ]; then
+        echo "      ✗ compile reported success but no wheel found in $stash_dir"
+        return 1
+      fi
+      echo "      ✓ stashed at $stash_hit  (compile ${compile_elapsed}s = $((compile_elapsed / 60))m $((compile_elapsed % 60))s)"
+      echo "[5/5] installing compiled wheel ..."
+      if pip install "$stash_hit"; then
+        t_end=$(date +%s)
+        elapsed=$((t_end - t_start))
+        echo "      ✓ flash-attn ${ver} installed via SOURCE COMPILE"
+        echo "      compile time:  ${compile_elapsed}s ($((compile_elapsed / 60))m $((compile_elapsed % 60))s)"
+        echo "      total elapsed: ${elapsed}s"
+        echo "      stash:         $stash_hit"
+        echo "      future runs on this combo will hit the stash and skip compile"
+      else
+        t_end=$(date +%s)
+        elapsed=$((t_end - t_start))
+        echo "      ✗ compiled-wheel install FAILED (${elapsed}s)"
+        return 1
+      fi
     else
       t_end=$(date +%s)
       compile_elapsed=$((t_end - compile_start))
       elapsed=$((t_end - t_start))
-      echo "[4/4] ✗ flash-attn ${ver} SOURCE COMPILE FAILED after ${compile_elapsed}s"
+      echo "[5/5] ✗ flash-attn ${ver} SOURCE COMPILE FAILED after ${compile_elapsed}s"
       return 1
     fi
   fi
@@ -143,7 +157,6 @@ ___train_install_trainer() {
   cd $HOME_TRAINER
   git submodule update --init --recursive
 
-  ___train_install_torch_pin
   ___train_install_flash_attn
   pip install -r requirements.txt
 
