@@ -28,10 +28,10 @@ from trainer import Trainer
 # }
 
 model = 'qwen'
-variant = 'gts-domain'
+variant = 'gts-app'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlasm'
+trigger = 'xlbusty'
 num_repeats = 1
 
 # ──────────────────────────────────────────────────────
