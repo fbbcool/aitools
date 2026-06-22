@@ -31,7 +31,7 @@ model = 'qwen'
 variant = 'gts-app'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlfbb'
+trigger = 'xlhairy'
 num_repeats = 1
 
 # ──────────────────────────────────────────────────────
