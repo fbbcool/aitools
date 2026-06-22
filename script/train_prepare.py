@@ -31,7 +31,7 @@ model = 'qwen'
 variant = 'gts-app'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlbusty'
+trigger = 'xlfbb'
 num_repeats = 1
 
 # ──────────────────────────────────────────────────────
