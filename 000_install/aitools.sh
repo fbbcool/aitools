@@ -14,6 +14,48 @@ ___train_install_aitools() {
   git clone $REPOS_AIT $HOME_AIT
   pip install -r $HOME_AIT/requirements_remote.txt
 }
+___train_install_torch_pin() {
+  # Vast.AI's pytorch:cuda-*-auto images can ship torch versions newer than the
+  # flash-attn wheel matrix covers (e.g. torch 2.11 → no wheel in flash-attn 2.8.3).
+  # Pin torch to a version with a known flash-attn wheel BEFORE the flash-attn install.
+  # Override via TORCH_PIN_VER. Empty value disables the pin entirely.
+  local pin="${TORCH_PIN_VER-2.9.*}"
+  local current
+  if [ -z "$pin" ]; then
+    echo "[torch pin] disabled (TORCH_PIN_VER is empty)"
+    return 0
+  fi
+  current=$(python3 -c 'import torch; print(torch.__version__.split("+")[0])' 2>/dev/null || echo "none")
+
+  echo
+  echo "================================================================="
+  echo "  torch pin  (target: ${pin})"
+  echo "================================================================="
+  echo "  current : ${current}"
+  echo "  target  : ${pin}"
+
+  # Cheap match check: if current already satisfies the pin's major.minor, no-op.
+  local pin_mm="${pin%.*}"  # strip trailing ".*" → "2.9"
+  case "$current" in
+    "${pin_mm}".*)
+      echo "  ✓ already on ${pin_mm} family, skipping install"
+      echo "================================================================="
+      echo
+      return 0
+      ;;
+  esac
+
+  echo "  installing 'torch==${pin}' (this overwrites the image's torch) ..."
+  if pip install "torch==${pin}"; then
+    current=$(python3 -c 'import torch; print(torch.__version__.split("+")[0])')
+    echo "  ✓ torch pinned to ${current}"
+  else
+    echo "  ✗ torch pin FAILED — leaving image's torch in place (${current})"
+    echo "  flash-attn install may fall through to source compile"
+  fi
+  echo "================================================================="
+  echo
+}
 ___train_install_flash_attn() {
   # Pull the prebuilt flash-attn wheel matching the active torch/cuda/python/cxx-abi
   # combo. Wheels live on GitHub Releases (not PyPI), so a direct URL pull avoids
@@ -101,6 +143,7 @@ ___train_install_trainer() {
   cd $HOME_TRAINER
   git submodule update --init --recursive
 
+  ___train_install_torch_pin
   ___train_install_flash_attn
   pip install -r requirements.txt
 
