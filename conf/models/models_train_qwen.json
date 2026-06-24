@@ -53,7 +53,7 @@
         }
       ]
     },
-    "gts-app": {
+    "gts-app-atomic": {
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",
