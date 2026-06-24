@@ -28,10 +28,10 @@ from trainer import Trainer
 # }
 
 model = 'qwen'
-variant = 'gts-app'
+variant = 'gts-app-xlbusty'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlfbb'
+trigger = 'xlbusty'
 num_repeats = 1
 
 # ──────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ config_trainer_qwen_gts_domain = {
     'optimizer___lr': 5e-5,
 }
 
-config_trainer_qwen_gts_app = {
+config_trainer_qwen_gts_app_atomic = {
     'epochs': 30,  # sentinel, manual cancel ~3K steps
     'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
     'warmup_steps': gpu_config[gpu].get(
@@ -108,10 +108,27 @@ config_trainer_qwen_gts_app = {
     'optimizer___lr': 5e-5,
 }
 
+config_trainer_qwen_gts_app = {
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
+    #'adapter___alpha': 4,  # will break; is set automatically!
+    'optimizer___lr': 5e-5,
+}
+
 config_trainer = {
     'gts-atomic': config_trainer_qwen_gts_atomic,
     'gts-domain': config_trainer_qwen_gts_domain,
+    'gts-app-atomic': config_trainer_qwen_gts_app_atomic,
     'gts-app': config_trainer_qwen_gts_app,
+    'gts-app-xlbusty': config_trainer_qwen_gts_app,
 }
 
 # config_trainer = config_trainer_qwen_h100
