@@ -73,7 +73,7 @@
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",
-          "file": "qwen/gts-app/xlbusty/atomic/25.safetensors",
+          "file": "qwen/gts-app/xlbusty/atomic/25-xlbusty-atomic.safetensors",
           "weight": 0.80,
           "skip": false
         },
