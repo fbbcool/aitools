@@ -28,10 +28,10 @@ from trainer import Trainer
 # }
 
 model = 'qwen'
-variant = 'gts-app-xlbusty'
+variant = 'gts-app-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlbusty'
+trigger = 'xlleggy'
 num_repeats = 1
 
 # ──────────────────────────────────────────────────────
