@@ -1,0 +1,96 @@
+{
+  "hidream_o1": {
+    "common": {
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/gemma-4",
+          "file": "text_encoders/gemma4_e4b_it_fp8_scaled.safetensors",
+          "rename": "gemma4-e4b-fp8",
+          "skip": false
+        }
+      ]
+    },
+    "full": {
+      "checkpoint": [
+        {
+          "repo_id": "Comfy-Org/HiDream-O1-Image",
+          "file": "checkpoints/hidream_o1_image_fp8_scaled.safetensors",
+          "rename": "o1-fp8",
+          "skip": false
+        },
+        {
+          "repo_id": "Comfy-Org/HiDream-O1-Image",
+          "file": "checkpoints/hidream_o1_image_mxfp8.safetensors",
+          "rename": "o1-mxfp8",
+          "skip": true
+        },
+        {
+          "repo_id": "Comfy-Org/HiDream-O1-Image",
+          "file": "checkpoints/hidream_o1_image_bf16.safetensors",
+          "rename": "o1-bf16",
+          "skip": true
+        }
+      ]
+    },
+    "dev": {
+      "checkpoint": [
+        {
+          "repo_id": "Comfy-Org/HiDream-O1-Image",
+          "file": "checkpoints/hidream_o1_image_dev_fp8_scaled.safetensors",
+          "rename": "o1-dev-fp8",
+          "skip": false
+        },
+        {
+          "repo_id": "Comfy-Org/HiDream-O1-Image",
+          "file": "checkpoints/hidream_o1_image_dev_mxfp8.safetensors",
+          "rename": "o1-dev-mxfp8",
+          "skip": true
+        },
+        {
+          "repo_id": "Comfy-Org/HiDream-O1-Image",
+          "file": "checkpoints/hidream_o1_image_dev_bf16.safetensors",
+          "rename": "o1-dev-bf16",
+          "skip": true
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "Kijai/hidream-O1-image_comfy",
+          "file": "loras/hidream_o1_dev_lora_rank_64_bf16.safetensors",
+          "rename": "o1-dev-r64",
+          "skip": false
+        },
+        {
+          "repo_id": "Kijai/hidream-O1-image_comfy",
+          "file": "loras/hidream_o1_dev_lora_rank_64_bf16_pruned_v1.safetensors",
+          "rename": "o1-dev-r64-pruned",
+          "skip": true
+        }
+      ]
+    },
+    "dev-2604": {
+      "checkpoint": [
+        {
+          "repo_id": "drbaph/HiDream-O1-Image-Dev-2604-FP8",
+          "file": "hidream_o1_image_dev_2604_fp8_scaled.safetensors",
+          "rename": "o1-dev-2604-fp8",
+          "skip": false
+        },
+        {
+          "repo_id": "drbaph/HiDream-O1-Image-Dev-2604-BF16",
+          "file": "hidream_o1_image_dev_2604_bf16.safetensors",
+          "rename": "o1-dev-2604-bf16",
+          "skip": true
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "Kijai/hidream-O1-image_comfy",
+          "file": "loras/hidream_o1_image_dev_2604_lora_avg_rankg_224_bf16.safetensors",
+          "rename": "o1-dev-2604-distill-r224",
+          "skip": false
+        }
+      ]
+    }
+  }
+}

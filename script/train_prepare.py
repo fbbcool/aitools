@@ -31,8 +31,8 @@ model = 'qwen'
 variant = 'gts-app-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlleggy'
-num_repeats = 1
+trigger = 'xlface-jez'
+num_repeats = 4
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
