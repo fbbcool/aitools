@@ -37,7 +37,7 @@ num_repeats = 2
 # ──────────────────────────────────────────────────────
 gpu_config = {
     '5090': {
-        'micro_batch_size_per_gpu': 2,  # maybe 1
+        'micro_batch_size_per_gpu': 3,  # krea2 fp8: ~27GB at b=2, ~3GB/item -> b=3 fits 32GB; b=4 likely OOMs
     },
     'h100': {
         'micro_batch_size_per_gpu': 12,  # maybe 1
@@ -149,9 +149,10 @@ config_trainer_krea2_gts_atomic = {
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
     #'adapter___alpha': 4,  # will break; is set automatically!
-    'optimizer___lr': 5e-5,
+    #'optimizer___lr': 5e-5,
+    'optimizer___lr': 2e-4,
 }
 
 config_trainer_krea2_gts_domain = {
