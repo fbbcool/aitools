@@ -24,6 +24,55 @@
           "skip": false
         }
       ]
+    },
+    "gts-atomic": {},
+    "gts-domain": {
+      "lora": [
+        {
+          "repo_id": "fbbcool/xlasm",
+          "file": "qwen/gts-atomic/25.safetensors",
+          "weight": 0.85,
+          "skip": false
+        }
+      ]
+    },
+    "gts-app-atomic": {
+      "lora": [
+        {
+          "repo_id": "fbbcool/xlasm",
+          "file": "qwen/gts-atomic/25.safetensors",
+          "weight": 0.85,
+          "skip": false
+        },
+        {
+          "repo_id": "fbbcool/xlasm",
+          "file": "qwen/gts-domain/31.safetensors",
+          "weight": 0.80,
+          "skip": false
+        }
+      ]
+    },
+    "gts-app-xlbusty": {
+      "lora": [
+        {
+          "repo_id": "fbbcool/xlasm",
+          "file": "qwen/gts-app/xlbusty/atomic/25-xlbusty-atomic.safetensors",
+          "weight": 0.80,
+          "skip": false
+        },
+        {
+          "repo_id": "fbbcool/xlasm",
+          "file": "qwen/gts-domain/31.safetensors",
+          "weight": 0.80,
+          "skip": false
+        },
+        {
+          "repo_id": "fbbcool/xlasm",
+          "file": "qwen/gts-atomic/25.safetensors",
+          "weight": 0.85,
+          "skip": false
+        }
+      ]
     }
   }
 }
