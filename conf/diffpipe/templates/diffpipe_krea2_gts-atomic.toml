@@ -105,14 +105,21 @@ ${steps_per_print}
 # This is how you configure WAN video. Other models will be different. See docs/supported_models.md for
 # details on the configuration and options for each model.
 [model]
-type = 'qwen_image'
-${model___transformer_path}
-${model___text_encoder_path}
-${model___vae_path}
-#${model___merge_adapters}
+type = 'krea2'
+# transformer / text encoder / vae paths are bound by the installer from models_train_krea2.json
+${model___diffusion_model}
+${model___text_encoders_krea2}
+${model___vae}
+# Optional ComfyUI single-file LoRAs merged into the base before training (snofs is already baked
+# into the merged raw base, so normally empty).
+${model___merge_adapters}
+# Trained in bf16 storage (ComfyPipeline compute dtype). float8 storage is not wired for
+# ComfyUI-native models here.
+#dtype = 'bfloat16'
 ${model___dtype}
-${model___transformer_dtype}
 timestep_sample_method = 'logit_normal'
+# Flow-matching shift, matches ComfyUI Krea2 sampling_settings (shift = 1.15).
+shift = 1.15
 #min_t = 0.875
 ${model___min_t}
 #max_t = 1
