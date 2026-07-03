@@ -1,0 +1,9 @@
+{
+  "epochs": 40,
+  "micro_batch_size_per_gpu": 1,
+  "warmup_steps": 20,
+  "caching_batch_size": 1,
+  "model___type": "krea2",
+  "adapter___rank": 32,
+  "optimizer___lr": 5e-5
+}

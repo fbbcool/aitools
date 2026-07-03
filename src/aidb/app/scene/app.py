@@ -40,7 +40,18 @@ class AIDBSceneApp:
         self._skin_name = skin
         set_active_skin(skin)
 
+        from aidb.app.tab_penis_mask import PenisMaskTab
+        self._penis_mask_tab = PenisMaskTab(self._scm)
+
         self._interface = self._create_interface()
+
+    # head HTML injected into the page <head> so the penis-mask annotator's
+    # document-level JS (wheel zoom / drag bbox / markers / shift) actually
+    # executes — <script> inside gr.HTML is not run by the browser.
+    @property
+    def _blocks_head(self) -> str:
+        from aidb.app.tab_penis_mask import PENIS_MASK_HEAD
+        return PENIS_MASK_HEAD
 
     def _create_interface(self):
         """
@@ -478,6 +489,11 @@ class AIDBSceneApp:
                                 elem_id='set-editor-stats-load-button',
                             )
                         set_editor_stats_html = gr.HTML(label='Set Statistics')
+
+            # Penis-mask annotator tab (SAM2 + YOLO). Models load lazily on
+            # first activation of the tab; results persist to the
+            # claude_penis_masks collection + on-disk mask store.
+            self._penis_mask_tab.build()
 
             # Link hidden triggers to functions
             button_hidden_cmd.click(
@@ -2770,6 +2786,10 @@ class AIDBSceneApp:
 
     def launch(self, **kwargs):
         print('Launching Gradio application...')
+        # Inject the penis-mask annotator's document-level JS/CSS into <head>
+        # (launch-time head is the supported path in gradio 6; Blocks(head=)
+        # is deprecated). <script> in gr.HTML would not execute.
+        kwargs.setdefault('head', self._blocks_head)
         self._interface.launch(**kwargs)
 
 

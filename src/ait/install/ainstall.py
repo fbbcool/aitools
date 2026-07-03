@@ -377,7 +377,10 @@ class AInstaller:
                 },
             },
             'clip': {'model___clip_path': {'type': 'str'}},
-            'transformer': {'model___transformer_path': {'type': 'str'}},
+            'transformer': {
+                'model___transformer_path': {'type': 'str'},
+                'model___diffusion_model': {'type': 'str'},
+            },
             'text_encoder': {
                 'model___llm_path': {'type': 'str'},
                 'model___text_encoder_path': {'type': 'str'},
@@ -385,6 +388,11 @@ class AInstaller:
                     'type': 'str',
                     'parameter': 'text_encoders',
                     'format': '${parameter} = [{path = ${value}, type = "lumina2"}]',
+                },
+                'model___text_encoders_krea2': {
+                    'type': 'str',
+                    'parameter': 'text_encoders',
+                    'format': '${parameter} = [{path = ${value}, type = "krea2"}]',
                 },
             },
         }

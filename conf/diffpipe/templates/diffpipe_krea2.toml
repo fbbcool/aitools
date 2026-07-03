@@ -1,0 +1,102 @@
+# Output path for training runs. Each training run makes a new directory in here.
+#output_dir = '{self.DIR_OUTPUT}'
+${output_dir}
+#dataset = '{self.FILE_CONFIG_DATASET}'
+${dataset}
+
+# training settings
+
+# I usually set this to a really high value because I don't know how long I want to train.
+#epochs = 40
+${epochs}
+# Batch size of a single forward/backward pass for one GPU.
+#micro_batch_size_per_gpu = {self._batch_size}
+${micro_batch_size_per_gpu}
+# Pipeline parallelism degree. A single instance of the model is divided across this many GPUs.
+pipeline_stages = 1
+# Number of micro-batches sent through the pipeline for each training step.
+gradient_accumulation_steps = 1
+# Grad norm clipping.
+gradient_clipping = 1.0
+# Learning rate warmup.
+#warmup_steps = 100
+${warmup_steps}
+
+# Block swapping keeps this many transformer blocks offloaded to RAM. Increasing it lowers VRAM
+# use with a performance penalty. LoRA-only, requires pipeline_stages=1.
+#blocks_to_swap = 20
+${blocks_to_swap}
+
+# eval settings
+
+eval_every_n_epochs = 1
+eval_before_first_step = true
+eval_micro_batch_size_per_gpu = 1
+eval_gradient_accumulation_steps = 1
+#disable_block_swap_for_eval = true
+
+# misc settings
+
+#save_every_n_epochs = 1
+${save_every_n_epochs}
+#checkpoint_every_n_minutes = 120
+activation_checkpointing = true
+#reentrant_activation_checkpointing = true
+partition_method = 'parameters'
+
+# dtype for saving the LoRA or model, if different from training dtype
+#save_dtype = 'bfloat16'
+${save_dtype}
+# Batch size for caching latents and text embeddings. Kept small: Krea2 conditioning is a
+# 12-layer Qwen3-VL stack (12*2560 = 30720 features per token), so cached text embeds are large.
+#caching_batch_size = {self._batch_size}
+${caching_batch_size}
+
+#steps_per_print = 10
+${steps_per_print}
+video_clip_mode = 'single_beginning'
+
+# Krea2 ("K2"): single-stream MMDiT, ComfyUI-native (comfy/ldm/krea2). Shares the Qwen-Image VAE
+# (Wan21 16ch latents) and conditions on a Qwen3-VL-4B 12-layer "txtfusion" tap (CLIPType 'krea2').
+[model]
+type = 'krea2'
+# transformer / text encoder / vae paths are bound by the installer from models_train_krea2.json
+${model___diffusion_model}
+${model___text_encoders_krea2}
+${model___vae}
+# Optional ComfyUI single-file LoRAs merged into the base before training (snofs is already baked
+# into the merged raw base, so normally empty).
+${model___merge_adapters}
+# Trained in bf16 storage (ComfyPipeline compute dtype). float8 storage is not wired for
+# ComfyUI-native models here.
+#dtype = 'bfloat16'
+${model___dtype}
+timestep_sample_method = 'logit_normal'
+# Flow-matching shift, matches ComfyUI Krea2 sampling_settings (shift = 1.15).
+shift = 1.15
+#min_t = 0.875
+${model___min_t}
+#max_t = 1
+${model___max_t}
+
+# For models that support full fine tuning, simply delete or comment out the [adapter] table to FFT.
+[adapter]
+type = 'lora'
+#rank = {int(self._config_train['netdim'])}
+${adapter___rank}
+# Dtype for the LoRA weights you are training.
+#dtype = 'bfloat16'
+${adapter___dtype}
+# You can initialize the lora weights from a previously trained lora.
+#init_from_existing = '/data/diffusion_pipe_training_runs/something/epoch50'
+
+[optimizer]
+# AdamW from the optimi library is a good default since it automatically uses Kahan summation when training bfloat16 weights.
+#type = 'adamw_optimi'
+${optimizer___type}
+#lr = {self._lr}
+${optimizer___lr}
+betas = [0.9, 0.99]
+#weight_decay = 0.01
+${optimizer___weight_decay}
+eps = 1e-8

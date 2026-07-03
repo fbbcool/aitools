@@ -1,0 +1,94 @@
+{
+  "krea2": {
+    "common": {
+      "vae": [
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "vae/qwen_image_vae.safetensors",
+          "rename": "vae",
+          "skip": false
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "text_encoders/qwen3vl_4b_fp8_scaled.safetensors",
+          "rename": "qwen3vl-4b_fp8",
+          "skip": false
+        },
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "text_encoders/qwen3vl_4b_bf16.safetensors",
+          "rename": "qwen3vl-4b_bf16",
+          "skip": true
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "loras/krea2_darkbrush.safetensors",
+          "rename": "darkbrush",
+          "skip": true
+        },
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "loras/krea2_dotmatrix.safetensors",
+          "rename": "dotmatrix",
+          "skip": true
+        },
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "loras/krea2_kidsdrawing.safetensors",
+          "rename": "kidsdrawing",
+          "skip": true
+        },
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "loras/krea2_neondrip.safetensors",
+          "rename": "neondrip",
+          "skip": true
+        },
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "loras/krea2_rainywindow.safetensors",
+          "rename": "rainywindow",
+          "skip": true
+        },
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "loras/krea2_retroanime.safetensors",
+          "rename": "retroanime",
+          "skip": true
+        },
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "loras/krea2_softwatercolor.safetensors",
+          "rename": "softwatercolor",
+          "skip": true
+        },
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "loras/krea2_sunsetblur.safetensors",
+          "rename": "sunsetblur",
+          "skip": true
+        },
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "loras/krea2_vintagetarot.safetensors",
+          "rename": "vintagetarot",
+          "skip": true
+        }
+      ]
+    },
+    "turbo": {
+      "transformer": [
+        {
+          "repo_id": "fbbcool/krea2-snofs-75",
+          "file": "krea2-turbo-snofs0.75-fp8-scaled.safetensors",
+          "rename": "krea2-turbo-snofs0.75-fp8-scaled",
+          "skip": false
+        }
+      ]
+    }
+  }
+}

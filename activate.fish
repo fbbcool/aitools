@@ -48,6 +48,11 @@ function ait_setup_zimage_edit
     python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY zimage:edit
 end
 
+function ait_setup_krea2
+    ait_update
+    python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY krea2:turbo
+end
+
 function ait_setup_ltx
     ait_update
     python3 $HOME_AIT/script/ainstall_comfyui.py $HOME_COMFY ltx:23

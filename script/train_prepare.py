@@ -27,8 +27,8 @@ from trainer import Trainer
 #    'optimizer___type': 'adamw_optimi',
 # }
 
-model = 'qwen'
-variant = 'gts-app-atomic'
+model = 'krea2'  # 'qwen' | 'krea2'
+variant = 'gts-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
 trigger = 'xlface-jez'
@@ -123,12 +123,98 @@ config_trainer_qwen_gts_app = {
     'optimizer___lr': 5e-5,
 }
 
+# krea2 (single-stream MMDiT, ComfyPipeline). variant 'raw' -> merged
+# krea2-raw-snofs0.75-bf16 base + Qwen3-VL-4B 12-layer text encoder.
+config_trainer_krea2_default = {
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
+    'optimizer___lr': 5e-5,
+}
+
+config_trainer_krea2_gts_atomic = {
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
+    #'adapter___alpha': 4,  # will break; is set automatically!
+    'optimizer___lr': 5e-5,
+}
+
+config_trainer_krea2_gts_domain = {
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 32,  # 32 for xlasm, 16 for xlasm-childs
+    #'adapter___alpha': 4,  # will break; is set automatically!
+    'optimizer___lr': 5e-5,
+}
+
+config_trainer_krea2_gts_app_atomic = {
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
+    #'adapter___alpha': 4,  # will break; is set automatically!
+    'optimizer___lr': 5e-5,
+}
+
+config_trainer_krea2_gts_app = {
+    'epochs': 30,  # sentinel, manual cancel ~3K steps
+    'micro_batch_size_per_gpu': gpu_config[gpu].get('micro_batch_size_per_gpu', 1),
+    'warmup_steps': gpu_config[gpu].get(
+        'warmup_steps', 50
+    ),  # small cushion for LR=2e-4 early-spike risk
+    'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
+    'checkpoint_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 16,  # 32 for xlasm, 16 for xlasm-childs
+    #'adapter___alpha': 4,  # will break; is set automatically!
+    'optimizer___lr': 5e-5,
+}
+
+# config_trainer[model][variant] -> the per-run trainer overrides.
 config_trainer = {
-    'gts-atomic': config_trainer_qwen_gts_atomic,
-    'gts-domain': config_trainer_qwen_gts_domain,
-    'gts-app-atomic': config_trainer_qwen_gts_app_atomic,
-    'gts-app': config_trainer_qwen_gts_app,
-    'gts-app-xlbusty': config_trainer_qwen_gts_app,
+    'qwen': {
+        'gts-atomic': config_trainer_qwen_gts_atomic,
+        'gts-domain': config_trainer_qwen_gts_domain,
+        'gts-app-atomic': config_trainer_qwen_gts_app_atomic,
+        'gts-app': config_trainer_qwen_gts_app,
+        'gts-app-xlbusty': config_trainer_qwen_gts_app,
+    },
+    'krea2': {
+        'gts-atomic': config_trainer_krea2_gts_atomic,
+        'gts-domain': config_trainer_krea2_gts_domain,
+        'gts-app-atomic': config_trainer_krea2_gts_app_atomic,
+        'gts-app': config_trainer_krea2_gts_app,
+        'gts-app-xlbusty': config_trainer_krea2_gts_app,
+    },
 }
 
 # config_trainer = config_trainer_qwen_h100
@@ -313,7 +399,7 @@ Trainer(
     model,
     datasets[trigger],
     variant=variant,
-    config_trainer=config_trainer[variant],
+    config_trainer=config_trainer[model][variant],
     config_dataset=config_dataset,
     multithread=True,
 )

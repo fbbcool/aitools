@@ -1,0 +1,29 @@
+{
+  "train_krea2": {
+    "common": {
+      "vae": [
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "vae/qwen_image_vae.safetensors",
+          "skip": false
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "comfy-org/krea-2",
+          "file": "text_encoders/qwen3vl_4b_bf16.safetensors",
+          "skip": false
+        }
+      ]
+    },
+    "raw": {
+      "transformer": [
+        {
+          "repo_id": "fbbcool/krea2-snofs-75",
+          "file": "krea2-raw-snofs0.75-bf16.safetensors",
+          "skip": false
+        }
+      ]
+    }
+  }
+}
