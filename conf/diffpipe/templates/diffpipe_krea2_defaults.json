@@ -4,6 +4,7 @@
   "warmup_steps": 20,
   "caching_batch_size": 1,
   "model___type": "krea2",
+  "model___diffusion_model_dtype": "float8",
   "adapter___rank": 32,
   "optimizer___lr": 5e-5
 }

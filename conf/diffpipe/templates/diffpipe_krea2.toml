@@ -67,10 +67,14 @@ ${model___vae}
 # Optional ComfyUI single-file LoRAs merged into the base before training (snofs is already baked
 # into the merged raw base, so normally empty).
 ${model___merge_adapters}
-# Trained in bf16 storage (ComfyPipeline compute dtype). float8 storage is not wired for
-# ComfyUI-native models here.
+# dtype = base/compute dtype (bf16). diffusion_model_dtype casts the transformer block linears
+# for storage: 'float8' (e4m3) halves the base VRAM so it fits a 32GB card — norms and the
+# keep_in_high_precision layers (first/tmlp/tproj/txtfusion/txtmlp/last) stay bf16. Same idea as
+# the qwen fp8 training base. Set to 'bfloat16' to train the base in full bf16.
 #dtype = 'bfloat16'
 ${model___dtype}
+#diffusion_model_dtype = 'float8'
+${model___diffusion_model_dtype}
 timestep_sample_method = 'logit_normal'
 # Flow-matching shift, matches ComfyUI Krea2 sampling_settings (shift = 1.15).
 shift = 1.15
