@@ -31,8 +31,10 @@ model = 'krea2'  # 'qwen' | 'krea2'
 variant = 'gts-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlasm'
-num_repeats = 2
+trigger = 'xlface-jez'
+num_repeats = 8
+lr = 1e-4
+rank = 8
 
 # ──────────────────────────────────────────────────────
 gpu_config = {

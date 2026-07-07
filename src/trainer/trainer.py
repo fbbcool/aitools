@@ -32,6 +32,8 @@ class Trainer:
         multithread: bool = False,
         root: str | None = None,
         trigger: str | None = None,
+        rank: int | None = None,
+        lr: float | None = None,
     ) -> None:
         if root is None:
             self.root = self.ROOT
@@ -44,6 +46,11 @@ class Trainer:
         self._config_trainer = {}
         if config_trainer is not None:
             self._config_trainer = config_trainer
+        # explicitly overwrite preconfigured config dicts if given
+        if rank is not None:
+            self._config_trainer['adapter___rank'] = rank
+        if lr is not None:
+            self._config_trainer['optimizer___lr'] = lr
 
         self._config_dataset = {}
         if config_dataset is not None:
@@ -63,6 +70,7 @@ class Trainer:
 
         self._config_trainer |= {'dataset': str(self._templater_dataset.file_saved)}
         self._config_trainer |= self._installer.vars_bound
+
         print(self.config_trainer)
         self._templater_diffpipe = Templater(
             'diffpipe',
@@ -128,7 +136,10 @@ class Trainer:
                 multithread = False
 
             self._make_dataset_hfd(
-                hfd, multithread=multithread, max_imgs=max_imgs, ids_filter=ids_filter,
+                hfd,
+                multithread=multithread,
+                max_imgs=max_imgs,
+                ids_filter=ids_filter,
             )
 
     def _make_dataset_hfd(
