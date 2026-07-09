@@ -31,8 +31,8 @@ model = 'krea2'  # 'qwen' | 'krea2'
 variant = 'gts-app-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlfbb'
-num_repeats = 1
+trigger = 'xlbusty'
+num_repeats = 2
 lr = 1e-4
 rank = 8
 
