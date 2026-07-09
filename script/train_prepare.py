@@ -32,7 +32,7 @@ variant = 'gts-app-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
 trigger = 'xlfbb'
-num_repeats = 8
+num_repeats = 1
 lr = 1e-4
 rank = 8
 
