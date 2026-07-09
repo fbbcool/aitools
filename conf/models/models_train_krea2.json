@@ -43,14 +43,8 @@
       "lora": [
         {
           "repo_id": "fbbcool/xlasm",
-          "file": "qwen/gts-atomic/25.safetensors",
+          "file": "krea2/gts-atomic/xlasm/r08/20.safetensors",
           "weight": 0.85,
-          "skip": false
-        },
-        {
-          "repo_id": "fbbcool/xlasm",
-          "file": "qwen/gts-domain/31.safetensors",
-          "weight": 0.80,
           "skip": false
         }
       ]
