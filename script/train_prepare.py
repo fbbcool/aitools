@@ -28,10 +28,10 @@ from trainer import Trainer
 # }
 
 model = 'krea2'  # 'qwen' | 'krea2'
-variant = 'gts-atomic'
+variant = 'gts-app-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlface-jez'
+trigger = 'xlfbb'
 num_repeats = 8
 lr = 1e-4
 rank = 8
@@ -182,9 +182,9 @@ config_trainer_krea2_gts_app_atomic = {
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 4,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
     #'adapter___alpha': 4,  # will break; is set automatically!
-    'optimizer___lr': 5e-5,
+    'optimizer___lr': 1e-4,
 }
 
 config_trainer_krea2_gts_app = {

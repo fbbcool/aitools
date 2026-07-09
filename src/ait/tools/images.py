@@ -98,6 +98,37 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
         return None
     data = json.loads(info_prompt)
 
+    # A `Display Any (rgthree)` node titled 'string pos' is an explicit,
+    # authoritative marker of the final positive prompt: when present, its
+    # cached value defines the prompt and wins over the graph walk.
+    named = _prompt_from_named_display(info_ext.get('workflow'), 'string pos', verbose)
+    if named:
+        return named
+
+    prompt, chain = _walk_positive_to_text(data, verbose)
+    if isinstance(prompt, str) and prompt:
+        return prompt
+
+    # The positive chain terminated in a dynamic node (e.g. a custom DB-backed
+    # loader like FbbcoolScenesImage) whose resolved text is not stored in the
+    # API `prompt` graph. Recover it from the UI `workflow` chunk, where a
+    # `Display Any (rgthree)` node mirroring a link in the chain caches the
+    # value it displayed at run time.
+    cached = _prompt_from_display_cache(data, info_ext.get('workflow'), chain, verbose)
+    if cached:
+        return cached
+
+    if verbose:
+        print('prompt is empty')
+    return None
+
+
+def _walk_positive_to_text(data: dict, verbose=False) -> tuple[str | None, list[str]]:
+    """Walk the ComfyUI API graph from the sampler's positive input back to a
+    static text widget. Returns (text_or_None, chain) where `chain` is the list
+    of node ids visited (used by the Display-cache fallback when the walk ends
+    on a dynamic node)."""
+    chain: list[str] = []
     prompt = None
     try:
         ksampler = {}
@@ -114,7 +145,7 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
         if inputs is None:
             if verbose:
                 print('no inputs found!')
-            return None
+            return None, chain
 
         prompt = None
         value = None
@@ -122,6 +153,7 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
             value = inputs.get(key, None)
             if value is not None:
                 id_pos = value[0]
+                chain.append(str(id_pos))
                 prompt = data[id_pos]
                 if verbose:
                     print(f'{key} with value[{value}] found!')
@@ -132,18 +164,18 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
             if prompt is None:
                 if verbose:
                     print('prompt is None!')
-                return None
+                return None, chain
 
             max_loop -= 1
             if max_loop < 0:
-                prompt = None
                 if verbose:
                     print('max_loop is <0!')
-                return None
+                return None, chain
 
             inputs = None
             if isinstance(prompt, list):
                 id_pos = prompt[0]
+                chain.append(str(id_pos))
                 node_pos = data[id_pos]
                 if isinstance(node_pos, dict):
                     inputs = node_pos.get('inputs', None)
@@ -156,12 +188,12 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
             else:
                 if verbose:
                     print(f'prompt [{prompt}] is neither dict nor list')
-                return None
+                return None, chain
 
             if inputs is None:
                 if verbose:
                     print('inputs is None!')
-                return None
+                return None, chain
 
             prompt = inputs.get('text', None)
             keys = ['Text', 'string_b', 'positive_prompt', 'conditioning']
@@ -181,19 +213,85 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
     except Exception as e:
         if verbose:
             print(f'got an exception: {e}')
-        return None
+        return None, chain
 
-    # always return None, regardless of None or empty.
     if not prompt:
-        if verbose:
-            print('prompt is empty')
+        return None, chain
+    return prompt, chain
+
+
+def _prompt_from_named_display(info_workflow, title: str, verbose=False) -> str | None:
+    """Return the cached value of a `Display Any (rgthree)` node whose title is
+    `title` (e.g. 'string pos'), read from the UI `workflow` chunk. Such a node
+    is an explicit, hand-placed marker of the resolved positive prompt."""
+    if not info_workflow:
         return None
-    return prompt
+    try:
+        wf = json.loads(info_workflow) if isinstance(info_workflow, str) else info_workflow
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    for node in wf.get('nodes', []):
+        if node.get('type') != 'Display Any (rgthree)':
+            continue
+        if (node.get('title') or '').strip().lower() != title.strip().lower():
+            continue
+        wv = node.get('widgets_values') or []
+        if wv and isinstance(wv[0], str) and wv[0].strip():
+            if verbose:
+                print(f"recovered prompt from Display node titled '{title}'")
+            return wv[0].strip()
+    return None
 
 
-def _image_extract_loras_from_info_ext(
-    info_ext: dict, verbose: bool = False
-) -> dict | None:
+def _prompt_from_display_cache(
+    data: dict, info_workflow, chain: list[str], verbose=False
+) -> str | None:
+    """Fallback prompt recovery for graphs whose positive text is produced by a
+    dynamic node (no static widget). A `Display Any (rgthree)` wired to the same
+    link the sampler consumes caches the value it showed at run time inside the
+    UI `workflow` chunk. Find such a display mirroring a node in `chain` and
+    return its cached text.
+
+    Chain order matters: we prefer the display nearest the sampler (post any
+    string transforms), i.e. the earliest chain node that a display mirrors."""
+    if not info_workflow:
+        return None
+    try:
+        wf = json.loads(info_workflow) if isinstance(info_workflow, str) else info_workflow
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    # UI node id -> cached displayed string (rgthree stores it in widgets_values[0]).
+    cached_text: dict[str, str] = {}
+    for node in wf.get('nodes', []):
+        if node.get('type') != 'Display Any (rgthree)':
+            continue
+        wv = node.get('widgets_values') or []
+        if wv and isinstance(wv[0], str) and wv[0].strip():
+            cached_text[str(node.get('id'))] = wv[0].strip()
+    if not cached_text:
+        return None
+
+    # API Display node -> the node id it displays (its `source` input link).
+    display_source: dict[str, str] = {}
+    for api_id, node in data.items():
+        if not isinstance(node, dict) or node.get('class_type') != 'Display Any (rgthree)':
+            continue
+        src = (node.get('inputs') or {}).get('source')
+        if isinstance(src, list) and src:
+            display_source[str(api_id)] = str(src[0])
+
+    for nid in chain:
+        for api_id, src_id in display_source.items():
+            if src_id == nid and api_id in cached_text:
+                if verbose:
+                    print(f'recovered prompt from Display node {api_id} (mirrors {nid})')
+                return cached_text[api_id]
+    return None
+
+
+def _image_extract_loras_from_info_ext(info_ext: dict, verbose: bool = False) -> dict | None:
     """Walk the ComfyUI workflow JSON in the PNG `prompt` chunk and return the
     Power Lora Loader (rgthree) slots that were toggled on, plus the sampler
     seed.
