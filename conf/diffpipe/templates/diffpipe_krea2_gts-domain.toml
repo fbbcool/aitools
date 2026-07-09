@@ -112,7 +112,9 @@ ${model___text_encoders_krea2}
 ${model___vae}
 # Optional ComfyUI single-file LoRAs merged into the base before training (snofs is already baked
 # into the merged raw base, so normally empty).
-${model___merge_adapters}
+
+#${model___merge_adapters}
+
 # dtype = base/compute dtype (bf16). diffusion_model_dtype casts the transformer block linears
 # for storage: 'float8' (e4m3) halves the base VRAM so it fits a 32GB card — norms and the
 # keep_in_high_precision layers (first/tmlp/tproj/txtfusion/txtmlp/last) stay bf16. Same idea as
