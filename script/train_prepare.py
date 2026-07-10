@@ -33,6 +33,7 @@ gpu = '5090'
 # gpu = 'h100-nvl'
 trigger = 'xlface-alex'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
+caption_trigger = None
 num_repeats = 8
 lr = 1e-4
 rank = 8
