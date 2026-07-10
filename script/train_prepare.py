@@ -31,7 +31,8 @@ model = 'krea2'  # 'qwen' | 'krea2'
 variant = 'gts-app-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlface-jez'
+trigger = 'xlface-alex'  # dataset-dict key (selects `datasets[trigger]`)
+# caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 num_repeats = 8
 lr = 1e-4
 rank = 8
@@ -223,9 +224,10 @@ config_trainer = {
 # config_trainer = config_trainer_qwen_h100
 config_dataset = {
     'num_repeats': num_repeats,
-    # The 7 distinct (w, h) pairs in the compiled gts_v3 training set.
-    # All max-side 1024, AR bucketed: 1:1, 3:4/4:3, 2:3/3:2, 3:5/5:3.
-    'resolutions': [1024],
+    # 1fem_alexandra is 768px max-edge across all 35 imgs → train native, no
+    # upscale. Use [1024] for the gts-v3 sets (all max-side 1024, AR bucketed:
+    # 1:1, 3:4/4:3, 2:3/3:2, 3:5/5:3).
+    'resolutions': [768],
     #'resolutions_arr': [
     #    [1024, 1024],  # 137 images
     #    [768, 1024],  # 27
@@ -396,6 +398,9 @@ datasets = {
     'xlface-jez': [
         ('fbbcool/face-jez', 0),
     ],
+    'xlface-alex': [
+        ('fbbcool/1fem_alexandra', 0),
+    ],
 }
 
 Trainer(
@@ -404,6 +409,7 @@ Trainer(
     variant=variant,
     config_trainer=config_trainer[model][variant],
     config_dataset=config_dataset,
+    trigger=caption_trigger,  # prepends '1alexandra,' to each caption .txt
     multithread=True,
 )
 
