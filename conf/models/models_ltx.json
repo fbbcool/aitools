@@ -6,6 +6,12 @@
           "id": 2752410,
           "method_download": "civitai2",
           "rename": "fp8-eros10",
+          "skip": true
+        },
+        {
+          "repo_id": "SulphurAI/Sulphur-2-base",
+          "file": "sulphur_dev_fp8mixed.safetensors",
+          "rename": "ltx-sulfur",
           "skip": false
         },
         {
@@ -29,34 +35,40 @@
           "skip": false
         },
         {
+          "id": 3006968,
+          "method_download": "civitai2",
+          "rename": "gts-growth-v0",
+          "skip": false
+        },
+        {
           "id": 2857106,
           "method_download": "civitai2",
           "rename": "sexgod-hj-v1",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2848299,
           "method_download": "civitai2",
           "rename": "VBVR-NSFW",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2747549,
           "method_download": "civitai2",
           "rename": "dreamplay-v1",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2783583,
           "method_download": "civitai2",
           "rename": "mp-sex-05-07",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2778606,
           "method_download": "civitai2",
           "rename": "female-nudity-v2",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2775233,
@@ -68,42 +80,42 @@
           "id": 2755189,
           "method_download": "civitai2",
           "rename": "penis-lora",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2729936,
           "method_download": "civitai2",
           "rename": "beeg-breasts-v11",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2772932,
           "method_download": "civitai2",
           "rename": "penile-praxis-v40",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2668170,
           "method_download": "civitai2",
           "rename": "tit-daddy-v20",
-          "skip": false
+          "skip": true
         },
         {
           "id": 2816262,
           "method_download": "civitai2",
           "rename": "sexgod_hairy",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "Lightricks/LTX-2.3",
           "file": "ltx-2.3-22b-distilled-lora-384.safetensors",
           "rename": "distilled-lora",
-          "skip": false
+          "skip": true
         },
         {
           "repo_id": "Comfy-Org/ltx-2",
           "file": "split_files/loras/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors",
-          "skip": false
+          "skip": true
         }
       ],
       "text_encoder": [

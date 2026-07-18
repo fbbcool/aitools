@@ -4,8 +4,6 @@ from typing import Final, Generator, Literal, Any
 import json
 from huggingface_hub import hf_hub_download, snapshot_download
 
-# from civitai_downloader import login as civitai_login
-# from civitai_downloader import civitai_download
 import requests
 from tqdm import tqdm
 from git import Repo  # pip install gitpython
@@ -82,6 +80,7 @@ class AInstallerDB:
 
 class AInstaller:
     CHUNK_SIZE: Final = 1638400
+    CIVITAI_RED_BASE: Final = 'https://civitai.red/api/download/models/'
     USER_AGENT: Final = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'  # noqa
 
     def __init__(
@@ -576,23 +575,20 @@ class AInstaller:
         os.symlink(str(src), str(target), target_is_directory=directory)
 
     def _install_item_civitai2(self, item: dict) -> dict:
-        print('civitai2 dl DEACTIVATED!')
-        # TODO reimplement, currenlty deactivated
-        return {}
-        civitai_login()
-        id = item['config'].get('id', None)
-        if id is None:
-            url = item['config'].get('link', None)
-            if url is None:
-                return item
-
-        civitai_download(
-            id,
-            cache_dir=str(self._cache),
-            use_cache=True,
-            local_dir=str(item['target_dir']),
-        )
-        return item
+        # civitai2 = download a civitai model *version by id* through the civitai.red
+        # mirror. It reuses the in-house v1 redirect downloader (_install_item_civitai):
+        # Bearer-token auth, follow the 302, take the filename from content-disposition,
+        # then cache + rename + symlink. No external civitai_downloader dependency.
+        config = item['config']
+        link = config.get('link', None)
+        if not link:
+            vid = config.get('id', None)
+            if vid is None:
+                print('warning: civitai2 item has neither "id" nor "link"!')
+                return {}
+            link = f'{self.CIVITAI_RED_BASE}{vid}'
+            item['config'] = config | {'link': link}
+        return self._install_item_civitai(item)
 
     def _install_item_civitai(self, item: dict) -> dict:
         url = item['config'].get('link', '')
