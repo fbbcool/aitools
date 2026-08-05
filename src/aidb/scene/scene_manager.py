@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Generator
+import sys
 import json
 
 from aidb.scene.db_connect import DBConnection
@@ -99,7 +100,7 @@ class SceneManager:
             else:
                 query |= {SceneDef.FIELD_LABELS: {'$in': labels}}
 
-        print(f'query: [{query}]')
+        print(f'query: [{query}]', file=sys.stderr)
         return self.ids_from_query(query)
 
     def data_from_id(self, id: Any) -> dict | None:
@@ -231,24 +232,65 @@ class SceneManager:
 
         return meta
 
-    def new_scene_from_urls(self, _urls: list[str] | list[Path] | str | Path) -> list[str] | None:
+    def new_scene_from_urls(
+        self,
+        _urls: list[str] | list[Path] | str | Path,
+        subdir_scenes: str | None = None,
+        register: bool = False,
+    ) -> list[str] | None:
+        """Create new scene(s) from image/dir urls and return the new scene ids.
+
+        subdir_scenes: per-call override of the target scene subdir (under the DB
+            root), applied only for this call — no need to rebuild the manager.
+            Omitted / None keeps the constructor's ``subdir_scenes`` value.
+        register: when True, bulk-register the imported images (insert image
+            docs + rename to the ``0rig___<id>`` convention) so the scenes'
+            ``imgs_active`` reflects them. Default False preserves the curator's
+            manual register/prototype choice (import creates the scene doc only).
+        """
         if not isinstance(_urls, list):
             urls = [_urls]
         else:
             urls = _urls
         urls_img = [Path(url) for url in urls if is_img_or_vid(url)]
 
-        ret = []
-        if urls_img:
-            oid = self._scene_new_imgs(urls_img)
-            if oid is not None:
-                ret.append(oid)
+        prev_subdir = self._subdir_scenes
+        if subdir_scenes is not None:
+            self._subdir_scenes = subdir_scenes
+        try:
+            ret = []
+            if urls_img:
+                oid = self._scene_new_imgs(urls_img)
+                if oid is not None:
+                    ret.append(oid)
 
-        dirs = [Path(url) for url in urls if is_dir(url)]
-        for dir in dirs:
-            oid = self._scene_new_dir(dir)
-            if oid is not None:
-                ret.append(oid)
+            dirs = [Path(url) for url in urls if is_dir(url)]
+            for dir in dirs:
+                oid = self._scene_new_dir(dir)
+                if oid is not None:
+                    ret.append(oid)
+        finally:
+            self._subdir_scenes = prev_subdir
+
+        if register:
+            self._register_scene_imgs(ret)
+
+        return ret
+
+    def _register_scene_imgs(self, scene_ids: list[str]) -> None:
+        """Register the raw images of freshly imported scenes.
+
+        Mirrors the curator flow (``script/aidb_scene.py`` imgs_register):
+        ``register_from_url`` inserts each image doc and renames the file to the
+        ``0rig___<id>`` convention; ``scene.update`` then refreshes the scene so
+        ``imgs_active`` counts the registered images.
+        """
+        im = self.scene_image_manager()
+        for oid in scene_ids:
+            scene = self.scene_from_id_or_url(oid)
+            for url_img in list(scene.urls_img):
+                im.register_from_url(url_img)
+            scene.update(force=True)
 
     def _scene_new_imgs(self, url_imgs: list[str] | list[Path]) -> None | str:
         """
@@ -311,6 +353,26 @@ class SceneManager:
 
         return Scene(self, id_or_url)
 
+    def display_image(self, scene_id: str) -> str | None:
+        """Return the image url the scene app displays for ``scene_id``.
+
+        Read-only and deterministic: the highest-rated registered image (newest
+        ``updated`` among ties), else the newest render file in the scene
+        folder. This mirrors the source of the grid thumbnail exactly (see
+        `Scene.url_display` / `Scene._update_thumbnail`), so a consumer resolving
+        a scene id gets the same image the app shows — not a mtime-newest guess.
+
+        Returns the url as a str, or None for an unknown/empty scene (no
+        registered images and no renders on disk). No mutation of scenes/images.
+        """
+        try:
+            scene = self.scene_from_id_or_url(scene_id)
+        except (FileNotFoundError, ValueError) as e:
+            self._log(f'display_image: cannot resolve scene[{scene_id}]: {e}', level='warning')
+            return None
+        url = scene.url_display
+        return str(url) if url else None
+
     def scenes_update(self) -> None:
         from .scene import Scene
 
@@ -352,4 +414,4 @@ class SceneManager:
 
     def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:
-            print(f'[scm:{level}] {msg}')
+            print(f'[scm:{level}] {msg}', file=sys.stderr)

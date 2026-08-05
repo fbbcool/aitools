@@ -1,3 +1,4 @@
+import sys
 import os
 from pathlib import Path
 from typing import Any, Final, Literal, Optional
@@ -100,4 +101,4 @@ class ConfigReader:
 
     def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:
-            print(f'[config:{level}] {msg}')
+            print(f'[config:{level}] {msg}', file=sys.stderr)

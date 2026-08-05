@@ -118,8 +118,62 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
     if cached:
         return cached
 
+    # Fbbcool enhancer renders (krea2/qwen graphs): the positive text is a
+    # runtime output of `FbbcoolEnhancerClient`, fed from a `FbbcoolClipspace`
+    # node that persists the full iteration payload in its `is_changed` field.
+    # The graph walk dead-ends on that dynamic node, but the resolved prompt is
+    # embedded in that payload's `prompt` key. Recover it, gated on the
+    # iteration schema_id so we never pick up an unrelated embedded JSON.
+    iteration = _prompt_from_enhancer_iteration(data, verbose)
+    if iteration:
+        return iteration
+
     if verbose:
         print('prompt is empty')
+    return None
+
+
+# Marker for the 1xlasm-enhancer iteration payload embedded by FbbcoolClipspace.
+# Gate the enhancer-prompt fallback on this so an unrelated embedded JSON that
+# happens to carry a `prompt` key is never mistaken for the generation prompt.
+_ENHANCER_ITERATION_SCHEMA_PREFIX = '1xlasm_enhancer.iteration'
+
+
+def _prompt_from_enhancer_iteration(data: dict, verbose=False) -> str | None:
+    """Recover the positive prompt from an embedded 1xlasm-enhancer iteration
+    payload. Fbbcool enhancer graphs feed `CLIPTextEncode.text` from a runtime
+    `FbbcoolEnhancerClient` output, but the `FbbcoolClipspace` source node keeps
+    the whole iteration JSON in its `is_changed` field. Scan every node for such
+    a blob (in `is_changed` entries or string inputs), gated on the iteration
+    `schema_id`, and return its `prompt`."""
+    for node in data.values():
+        if not isinstance(node, dict):
+            continue
+        blobs: list[str] = []
+        is_changed = node.get('is_changed')
+        if isinstance(is_changed, list):
+            blobs += [b for b in is_changed if isinstance(b, str)]
+        elif isinstance(is_changed, str):
+            blobs.append(is_changed)
+        blobs += [v for v in node.get('inputs', {}).values() if isinstance(v, str)]
+        for blob in blobs:
+            if _ENHANCER_ITERATION_SCHEMA_PREFIX not in blob:
+                continue
+            try:
+                payload = json.loads(blob)
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            schema_id = payload.get('schema_id', '')
+            if not (isinstance(schema_id, str)
+                    and schema_id.startswith(_ENHANCER_ITERATION_SCHEMA_PREFIX)):
+                continue
+            prompt = payload.get('prompt')
+            if isinstance(prompt, str) and prompt:
+                if verbose:
+                    print(f'enhancer-iteration prompt recovered (schema {schema_id})')
+                return prompt
     return None
 
 

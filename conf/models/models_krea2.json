@@ -73,6 +73,12 @@
           "skip": true
         },
         {
+          "id": 3109006,
+          "method_download": "civitai2",
+          "rename": "realsm-engine-v3",
+          "skip": false
+        },
+        {
           "repo_id": "comfy-org/krea-2",
           "file": "loras/krea2_vintagetarot.safetensors",
           "rename": "vintagetarot",

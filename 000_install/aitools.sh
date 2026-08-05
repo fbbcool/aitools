@@ -9,6 +9,8 @@ export HOME_TRAINER=$WORKSPACE/diffusion-pipe
 export HOME_AIT=$WORKSPACE/aitools
 export CONF_AIT=$HOME_AIT/conf
 export PYTHONPATH=$HOME_AIT/src
+export HF_HUB_ENABLE_HF_TRANSFER=1
+export HF_HUB_DISABLE_XET=1
 
 ___train_install_aitools() {
   git clone $REPOS_AIT $HOME_AIT

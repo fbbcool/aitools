@@ -967,10 +967,10 @@ class AppSceneImageCell:
     def _html_goto_scene_button(scene_id: Optional[str]) -> str:
         """
         Small button: navigates to the Scene Editor with the given scene
-        loaded. Mirrors `AppSceneCell._html_thumb_onclick_js` (writes
-        scene_id to the simg-editor databus, clicks the hidden trigger,
-        and switches the outer tab). Renders a disabled button when
-        `scene_id` is falsy.
+        loaded IN-PAGE (writes scene_id to the simg-editor databus, clicks the
+        hidden trigger, and switches the outer tab). Unlike the Scene Search
+        thumbnails (which are new-tab `?scene=<id>` deep-links), this stays in
+        the current tab. Renders a disabled button when `scene_id` is falsy.
         """
         elem_id_btn = AppHtml.elem_id_simg_editor_open_button()
         elem_id_bus = AppHtml.elem_id_simg_editor_databus()

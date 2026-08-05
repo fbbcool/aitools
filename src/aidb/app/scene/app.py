@@ -896,6 +896,40 @@ class AIDBSceneApp:
                 outputs=[set_editor_stats_html],
             )
 
+            # Deep-link support. A fresh page load of `/?scene=<id>` renders
+            # the Scene Editor pre-loaded with that scene. Scene Search
+            # thumbnails are real `<a target="_blank" href="?scene=<id>">`
+            # anchors (see cell_scene.py), so clicking one opens the editor in
+            # a NEW browser tab while the search tab keeps its filters/results.
+            # Each browser tab is an independent Gradio session, so N such tabs
+            # are N independent editors; closing one leaves the others and the
+            # search tab intact. Without the param the normal search-first view
+            # is shown unchanged. The Python step renders the editor content;
+            # the JS `.then` switches the visible tab to 'Scene Editor'.
+            if_app.load(
+                self._on_load_scene_param,
+                inputs=None,
+                outputs=editor_outputs,
+            ).then(
+                fn=None,
+                inputs=None,
+                outputs=None,
+                js="""
+                () => {
+                    const scene = new URLSearchParams(window.location.search).get('scene');
+                    if (!scene) return;
+                    const tabBtns = document.querySelectorAll('button[role="tab"]');
+                    for (let i = 0; i < tabBtns.length; i++) {
+                        const t = tabBtns[i];
+                        if (t.textContent && t.textContent.trim() === 'Scene Editor') {
+                            t.click();
+                            break;
+                        }
+                    }
+                }
+                """,
+            )
+
         return if_app
 
     def _set_names(self) -> list[str]:
@@ -2044,6 +2078,31 @@ class AIDBSceneApp:
                 torch.cuda.ipc_collect()
         except Exception:
             pass
+
+    def _on_load_scene_param(
+        self, request: gr.Request
+    ) -> tuple[Any, Any, Any, Any]:
+        """
+        Blocks `.load` deep-link handler. If the page was opened as
+        `/?scene=<id>` (a Scene Search thumbnail's new-tab link, or a pasted
+        URL), render the Scene Editor pre-loaded with that scene. Otherwise
+        leave every editor output unchanged (normal search-first view). The
+        accompanying JS `.then` selects the 'Scene Editor' tab when the param
+        is present.
+
+        Runs once per session (== once per browser tab), so opening several
+        `/?scene=<id>` tabs yields several independent editors.
+        """
+        scene_id: Optional[str] = None
+        if request is not None:
+            try:
+                scene_id = request.query_params.get('scene')
+            except Exception:
+                scene_id = None
+        if not scene_id:
+            # No deep-link: don't disturb the default search-first view.
+            return gr.update(), gr.update(), gr.update(), gr.update()
+        return self._html_simg_editor_open(scene_id)
 
     def _html_simg_editor_open(
         self, scene_id: Optional[str]

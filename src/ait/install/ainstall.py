@@ -467,12 +467,18 @@ class AInstaller:
 
         target_dir = Path(item['target_dir'])
 
+        # read-only HF token (env), needed for private/gated repos; None is fine for public
+        hf_token = os.environ.get('HF_TOKEN') or None
+
         if not file:
             # use snaphot download
             print(f'ignore_patterns: {ignore_patterns}')
             link = Path(
                 snapshot_download(
-                    repo_id=repo_id, repo_type=repo_type, ignore_patterns=ignore_patterns
+                    repo_id=repo_id,
+                    repo_type=repo_type,
+                    ignore_patterns=ignore_patterns,
+                    token=hf_token,
                 )
             )
             if action == 'link_safetensors':
@@ -486,7 +492,7 @@ class AInstaller:
 
         else:
             # use hf download
-            link = hf_hub_download(repo_id=repo_id, filename=file)
+            link = hf_hub_download(repo_id=repo_id, filename=file, token=hf_token)
             src = Path(link)
 
             if action != 'no_link':
@@ -590,6 +596,32 @@ class AInstaller:
             item['config'] = config | {'link': link}
         return self._install_item_civitai(item)
 
+    @staticmethod
+    def _filename_from_cd(cd: str | None) -> str:
+        # parse a Content-Disposition value -> filename, or '' if none present
+        if not cd or 'filename=' not in cd:
+            return ''
+        return unquote(cd.split('filename=', 1)[1].strip().strip('"'))
+
+    def _filename_from_redirect(self, redirect_url: str | None, response) -> str:
+        # Determine the download filename from a civitai(.red) 3xx redirect. Sources,
+        # in order: the pre-redirect Content-Disposition header; the redirect URL's
+        # content-disposition query param (civitai.com uses 'response-content-disposition',
+        # the civitai.red / Backblaze-B2 mirror uses 'b2ContentDisposition'); finally the
+        # basename of the redirect URL path. Returns '' if nothing usable is found.
+        fn = self._filename_from_cd(response.getheader('Content-Disposition'))
+        if fn:
+            return fn
+        if not redirect_url:
+            return ''
+        parsed = urlparse(redirect_url)
+        query = parse_qs(parsed.query)
+        for key in ('response-content-disposition', 'b2ContentDisposition'):
+            fn = self._filename_from_cd(query.get(key, [None])[0])
+            if fn:
+                return fn
+        return Path(unquote(parsed.path)).name
+
     def _install_item_civitai(self, item: dict) -> dict:
         url = item['config'].get('link', '')
         if not url:
@@ -623,19 +655,20 @@ class AInstaller:
         if response.status in [301, 302, 303, 307, 308]:
             redirect_url = response.getheader('Location')
 
-            # Extract filename from the redirect URL
-            parsed_url = urlparse(redirect_url)
-            query_params = parse_qs(parsed_url.query)
-            content_disposition = query_params.get('response-content-disposition', [None])[0]
+            filename_cai = self._filename_from_redirect(redirect_url, response)
+            if not filename_cai:
+                # last resort: name the cache file after the configured rename
+                rename = item['config'].get('rename', '')
+                if rename:
+                    filename_cai = f'{rename}.safetensors'
+                else:
+                    raise Exception('Unable to determine filename')
 
-            print(content_disposition)
-
-            if content_disposition:
-                filename_cai = unquote(content_disposition.split('filename=')[1].strip('"'))
-            else:
-                raise Exception('Unable to determine filename')
-
-            response = urllib.request.urlopen(redirect_url)
+            # The signed CDN URL (Backblaze B2) carries its own auth in the query
+            # string, but Cloudflare 403s a bare urllib User-Agent, so send a browser one.
+            response = urllib.request.urlopen(
+                urllib.request.Request(redirect_url, headers={'User-Agent': self.USER_AGENT})
+            )
         elif response.status == 404:
             raise Exception('File not found')
         else:

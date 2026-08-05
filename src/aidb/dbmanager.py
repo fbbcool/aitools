@@ -1,3 +1,4 @@
+import sys
 import json
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -1078,4 +1079,4 @@ class DBManager:
 
     def _log(self, msg: str, level: str = 'message') -> None:
         if self._verbose > 0:
-            print(f'[dbm:{level}] {msg}')
+            print(f'[dbm:{level}] {msg}', file=sys.stderr)

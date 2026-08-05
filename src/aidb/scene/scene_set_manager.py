@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Generator, Optional
+import sys
 import json
 
 from bson import ObjectId
@@ -167,4 +168,4 @@ class SceneSetManager:
 
     def _log(self, msg: str, level: str = 'warning') -> None:
         if self._verbose > 0:
-            print(f'[ssm:{level}] {msg}')
+            print(f'[ssm:{level}] {msg}', file=sys.stderr)

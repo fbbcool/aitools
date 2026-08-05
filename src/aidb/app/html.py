@@ -273,6 +273,14 @@ class AppHtml:
                 padding: 5px;
                 cursor: pointer; /* Indicate clickable only on image itself */
             }}
+            /* Scene thumbnails are real anchors opening the Scene Editor in a
+               new tab; keep the anchor transparent to layout/styling so only
+               the wrapped <img> is the visible, clickable target. */
+            .scene-cell-link {{
+                display: block;
+                text-decoration: none;
+                color: inherit;
+            }}
             .image-item-warning {{
                 border: 1px solid #ddd;
                 border-radius: 8px;

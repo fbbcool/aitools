@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 import pprint
 from typing import Any, Generator
 
@@ -156,6 +157,38 @@ class Scene:
     def url_from_data(self) -> Path:
         return Path(self._data.get(SceneDef.FIELD_URL, ''))
 
+    @property
+    def img_display(self) -> SceneImage | None:
+        """The registered image the scene app displays for this scene, or None.
+
+        Selection: registered images reduced to the highest rating, newest
+        ``updated`` first. Returns None when the scene has no registered images
+        (the app then falls back to the newest render on disk — see
+        `url_display`). Read-only, deterministic. Single source of truth shared
+        with `_update_thumbnail`, so it can never diverge from the grid.
+        """
+        imgs = SceneDef.sort_by_timestamp_updated(
+            SceneDef.reduce_by_rating_highest(self.imgs)
+        )
+        return imgs[0] if imgs else None
+
+    @property
+    def url_display(self) -> Path | None:
+        """The single image url the scene app displays for this scene.
+
+        Matches the source of the grid thumbnail (see `_update_thumbnail`):
+          1. `img_display` (highest-rated registered image, newest updated), else
+          2. the newest render file in the scene folder.
+        This is the full-resolution image the thumbnail is generated from — the
+        image to read/replicate, not the downsized thumbnail. Returns None only
+        for a scene with neither registered images nor renders on disk.
+        Read-only, deterministic w.r.t. DB + folder state.
+        """
+        img = self.img_display
+        if img is not None:
+            return img.url_from_data
+        return img_latest_from_url(self.url)
+
     def _url_sync(self) -> bool:
         """
         If scene was successfully instanciated from a specific url, this url
@@ -210,11 +243,11 @@ class Scene:
         """
         url_latest: Path | None = None
         ts_latest = 0.0
-        # 1. reg imgs
-        imgs = SceneDef.sort_by_timestamp_updated(SceneDef.reduce_by_rating_highest(self.imgs))
-        if imgs:
-            url_latest = imgs[0].url_from_data
-            ts_latest = SceneDef.get_timestamp_update_from_data(imgs[0])
+        # 1. reg imgs (shares the selection with `img_display`/`url_display`)
+        img = self.img_display
+        if img is not None:
+            url_latest = img.url_from_data
+            ts_latest = SceneDef.get_timestamp_update_from_data(img)
 
         # 2. non-reg imgs
         if url_latest is None:
@@ -334,4 +367,4 @@ class Scene:
         return ret
 
     def _log(self, msg: str, level: str = 'info') -> None:
-        print(f'[scene id({self.id}):{level}] {msg}')
+        print(f'[scene id({self.id}):{level}] {msg}', file=sys.stderr)

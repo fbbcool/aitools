@@ -37,7 +37,15 @@ class AppSceneCell:
                 f'Warning: No thumbnail available for image ID: {obj.id}. Displaying empty image.'
             )
 
-        onclick_js = AppSceneCell._html_thumb_onclick_js(obj.id)
+        # Deep-link: the thumbnail is a real anchor opening the Scene Editor
+        # for this scene in a NEW browser tab (target="_blank"), via the
+        # `?scene=<id>` query param handled by the Blocks `.load` deep-link
+        # handler. The href is relative to the current page URL (`?scene=`
+        # replaces only the query string), so it survives proxies / sub-paths
+        # / share links without hardcoding the origin. Replaces the former
+        # in-page hidden-button + databus bridge, so the Scene Search tab
+        # keeps its filters/results and several editors can be open at once.
+        href = f'?scene={html_lib.escape(obj.id, quote=True)}'
         extras_html = ''
         if extras_below_image:
             extras_html = (
@@ -52,7 +60,9 @@ class AppSceneCell:
         return f"""
         <div class="{cell_classes}" id="cell-scene-{obj.id}">
             <div class="scene-cell-top">
-                <img src="data:image/png;base64,{grid_img_base64}" onclick="{onclick_js}">
+                <a class="scene-cell-link" href="{href}" target="_blank" rel="noopener">
+                    <img src="data:image/png;base64,{grid_img_base64}">
+                </a>
                 {extras_html}
             </div>
             <div class="image-controls">
@@ -60,39 +70,6 @@ class AppSceneCell:
             </div>
         </div>
         """
-
-    @staticmethod
-    def _html_thumb_onclick_js(scene_id: str) -> str:
-        """
-        JS run when a scene thumbnail is clicked: writes the scene id into the
-        SceneImage editor databus, fires the hidden trigger button (which makes
-        the backend render the editor cells), and switches to the editor tab.
-        """
-        elem_id_btn = AppHtml.elem_id_simg_editor_open_button()
-        elem_id_bus = AppHtml.elem_id_simg_editor_databus()
-        # Use single-quoted JS strings so we don't have to escape double quotes
-        # for the surrounding HTML attribute. Newlines get squashed at the end.
-        js = f"""
-        event.stopPropagation();
-        const bus = document.querySelector('#{elem_id_bus} textarea');
-        if (bus) {{
-            bus.value = '{scene_id}';
-            bus.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        }}
-        const btn = document.getElementById('{elem_id_btn}');
-        if (btn) {{ btn.click(); }}
-        const tabBtns = document.querySelectorAll('button[role=&quot;tab&quot;]');
-        for (let i = 0; i < tabBtns.length; i++) {{
-            const t = tabBtns[i];
-            if (t.textContent) {{
-                if (t.textContent.trim() === 'Scene Editor') {{
-                    t.click();
-                    break;
-                }}
-            }}
-        }}
-        """.replace('\n', ' ').replace('"', '&quot;')
-        return js
 
     @staticmethod
     def html_operation(

@@ -1,4 +1,5 @@
 from typing import Optional, Any
+import sys
 import json
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -370,4 +371,4 @@ class DBConnection:
 
     def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:
-            print(f'[dbc:{level}] {msg}')
+            print(f'[dbc:{level}] {msg}', file=sys.stderr)

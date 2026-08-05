@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 import pprint
 from typing import Any, Optional
 from PIL import Image as PILImage
@@ -388,4 +389,4 @@ class SceneImage:
 
     def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:
-            print(f'[simg:{level}] {msg}')
+            print(f'[simg:{level}] {msg}', file=sys.stderr)

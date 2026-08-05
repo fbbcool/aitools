@@ -3,6 +3,7 @@ scipy
 pandas
 pillow
 huggingface_hub
+hf_transfer
 tqdm
 gradio
 pymongo

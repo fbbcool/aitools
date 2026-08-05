@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Generator, Optional
+import sys
 import json
 
 from .db_connect import DBConnection
@@ -243,4 +244,4 @@ class SceneImageManager:
 
     def _log(self, msg: str, level: str = 'info') -> None:
         if self._verbose > 0:
-            print(f'[im:{level}] {msg}')
+            print(f'[im:{level}] {msg}', file=sys.stderr)
