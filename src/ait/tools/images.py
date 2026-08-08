@@ -10,6 +10,8 @@ RESOLUTIONS: Final = [512, 768, 1024]
 RATIOS: Final = [1.0, 3.0 / 4.0, 2.0 / 3.0]
 THRESHOLD_RATIO_SQUARE: Final = 0.25
 
+METADATA_SCHEMA: Final = 'ait.image.metadata.v1'
+
 
 def image_from_url(url: str | Path, verbose: bool = False) -> PILImage.Image | None:
     url = Path(url)
@@ -37,10 +39,122 @@ def image_from_url(url: str | Path, verbose: bool = False) -> PILImage.Image | N
         return None
 
 
+def metadata(url: Path | str) -> dict | None:
+    """Single schematized entry point for image-embedded metadata.
+
+    Opens the image once and returns the `ait.image.metadata.v1` dict; the
+    caller never branches on pipeline (krea2/qwen/wan), enhancer payload
+    version (v3/v4) or partial embeds. Missing/unopenable file -> None
+    (consistent with `image_info_from_url`); never raises on malformed or
+    partial metadata — every key is always present, `None`/`[]` when a piece
+    is not extractable.
+
+    Schema (`schema` == `METADATA_SCHEMA`):
+        {
+          'schema': 'ait.image.metadata.v1',
+          'url': str,                       # the path given
+          'image': {'width': int, 'height': int, 'size': int,   # size = w*h
+                    'timestamp_created': float},
+          'comfy': {'prompt_graph': dict | None,   # raw parsed ComfyUI chunks
+                    'workflow': dict | None},
+          'enhancer': dict | None,          # raw 1xlasm-enhancer iteration
+                                            # payload (v3 or v4), schema_id-gated
+          'generation': {
+              'prompt': str | None,         # identified positive prompt
+              'prompt_index': int | None,   # v4 rendered entry (prompt_index,
+                                            # else prompts.current); v3/plain None
+              'prompt_offset': int | None,  # prompt_index - prompts.current,
+                                            # when both are known
+          },
+          'loras': [{'name': str, 'strength': float, 'source': str}, ...],
+          'seed': int | None,
+        }
+    """
+    url = Path(url)
+    pil = image_from_url(url)
+    if pil is None:
+        return None
+    try:
+        pil.load()
+    except Exception:
+        return None
+    return _metadata_from_pil(url, pil)
+
+
+def _metadata_from_pil(url: Path, pil: PILImage.Image) -> dict:
+    """Core of `metadata()`: build the v1 schema dict from an opened image.
+    Shared with the `image_info_from_url` adapter so the file is opened once."""
+    info_ext = pil.info or {}
+
+    prompt_graph = _parse_json_chunk(info_ext.get('prompt'))
+    workflow = _parse_json_chunk(info_ext.get('workflow'))
+
+    enhancer = _enhancer_payload_from_graph(prompt_graph) if prompt_graph else None
+
+    prompt: str | None = None
+    try:
+        prompt = _image_extract_prompt_from_info_ext(info_ext, verbose=False)
+    except Exception:
+        pass
+
+    prompt_index: int | None = None
+    prompt_offset: int | None = None
+    if enhancer is not None:
+        _, prompt_index = _iteration_prompt_and_index(enhancer)
+        prompts = enhancer.get('prompts')
+        current = prompts.get('current') if isinstance(prompts, dict) else None
+        if isinstance(prompt_index, int) and isinstance(current, int):
+            prompt_offset = prompt_index - current
+
+    seed: int | None = None
+    loras: list[dict] = []
+    try:
+        loras_info = _image_extract_loras_from_info_ext(info_ext)
+    except Exception:
+        loras_info = None
+    if loras_info is not None:
+        seed = loras_info['seed']
+        loras = loras_info['loras']
+
+    return {
+        'schema': METADATA_SCHEMA,
+        'url': str(url),
+        'image': {
+            'width': pil.width,
+            'height': pil.height,
+            'size': pil.width * pil.height,
+            'timestamp_created': url.stat().st_ctime,
+        },
+        'comfy': {'prompt_graph': prompt_graph, 'workflow': workflow},
+        'enhancer': enhancer,
+        'generation': {
+            'prompt': prompt,
+            'prompt_index': prompt_index,
+            'prompt_offset': prompt_offset,
+        },
+        'loras': loras,
+        'seed': seed,
+    }
+
+
+def _parse_json_chunk(chunk) -> dict | None:
+    """Parse a PNG text chunk into a dict; None for absent/invalid/non-dict."""
+    if isinstance(chunk, dict):
+        return chunk
+    if not isinstance(chunk, str):
+        return None
+    try:
+        parsed = json.loads(chunk)
+    except (ValueError, TypeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 def image_info_from_url(url: Path | str, include_info_ext: bool = False) -> dict | None:
     """
     Creates an info struct if image exists, otherwise returns None.
 
+    Thin adapter over `metadata()` (same extraction, legacy flat key layout).
     The given url is stored in ['url_src'].
     """
     url = Path(url)
@@ -48,30 +162,24 @@ def image_info_from_url(url: Path | str, include_info_ext: bool = False) -> dict
     if pil is None:
         return None
     pil.load()
+    md = _metadata_from_pil(url, pil)
 
-    info = {'url_src': str(url)}
-
-    # timestamps
-    # get creation time
-    info |= {'timestamp_created': url.stat().st_ctime}
-    # set data ts to current time
-    # DISABLED: oid stores db creation time!
-    # info |= {'timestamp_data': time.time()}
-
-    # size
-    info |= {'width': pil.width}
-    info |= {'height': pil.height}
-    info |= {'size': pil.width * pil.height}
+    info = {
+        'url_src': md['url'],
+        'timestamp_created': md['image']['timestamp_created'],
+        'width': md['image']['width'],
+        'height': md['image']['height'],
+        'size': md['image']['size'],
+    }
 
     # prompt
-    prompt = _image_extract_prompt_from_info_ext(pil.info, verbose=False)
-    if prompt is not None:
-        info |= {'prompt': prompt}
+    if md['generation']['prompt'] is not None:
+        info |= {'prompt': md['generation']['prompt']}
 
-    # loras + seed (Power Lora Loader rgthree slots only)
-    loras_info = _image_extract_loras_from_info_ext(pil.info)
-    if loras_info is not None:
-        info |= {'seed': loras_info['seed'], 'loras': loras_info['loras']}
+    # loras + seed (Power Lora Loader rgthree slots only); keys present exactly
+    # when the ComfyUI prompt chunk was present and parseable, as before
+    if md['comfy']['prompt_graph'] is not None:
+        info |= {'seed': md['seed'], 'loras': md['loras']}
 
     # info_ext
     if include_info_ext:
@@ -122,8 +230,9 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
     # runtime output of `FbbcoolEnhancerClient`, fed from a `FbbcoolClipspace`
     # node that persists the full iteration payload in its `is_changed` field.
     # The graph walk dead-ends on that dynamic node, but the resolved prompt is
-    # embedded in that payload's `prompt` key. Recover it, gated on the
-    # iteration schema_id so we never pick up an unrelated embedded JSON.
+    # embedded in that payload (v3 flat `prompt`, or v4 structured
+    # `prompts.prompt_data[]`). Recover it, gated on the iteration schema_id so
+    # we never pick up an unrelated embedded JSON.
     iteration = _prompt_from_enhancer_iteration(data, verbose)
     if iteration:
         return iteration
@@ -139,13 +248,62 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
 _ENHANCER_ITERATION_SCHEMA_PREFIX = '1xlasm_enhancer.iteration'
 
 
-def _prompt_from_enhancer_iteration(data: dict, verbose=False) -> str | None:
-    """Recover the positive prompt from an embedded 1xlasm-enhancer iteration
-    payload. Fbbcool enhancer graphs feed `CLIPTextEncode.text` from a runtime
-    `FbbcoolEnhancerClient` output, but the `FbbcoolClipspace` source node keeps
-    the whole iteration JSON in its `is_changed` field. Scan every node for such
-    a blob (in `is_changed` entries or string inputs), gated on the iteration
-    `schema_id`, and return its `prompt`."""
+def _prompt_from_iteration_payload(payload: dict) -> str | None:
+    """Resolve the generation prompt from a 1xlasm-enhancer iteration payload,
+    v3 or v4.
+
+    v4 (`schema_id` == `1xlasm_enhancer.iteration.v4`): all flat prompt fields
+    are retired; the prompt lives in the structured `prompts.prompt_data[]`
+    list. The rendered entry is `prompt_index` (a top-level field the render
+    pipeline stamps with the index actually generated) when present, else
+    `prompts.current` (the enhancer's now-scene pointer, for offset-unaware
+    embeds). `prompt_index`-with-`current`-fallback is the attribution contract
+    agreed on board FEATURE REQ #23; each index is bounds-checked.
+
+    v3 (legacy): the flat `prompt` field.
+
+    Returns the prompt string, or None when neither shape yields text."""
+    return _iteration_prompt_and_index(payload)[0]
+
+
+def _iteration_prompt_and_index(payload: dict) -> tuple[str | None, int | None]:
+    """Resolve (prompt, index) from an iteration payload. The index is the
+    `prompt_data` entry the prompt came from (v4 only); v3 flat-field prompts
+    and unresolvable payloads yield index None."""
+    prompts = payload.get('prompts')
+    if isinstance(prompts, dict):
+        prompt_data = prompts.get('prompt_data')
+        if isinstance(prompt_data, list) and prompt_data:
+            # Ordered candidate indices per the #23 contract: the render-stamped
+            # `prompt_index` first, then the enhancer's `current`; each is
+            # bounds-checked so a malformed pointer falls through instead of
+            # raising or returning the wrong entry.
+            candidates = [
+                i
+                for i in (payload.get('prompt_index'), prompts.get('current'))
+                if isinstance(i, int)
+            ]
+            for i in candidates:
+                if 0 <= i < len(prompt_data):
+                    entry = prompt_data[i]
+                    if isinstance(entry, dict):
+                        prompt = entry.get('prompt')
+                        if isinstance(prompt, str) and prompt:
+                            return prompt, i
+    # v3 legacy flat field.
+    prompt = payload.get('prompt')
+    if isinstance(prompt, str) and prompt:
+        return prompt, None
+    return None, None
+
+
+def _enhancer_payload_from_graph(data: dict) -> dict | None:
+    """Find the raw 1xlasm-enhancer iteration payload (v3 or v4) embedded in a
+    ComfyUI API graph. The `FbbcoolClipspace` source node keeps the whole
+    iteration JSON in its `is_changed` field; older/string-input embeds carry
+    it in a node string input. Scan every node for such a blob, gated on the
+    iteration `schema_id` so an unrelated embedded JSON is never picked up.
+    Returns the parsed payload dict, or None."""
     for node in data.values():
         if not isinstance(node, dict):
             continue
@@ -166,15 +324,25 @@ def _prompt_from_enhancer_iteration(data: dict, verbose=False) -> str | None:
             if not isinstance(payload, dict):
                 continue
             schema_id = payload.get('schema_id', '')
-            if not (isinstance(schema_id, str)
-                    and schema_id.startswith(_ENHANCER_ITERATION_SCHEMA_PREFIX)):
-                continue
-            prompt = payload.get('prompt')
-            if isinstance(prompt, str) and prompt:
-                if verbose:
-                    print(f'enhancer-iteration prompt recovered (schema {schema_id})')
-                return prompt
+            if isinstance(schema_id, str) and schema_id.startswith(
+                _ENHANCER_ITERATION_SCHEMA_PREFIX
+            ):
+                return payload
     return None
+
+
+def _prompt_from_enhancer_iteration(data: dict, verbose=False) -> str | None:
+    """Recover the positive prompt from an embedded 1xlasm-enhancer iteration
+    payload (see `_enhancer_payload_from_graph` for where it is embedded) and
+    resolve its prompt (v3 flat field or v4 structured `prompts.prompt_data[]`;
+    see `_prompt_from_iteration_payload`)."""
+    payload = _enhancer_payload_from_graph(data)
+    if payload is None:
+        return None
+    prompt = _prompt_from_iteration_payload(payload)
+    if prompt and verbose:
+        print(f'enhancer-iteration prompt recovered (schema {payload.get("schema_id")})')
+    return prompt
 
 
 def _walk_positive_to_text(data: dict, verbose=False) -> tuple[str | None, list[str]]:
