@@ -65,13 +65,19 @@ def metadata(url: Path | str) -> dict | None:
                     'workflow': dict | None},
           'enhancer': dict | None,          # raw 1xlasm-enhancer iteration
                                             # payload (v3 or v4), schema_id-gated;
-                                            # authoritative copy across both
-                                            # chunks — a prompt_index-bearing
-                                            # copy wins over an index-less one
+                                            # own copy = API prompt-graph embed
+                                            # (queue-time input, this run's
+                                            # truth); a parent-envelope copy
+                                            # bearing the execution-time
+                                            # `prompt_index` supersedes an
+                                            # index-less own copy (#30)
           'generation': {
               'prompt': str | None,         # identified positive prompt
-              'prompt_index': int | None,   # v4 rendered entry (prompt_index,
-                                            # else prompts.current); v3/plain None
+              'prompt_index': int | None,   # v4 rendered entry: stamped
+                                            # prompt_index, else current +
+                                            # queue-time `prompt_offset` graph
+                                            # input, else prompts.current;
+                                            # v3/plain None
               'prompt_offset': int | None,  # prompt_index - prompts.current,
                                             # when both are known
           },
@@ -86,14 +92,28 @@ def metadata(url: Path | str) -> dict | None:
                                             # everything is first-hand
         }
 
-    Inheritance: when the image's own chunks don't yield a field but a
-    `parent` envelope is present, the field is recovered from the parent —
-    a round-tripped `ait.image.metadata.v1` dict contributes `enhancer`,
-    `generation`, `seed` and `loras`; any other envelope shape (enhancer
-    client envelope, scenes `input_data`, raw wrap) contributes an embedded
-    iteration payload found by schema_id, from which `generation` is
-    resolved. Own data always wins; inherited fields are listed in
-    `inherited`; the `parent` envelope itself stays verbatim.
+    Trust (board ISSUE #30): "own data" means the API prompt-graph chunk —
+    queue-time inputs (FbbcoolClipspace `is_changed`, node string inputs)
+    are this run's values. Workflow-chunk display-widget copies (rgthree
+    Display nodes: the enhancer-json envelope, the 'string pos' marker) are
+    serialized one run STALE by construction and are never used on
+    payload-bearing renders — neither for attribution nor for the prompt
+    text; display caches only serve renders without any payload.
+
+    Inheritance: when the image's own trustworthy chunks don't yield a field
+    but a `parent` envelope is present, the field is recovered from the
+    parent — a round-tripped `ait.image.metadata.v1` dict contributes
+    `enhancer`, `generation`, `seed` and `loras` (the parent image's account,
+    gap-fill only); any other envelope shape (enhancer client envelope,
+    scenes `input_data`, raw wrap) is written at execution time of THIS
+    render, so its embedded iteration payload both fills a missing payload
+    and supersedes an index-less own copy with the truly rendered
+    `prompt_index`. Stored-mode renders (clipspace input = source-image PATH,
+    no embedded payload at all) recover the payload by following that
+    queue-time reference through the source chain to the first file that
+    embeds it, with this render's `prompt_offset` applied. Own trustworthy
+    data always wins; inherited fields are listed in `inherited`; the
+    `parent` envelope itself stays verbatim.
     """
     url = Path(url)
     pil = image_from_url(url)
@@ -114,17 +134,100 @@ def _metadata_from_pil(url: Path, pil: PILImage.Image) -> dict:
     prompt_graph = _parse_json_chunk(info_ext.get('prompt'))
     workflow = _parse_json_chunk(info_ext.get('workflow'))
 
-    # Authoritative payload copy across BOTH ComfyUI chunks (board ISSUE in
-    # #23's reopen: real renders can carry the raw index-less clipspace copy in
-    # the prompt graph while the prompt_index-bearing envelope sits only in the
-    # workflow chunk).
-    enhancer = _select_enhancer_payload(prompt_graph, workflow)
+    # Own trustworthy payload copy: the API prompt graph ONLY. Queue-time
+    # inputs (FbbcoolClipspace `is_changed`, node string inputs) are this run's
+    # values; workflow-chunk display-widget copies show the PREVIOUS run when
+    # the graph is serialized and never count as own attribution (board #30).
+    enhancer = _enhancer_payload_from_graph(prompt_graph) if prompt_graph else None
 
+    # Rendered-index attribution from own data: a stamped `prompt_index` on the
+    # payload wins; otherwise derive it from the enhancer client's queue-time
+    # `prompt_offset` INPUT (also this run's truth) + the payload's `current`.
+    own_index = _rendered_index_from_graph(enhancer, prompt_graph) if enhancer else None
+
+    parent = _parse_json_chunk(info_ext.get(PARENT_METADATA_CHUNK))
+    # Round-tripped metadata() dict (SmartInput `metadata` output) — its fields
+    # describe the PARENT's generation: gap-fill only, never an override.
+    pmd = parent if parent and parent.get('schema') == METADATA_SCHEMA else None
+    # Any other envelope shape (enhancer-client envelope, scenes `input_data`,
+    # raw wrap) was written at execution time of THIS render by the preview
+    # node — an embedded payload there carries the truly rendered
+    # `prompt_index`.
+    parent_payload: dict | None = None
+    if parent is not None and pmd is None:
+        try:
+            parent_payload = _iteration_payload_from_obj(parent)
+        except Exception:
+            parent_payload = None
+
+    inherited: list[str] = []
+    if enhancer is None:
+        cand = parent_payload
+        if cand is None and pmd:
+            c = pmd.get('enhancer')
+            cand = c if isinstance(c, dict) else _iteration_payload_from_obj(pmd)
+        if cand is None and prompt_graph:
+            # Stored-mode renders: the clipspace input is the SOURCE IMAGE
+            # PATH (queue-time), the payload only lives at the root of that
+            # source chain. This run's `prompt_offset` applies to it.
+            cand = _enhancer_payload_from_source_chain(prompt_graph)
+            if cand is not None:
+                own_index = _rendered_index_from_graph(cand, prompt_graph)
+        if cand is not None:
+            enhancer = cand
+            inherited.append('enhancer')
+    elif (
+        parent_payload is not None
+        and own_index is None
+        and isinstance(parent_payload.get('prompt_index'), int)
+    ):
+        # Own copy is a raw clipspace payload with no resolvable index; the
+        # parent envelope is the execution-time stamped account of the same
+        # run — it wins (#30).
+        enhancer = parent_payload
+        inherited.append('enhancer')
+
+    # Generation attribution AND prompt from the final payload — own or
+    # inherited (board #29/#30). On payload-governed renders the payload is the
+    # only trustworthy prompt source: display caches ('string pos' included)
+    # are one run stale, so they must not outrank it.
     prompt: str | None = None
+    prompt_index: int | None = None
+    prompt_offset: int | None = None
     try:
-        prompt = _image_extract_prompt_from_info_ext(info_ext, verbose=False)
+        if enhancer is not None:
+            # own_index is only ever set for queue-time-anchored payloads
+            # (own graph copy or source-chain root + this run's offset).
+            prompt, prompt_index = _iteration_prompt_and_index(enhancer, own_index)
+            prompts = enhancer.get('prompts')
+            current = prompts.get('current') if isinstance(prompts, dict) else None
+            if isinstance(prompt_index, int) and isinstance(current, int):
+                prompt_offset = prompt_index - current
+            if 'enhancer' in inherited and (prompt_index is not None or prompt is not None):
+                inherited.append('generation')
     except Exception:
         pass
+
+    if prompt is None:
+        # Renders without a resolvable payload: legacy graph paths — named
+        # display marker, positive walk, display-cache fallback.
+        try:
+            prompt = _image_extract_prompt_from_info_ext(info_ext, verbose=False)
+        except Exception:
+            pass
+
+    if prompt is None and pmd:
+        try:
+            pgen = pmd.get('generation')
+            if isinstance(pgen, dict) and isinstance(pgen.get('prompt'), str) and pgen['prompt']:
+                prompt = pgen['prompt']
+                pi, po = pgen.get('prompt_index'), pgen.get('prompt_offset')
+                prompt_index = pi if isinstance(pi, int) else None
+                prompt_offset = po if isinstance(po, int) else None
+                if 'generation' not in inherited:
+                    inherited.append('generation')
+        except Exception:
+            pass
 
     seed: int | None = None
     loras: list[dict] = []
@@ -135,63 +238,17 @@ def _metadata_from_pil(url: Path, pil: PILImage.Image) -> dict:
     if loras_info is not None:
         seed = loras_info['seed']
         loras = loras_info['loras']
-
-    parent = _parse_json_chunk(info_ext.get(PARENT_METADATA_CHUNK))
-    # Round-tripped metadata() dict (SmartInput `metadata` output) — its fields
-    # describe the parent's generation and are the best available account of
-    # what this derived render came from.
-    pmd = parent if parent and parent.get('schema') == METADATA_SCHEMA else None
-    inherited: list[str] = []
-    if parent is not None:
+    if pmd:
         try:
-            if enhancer is None:
-                cand = pmd.get('enhancer') if pmd else None
-                if not isinstance(cand, dict):
-                    cand = _iteration_payload_from_obj(parent)
-                if isinstance(cand, dict):
-                    enhancer = cand
-                    inherited.append('enhancer')
-
-            if pmd:
-                if seed is None and isinstance(pmd.get('seed'), int):
-                    seed = pmd['seed']
-                    inherited.append('seed')
-                if not loras and isinstance(pmd.get('loras'), list):
-                    loras = [lora for lora in pmd['loras'] if isinstance(lora, dict)]
-                    if loras:
-                        inherited.append('loras')
+            if seed is None and isinstance(pmd.get('seed'), int):
+                seed = pmd['seed']
+                inherited.append('seed')
+            if not loras and isinstance(pmd.get('loras'), list):
+                loras = [lora for lora in pmd['loras'] if isinstance(lora, dict)]
+                if loras:
+                    inherited.append('loras')
         except Exception:
             pass
-
-    # Unified generation attribution (board ISSUE #29): derive index/offset
-    # from the FINAL payload — own or inherited — regardless of which path
-    # produced the prompt text, so an inherited payload always yields
-    # attribution even when the image's own chunks resolved the prompt.
-    prompt_index: int | None = None
-    prompt_offset: int | None = None
-    try:
-        if enhancer is not None:
-            payload_prompt, prompt_index = _iteration_prompt_and_index(enhancer)
-            prompts = enhancer.get('prompts')
-            current = prompts.get('current') if isinstance(prompts, dict) else None
-            if isinstance(prompt_index, int) and isinstance(current, int):
-                prompt_offset = prompt_index - current
-            prompt_from_payload = prompt is None and payload_prompt is not None
-            if prompt_from_payload:
-                prompt = payload_prompt
-            if 'enhancer' in inherited and (prompt_index is not None or prompt_from_payload):
-                inherited.append('generation')
-        if prompt is None and pmd:
-            pgen = pmd.get('generation')
-            if isinstance(pgen, dict) and isinstance(pgen.get('prompt'), str) and pgen['prompt']:
-                prompt = pgen['prompt']
-                pi, po = pgen.get('prompt_index'), pgen.get('prompt_offset')
-                prompt_index = pi if isinstance(pi, int) else None
-                prompt_offset = po if isinstance(po, int) else None
-                if 'generation' not in inherited:
-                    inherited.append('generation')
-    except Exception:
-        pass
 
     return {
         'schema': METADATA_SCHEMA,
@@ -214,49 +271,6 @@ def _metadata_from_pil(url: Path, pil: PILImage.Image) -> dict:
         'parent': parent,
         'inherited': inherited,
     }
-
-
-def _select_enhancer_payload(prompt_graph: dict | None, workflow: dict | None) -> dict | None:
-    """Collect every copy of the 1xlasm-enhancer iteration payload embedded in
-    the two ComfyUI chunks and select the authoritative one. Real renders can
-    carry several copies with different attribution: the API prompt graph holds
-    the raw clipspace payload (no `prompt_index`), while the metadata-enhancer
-    Display node in the UI workflow chunk holds the enhancer-client envelope
-    whose nested payload carries the render-stamped top-level `prompt_index`.
-    A `prompt_index`-bearing copy always wins over an index-less one (#23)."""
-    candidates: list[dict] = []
-    if prompt_graph:
-        found = _enhancer_payload_from_graph(prompt_graph)
-        if found is not None:
-            candidates.append(found)
-    if workflow:
-        candidates += _enhancer_payloads_from_workflow(workflow)
-    for payload in candidates:
-        if isinstance(payload.get('prompt_index'), int):
-            return payload
-    return candidates[0] if candidates else None
-
-
-def _enhancer_payloads_from_workflow(workflow: dict) -> list[dict]:
-    """Iteration payload copies embedded in the UI `workflow` chunk: the
-    fbbcool metadata-enhancer `Display Any (rgthree)` node caches the
-    enhancer-client envelope (payload nested inside) in its `widgets_values`.
-    Scan every node's widget strings, schema_id-gated."""
-    out: list[dict] = []
-    for node in workflow.get('nodes', []):
-        if not isinstance(node, dict):
-            continue
-        widgets = node.get('widgets_values') or []
-        if isinstance(widgets, dict):
-            widgets = list(widgets.values())
-        if not isinstance(widgets, list):
-            continue
-        for widget in widgets:
-            if isinstance(widget, str) and _ENHANCER_ITERATION_SCHEMA_PREFIX in widget:
-                found = _iteration_payload_from_obj(widget)
-                if found is not None:
-                    out.append(found)
-    return out
 
 
 def _iteration_payload_from_obj(obj, depth: int = 6) -> dict | None:
@@ -357,9 +371,20 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
         return None
     data = json.loads(info_prompt)
 
+    # Fbbcool enhancer renders (krea2/qwen graphs): the `FbbcoolClipspace`
+    # source node persists the full iteration payload in its `is_changed`
+    # field — a queue-time INPUT, i.e. this run's value. It outranks every
+    # display-cache path below: display widgets (the 'string pos' marker
+    # included) are serialized one run stale (board #30), so on
+    # payload-bearing renders they show the previous run's prompt.
+    iteration = _prompt_from_enhancer_iteration(info_ext, verbose)
+    if iteration:
+        return iteration
+
     # A `Display Any (rgthree)` node titled 'string pos' is an explicit,
-    # authoritative marker of the final positive prompt: when present, its
-    # cached value defines the prompt and wins over the graph walk.
+    # hand-placed marker of the final positive prompt: on payload-less
+    # renders its cached value defines the prompt and wins over the graph
+    # walk.
     named = _prompt_from_named_display(info_ext.get('workflow'), 'string pos', verbose)
     if named:
         return named
@@ -376,19 +401,6 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
     cached = _prompt_from_display_cache(data, info_ext.get('workflow'), chain, verbose)
     if cached:
         return cached
-
-    # Fbbcool enhancer renders (krea2/qwen graphs): the positive text is a
-    # runtime output of `FbbcoolEnhancerClient`, fed from a `FbbcoolClipspace`
-    # node that persists the full iteration payload in its `is_changed` field.
-    # The graph walk dead-ends on that dynamic node, but the resolved prompt is
-    # embedded in that payload (v3 flat `prompt`, or v4 structured
-    # `prompts.prompt_data[]`). Recover it from the authoritative copy across
-    # both chunks (prompt_index-bearing envelope preferred, see
-    # `_select_enhancer_payload`), gated on the iteration schema_id so we never
-    # pick up an unrelated embedded JSON.
-    iteration = _prompt_from_enhancer_iteration(info_ext, verbose)
-    if iteration:
-        return iteration
 
     if verbose:
         print('prompt is empty')
@@ -419,21 +431,26 @@ def _prompt_from_iteration_payload(payload: dict) -> str | None:
     return _iteration_prompt_and_index(payload)[0]
 
 
-def _iteration_prompt_and_index(payload: dict) -> tuple[str | None, int | None]:
+def _iteration_prompt_and_index(
+    payload: dict, index_hint: int | None = None
+) -> tuple[str | None, int | None]:
     """Resolve (prompt, index) from an iteration payload. The index is the
     `prompt_data` entry the prompt came from (v4 only); v3 flat-field prompts
-    and unresolvable payloads yield index None."""
+    and unresolvable payloads yield index None. `index_hint` is a rendered
+    index derived outside the payload (queue-time `prompt_offset` graph input
+    + `current`, board #30) — it ranks between the stamped `prompt_index` and
+    the `current` fallback."""
     prompts = payload.get('prompts')
     if isinstance(prompts, dict):
         prompt_data = prompts.get('prompt_data')
         if isinstance(prompt_data, list) and prompt_data:
             # Ordered candidate indices per the #23 contract: the render-stamped
-            # `prompt_index` first, then the enhancer's `current`; each is
-            # bounds-checked so a malformed pointer falls through instead of
-            # raising or returning the wrong entry.
+            # `prompt_index` first, then the derived hint, then the enhancer's
+            # `current`; each is bounds-checked so a malformed pointer falls
+            # through instead of raising or returning the wrong entry.
             candidates = [
                 i
-                for i in (payload.get('prompt_index'), prompts.get('current'))
+                for i in (payload.get('prompt_index'), index_hint, prompts.get('current'))
                 if isinstance(i, int)
             ]
             for i in candidates:
@@ -484,18 +501,119 @@ def _enhancer_payload_from_graph(data: dict) -> dict | None:
     return None
 
 
+def _rendered_index_from_graph(payload: dict, prompt_graph: dict | None) -> int | None:
+    """Rendered `prompt_data` index for a queue-time-anchored payload: the
+    stamped `prompt_index` when present, else the payload's `current` + the
+    enhancer client's queue-time `prompt_offset` graph input (board #30)."""
+    pi = payload.get('prompt_index')
+    if isinstance(pi, int):
+        return pi
+    offset = _prompt_offset_from_graph(prompt_graph) if prompt_graph else None
+    prompts = payload.get('prompts')
+    current = prompts.get('current') if isinstance(prompts, dict) else None
+    if isinstance(offset, int) and isinstance(current, int):
+        return current + offset
+    return None
+
+
+def _source_image_path_from_graph(data: dict) -> Path | None:
+    """The queue-time source-image reference of a stored-mode render: the
+    `FbbcoolClipspace` node's `is_changed`/input holds the PATH of the image
+    the payload was resolved from at execution time (instead of the payload
+    JSON itself). Returns the first existing image path, or None."""
+    for node in data.values():
+        if not isinstance(node, dict) or node.get('class_type') != 'FbbcoolClipspace':
+            continue
+        cands: list[str] = []
+        is_changed = node.get('is_changed')
+        if isinstance(is_changed, list):
+            cands += [c for c in is_changed if isinstance(c, str)]
+        elif isinstance(is_changed, str):
+            cands.append(is_changed)
+        cands += [v for v in (node.get('inputs') or {}).values() if isinstance(v, str)]
+        for cand in cands:
+            if _ENHANCER_ITERATION_SCHEMA_PREFIX in cand:
+                continue
+            path = Path(cand)
+            if is_img(path) and path.is_file():
+                return path
+    return None
+
+
+def _enhancer_payload_from_source_chain(data: dict, max_depth: int = 8) -> dict | None:
+    """Recover the iteration payload of a stored-mode render (board #30
+    follow-up): its own graph carries only the queue-time source-image PATH.
+    Follow that reference — transitively, since the source may itself be a
+    stored-mode render — to the first file whose own chunks embed the payload
+    (prompt-graph copy, else `parent_metadata` envelope). Depth-capped and
+    cycle-guarded; any unreadable link ends the walk (honest None)."""
+    seen: set[str] = set()
+    graph: dict | None = data
+    for _ in range(max_depth):
+        path = _source_image_path_from_graph(graph) if graph else None
+        if path is None or str(path) in seen:
+            return None
+        seen.add(str(path))
+        try:
+            pil = PILImage.open(path)
+            pil.load()
+        except Exception:
+            return None
+        info = pil.info or {}
+        graph = _parse_json_chunk(info.get('prompt'))
+        if graph:
+            payload = _enhancer_payload_from_graph(graph)
+            if payload is not None:
+                return payload
+        parent = _parse_json_chunk(info.get(PARENT_METADATA_CHUNK))
+        if parent:
+            payload = _iteration_payload_from_obj(parent)
+            if payload is not None:
+                return payload
+    return None
+
+
+def _prompt_offset_from_graph(data: dict) -> int | None:
+    """The enhancer client's `prompt_offset` INPUT from the API prompt graph —
+    a queue-time value, i.e. this run's truth (unlike display widgets, board
+    #30). Either a literal on the client node or a link to an int-primitive
+    node (e.g. `PrimitiveInt`, whose queue-time `value` input is resolved)."""
+    for node in data.values():
+        if not isinstance(node, dict) or node.get('class_type') != 'FbbcoolEnhancerClient':
+            continue
+        offset = (node.get('inputs') or {}).get('prompt_offset')
+        if isinstance(offset, int):
+            return offset
+        if isinstance(offset, list) and offset:
+            src = data.get(str(offset[0]))
+            src_inputs = src.get('inputs') if isinstance(src, dict) else None
+            if isinstance(src_inputs, dict):
+                value = src_inputs.get('value')
+                if isinstance(value, int):
+                    return value
+                int_inputs = [v for v in src_inputs.values() if isinstance(v, int)]
+                if len(int_inputs) == 1:
+                    return int_inputs[0]
+    return None
+
+
 def _prompt_from_enhancer_iteration(info_ext: dict, verbose=False) -> str | None:
-    """Recover the positive prompt from an embedded 1xlasm-enhancer iteration
-    payload: select the authoritative copy across the prompt-graph and
-    workflow chunks (see `_select_enhancer_payload`) and resolve its prompt
-    (v3 flat field or v4 structured `prompts.prompt_data[]`; see
-    `_prompt_from_iteration_payload`)."""
-    payload = _select_enhancer_payload(
-        _parse_json_chunk(info_ext.get('prompt')), _parse_json_chunk(info_ext.get('workflow'))
-    )
+    """Recover the positive prompt from the trustworthy embedded 1xlasm-enhancer
+    iteration payload: the API prompt-graph copy only (queue-time input, see
+    `_enhancer_payload_from_graph`). Workflow-chunk display-widget copies are
+    one run stale by construction and are never consulted (board ISSUE #30).
+    Prompt resolution is v3 flat field or v4 structured `prompts.prompt_data[]`
+    (see `_prompt_from_iteration_payload`)."""
+    prompt_graph = _parse_json_chunk(info_ext.get('prompt'))
+    payload = _enhancer_payload_from_graph(prompt_graph) if prompt_graph else None
+    if payload is None and prompt_graph:
+        payload = _enhancer_payload_from_source_chain(prompt_graph)
     if payload is None:
         return None
-    prompt = _prompt_from_iteration_payload(payload)
+    # Same rendered-index derivation as metadata(): stamped index, else
+    # queue-time `prompt_offset` graph input + the payload's `current`.
+    hint = _rendered_index_from_graph(payload, prompt_graph)
+    prompt = _iteration_prompt_and_index(payload, hint)[0]
     if prompt and verbose:
         print(f'enhancer-iteration prompt recovered (schema {payload.get("schema_id")})')
     return prompt
