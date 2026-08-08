@@ -12,6 +12,12 @@ THRESHOLD_RATIO_SQUARE: Final = 0.25
 
 METADATA_SCHEMA: Final = 'ait.image.metadata.v1'
 
+# PNG text chunk carrying the provenance envelope of the image an AI render was derived
+# from (written by the fbbcool-suite preview/save nodes; any JSON object is accepted).
+# The ComfyUI graph chunks cannot serve this: resolved parent identity (scene/image ids,
+# clipboard payloads) exists only at execution time and never appears in the graph.
+PARENT_METADATA_CHUNK: Final = 'parent_metadata'
+
 
 def image_from_url(url: str | Path, verbose: bool = False) -> PILImage.Image | None:
     url = Path(url)
@@ -58,7 +64,10 @@ def metadata(url: Path | str) -> dict | None:
           'comfy': {'prompt_graph': dict | None,   # raw parsed ComfyUI chunks
                     'workflow': dict | None},
           'enhancer': dict | None,          # raw 1xlasm-enhancer iteration
-                                            # payload (v3 or v4), schema_id-gated
+                                            # payload (v3 or v4), schema_id-gated;
+                                            # authoritative copy across both
+                                            # chunks — a prompt_index-bearing
+                                            # copy wins over an index-less one
           'generation': {
               'prompt': str | None,         # identified positive prompt
               'prompt_index': int | None,   # v4 rendered entry (prompt_index,
@@ -68,7 +77,23 @@ def metadata(url: Path | str) -> dict | None:
           },
           'loras': [{'name': str, 'strength': float, 'source': str}, ...],
           'seed': int | None,
+          'parent': dict | None,            # provenance envelope of the source
+                                            # image this render was derived from
+                                            # (`parent_metadata` chunk)
+          'inherited': [str, ...],          # top-level fields recovered from
+                                            # `parent` because the image's own
+                                            # chunks didn't yield them; [] when
+                                            # everything is first-hand
         }
+
+    Inheritance: when the image's own chunks don't yield a field but a
+    `parent` envelope is present, the field is recovered from the parent —
+    a round-tripped `ait.image.metadata.v1` dict contributes `enhancer`,
+    `generation`, `seed` and `loras`; any other envelope shape (enhancer
+    client envelope, scenes `input_data`, raw wrap) contributes an embedded
+    iteration payload found by schema_id, from which `generation` is
+    resolved. Own data always wins; inherited fields are listed in
+    `inherited`; the `parent` envelope itself stays verbatim.
     """
     url = Path(url)
     pil = image_from_url(url)
@@ -89,22 +114,17 @@ def _metadata_from_pil(url: Path, pil: PILImage.Image) -> dict:
     prompt_graph = _parse_json_chunk(info_ext.get('prompt'))
     workflow = _parse_json_chunk(info_ext.get('workflow'))
 
-    enhancer = _enhancer_payload_from_graph(prompt_graph) if prompt_graph else None
+    # Authoritative payload copy across BOTH ComfyUI chunks (board ISSUE in
+    # #23's reopen: real renders can carry the raw index-less clipspace copy in
+    # the prompt graph while the prompt_index-bearing envelope sits only in the
+    # workflow chunk).
+    enhancer = _select_enhancer_payload(prompt_graph, workflow)
 
     prompt: str | None = None
     try:
         prompt = _image_extract_prompt_from_info_ext(info_ext, verbose=False)
     except Exception:
         pass
-
-    prompt_index: int | None = None
-    prompt_offset: int | None = None
-    if enhancer is not None:
-        _, prompt_index = _iteration_prompt_and_index(enhancer)
-        prompts = enhancer.get('prompts')
-        current = prompts.get('current') if isinstance(prompts, dict) else None
-        if isinstance(prompt_index, int) and isinstance(current, int):
-            prompt_offset = prompt_index - current
 
     seed: int | None = None
     loras: list[dict] = []
@@ -115,6 +135,63 @@ def _metadata_from_pil(url: Path, pil: PILImage.Image) -> dict:
     if loras_info is not None:
         seed = loras_info['seed']
         loras = loras_info['loras']
+
+    parent = _parse_json_chunk(info_ext.get(PARENT_METADATA_CHUNK))
+    # Round-tripped metadata() dict (SmartInput `metadata` output) — its fields
+    # describe the parent's generation and are the best available account of
+    # what this derived render came from.
+    pmd = parent if parent and parent.get('schema') == METADATA_SCHEMA else None
+    inherited: list[str] = []
+    if parent is not None:
+        try:
+            if enhancer is None:
+                cand = pmd.get('enhancer') if pmd else None
+                if not isinstance(cand, dict):
+                    cand = _iteration_payload_from_obj(parent)
+                if isinstance(cand, dict):
+                    enhancer = cand
+                    inherited.append('enhancer')
+
+            if pmd:
+                if seed is None and isinstance(pmd.get('seed'), int):
+                    seed = pmd['seed']
+                    inherited.append('seed')
+                if not loras and isinstance(pmd.get('loras'), list):
+                    loras = [lora for lora in pmd['loras'] if isinstance(lora, dict)]
+                    if loras:
+                        inherited.append('loras')
+        except Exception:
+            pass
+
+    # Unified generation attribution (board ISSUE #29): derive index/offset
+    # from the FINAL payload — own or inherited — regardless of which path
+    # produced the prompt text, so an inherited payload always yields
+    # attribution even when the image's own chunks resolved the prompt.
+    prompt_index: int | None = None
+    prompt_offset: int | None = None
+    try:
+        if enhancer is not None:
+            payload_prompt, prompt_index = _iteration_prompt_and_index(enhancer)
+            prompts = enhancer.get('prompts')
+            current = prompts.get('current') if isinstance(prompts, dict) else None
+            if isinstance(prompt_index, int) and isinstance(current, int):
+                prompt_offset = prompt_index - current
+            prompt_from_payload = prompt is None and payload_prompt is not None
+            if prompt_from_payload:
+                prompt = payload_prompt
+            if 'enhancer' in inherited and (prompt_index is not None or prompt_from_payload):
+                inherited.append('generation')
+        if prompt is None and pmd:
+            pgen = pmd.get('generation')
+            if isinstance(pgen, dict) and isinstance(pgen.get('prompt'), str) and pgen['prompt']:
+                prompt = pgen['prompt']
+                pi, po = pgen.get('prompt_index'), pgen.get('prompt_offset')
+                prompt_index = pi if isinstance(pi, int) else None
+                prompt_offset = po if isinstance(po, int) else None
+                if 'generation' not in inherited:
+                    inherited.append('generation')
+    except Exception:
+        pass
 
     return {
         'schema': METADATA_SCHEMA,
@@ -134,7 +211,81 @@ def _metadata_from_pil(url: Path, pil: PILImage.Image) -> dict:
         },
         'loras': loras,
         'seed': seed,
+        'parent': parent,
+        'inherited': inherited,
     }
+
+
+def _select_enhancer_payload(prompt_graph: dict | None, workflow: dict | None) -> dict | None:
+    """Collect every copy of the 1xlasm-enhancer iteration payload embedded in
+    the two ComfyUI chunks and select the authoritative one. Real renders can
+    carry several copies with different attribution: the API prompt graph holds
+    the raw clipspace payload (no `prompt_index`), while the metadata-enhancer
+    Display node in the UI workflow chunk holds the enhancer-client envelope
+    whose nested payload carries the render-stamped top-level `prompt_index`.
+    A `prompt_index`-bearing copy always wins over an index-less one (#23)."""
+    candidates: list[dict] = []
+    if prompt_graph:
+        found = _enhancer_payload_from_graph(prompt_graph)
+        if found is not None:
+            candidates.append(found)
+    if workflow:
+        candidates += _enhancer_payloads_from_workflow(workflow)
+    for payload in candidates:
+        if isinstance(payload.get('prompt_index'), int):
+            return payload
+    return candidates[0] if candidates else None
+
+
+def _enhancer_payloads_from_workflow(workflow: dict) -> list[dict]:
+    """Iteration payload copies embedded in the UI `workflow` chunk: the
+    fbbcool metadata-enhancer `Display Any (rgthree)` node caches the
+    enhancer-client envelope (payload nested inside) in its `widgets_values`.
+    Scan every node's widget strings, schema_id-gated."""
+    out: list[dict] = []
+    for node in workflow.get('nodes', []):
+        if not isinstance(node, dict):
+            continue
+        widgets = node.get('widgets_values') or []
+        if isinstance(widgets, dict):
+            widgets = list(widgets.values())
+        if not isinstance(widgets, list):
+            continue
+        for widget in widgets:
+            if isinstance(widget, str) and _ENHANCER_ITERATION_SCHEMA_PREFIX in widget:
+                found = _iteration_payload_from_obj(widget)
+                if found is not None:
+                    out.append(found)
+    return out
+
+
+def _iteration_payload_from_obj(obj, depth: int = 6) -> dict | None:
+    """Find a 1xlasm-enhancer iteration payload nested anywhere inside a parent
+    provenance envelope (enhancer client envelope, scenes `input_data`, raw
+    wrap, ...): the payload dict itself, a dict value, a list item, or a
+    JSON-encoded string field. Gated on the iteration `schema_id`,
+    depth-limited against pathological nesting."""
+    if depth < 0:
+        return None
+    if isinstance(obj, dict):
+        schema_id = obj.get('schema_id', '')
+        if isinstance(schema_id, str) and schema_id.startswith(_ENHANCER_ITERATION_SCHEMA_PREFIX):
+            return obj
+        for value in obj.values():
+            found = _iteration_payload_from_obj(value, depth - 1)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for item in obj:
+            found = _iteration_payload_from_obj(item, depth - 1)
+            if found is not None:
+                return found
+    elif isinstance(obj, str) and _ENHANCER_ITERATION_SCHEMA_PREFIX in obj:
+        try:
+            return _iteration_payload_from_obj(json.loads(obj), depth - 1)
+        except (ValueError, TypeError):
+            return None
+    return None
 
 
 def _parse_json_chunk(chunk) -> dict | None:
@@ -231,9 +382,11 @@ def _image_extract_prompt_from_info_ext(info_ext: dict, verbose=False) -> str | 
     # node that persists the full iteration payload in its `is_changed` field.
     # The graph walk dead-ends on that dynamic node, but the resolved prompt is
     # embedded in that payload (v3 flat `prompt`, or v4 structured
-    # `prompts.prompt_data[]`). Recover it, gated on the iteration schema_id so
-    # we never pick up an unrelated embedded JSON.
-    iteration = _prompt_from_enhancer_iteration(data, verbose)
+    # `prompts.prompt_data[]`). Recover it from the authoritative copy across
+    # both chunks (prompt_index-bearing envelope preferred, see
+    # `_select_enhancer_payload`), gated on the iteration schema_id so we never
+    # pick up an unrelated embedded JSON.
+    iteration = _prompt_from_enhancer_iteration(info_ext, verbose)
     if iteration:
         return iteration
 
@@ -331,12 +484,15 @@ def _enhancer_payload_from_graph(data: dict) -> dict | None:
     return None
 
 
-def _prompt_from_enhancer_iteration(data: dict, verbose=False) -> str | None:
+def _prompt_from_enhancer_iteration(info_ext: dict, verbose=False) -> str | None:
     """Recover the positive prompt from an embedded 1xlasm-enhancer iteration
-    payload (see `_enhancer_payload_from_graph` for where it is embedded) and
-    resolve its prompt (v3 flat field or v4 structured `prompts.prompt_data[]`;
-    see `_prompt_from_iteration_payload`)."""
-    payload = _enhancer_payload_from_graph(data)
+    payload: select the authoritative copy across the prompt-graph and
+    workflow chunks (see `_select_enhancer_payload`) and resolve its prompt
+    (v3 flat field or v4 structured `prompts.prompt_data[]`; see
+    `_prompt_from_iteration_payload`)."""
+    payload = _select_enhancer_payload(
+        _parse_json_chunk(info_ext.get('prompt')), _parse_json_chunk(info_ext.get('workflow'))
+    )
     if payload is None:
         return None
     prompt = _prompt_from_iteration_payload(payload)
