@@ -1,5 +1,5 @@
 mongodb:
-  host: "mongodb://mongo:mongo@n100"
+  host: "mongodb://ait:Ky9gKaRTYoqoaZHkDJFzudhHel1ZGM7H@n100"
   port: 27017
   name: "scenes_test"
 

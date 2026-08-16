@@ -1,0 +1,4 @@
+mongodb:
+  host: "mongodb://ait:Ky9gKaRTYoqoaZHkDJFzudhHel1ZGM7H@n100"
+  port: 27017
+  name: "ai_prod"
