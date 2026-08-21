@@ -118,6 +118,24 @@ img.db_store()                 # <-- nothing is saved until you call this
 `Scene` has parallel `set_rating` / `set_labels` / `push_label` / `db_store`.
 **Rule: every setter is in-memory; a change is durable only after `db_store()`.**
 
+Filing a **loose render** (e.g. a ComfyUI output in `~/Downloads`) into the scene
+it belongs to — don't hand-roll the resolve + move:
+
+```python
+scene_id = scm.scene_adopt_img('/path/to/render.png')             # move (default)
+scene_id = scm.scene_adopt_img('/path/to/render.png', move=False) # copy, keep source
+```
+
+It resolves the scene on its own: the file's own registration first, else the
+embedded `parent_metadata` provenance chain (`ait.tools.images.metadata()['parent']`
+— parent registered → its scene; else the parent's directory as scene url).
+Returns the scene id (truthy str) on success, `False` when nothing resolves —
+in that case **nothing** is touched on disk or in the DB. The file lands as an
+*unregistered* render: no image doc is inserted (registration stays a curator
+step). A same-named file already in the scene folder is only accepted when
+byte-identical (idempotent re-adopt); different content → `False`, never
+overwritten.
+
 ---
 
 ## 4. Caption / suggest — use the slash-command API, not raw classes

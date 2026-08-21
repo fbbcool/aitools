@@ -2,6 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Agent scope (refocused 2026-08-21)
+
+Claude Code in this workspace is the **aitools agent**: it maintains and
+develops the aitools codebase and the scene app — `src/` (aidb, ait, trainer,
+templater), the Gradio app, `conf/` schemas, `script/`, tests, and the
+agent-facing API surface (`AGENT_QUICKSTART.md`, `metadata()`,
+`scene_adopt_img`, board HOWTOs). Work arrives as board FEATURE REQ/ISSUE
+tickets (Vikunja card `AGENT: aitools`) or directly from the operator.
+
+Out of scope — route to the owning agent instead: training technique and the
+diffusion-pipe fork (**agent-lora**), dataset design/curation advising
+(**1xlasm-datasetter**), aidb operations (**agent-aidb**), world knowledge and
+prompt craft (**1xlasm-enhancer**), rendering (**comfyui-fbbcool-suite**).
+
+Captioning/curation *operations* are deactivated but preserved: their slash
+commands sit in `.claude/commands_archive/` (move one back to
+`.claude/commands/` to reactivate) with companion memory in the memory store's
+`archive_captioning/`. The captioning **code** in `src/ait/caption` remains
+maintained here.
+
 ## Environment setup
 
 Code in `src/` is imported as top-level packages (e.g. `from aidb import ...`, `from ait.tools.files import ...`), so `PYTHONPATH` **must** include `src/`. The `.vscode/settings.json` sets this for editors; shells should source `000_install/aitools.sh` (training/remote) or `activate.fish` (local), which export:
@@ -82,7 +102,7 @@ Training a model is orchestrated by `trainer.Trainer` (`src/trainer/trainer.py`)
 - Notebooks in `nb/` are exploratory; the `.vscode/settings.json` sets `jupyter.notebookFileRoot` to `src/` so notebooks can `import aidb`/`ait` directly.
 - `src/depr_*` directories are deprecated — don't extend them; if you find yourself reading them to understand current behavior, double-check against the non-`depr_` equivalent first.
 - **`claude_*` MongoDB collections** — Claude may freely create, read, and write to collections prefixed `claude_` in the active `scenes_<config>` database (alongside the canonical `scenes` / `images` / `sets`) to persist AI-side scratch state: caption-priority rankings, batch run artifacts, scoring caches. These are not source-of-truth; the canonical collections are unaffected. Schema is whatever the writing tool defines — document it in the slash command or script that owns the collection. Direct access is via `DBConnection._get_collection('claude_xxx')`.
-- **Caption skins (`conf/skins/*.json`)** — A single JSON per captioning recipe holds source fields (entities, interaction, label groups, rules, forbidden vocab, concepts, model & LoRA refs) plus a derived `_built` block (composed directive, flat label lookup, reverse indices, union forbidden, source_hash). Schema lives at `conf/skins/_schema.json`. The build phase (`python -m ait.caption.skin_build <name>`) composes derived fields from source. Use-time consumers — `JoyNG` (pure runtime, `src/ait/caption/joy_ng.py`), `JoySceneDBNG` (orchestrator, `src/ait/caption/joy_scenedb_ng.py`), and the `/v1-status` / `/todo-ai` slash commands — read derived fields via `SkinRegistry().get(name)` (`src/ait/caption/skin.py`). Today only `1xlasm` lives there; the legacy `Joy` / `JoySceneDB` classes still back the other 15 caption recipes (the keys in `joy.py`'s `CONTENT_SYSTEM`/`CONTENT_PROMPT` dicts) until each migrates to its own JSON.
+- **Caption skins (`conf/skins/*.json`)** — A single JSON per captioning recipe holds source fields (entities, interaction, label groups, rules, forbidden vocab, concepts, model & LoRA refs) plus a derived `_built` block (composed directive, flat label lookup, reverse indices, union forbidden, source_hash). Schema lives at `conf/skins/_schema.json`. The build phase (`python -m ait.caption.skin_build <name>`) composes derived fields from source. Use-time consumers — `JoyNG` (pure runtime, `src/ait/caption/joy_ng.py`), `JoySceneDBNG` (orchestrator, `src/ait/caption/joy_scenedb_ng.py`), and the archived `/v1-status` / `/todo-ai` slash commands (`.claude/commands_archive/`) — read derived fields via `SkinRegistry().get(name)` (`src/ait/caption/skin.py`). Today only `1xlasm` lives there; the legacy `Joy` / `JoySceneDB` classes still back the other 15 caption recipes (the keys in `joy.py`'s `CONTENT_SYSTEM`/`CONTENT_PROMPT` dicts) until each migrates to its own JSON.
 
 ## Code style (project-specific points beyond AGENTS.md)
 

@@ -1,5 +1,7 @@
 from pathlib import Path
 from typing import Any, Generator
+import filecmp
+import shutil
 import sys
 import json
 
@@ -12,6 +14,7 @@ from ait.tools.files import (
     urls_to_dir,
     is_dir,
 )
+from ait.tools.images import metadata as image_metadata
 
 from .scene_common import SceneDef, SceneConfig
 
@@ -372,6 +375,102 @@ class SceneManager:
             return None
         url = scene.url_display
         return str(url) if url else None
+
+    def scene_adopt_img(self, url: str | Path, move: bool = True) -> str | bool:
+        """Attach a loose render file to the DB scene it provably belongs to.
+
+        Resolution is fully self-contained (board FEATURE REQ task 65): the
+        file's own registration (``0rig___<id>`` filename or a registered
+        image url) wins; otherwise the ``parent_metadata`` provenance chain
+        (`ait.tools.images.metadata()['parent']`) is followed — a parent that
+        is itself a registered image yields its scene, else the parent's
+        directory is looked up as a scene url. When nothing resolves, the call
+        returns ``False`` and touches neither disk nor DB.
+
+        On success the file is moved (default) or, with ``move=False``, copied
+        into the scene folder as an *unregistered* render — no image document
+        is inserted, no canonical field is written; registration stays a
+        separate curator step. Returns the resolved scene id (truthy str).
+
+        A same-named file already in the scene folder is only accepted when it
+        is byte-identical (idempotent re-adopt: ``move=True`` then removes the
+        source); differing content aborts with ``False`` — never overwrite.
+        """
+        url = Path(url)
+        if not url.is_file() or not is_img_or_vid(url):
+            self._log(f'scene_adopt_img: not an image file: {url}', level='warning')
+            return False
+
+        scene_id = self._scene_id_for_adoption(url)
+        if not scene_id:
+            self._log(f'scene_adopt_img: no scene resolves for {url}', level='warning')
+            return False
+
+        url_scene = self.url_from_id(scene_id)
+        if url_scene is None or not Path(url_scene).is_dir():
+            self._log(
+                f'scene_adopt_img: scene[{scene_id}] folder missing: {url_scene}', level='error'
+            )
+            return False
+
+        dest = Path(url_scene) / url.name
+        if dest.exists():
+            if url.resolve() == dest.resolve():
+                return scene_id
+            if not filecmp.cmp(url, dest, shallow=False):
+                self._log(
+                    f'scene_adopt_img: name collision with different content: {dest}',
+                    level='error',
+                )
+                return False
+            if move:
+                url.unlink()
+        elif move:
+            shutil.move(str(url), str(dest))
+        else:
+            shutil.copy2(url, dest)
+
+        self._log(f'scene_adopt_img: {url.name} -> scene[{scene_id}] ({url_scene})')
+        return scene_id
+
+    def _scene_id_for_adoption(self, url: Path) -> str | None:
+        """Resolve the owning scene of an image file, DB + provenance only.
+
+        Order: the file's own registered identity (filename id, then image-url
+        lookup), then the embedded ``parent_metadata`` chain (nested ``parent``
+        envelopes, depth-capped) — each parent tried as registered image
+        (filename id / url), then its directory as a scene url.
+        """
+        sim = self.scene_image_manager()
+
+        def _scene_of_registered(img_url: str | Path) -> str | None:
+            id_prefix = SceneDef.id_and_prefix_from_filename(img_url)
+            oid = id_prefix[0] if id_prefix is not None else sim.id_from_url(img_url)
+            if oid and sim.is_id(oid):
+                img = sim.img_from_id(oid)
+                return img.scene_id if img is not None else None
+            return None
+
+        scene_id = _scene_of_registered(url)
+        if scene_id:
+            return scene_id
+
+        md = image_metadata(url)
+        parent = md.get('parent') if md else None
+        for _ in range(8):
+            if not isinstance(parent, dict):
+                break
+            # 'url' as defined by the ait.image.metadata.v1 parent envelope
+            parent_url = parent.get('url')
+            if isinstance(parent_url, str) and parent_url:
+                scene_id = _scene_of_registered(parent_url)
+                if scene_id:
+                    return scene_id
+                scene_id = self.id_from_url(Path(parent_url).parent)
+                if scene_id:
+                    return scene_id
+            parent = parent.get('parent')
+        return None
 
     def scenes_update(self) -> None:
         from .scene import Scene
