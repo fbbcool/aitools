@@ -1,0 +1,20 @@
+{
+  "dinov2": {
+    "small": {
+      "model": [
+        {
+          "repo_id": "facebook/dinov2-small",
+          "action": "no_install"
+        }
+      ]
+    },
+    "base": {
+      "model": [
+        {
+          "repo_id": "facebook/dinov2-base",
+          "action": "no_install"
+        }
+      ]
+    }
+  }
+}

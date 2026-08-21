@@ -912,3 +912,262 @@ def train_from_image(
     pil_train = pil_train.resize((width_train, height_train), PILImage.Resampling.LANCZOS)
 
     return pil_train
+
+
+EMBED_MODEL_DEFAULT: Final = 'dinov2:small'
+# batches above this size auto-select the GPU (operator directive 2026-08-21);
+# dinov2-small's footprint is small enough to coexist with a running ComfyUI
+EMBED_GPU_MIN_BATCH: Final = 3
+
+# stored-embedding payload: a PNG tEXt chunk named 'embedding-<group>-<variant>'
+# (e.g. 'embedding-dinov2-small') carrying schema_id + the normalized vector,
+# so re-embedding a stored file is a chunk read instead of an inference pass
+EMBEDDING_SCHEMA: Final = 'ait.image.embedding.v1'
+EMBED_CHUNK_PREFIX: Final = 'embedding-'
+
+_PNG_SIG: Final = b'\x89PNG\r\n\x1a\n'
+
+
+def _embed_chunk_key(model: str) -> str:
+    return EMBED_CHUNK_PREFIX + model.replace(':', '-')
+
+
+def _embedding_payload_parse(raw, model: str):
+    """Stored embedding chunk -> normalized float32 numpy vector, or None on
+    any mismatch (schema, model, malformed vector) — never raises."""
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(data, dict) or data.get('schema_id') != EMBEDDING_SCHEMA:
+        return None
+    if data.get('model') != model:
+        return None
+    vec = data.get('vector')
+    if not isinstance(vec, list) or not vec:
+        return None
+    import numpy as np
+
+    try:
+        v = np.asarray(vec, dtype=np.float32)
+    except (TypeError, ValueError):
+        return None
+    norm = float(np.linalg.norm(v))
+    if v.ndim != 1 or not np.isfinite(norm) or norm == 0.0:
+        return None
+    return v / norm
+
+
+def _png_text_chunk_upsert(url: Path, key: str, text: str) -> bool:
+    """Insert/replace one tEXt chunk in a PNG *without re-encoding*: IDAT and
+    every other chunk (prompt graph, workflow, parent_metadata provenance)
+    stay byte-identical; a stale chunk under the same key is replaced. Atomic
+    via temp file + rename. Returns False (no write) on any non-PNG input."""
+    import struct
+    import zlib
+
+    try:
+        raw = url.read_bytes()
+    except OSError:
+        return False
+    if not raw.startswith(_PNG_SIG):
+        return False
+
+    keyb = key.encode('latin-1')
+    data = keyb + b'\x00' + text.encode('latin-1')
+    new_chunk = (
+        struct.pack('>I', len(data))
+        + b'tEXt'
+        + data
+        + struct.pack('>I', zlib.crc32(b'tEXt' + data))
+    )
+
+    out = bytearray(_PNG_SIG)
+    pos = len(_PNG_SIG)
+    inserted = False
+    while pos + 12 <= len(raw):
+        (length,) = struct.unpack('>I', raw[pos : pos + 4])
+        ctype = raw[pos + 4 : pos + 8]
+        chunk = raw[pos : pos + 12 + length]
+        pos += 12 + length
+        if ctype == b'tEXt' and chunk[8:].startswith(keyb + b'\x00'):
+            continue
+        # before the first IDAT, so PIL surfaces the chunk on open() without a
+        # full pixel load (post-IDAT text only appears after .load())
+        if ctype in (b'IDAT', b'IEND') and not inserted:
+            out += new_chunk
+            inserted = True
+        out += chunk
+    if not inserted:
+        return False
+
+    tmp = url.with_name(url.name + '.tmp_embed')
+    try:
+        tmp.write_bytes(out)
+        tmp.replace(url)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        return False
+    return True
+
+
+def _embedding_store(url: Path, key: str, model: str, vector) -> bool:
+    """Persist a computed vector into the image file as its model-keyed
+    embedding payload. PNG only — other formats are silently skipped."""
+    if url.suffix.lower() != '.png':
+        return False
+    payload = json.dumps(
+        {
+            'schema_id': EMBEDDING_SCHEMA,
+            'model': model,
+            'dim': int(vector.shape[0]),
+            'vector': [float(x) for x in vector],
+        }
+    )
+    return _png_text_chunk_upsert(url, key, payload)
+
+
+# lazy per-model cache: {(model, device): (processor, model_instance)} — one load
+# per process, so a batch call never reloads the model per image (board task 67)
+_embed_models: dict = {}
+
+
+def _embed_model(model: str, device: str):
+    key = (model, device)
+    cached = _embed_models.get(key)
+    if cached is not None:
+        return cached
+    # imported lazily: metadata()/thumbnail consumers must not pay the torch
+    # import (nor the model download) unless embeddings are actually used
+    from transformers import AutoImageProcessor, AutoModel
+    from transformers.utils import logging as hf_logging
+
+    from ait.install import snapshot_from_db
+
+    # agent-facing call: keep load-time progress bars/info off stderr
+    hf_logging.set_verbosity_error()
+    hf_logging.disable_progress_bar()
+
+    # 'group:variant' spec against the conf/models DB (conf/models/models_dinov2.json)
+    group, _, variant = model.partition(':')
+    local_dir = snapshot_from_db(group, variant or 'common')
+
+    processor = AutoImageProcessor.from_pretrained(local_dir)
+    instance = AutoModel.from_pretrained(local_dir).to(device).eval()
+    _embed_models[key] = (processor, instance)
+    return processor, instance
+
+
+def embed(
+    urls: list[str | Path] | str | Path,
+    model: str = EMBED_MODEL_DEFAULT,
+    device: str | None = None,
+    batch_size: int = 16,
+    store: bool = False,
+    refresh: bool = False,
+) -> list:
+    """Batched semantic image embeddings for similarity/dedup/grouping.
+
+    Input: image path(s) (any format `is_img` accepts — png/jpg/webp/gif).
+    Output: one L2-normalized float32 numpy vector per input, order matching
+    the input; an unreadable/missing file yields ``None`` in its slot
+    (consistent with `metadata()`), never an exception. Cosine similarity of
+    two results is their plain dot product.
+
+    ``model`` is a ``group:variant`` key into the layered `conf/models` DB
+    (`conf/models/models_dinov2.json`); the default ``dinov2:small`` gives
+    384-dim vectors, ``dinov2:base`` swaps in the bigger variant — new
+    variants are added in the JSON, not in code. Files are materialized via
+    the ait downloader (`ait.install.snapshot_from_db`), loaded once per
+    process and cached; a call processes the whole list in ``batch_size``
+    chunks — no per-image model loads.
+
+    Stored payloads: a PNG may carry its embedding in a
+    ``embedding-<group>-<variant>`` tEXt chunk (e.g. ``embedding-dinov2-small``,
+    schema ``ait.image.embedding.v1``). Such a payload is used instead of
+    inference whenever the model matches — a fully stored batch never loads
+    the model. ``store=True`` writes freshly computed vectors back into their
+    PNG files (chunk-level insert, image data and every other chunk stay
+    byte-identical; non-PNG inputs are skipped). ``refresh=True`` ignores
+    stored payloads and recomputes (rewriting them when ``store``). NOTE:
+    storing changes the file's bytes — a stored copy no longer byte-matches
+    an unstored one (relevant for `SceneManager.scene_adopt_img` idempotence).
+
+    ``device=None`` auto-selects: when more than ``EMBED_GPU_MIN_BATCH``
+    images actually need inference, the GPU is used when available, else CPU
+    (model footprint is small enough to coexist with a running ComfyUI).
+    An explicit ``device`` ('cpu'/'cuda') always wins.
+    """
+    if not isinstance(urls, list):
+        urls = [urls]
+
+    paths = [Path(url) for url in urls]
+    vectors: list = [None] * len(paths)
+    pils: dict[int, PILImage.Image] = {
+        i: pil for i, path in enumerate(paths) if (pil := image_from_url(path)) is not None
+    }
+    if not pils:
+        return vectors
+
+    chunk_key = _embed_chunk_key(model)
+    todo = list(pils)
+    if not refresh:
+        todo = []
+        for i, pil in pils.items():
+            stored = _embedding_payload_parse(pil.info.get(chunk_key), model)
+            if stored is None:
+                todo.append(i)
+            else:
+                vectors[i] = stored
+
+    if todo:
+        import torch
+
+        if device is None:
+            use_gpu = len(todo) > EMBED_GPU_MIN_BATCH and torch.cuda.is_available()
+            device = 'cuda' if use_gpu else 'cpu'
+
+        processor, instance = _embed_model(model, device)
+        for start in range(0, len(todo), batch_size):
+            chunk = todo[start : start + batch_size]
+            imgs = [pils[i].convert('RGB') for i in chunk]
+            inputs = processor(images=imgs, return_tensors='pt').to(device)
+            with torch.no_grad():
+                out = instance(**inputs)
+            # CLS token — DINOv2's global image descriptor
+            cls = torch.nn.functional.normalize(out.last_hidden_state[:, 0], dim=-1)
+            for j, i in enumerate(chunk):
+                vectors[i] = cls[j].cpu().numpy()
+
+    if store:
+        for i in todo:
+            if vectors[i] is not None:
+                _embedding_store(paths[i], chunk_key, model, vectors[i])
+    return vectors
+
+
+def embed_stored(
+    urls: list[str | Path] | str | Path,
+    model: str = EMBED_MODEL_DEFAULT,
+) -> list:
+    """Read stored embedding payloads only — never computes.
+
+    Same list contract as `embed()`: one L2-normalized float32 numpy vector
+    per input, order matching; ``None`` for a file that is unreadable or
+    carries no stored payload for ``model`` (chunk
+    ``embedding-<group>-<variant>``, schema ``ait.image.embedding.v1``).
+    No torch, no model load, no GPU — a pure chunk read, safe on boxes
+    without the ML stack. Use it to consume `embed(..., store=True)` results
+    cheaply or to check cache coverage before a compute pass.
+    """
+    if not isinstance(urls, list):
+        urls = [urls]
+    chunk_key = _embed_chunk_key(model)
+    vectors: list = []
+    for url in urls:
+        pil = image_from_url(url)
+        raw = pil.info.get(chunk_key) if pil is not None else None
+        vectors.append(_embedding_payload_parse(raw, model))
+    return vectors

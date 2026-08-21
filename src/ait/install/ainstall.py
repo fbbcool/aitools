@@ -78,6 +78,22 @@ class AInstallerDB:
         return repo_ids
 
 
+def snapshot_from_db(group: str, variant: str, target: str = 'model') -> Path:
+    """Materialize a model-DB entry locally and return its snapshot directory.
+
+    The `group/variant/target` entry of the layered `conf/models` DB is
+    resolved via `AInstallerDB` and downloaded through the same HF snapshot
+    path (incl. `HF_TOKEN` handling) that `AInstaller` uses for file-less HF
+    items — for runtime loaders (e.g. `ait.tools.images.embed`) that need the
+    files in place without an install tree to symlink into.
+    """
+    repo_ids = AInstallerDB().repo_ids(group, variant, target)
+    if not repo_ids:
+        raise KeyError(f'AInstallerDB: no {target} configured for {group}:{variant}')
+    hf_token = os.environ.get('HF_TOKEN') or None
+    return Path(snapshot_download(repo_id=repo_ids[0], token=hf_token))
+
+
 class AInstaller:
     CHUNK_SIZE: Final = 1638400
     CIVITAI_RED_BASE: Final = 'https://civitai.red/api/download/models/'

@@ -95,6 +95,79 @@ img.data                  # raw dict
 img.data.get(SceneDef.FIELD_CAPTION_JOY)
 ```
 
+**Semantic image similarity** — "same motif?", dedup, grouping by content
+(pixel hashes only catch near-duplicates):
+
+```python
+from ait.tools.images import embed
+
+vecs = embed(['/path/a.png', '/path/b.webp', '/path/c.jpg'])  # one batched call
+sim = float(vecs[0] @ vecs[1])   # cosine similarity — vectors are L2-normalized
+```
+
+One 384-dim L2-normalized float32 numpy vector per input path (png/jpg/webp/gif),
+order matching the input; an unreadable file yields `None` in its slot instead of
+raising. The model loads once per process and the whole list runs in batched
+chunks — call it with the full list, not in a loop. `model=` is a
+`group:variant` key into the `conf/models` DB (default `dinov2:small`, see
+`conf/models/models_dinov2.json`; `dinov2:base` swaps in the bigger variant —
+add new variants in the JSON, not in code); files are materialized locally via
+the ait downloader (`ait.install.snapshot_from_db`). Device auto-selects:
+batches of **more than 3** readable images run on the GPU when available,
+smaller ones on CPU (the model is small enough to coexist with a running
+ComfyUI — which is never touched); an explicit `device='cpu'`/`'cuda'` always
+wins. `batch_size=` (default 16) bounds memory. Rule of thumb with
+dinov2:small: same motif re-rendered ≳0.6, unrelated images ≲0.3.
+
+**Stored embeddings** — `embed(paths, store=True)` writes each freshly computed
+vector back into its PNG as a model-keyed metadata payload: a tEXt chunk named
+`embedding-<group>-<variant>` (default `embedding-dinov2-small`, schema
+`ait.image.embedding.v1` with `model`, `dim`, `vector`). Any later `embed()`
+call with the matching model serves such files straight from the chunk — a
+fully stored batch never even loads the model. `refresh=True` ignores stored
+payloads and recomputes (rewriting them when combined with `store=True`). The
+write is chunk-level: pixels and every other chunk (`prompt`, `workflow`,
+`parent_metadata`) stay byte-identical; non-PNG inputs are computed but never
+written to. Caveat: storing changes the file's bytes, so a stored copy no
+longer byte-matches an unstored duplicate (relevant for `scene_adopt_img`'s
+idempotent re-adopt check — store either before distributing copies or on all
+of them).
+
+To *only read* stored payloads — no torch, no model load, safe on boxes
+without the ML stack:
+
+```python
+from ait.tools.images import embed_stored
+
+vecs = embed_stored(paths)     # same list contract as embed();
+                               # None = unreadable OR no stored payload
+```
+
+**Embedding cheatsheet**
+
+```python
+from ait.tools.images import embed, embed_stored
+
+embed(paths)                          # compute (cached files served from chunk)
+embed(paths, store=True)              # compute + persist into the PNGs
+embed(paths, store=True, refresh=True)# force recompute + rewrite payloads
+embed(paths, model='dinov2:base')     # bigger variant (conf/models DB key)
+embed(paths, device='cpu')            # pin device (else auto: >3 imgs → GPU)
+embed_stored(paths)                   # read-only, no torch/model — never computes
+embed_stored(paths, model='dinov2:base')  # payload lookup is model-scoped
+```
+
+| aspect | contract |
+|---|---|
+| return | `list`, one entry per input, order preserved — even for a single path |
+| entry | L2-normalized 384-dim float32 numpy vector (`dinov2:small`) |
+| n/a → `None` | unreadable/missing file; for `embed_stored` also: no payload, other model, malformed payload, non-PNG. Never raises. |
+| similarity | `float(v1 @ v2)` — dot product IS cosine; same motif ≳0.6, unrelated ≲0.3 |
+| payload | PNG tEXt chunk `embedding-<group>-<variant>` (e.g. `embedding-dinov2-small`), schema `ait.image.embedding.v1` |
+| store | PNG only, pixels + all other chunks byte-identical; changes file bytes (byte-identity checks!) |
+| device | auto: >3 images needing compute **and** CUDA available → GPU, else CPU; explicit `device=` wins |
+| model | `group:variant` key into `conf/models/models_dinov2.json` — add variants there, not in code |
+
 ---
 
 ## 3. Create / edit scenes
@@ -126,15 +199,48 @@ scene_id = scm.scene_adopt_img('/path/to/render.png')             # move (defaul
 scene_id = scm.scene_adopt_img('/path/to/render.png', move=False) # copy, keep source
 ```
 
-It resolves the scene on its own: the file's own registration first, else the
-embedded `parent_metadata` provenance chain (`ait.tools.images.metadata()['parent']`
-— parent registered → its scene; else the parent's directory as scene url).
-Returns the scene id (truthy str) on success, `False` when nothing resolves —
-in that case **nothing** is touched on disk or in the DB. The file lands as an
-*unregistered* render: no image doc is inserted (registration stays a curator
-step). A same-named file already in the scene folder is only accepted when
-byte-identical (idempotent re-adopt); different content → `False`, never
-overwritten.
+**Enhancer renders route differently.** A render carrying a 1xlasm-enhancer
+iteration payload (own or inherited, per `ait.tools.images.metadata()` trust
+rules) belongs to the creative unit of its *enhancer* scene, **not** to the DB
+scene of its source image — the enhancer changed the prompt. Its payload
+`scene_id` (an enhancer scene id — never resolve it against the `scenes`
+collection) is matched against `scenes_linked.ids_scene_enh` across scenes:
+
+- a matching scene already holding the file byte-identical wins (idempotent);
+- exactly one match → adopted there (and the enhancer id is kept present in
+  that scene's `ids_scene_enh`);
+- multiple matches → the scene whose folder has the newest file mtime wins;
+- **no match** → with `subdir_new='some_subdir'` a new scene is created under
+  that subdir, seeded with the enhancer id, and the file adopted there;
+  **without** `subdir_new` the call returns `None` — the distinct
+  "unmatched, subdir needed" outcome — with zero side effects, so you can ask
+  the operator for a subdir and retry.
+
+Payload-less renders resolve as before: the file's own registration first, else
+the embedded `parent_metadata` provenance chain (`metadata()['parent']` —
+parent registered → its scene; else the parent's directory as scene url).
+
+Outcome contract: **truthy str** = adopted scene id; **`None`** = enhancer
+payload matched no scene and no `subdir_new` was given; **`False`** = nothing
+resolves / never-overwrite collision — on both non-str outcomes **nothing** is
+touched on disk or in the DB. The file lands as an *unregistered* render: no
+image doc is inserted (registration stays a curator step). A same-named file
+already in the scene folder is only accepted when byte-identical (idempotent
+re-adopt); different content → `False`, never overwritten.
+
+**`scenes_linked` semantics** — optional scene-doc object with
+`ids_scene_enh` (enhancer scene ids present among the scene's images) and
+`ids_scene_db` (reserved, unused). Absent field reads as empty lists — old
+docs need no migration (`SceneDef.scenes_linked_from_data`). It is
+**machine-maintained bookkeeping, not curator ground truth**: it never
+justifies touching `labels_ng`/`hints`/`caption*`/ratings, and machines may
+write it without curator confirmation (writes deliberately don't bump
+`timestamp_updated`). Maintained by: `scene_adopt_img` (match + create paths)
+and `new_scene_from_urls` (seeded from the imported images' payloads at
+creation). **Not** maintained by: manual folder drops + `update_from_url` /
+`scenes_update`, and registration/rating/caption flows — after hand-filing
+renders, call `scm.scene_seed_enh_links(scene_id)` (or rerun
+`script/scenes_linked_backfill.py`, idempotent) to catch the links up.
 
 ---
 

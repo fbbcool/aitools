@@ -54,6 +54,17 @@ class SceneDef:
     FIELD_IMGS_EXCLUDE: Final = 'imgs_exclude'
     FIELD_SCENES_EXCLUDE: Final = 'scenes_exclude'
 
+    # scenes_linked (board FEATURE REQ task 66): machine-maintained bookkeeping,
+    # NOT curator ground truth — never a justification to touch labels_ng /
+    # hints / caption* / ratings; machines may write it without curator
+    # confirmation. `ids_scene_enh` lists 1xlasm-enhancer scene ids (docs in
+    # the enhancer's own collection, never resolvable against `scenes`) present
+    # among the scene's images; `ids_scene_db` is reserved for future DB-scene
+    # associations and unused today.
+    FIELD_SCENES_LINKED: Final = 'scenes_linked'
+    FIELD_IDS_SCENE_ENH: Final = 'ids_scene_enh'
+    FIELD_IDS_SCENE_DB: Final = 'ids_scene_db'
+
     DEFAULT_RATIOS: Final = [1.0, 2.0 / 3.0, 3.0 / 4.0]
     DEFAULT_RESOLUTIONS: Final = [512, 768, 1024]
 
@@ -156,6 +167,18 @@ class SceneDef:
         return [
             item for item in items if item.data.get(cls.FIELD_RATING, cls.RATING_MIN) == rating_max
         ]
+
+    @classmethod
+    def scenes_linked_from_data(cls, data: dict | None) -> dict[str, list[str]]:
+        """Normalized `scenes_linked` of a scene document: absent field or
+        missing keys read as empty lists, so old docs need no migration."""
+        linked = (data or {}).get(cls.FIELD_SCENES_LINKED)
+        if not isinstance(linked, dict):
+            linked = {}
+        return {
+            key: [i for i in (linked.get(key) or []) if isinstance(i, str)]
+            for key in (cls.FIELD_IDS_SCENE_ENH, cls.FIELD_IDS_SCENE_DB)
+        }
 
     @classmethod
     def now_ts(cls) -> float:
