@@ -354,6 +354,43 @@ class SceneManager:
         result = dbc.update_one({SceneDef.FIELD_OID: oid}, {'$set': SceneDef.update_ts()})
         return result is not None and result.matched_count > 0
 
+    def scene_scan_write(self, scene_id: str, prop: str, value: dict) -> bool:
+        """Persist one scan property sub-doc (``$set scan.<prop>``, board
+        task 69). Machine bookkeeping: deliberately does NOT bump
+        ``timestamp_updated`` — a scan write must never mark the scene stale
+        for its own skip rule."""
+        dbc = self._dbc_scenes
+        oid = self._dbc.to_oid(scene_id)
+        if dbc is None or oid is None:
+            return False
+        field = f'{SceneDef.FIELD_SCAN}.{prop}'
+        result = dbc.update_one({SceneDef.FIELD_OID: oid}, {'$set': {field: value}})
+        return result is not None and result.matched_count > 0
+
+    def scan_all(
+        self,
+        props: list[str] | None = None,
+        force: bool = False,
+        query: dict | None = None,
+    ) -> dict[str, dict[str, str]]:
+        """Batch sweep of `Scene.scan` over all scenes (optionally
+        query-restricted). Near-free when everything is fresh: a fresh
+        property is skipped on its ``ts`` alone — no model load, no file
+        reads. Returns ``{scene_id: {prop: outcome}}`` (see `Scene.scan`);
+        scenes that fail to instantiate are logged and skipped."""
+        from .scene import Scene
+
+        results: dict[str, dict[str, str]] = {}
+        ids = self.ids if query is None else self.ids_from_query(query)
+        for sid in ids:
+            try:
+                scene = Scene(self, sid)
+            except (FileNotFoundError, ValueError) as e:
+                self._log(f'scan_all: skip scene[{sid}]: {e}', level='warning')
+                continue
+            results[sid] = scene.scan(props=props, force=force)
+        return results
+
     def _db_update_scene(self, data: dict) -> bool:
         dbc = self._dbc_scenes
         if dbc is None:

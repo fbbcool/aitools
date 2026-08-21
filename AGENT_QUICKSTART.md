@@ -279,6 +279,47 @@ scm.img_move(img_or_url, scene_id_target)            # scene → scene, doc kept
   doc ↔ file stay resolvable; both scenes get the bump. A source outside any
   scene degrades to add semantics.
 
+**Scene self-scan — cached derived properties (board task 69).** Scene docs
+carry a machine-maintained `scan` field: one sub-doc per property, each with
+its own `ts` next to its value fields. Recompute happens only when a property
+is missing, `force=True`, or `timestamp_updated > scan[prop].ts` — **pure
+DB-timestamp semantics**: files appearing on disk alone do NOT trigger a
+recompute (the membership API above guarantees the bump for sanctioned
+changes; after hand-filing, pass `force=True`). Scan writes are targeted
+`$set scan.<prop>` and never bump `timestamp_updated`.
+
+```python
+scene.scan()                          # all properties; {prop: 'computed'|'skipped'|...}
+scene.scan(props=['embedding'], force=True)
+scm.scan_all(query={...})             # batch sweep, near-free when fresh
+```
+
+First property `embedding` — scene-level dinov2 aggregate over ALL image
+files in the folder (registered, unregistered, prototype alike): `mean`
+(component-wise, stored as computed — re-normalize before cosine) and
+`sigma3` (component-wise 3·std, for per-component membership band tests),
+plus `model`, `n_imgs`, `ts`. Per-image vectors are PNG-chunk cached
+(`embed(store=True)` — byte mutation accepted), so a re-scan after adding
+one image only infers that file. A stored-vs-default model mismatch also
+triggers recompute.
+
+Adding a second property = **one registry entry + one compute function** in
+`Scene` (`src/aidb/scene/scene.py`):
+
+```python
+def _scan_myprop(self) -> dict | None:      # value sub-doc, WITHOUT ts
+    return {SceneDef.FIELD_...: ...}        # None = not computable
+
+SCAN_REGISTRY = {
+    SceneDef.SCAN_PROP_EMBEDDING: _scan_embedding,
+    SceneDef.SCAN_PROP_MYPROP: _scan_myprop,   # ← that's all
+}
+```
+
+(`_SCAN_STALE_EXTRA` optionally adds a per-property recompute trigger
+evaluated on the stored value doc — e.g. the embedding's model check —
+without loading any model.)
+
 **`scenes_linked` semantics** — optional scene-doc object with
 `ids_scene_enh` (enhancer scene ids present among the scene's images) and
 `ids_scene_db`, an object `{neighbors: [str], sourced: [str]}` of DB-scene →

@@ -1,7 +1,7 @@
 from pathlib import Path
 import sys
 import pprint
-from typing import Any, Generator
+from typing import Any, Callable, ClassVar, Generator
 
 from ait.tools.files import imgs_from_url, img_latest_from_url
 from ait.tools.images import thumbnail_to_url
@@ -167,9 +167,7 @@ class Scene:
         `url_display`). Read-only, deterministic. Single source of truth shared
         with `_update_thumbnail`, so it can never diverge from the grid.
         """
-        imgs = SceneDef.sort_by_timestamp_updated(
-            SceneDef.reduce_by_rating_highest(self.imgs)
-        )
+        imgs = SceneDef.sort_by_timestamp_updated(SceneDef.reduce_by_rating_highest(self.imgs))
         return imgs[0] if imgs else None
 
     @property
@@ -271,6 +269,135 @@ class Scene:
         # labels
         if self._data.get(SceneDef.FIELD_LABELS, None) is None:
             self.set_labels(self.labels)
+
+    # ------------------------------------------------------------------
+    # scene self-scan (board task 69): per-property cached derived state
+    # ------------------------------------------------------------------
+
+    def scan(self, props: list[str] | None = None, force: bool = False) -> dict[str, str]:
+        """Compute/refresh cached derived properties of this scene.
+
+        Iterates `SCAN_REGISTRY` (or the given ``props`` subset) and
+        recomputes a property only when it is missing, ``force=True``,
+        ``timestamp_updated > scan[prop].ts``, or its optional
+        `_SCAN_STALE_EXTRA` trigger fires (e.g. stored-vs-requested model
+        mismatch). Pure DB-timestamp semantics: files appearing on disk
+        alone do NOT trigger a recompute — the membership API (board task
+        70) guarantees the bump for sanctioned changes; hand-filed files
+        need ``force=True``.
+
+        Fresh values are persisted per property via
+        `SceneManager.scene_scan_write` — a targeted ``$set scan.<prop>``
+        that deliberately does not bump ``timestamp_updated`` — and stamped
+        with their own ``ts`` AFTER computing, so a fresh property stays
+        fresh until the next real scene change.
+
+        Returns ``{prop: outcome}`` with outcome one of ``'computed'`` /
+        ``'skipped'`` / ``'failed'`` (not computable or write failed) /
+        ``'unknown'`` (no registry entry).
+        """
+        names = list(self.SCAN_REGISTRY) if props is None else props
+        stored = self._data.get(SceneDef.FIELD_SCAN)
+        scan_doc: dict[str, Any] = dict(stored) if isinstance(stored, dict) else {}
+        ts_updated = self._data.get(SceneDef.FIELD_TIMESTAMP_UPDATED) or 0.0
+
+        result: dict[str, str] = {}
+        for name in names:
+            fn = self.SCAN_REGISTRY.get(name)
+            if fn is None:
+                self._log(f'scan: unknown property: {name}', level='warning')
+                result[name] = 'unknown'
+                continue
+            if not force and self._scan_is_fresh(name, scan_doc.get(name), ts_updated):
+                result[name] = 'skipped'
+                continue
+            value = fn(self)
+            if value is None:
+                result[name] = 'failed'
+                continue
+            value = dict(value)
+            value[SceneDef.FIELD_SCAN_TS] = SceneDef.now_ts()
+            if not self._scm.scene_scan_write(self.id, name, value):
+                result[name] = 'failed'
+                continue
+            scan_doc[name] = value
+            result[name] = 'computed'
+            self._log(f'scan: {name} computed', level='info')
+
+        self._data[SceneDef.FIELD_SCAN] = scan_doc
+        return result
+
+    def _scan_is_fresh(self, name: str, cur: Any, ts_updated: float) -> bool:
+        """Skip rule of `scan()`: a stored property value is fresh iff it has
+        a ``ts`` not older than the scene's ``timestamp_updated`` and its
+        optional extra staleness trigger does not fire. Never loads a model."""
+        if not isinstance(cur, dict):
+            return False
+        ts = cur.get(SceneDef.FIELD_SCAN_TS)
+        if not isinstance(ts, (int, float)):
+            return False
+        if ts_updated > ts:
+            return False
+        stale_fn = self._SCAN_STALE_EXTRA.get(name)
+        if stale_fn is not None and stale_fn(cur):
+            return False
+        return True
+
+    def _scan_embedding(self) -> dict | None:
+        """Scan property ``embedding``: scene-level dinov2 aggregate over ALL
+        image files in the scene folder — registered, unregistered and
+        prototype alike (`urls_img`).
+
+        Two vectors side by side, deliberately NOT combined (board task 69):
+        ``mean`` is the component-wise mean of the per-image embeddings,
+        stored as computed (not re-normalized) — cosine on the re-normalized
+        mean gives scene↔scene similarity directly on the calibrated dinov2
+        scale (board task 68: cluster ≥0.775, attach ≥0.65); ``sigma3`` is
+        the component-wise 3·std, enabling a per-component band test
+        (diagonal-covariance style) for single-image membership.
+
+        Per-image vectors come from `ait.tools.images.embed(store=True)` —
+        PNG-chunk caching on purpose, so a re-scan after adding one image
+        only runs inference for the new file (the resulting PNG byte
+        mutation is accepted; see the `scene_adopt_img` byte-identity
+        caveat). Returns None (→ outcome 'failed') when no image embeds.
+        """
+        import numpy as np
+
+        from ait.tools.images import EMBED_MODEL_DEFAULT, embed
+
+        urls = list(self.urls_img)
+        vecs = [v for v in embed(urls, model=EMBED_MODEL_DEFAULT, store=True) if v is not None]
+        if not vecs:
+            self._log('scan: embedding: no embeddable images', level='warning')
+            return None
+        arr = np.stack(vecs).astype(float)
+        return {
+            SceneDef.FIELD_SCAN_MODEL: EMBED_MODEL_DEFAULT,
+            SceneDef.FIELD_SCAN_N_IMGS: len(vecs),
+            SceneDef.FIELD_SCAN_MEAN: arr.mean(axis=0).tolist(),
+            SceneDef.FIELD_SCAN_SIGMA3: (3.0 * arr.std(axis=0)).tolist(),
+        }
+
+    @staticmethod
+    def _scan_embedding_stale(cur: dict) -> bool:
+        """Extra recompute trigger for ``embedding``: the stored value was
+        computed with a different model than the current default."""
+        from ait.tools.images import EMBED_MODEL_DEFAULT
+
+        return cur.get(SceneDef.FIELD_SCAN_MODEL) != EMBED_MODEL_DEFAULT
+
+    # Property registry: name → compute fn returning the value sub-doc
+    # (WITHOUT `ts` — `scan()` stamps it) or None when not computable.
+    # Adding a property = one entry here + one compute method; an extra
+    # per-property staleness trigger (evaluated on the stored value doc,
+    # no model load) is optional via `_SCAN_STALE_EXTRA`.
+    SCAN_REGISTRY: ClassVar[dict[str, Callable[['Scene'], dict | None]]] = {
+        SceneDef.SCAN_PROP_EMBEDDING: _scan_embedding,
+    }
+    _SCAN_STALE_EXTRA: ClassVar[dict[str, Callable[[dict], bool]]] = {
+        SceneDef.SCAN_PROP_EMBEDDING: _scan_embedding_stale,
+    }
 
     # @property
     # def rating(self) -> int: ...

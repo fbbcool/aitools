@@ -90,6 +90,24 @@ class SceneDef:
     FIELD_LINKED_NEIGHBORS: Final = 'neighbors'
     FIELD_LINKED_SOURCED: Final = 'sourced'
 
+    # scan (board FEATURE REQ task 69): machine-maintained cache of derived
+    # per-scene properties — one sub-doc per property under `scan`, each
+    # carrying its own `ts` (epoch float) next to its value fields.
+    # Staleness rule (pure DB-timestamp semantics): a property is recomputed
+    # iff it is missing, `force=True`, or `timestamp_updated > scan[prop].ts`
+    # — files appearing on disk alone do NOT trigger a recompute (use force).
+    # Scan writes are targeted `$set scan.<prop>` and deliberately do NOT
+    # bump `timestamp_updated` (a scan write must never mark the scene stale
+    # for its own skip rule). Property registry: `Scene.SCAN_REGISTRY`.
+    FIELD_SCAN: Final = 'scan'
+    FIELD_SCAN_TS: Final = 'ts'
+    # `embedding` property value keys (scene-level dinov2 aggregate)
+    SCAN_PROP_EMBEDDING: Final = 'embedding'
+    FIELD_SCAN_MODEL: Final = 'model'
+    FIELD_SCAN_N_IMGS: Final = 'n_imgs'
+    FIELD_SCAN_MEAN: Final = 'mean'
+    FIELD_SCAN_SIGMA3: Final = 'sigma3'
+
     DEFAULT_RATIOS: Final = [1.0, 2.0 / 3.0, 3.0 / 4.0]
     DEFAULT_RESOLUTIONS: Final = [512, 768, 1024]
 
