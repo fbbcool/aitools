@@ -110,6 +110,20 @@ class AIDBSceneApp:
                 elem_id=AppHtml.elem_id_simg_editor_register_prototype_databus(),
             )
 
+            # Hidden trigger + databus for the per-cell wastebin quick-delete
+            # (registered, prototype and unregistered cells). The databus
+            # carries an image id or a file url; the backend routes through
+            # `SceneManager.img_delete` (board task 70).
+            button_hidden_simg_editor_delete = gr.Button(
+                'Hidden SceneImage Editor Delete',
+                visible='hidden',
+                elem_id=AppHtml.elem_id_simg_editor_delete_button(),
+            )
+            databus_simg_editor_delete = gr.Textbox(
+                visible='hidden',
+                elem_id=AppHtml.elem_id_simg_editor_delete_databus(),
+            )
+
             # Hidden trigger + databus for captioning a registered SceneImage
             # via JoySceneDB (routing through the persistent joy_server).
             button_hidden_simg_editor_caption = gr.Button(
@@ -607,6 +621,17 @@ class AIDBSceneApp:
                     databus_simg_editor_register_prototype,
                     simg_editor_scene_id,
                 ],
+                outputs=[],
+                show_progress='hidden',
+            )
+
+            # Wastebin quick-delete (per-cell, NO confirmation). Toast-only;
+            # the cell is hidden optimistically by the button's JS, so no
+            # editor refresh is needed — on a failure toast, refresh manually
+            # to bring the cell back.
+            button_hidden_simg_editor_delete.click(
+                self._html_simg_editor_delete,
+                inputs=[databus_simg_editor_delete],
                 outputs=[],
                 show_progress='hidden',
             )
@@ -2306,6 +2331,31 @@ class AIDBSceneApp:
 
         label = 'prototype' if prototype else 'image'
         gr.Info(f'{url.name} registered as {label}.', duration=0.5)
+
+    def _html_simg_editor_delete(self, target_str: Optional[str]) -> None:
+        """
+        Wastebin quick-delete, NO confirmation: removes an image from its
+        scene via the canonical membership API (`SceneManager.img_delete`,
+        board task 70). `target_str` is an image id (registered/prototype
+        cells) or a file url (unregistered cells). Registered images are
+        hard-deleted (doc + file). Toast-only; the cell was already hidden
+        optimistically in the DOM — after a failure toast, refresh the
+        editor to bring it back.
+        """
+        if not target_str or not isinstance(target_str, str):
+            gr.Warning('Delete: invalid target.')
+            return
+        target = target_str.strip()
+        try:
+            ok = self._scm.img_delete(target)
+        except Exception as e:
+            print(f'ERROR: img_delete [{target}]: {e}')
+            gr.Warning(f'Delete failed: {e} — refresh the editor.')
+            return
+        if not ok:
+            gr.Warning(f'Delete refused: {target} is not a scene member — refresh the editor.')
+            return
+        gr.Info(f'deleted: {Path(target).name}', duration=0.5)
 
     # ------------------------------------------------------------------
     # prototype-all: bulk-flag every registered image of the loaded scene

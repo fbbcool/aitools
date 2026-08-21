@@ -214,6 +214,9 @@ class AppSceneImageCell:
         )
         goto_scene_btn = AppSceneImageCell._html_goto_scene_button(obj.scene_id)
         refresh_btn = AppSceneImageCell._html_refresh_button(obj.id, set_id)
+        delete_btn = AppSceneImageCell._html_delete_button(
+            obj.id, title='delete image + db doc — no confirmation!'
+        )
 
         skin_name = active_skin_name()
         caption_btn_skin = AppSceneImageCell._html_caption_button(
@@ -274,6 +277,7 @@ class AppSceneImageCell:
                         {caption_btn_skin}
                         {caption_btn_skin_clip}
                         <span class="simg-cell-actions-refresh">{refresh_btn}</span>
+                        {delete_btn}
                     </div>
                 </div>
                 <div class="simg-edit-labels-col">
@@ -964,6 +968,34 @@ class AppSceneImageCell:
         )
 
     @staticmethod
+    def _html_delete_button(target: str, title: str = 'delete image — no confirmation!') -> str:
+        """Wastebin button: quick-delete via `SceneManager.img_delete`, NO
+        confirmation (board follow-up to task 70). `target` is what the
+        backend resolves — an image id for registered cells, the file url
+        for unregistered ones. The cell is hidden optimistically in the DOM;
+        the backend reports the outcome as a toast (a failure toast means
+        the hidden cell reappears on the next refresh)."""
+        elem_id_btn = AppHtml.elem_id_simg_editor_delete_button()
+        elem_id_bus = AppHtml.elem_id_simg_editor_delete_databus()
+
+        target_js = str(target).replace('\\', '\\\\').replace("'", "\\'")
+        js = (
+            'event.stopPropagation();'
+            "const cell = event.currentTarget.closest('.image-item');"
+            "if (cell) { cell.style.display = 'none'; }"
+            f"const bus = document.querySelector('#{elem_id_bus} textarea');"
+            f"if (bus) {{ bus.value = '{target_js}';"
+            f"bus.dispatchEvent(new Event('input', {{ bubbles: true }})); }}"
+            f"const btn = document.getElementById('{elem_id_btn}');"
+            'if (btn) { btn.click(); }'
+        ).replace('"', '&quot;')
+        safe_title = html_lib.escape(title, quote=True)
+        return (
+            f'<button type="button" class="simg-delete-btn" onclick="{js}" '
+            f'title="{safe_title}">&#128465;</button>'
+        )
+
+    @staticmethod
     def _html_goto_scene_button(scene_id: Optional[str]) -> str:
         """
         Small button: navigates to the Scene Editor with the given scene
@@ -1620,6 +1652,9 @@ class AppSceneImageCell:
         thumb_onclick = AppSceneImageCell._html_lightbox_onclick(
             target_type='unregistered', target=url_str
         )
+        delete_btn = AppSceneImageCell._html_delete_button(
+            url_str, title='delete file — no confirmation!'
+        )
         return f"""
         <div class="image-item simg-unreg-cell">
             <img src="data:image/png;base64,{img_b64}" onclick="{thumb_onclick}">
@@ -1637,6 +1672,7 @@ class AppSceneImageCell:
                             onclick="{onclick_js_p}">
                         register prototype
                     </button>
+                    {delete_btn}
                 </div>
             </div>
         </div>
@@ -1766,6 +1802,24 @@ class AppSceneImageCell:
             .simg-caption-btn:hover,
             .simg-set-btn:hover {
                 background-color: #777777;
+            }
+            /* wastebin quick-delete: styled as the other cell buttons but
+               with a red hover so the destructive action stands out */
+            .simg-delete-btn {
+                padding: 5px 8px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 0.8em;
+                transition: all 0.2s ease;
+                background-color: #555555;
+                color: #ffffff;
+                font-family: inherit;
+                line-height: 1;
+            }
+            .simg-delete-btn:hover {
+                background-color: #b91c1c;
+                border-color: #b91c1c;
             }
             /* Cells whose backend state has likely diverged from what is
                rendered (e.g. register was clicked but the editor has not
