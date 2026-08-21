@@ -116,8 +116,15 @@ the ait downloader (`ait.install.snapshot_from_db`). Device auto-selects:
 batches of **more than 3** readable images run on the GPU when available,
 smaller ones on CPU (the model is small enough to coexist with a running
 ComfyUI — which is never touched); an explicit `device='cpu'`/`'cuda'` always
-wins. `batch_size=` (default 16) bounds memory. Rule of thumb with
-dinov2:small: same motif re-rendered ≳0.6, unrelated images ≲0.3.
+wins. `batch_size=` (default 16) bounds memory. Similarity scale with
+dinov2:small (calibrated by agent-aidb on enhancer renders, board task 68,
+2026-08-21): near-identical pose ≳0.93; same scene, different pose/framing
+~0.77–0.93 (same-scene pairs range down to 0.44); different scene ≤0.77
+(strongest cross-scene pair measured: 0.768); unrelated images ≲0.3. For
+grouping renders into scenes, the validated two-stage rule is: union-find
+cluster at cosine ≥0.775, then attach leftover singletons to the group of
+their best link when that link is ≥0.65 (true singletons top out at ~0.56).
+Recalibrate if the embedding model or render style changes.
 
 **Stored embeddings** — `embed(paths, store=True)` writes each freshly computed
 vector back into its PNG as a model-keyed metadata payload: a tEXt chunk named
@@ -162,7 +169,7 @@ embed_stored(paths, model='dinov2:base')  # payload lookup is model-scoped
 | return | `list`, one entry per input, order preserved — even for a single path |
 | entry | L2-normalized 384-dim float32 numpy vector (`dinov2:small`) |
 | n/a → `None` | unreadable/missing file; for `embed_stored` also: no payload, other model, malformed payload, non-PNG. Never raises. |
-| similarity | `float(v1 @ v2)` — dot product IS cosine; same motif ≳0.6, unrelated ≲0.3 |
+| similarity | `float(v1 @ v2)` — dot product IS cosine; same scene ~0.77–0.93 (down to 0.44), different scene ≤0.77, unrelated ≲0.3; scene grouping: cluster ≥0.775, attach ≥0.65 (task 68) |
 | payload | PNG tEXt chunk `embedding-<group>-<variant>` (e.g. `embedding-dinov2-small`), schema `ait.image.embedding.v1` |
 | store | PNG only, pixels + all other chunks byte-identical; changes file bytes (byte-identity checks!) |
 | device | auto: >3 images needing compute **and** CUDA available → GPU, else CPU; explicit `device=` wins |
@@ -216,6 +223,15 @@ collection) is matched against `scenes_linked.ids_scene_enh` across scenes:
   "unmatched, subdir needed" outcome — with zero side effects, so you can ask
   the operator for a subdir and retry.
 
+Every successful payload adoption also records the **derivation**: the
+payload's `url` (the enhancer scene's canonical image path — the ONLY bridge
+to DB scenes) is resolved to its *origin* DB scene (registered image → its
+`scene_id`, else the url's directory as a scene url) and appended to the
+adopting scene's `scenes_linked.ids_scene_db.sourced`. Links are **one-way
+child → origin**: the origin scene gets no backlink. An unresolvable origin
+(payload url null / outside the scenes tree / dir not a scene) never blocks
+the adoption, but the miss is visible in the result (see outcome contract).
+
 Payload-less renders resolve as before: the file's own registration first, else
 the embedded `parent_metadata` provenance chain (`metadata()['parent']` —
 parent registered → its scene; else the parent's directory as scene url).
@@ -223,24 +239,35 @@ parent registered → its scene; else the parent's directory as scene url).
 Outcome contract: **truthy str** = adopted scene id; **`None`** = enhancer
 payload matched no scene and no `subdir_new` was given; **`False`** = nothing
 resolves / never-overwrite collision — on both non-str outcomes **nothing** is
-touched on disk or in the DB. The file lands as an *unregistered* render: no
-image doc is inserted (registration stays a curator step). A same-named file
-already in the scene folder is only accepted when byte-identical (idempotent
-re-adopt); different content → `False`, never overwritten.
+touched on disk or in the DB. Payload-path successes are an `AdoptOutcome`
+(exported from `aidb`) — a `str` subclass that compares/serializes as the
+scene id and carries `id_origin: str | None` plus `origin_unresolved: bool`,
+so an origin miss is in the result, not silent. The file lands as an
+*unregistered* render: no image doc is inserted (registration stays a curator
+step). A same-named file already in the scene folder is only accepted when
+byte-identical (idempotent re-adopt); different content → `False`, never
+overwritten.
 
 **`scenes_linked` semantics** — optional scene-doc object with
 `ids_scene_enh` (enhancer scene ids present among the scene's images) and
-`ids_scene_db` (reserved, unused). Absent field reads as empty lists — old
-docs need no migration (`SceneDef.scenes_linked_from_data`). It is
+`ids_scene_db`, an object `{neighbors: [str], sourced: [str]}` of DB-scene →
+DB-scene links: `sourced` holds the scenes this scene was derived from
+(direct origin only — deeper ancestry stays recoverable transitively;
+one-way, no backlinks), `neighbors` is reserved for future association and
+unused today. Absent field/keys read as the empty structure — old docs need
+no migration (`SceneDef.scenes_linked_from_data`). It is
 **machine-maintained bookkeeping, not curator ground truth**: it never
 justifies touching `labels_ng`/`hints`/`caption*`/ratings, and machines may
 write it without curator confirmation (writes deliberately don't bump
-`timestamp_updated`). Maintained by: `scene_adopt_img` (match + create paths)
-and `new_scene_from_urls` (seeded from the imported images' payloads at
-creation). **Not** maintained by: manual folder drops + `update_from_url` /
-`scenes_update`, and registration/rating/caption flows — after hand-filing
-renders, call `scm.scene_seed_enh_links(scene_id)` (or rerun
-`script/scenes_linked_backfill.py`, idempotent) to catch the links up.
+`timestamp_updated`). Maintained by: `scene_adopt_img` (match + create paths,
+both keys) and `new_scene_from_urls` (both keys seeded from the imported
+images' payloads at creation). **Not** maintained by: manual folder drops +
+`update_from_url` / `scenes_update`, and registration/rating/caption flows —
+after hand-filing renders, call `scm.scene_seed_enh_links(scene_id)` (seeds
+both keys; or rerun `script/scenes_linked_backfill.py`, idempotent) to catch
+the links up. The scene-editor UI renders every id in `ids_scene_db`
+(sourced + neighbors) as a standard scene cell below the scene's images —
+click opens that scene in a new scene-editor tab.
 
 ---
 

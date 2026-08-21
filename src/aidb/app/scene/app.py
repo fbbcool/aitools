@@ -319,6 +319,11 @@ class AIDBSceneApp:
                 simg_editor_html = gr.HTML(label='Scene Images')
                 gr.Markdown('### Unregistered Images')
                 simg_editor_unregistered_html = gr.HTML(label='Unregistered Images')
+                # Linked scenes (board task 66): scenes_linked.ids_scene_db
+                # (sourced + neighbors) rendered as standard scene cells below
+                # the scene's images. Header lives inside the HTML value so a
+                # scene without links renders no extra section at all.
+                simg_editor_linked_html = gr.HTML(label='Linked Scenes')
 
             with gr.Tab('Set Editor'):
                 gr.Markdown('## Set Editor')
@@ -508,6 +513,7 @@ class AIDBSceneApp:
                 simg_editor_scene_info_html,
                 simg_editor_html,
                 simg_editor_unregistered_html,
+                simg_editor_linked_html,
             ]
 
             # SceneImage editor: opening triggered from a scene-cell thumbnail
@@ -2033,7 +2039,7 @@ class AIDBSceneApp:
         return None
 
     @staticmethod
-    def _editor_clear_all() -> tuple[str, str, str, str]:
+    def _editor_clear_all() -> tuple[str, str, str, str, str]:
         """
         Wipes EVERY editor output to a clean placeholder, including the
         scene-id textbox. Used as the first step of the thumbnail-click
@@ -2042,19 +2048,19 @@ class AIDBSceneApp:
         and ensures no stale state survives.
         """
         loading = '<p><em>loading...</em></p>'
-        return '', '', loading, ''
+        return '', '', loading, '', ''
 
     @staticmethod
-    def _editor_clear_content(scene_id: Optional[str]) -> tuple[str, str, str, str]:
+    def _editor_clear_content(scene_id: Optional[str]) -> tuple[str, str, str, str, str]:
         """
         Wipes only the content panes (scene-info / registered / unregistered
-        HTMLs) and PRESERVES the scene-id textbox. Used as the first step
-        of refresh / batch-caption paths whose `.then()` step reads the
+        / linked HTMLs) and PRESERVES the scene-id textbox. Used as the first
+        step of refresh / batch-caption paths whose `.then()` step reads the
         scene id back from the textbox - if we cleared it, the load step
         would get an empty string and lose the scene context.
         """
         loading = '<p><em>loading...</em></p>'
-        return (scene_id or ''), '', loading, ''
+        return (scene_id or ''), '', loading, '', ''
 
     @staticmethod
     def _flush_state() -> None:
@@ -2081,7 +2087,7 @@ class AIDBSceneApp:
 
     def _on_load_scene_param(
         self, request: gr.Request
-    ) -> tuple[Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any]:
         """
         Blocks `.load` deep-link handler. If the page was opened as
         `/?scene=<id>` (a Scene Search thumbnail's new-tab link, or a pasted
@@ -2101,15 +2107,16 @@ class AIDBSceneApp:
                 scene_id = None
         if not scene_id:
             # No deep-link: don't disturb the default search-first view.
-            return gr.update(), gr.update(), gr.update(), gr.update()
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         return self._html_simg_editor_open(scene_id)
 
     def _html_simg_editor_open(
         self, scene_id: Optional[str]
-    ) -> tuple[str, str, str, str]:
+    ) -> tuple[str, str, str, str, str]:
         """
         Renders the editor for the given scene. Returns:
-            (scene_id, scene_info_html, registered_imgs_html, unregistered_imgs_html)
+            (scene_id, scene_info_html, registered_imgs_html,
+             unregistered_imgs_html, linked_scenes_html)
 
         The Scene + SceneImage objects are constructed fresh from the DB on
         every call (no in-process caching), so values shown reflect the
@@ -2121,7 +2128,7 @@ class AIDBSceneApp:
 
         empty_msg = '<p>No scene selected. Click a scene thumbnail to load it.</p>'
         if not scene_id or not isinstance(scene_id, str):
-            return '', '', empty_msg, ''
+            return '', '', empty_msg, '', ''
 
         scene_id = scene_id.strip()
         try:
@@ -2129,7 +2136,7 @@ class AIDBSceneApp:
         except Exception as e:
             print(f'ERROR: couldnt load scene [{scene_id}]: {e}')
             err = f'<p>Failed to load scene <code>{scene_id}</code>: {e}</p>'
-            return scene_id, '', err, ''
+            return scene_id, '', err, '', ''
 
         styles = AppSceneImageCell.html_styles()
         scene_info_html = styles + AppSceneImageCell.html_scene_info(scene)
@@ -2190,7 +2197,40 @@ class AIDBSceneApp:
                 f'<p>No unregistered images in scene <code>{scene.url}</code>.</p>'
             )
 
-        return scene_id, scene_info_html, registered_html, unregistered_html
+        linked_html = self._html_linked_scenes(scene_id)
+
+        return scene_id, scene_info_html, registered_html, unregistered_html, linked_html
+
+    def _html_linked_scenes(self, scene_id: str) -> str:
+        """
+        Linked-scenes section of the Scene Editor (board task 66): every id in
+        the scene's `scenes_linked.ids_scene_db` (sourced first, then
+        neighbors) as a standard scene cell — the thumbnail anchor opens the
+        linked scene in a new scene-editor tab, exactly like a Scene Search
+        result. Scenes without links yield '' (no extra section).
+        """
+        linked = SceneDef.scenes_linked_from_data(self._scm.data_from_id(scene_id))
+        ids_db = linked[SceneDef.FIELD_IDS_SCENE_DB]
+        ids_linked: list[str] = []
+        for sid in (
+            ids_db[SceneDef.FIELD_LINKED_SOURCED] + ids_db[SceneDef.FIELD_LINKED_NEIGHBORS]
+        ):
+            if sid not in ids_linked:
+                ids_linked.append(sid)
+        if not ids_linked:
+            return ''
+
+        cells = ''
+        for sid in ids_linked:
+            try:
+                cells += AppSceneCell.html(self._scm.scene_from_id_or_url(sid), 'none')
+            except Exception as e:
+                print(f'ERROR: couldnt render linked scene [{sid}] of [{scene_id}]: {e}')
+                cells += (
+                    f'<div class="image-item"><p>linked scene <code>{sid}</code> '
+                    f'failed to load</p></div>'
+                )
+        return '<h3>Linked Scenes</h3>' + AppHtml.html_styled_cells_grid(cells)
 
     def _unregistered_urls_in_scene(self, scene) -> list[Path]:
         """
@@ -2273,7 +2313,7 @@ class AIDBSceneApp:
 
     def _html_simg_editor_prototype_all(
         self, scene_id: Optional[str]
-    ) -> tuple[str, str, str, str]:
+    ) -> tuple[str, str, str, str, str]:
         if not scene_id or not isinstance(scene_id, str):
             gr.Warning('No scene loaded.')
             return self._html_simg_editor_open(scene_id)
@@ -2312,7 +2352,7 @@ class AIDBSceneApp:
 
     def _html_simg_editor_caption_empty(
         self, scene_id: Optional[str]
-    ) -> tuple[str, str, str, str]:
+    ) -> tuple[str, str, str, str, str]:
         """
         Scene-level batch caption.
 

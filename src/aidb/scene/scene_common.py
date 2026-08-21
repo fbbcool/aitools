@@ -8,6 +8,26 @@ from aidb.dbdefines import TAGS_TRIGGER
 SceneConfig = Literal['test', 'prod', 'default']
 
 
+class AdoptOutcome(str):
+    """Successful `SceneManager.scene_adopt_img` payload-routing outcome: the
+    adopted scene id (compares/serializes as a plain str), carrying whether
+    the enhancer payload's origin DB scene resolved (board task 66 — the
+    origin miss must be visible in the call's result, not silent).
+
+    `id_origin` is the origin DB scene resolved from the payload's `url`
+    (None when unresolvable — payload url null / outside the scenes tree /
+    dir not a scene); `origin_unresolved` mirrors that as a bool."""
+
+    id_origin: Optional[str]
+    origin_unresolved: bool
+
+    def __new__(cls, scene_id: str, id_origin: Optional[str] = None) -> 'AdoptOutcome':
+        obj = super().__new__(cls, scene_id)
+        obj.id_origin = id_origin
+        obj.origin_unresolved = id_origin is None
+        return obj
+
+
 class SceneDef:
     COLLECTION_IMAGES: Final = 'images'
     COLLECTION_SCENES: Final = 'scenes'
@@ -59,11 +79,16 @@ class SceneDef:
     # hints / caption* / ratings; machines may write it without curator
     # confirmation. `ids_scene_enh` lists 1xlasm-enhancer scene ids (docs in
     # the enhancer's own collection, never resolvable against `scenes`) present
-    # among the scene's images; `ids_scene_db` is reserved for future DB-scene
-    # associations and unused today.
+    # among the scene's images; `ids_scene_db` holds DB-scene → DB-scene links
+    # as `{neighbors: [str], sourced: [str]}`: `sourced` are the scenes this
+    # scene was derived from (direct origin only, resolved from the enhancer
+    # payload's `url`; ONE-WAY child → origin, origins get no backlink),
+    # `neighbors` is reserved for generic future association and unused today.
     FIELD_SCENES_LINKED: Final = 'scenes_linked'
     FIELD_IDS_SCENE_ENH: Final = 'ids_scene_enh'
     FIELD_IDS_SCENE_DB: Final = 'ids_scene_db'
+    FIELD_LINKED_NEIGHBORS: Final = 'neighbors'
+    FIELD_LINKED_SOURCED: Final = 'sourced'
 
     DEFAULT_RATIOS: Final = [1.0, 2.0 / 3.0, 3.0 / 4.0]
     DEFAULT_RESOLUTIONS: Final = [512, 768, 1024]
@@ -169,15 +194,29 @@ class SceneDef:
         ]
 
     @classmethod
-    def scenes_linked_from_data(cls, data: dict | None) -> dict[str, list[str]]:
+    def scenes_linked_from_data(cls, data: dict | None) -> dict[str, Any]:
         """Normalized `scenes_linked` of a scene document: absent field or
-        missing keys read as empty lists, so old docs need no migration."""
+        missing keys read as empty structure (`ids_scene_enh` a list,
+        `ids_scene_db` a `{neighbors: [], sourced: []}` object), so old docs
+        need no migration."""
+
+        def _ids(value: Any) -> list[str]:
+            if not isinstance(value, list):
+                return []
+            return [i for i in value if isinstance(i, str)]
+
         linked = (data or {}).get(cls.FIELD_SCENES_LINKED)
         if not isinstance(linked, dict):
             linked = {}
+        ids_db = linked.get(cls.FIELD_IDS_SCENE_DB)
+        if not isinstance(ids_db, dict):
+            ids_db = {}
         return {
-            key: [i for i in (linked.get(key) or []) if isinstance(i, str)]
-            for key in (cls.FIELD_IDS_SCENE_ENH, cls.FIELD_IDS_SCENE_DB)
+            cls.FIELD_IDS_SCENE_ENH: _ids(linked.get(cls.FIELD_IDS_SCENE_ENH)),
+            cls.FIELD_IDS_SCENE_DB: {
+                key: _ids(ids_db.get(key))
+                for key in (cls.FIELD_LINKED_NEIGHBORS, cls.FIELD_LINKED_SOURCED)
+            },
         }
 
     @classmethod

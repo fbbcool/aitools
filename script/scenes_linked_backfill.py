@@ -1,9 +1,11 @@
-"""One-time backfill of `scenes_linked.ids_scene_enh` (board FEATURE REQ task 66).
+"""One-time backfill of `scenes_linked` (board FEATURE REQ task 66).
 
 Scans every scene folder's images for 1xlasm-enhancer iteration payloads (via
 `ait.tools.images.metadata()` — prompt-chunk authoritative, parent/workflow
 inheritance per its trust rules) and writes the found enhancer scene ids into
-the scene document's `scenes_linked.ids_scene_enh` ($addToSet — idempotent,
+the scene document's `scenes_linked.ids_scene_enh` AND each payload's
+url-resolved origin DB scene into `scenes_linked.ids_scene_db.sourced`
+(one-way child → origin, self-links excluded; $addToSet — idempotent,
 re-runnable). Without this, `scene_adopt_img` payload matching starts blind and
 every adoption spawns a new scene.
 
@@ -16,7 +18,7 @@ Usage:
 
 import sys
 
-from aidb import SceneConfig, SceneManager
+from aidb import SceneConfig, SceneDef, SceneManager
 
 
 def main() -> None:
@@ -38,18 +40,25 @@ def main() -> None:
     scm = SceneManager(config=config, verbose=0)
     n_scenes = 0
     n_linked = 0
+    n_sourced = 0
     for scene_id in scm.ids:
         n_scenes += 1
         if dry:
-            found = scm.scene_scan_enh_ids(scene_id)
+            found = scm.scene_scan_links(scene_id)
         else:
             found = scm.scene_seed_enh_links(scene_id)
-        if found:
+        enh = found[SceneDef.FIELD_IDS_SCENE_ENH]
+        sourced = found[SceneDef.FIELD_LINKED_SOURCED]
+        if enh or sourced:
             n_linked += 1
-            print(f'{scene_id}: {found}')
+            n_sourced += 1 if sourced else 0
+            print(f'{scene_id}: enh={enh} sourced={sourced}')
 
     mode = 'DRY RUN — no writes' if dry else 'written'
-    print(f'{n_scenes} scenes scanned, {n_linked} carry enhancer renders ({mode})')
+    print(
+        f'{n_scenes} scenes scanned, {n_linked} carry enhancer renders, '
+        f'{n_sourced} resolve an origin scene ({mode})'
+    )
 
 
 if __name__ == '__main__':

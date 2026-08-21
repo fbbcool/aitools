@@ -16,7 +16,7 @@ from ait.tools.files import (
 )
 from ait.tools.images import metadata as image_metadata
 
-from .scene_common import SceneDef, SceneConfig
+from .scene_common import AdoptOutcome, SceneDef, SceneConfig
 
 
 class SceneManager:
@@ -275,8 +275,9 @@ class SceneManager:
         finally:
             self._subdir_scenes = prev_subdir
 
-        # maintenance write point (board task 66): seed scenes_linked from the
-        # imported images' enhancer payloads at creation time.
+        # maintenance write point (board task 66): seed scenes_linked
+        # (ids_scene_enh + ids_scene_db.sourced) from the imported images'
+        # enhancer payloads at creation time.
         for oid in ret:
             self.scene_seed_enh_links(oid)
 
@@ -396,8 +397,17 @@ class SceneManager:
         folder. No match: with ``subdir_new`` a new scene is created under that
         subdir (seeded with the enhancer id), without it the call returns
         ``None`` — the distinct "unmatched, subdir needed" outcome — with zero
-        side effects, so the caller can ask the operator and retry. Successful
-        payload adoptions keep ``ids_scene_enh`` current.
+        side effects, so the caller can ask the operator and retry.
+
+        Successful payload adoptions keep ``ids_scene_enh`` current AND record
+        the derivation: the payload's ``url`` is resolved to its origin DB
+        scene (registered image → its ``scene_id``, else the url's directory
+        as a scene url) and appended to the adopting scene's
+        ``scenes_linked.ids_scene_db.sourced`` — one-way child → origin, the
+        origin scene gets no backlink. Payload-path successes return an
+        `AdoptOutcome` (a str carrying ``id_origin`` / ``origin_unresolved``):
+        an unresolvable origin never blocks the adoption, but the miss is
+        visible in the result instead of silent.
 
         Payload-less renders resolve as before (board task 65): the file's own
         registration (``0rig___<id>`` filename or a registered image url) wins;
@@ -422,7 +432,7 @@ class SceneManager:
         md = image_metadata(url)
         id_enh = self._enh_id_from_metadata(md)
         if id_enh is not None:
-            return self._adopt_by_enh_id(url, id_enh, move, subdir_new)
+            return self._adopt_by_enh_id(url, id_enh, move, subdir_new, md)
 
         scene_id = self._scene_id_for_adoption(url, md)
         if not scene_id:
@@ -462,29 +472,40 @@ class SceneManager:
         return scene_id
 
     def _adopt_by_enh_id(
-        self, url: Path, id_enh: str, move: bool, subdir_new: str | None
+        self, url: Path, id_enh: str, move: bool, subdir_new: str | None, md: dict | None
     ) -> str | None | bool:
         """Payload routing of `scene_adopt_img`: match the enhancer scene id
         against ``scenes_linked.ids_scene_enh``; see the caller's docstring for
-        the win/tie-break/no-match contract."""
+        the win/tie-break/no-match contract and the ``sourced`` maintenance."""
+        id_origin = self._origin_scene_from_enh(md)
+        if id_origin is None:
+            self._log(
+                f'scene_adopt_img: origin scene of enhancer payload unresolvable: {url}',
+                level='warning',
+            )
         matches = self.scene_ids_from_enh_id(id_enh)
 
         # a matching scene already holding the file byte-identical wins
+        target: str | None = None
         for scene_id in matches:
             url_scene = self.url_from_id(scene_id)
             if url_scene is None:
                 continue
             dest = Path(url_scene) / url.name
             if dest.is_file() and filecmp.cmp(url, dest, shallow=False):
-                return self._img_to_scene_dir(url, scene_id, move)
+                target = scene_id
+                break
 
-        if len(matches) > 1:
-            matches = [max(matches, key=self._scene_newest_mtime)]
-        if matches:
-            placed = self._img_to_scene_dir(url, matches[0], move)
-            if isinstance(placed, str):
-                self.link_scene_enh(placed, id_enh)
-            return placed
+        if target is None and matches:
+            target = max(matches, key=self._scene_newest_mtime) if len(matches) > 1 else matches[0]
+        if target is not None:
+            placed = self._img_to_scene_dir(url, target, move)
+            if not isinstance(placed, str):
+                return placed
+            self.link_scene_enh(placed, id_enh)
+            if id_origin is not None:
+                self.link_scene_db_sourced(placed, id_origin)
+            return AdoptOutcome(placed, id_origin)
 
         if subdir_new is None:
             self._log(
@@ -492,13 +513,14 @@ class SceneManager:
                 level='warning',
             )
             return None
-        return self._scene_new_from_enh(url, id_enh, move, subdir_new)
+        return self._scene_new_from_enh(url, id_enh, move, subdir_new, id_origin)
 
     def _scene_new_from_enh(
-        self, url: Path, id_enh: str, move: bool, subdir_new: str
+        self, url: Path, id_enh: str, move: bool, subdir_new: str, id_origin: str | None
     ) -> str | bool:
         """Create a new scene under ``subdir_new`` for an unmatched enhancer
-        render: place the file, register the scene doc, seed ``ids_scene_enh``."""
+        render: place the file, register the scene doc, seed ``ids_scene_enh``
+        and (when the origin resolved) ``ids_scene_db.sourced``."""
         prev_subdir = self._subdir_scenes
         self._subdir_scenes = subdir_new
         try:
@@ -518,8 +540,10 @@ class SceneManager:
             self._log(f'scene_adopt_img: scene creation failed for {dir_scene}', level='error')
             return False
         self.link_scene_enh(scene_id, id_enh)
+        if id_origin is not None:
+            self.link_scene_db_sourced(scene_id, id_origin)
         self._log(f'scene_adopt_img: {url.name} -> NEW scene[{scene_id}] ({dir_scene})')
-        return scene_id
+        return AdoptOutcome(scene_id, id_origin)
 
     def _scene_newest_mtime(self, scene_id: str) -> float:
         """Tie-break key for multi-match adoption: newest file mtime in the
@@ -549,36 +573,94 @@ class SceneManager:
         """Ensure an enhancer scene id is present in a scene's
         ``scenes_linked.ids_scene_enh`` ($addToSet — idempotent). Machine
         bookkeeping only: deliberately does not bump ``timestamp_updated``."""
+        field = f'{SceneDef.FIELD_SCENES_LINKED}.{SceneDef.FIELD_IDS_SCENE_ENH}'
+        return self._link_add_to_set(scene_id, field, id_enh)
+
+    def link_scene_db_sourced(self, scene_id: str, id_origin: str) -> bool:
+        """Ensure an origin DB scene id is present in a scene's
+        ``scenes_linked.ids_scene_db.sourced`` ($addToSet — idempotent).
+        ONE-WAY child → origin: the origin scene gets no backlink, and a
+        self-link is refused. Machine bookkeeping only: deliberately does not
+        bump ``timestamp_updated``."""
+        if id_origin == scene_id:
+            return False
+        field = (
+            f'{SceneDef.FIELD_SCENES_LINKED}.{SceneDef.FIELD_IDS_SCENE_DB}'
+            f'.{SceneDef.FIELD_LINKED_SOURCED}'
+        )
+        return self._link_add_to_set(scene_id, field, id_origin)
+
+    def _link_add_to_set(self, scene_id: str, field: str, value: str) -> bool:
         dbc = self._dbc_scenes
         oid = self._dbc.to_oid(scene_id)
         if dbc is None or oid is None:
             return False
-        field = f'{SceneDef.FIELD_SCENES_LINKED}.{SceneDef.FIELD_IDS_SCENE_ENH}'
-        result = dbc.update_one({SceneDef.FIELD_OID: oid}, {'$addToSet': {field: id_enh}})
+        result = dbc.update_one({SceneDef.FIELD_OID: oid}, {'$addToSet': {field: value}})
         return result is not None
 
     def scene_scan_enh_ids(self, scene_id: str) -> list[str]:
         """Read-only: the enhancer scene ids found in the payloads of a scene
         folder's images."""
+        return self.scene_scan_links(scene_id)[SceneDef.FIELD_IDS_SCENE_ENH]
+
+    def scene_scan_links(self, scene_id: str) -> dict[str, list[str]]:
+        """Read-only: the enhancer scene ids found in the payloads of a scene
+        folder's images plus the origin DB scenes those payloads' ``url``
+        resolve to — ``{ids_scene_enh: [...], sourced: [...]}``, both dedup'd,
+        self-links excluded from ``sourced``."""
+        found: dict[str, list[str]] = {
+            SceneDef.FIELD_IDS_SCENE_ENH: [],
+            SceneDef.FIELD_LINKED_SOURCED: [],
+        }
         url_scene = self.url_from_id(scene_id)
         if url_scene is None or not Path(url_scene).is_dir():
-            return []
-        found: list[str] = []
+            return found
         for url_img in imgs_and_vids_from_url(url_scene):
-            id_enh = self._enh_id_from_metadata(image_metadata(url_img))
-            if id_enh is not None and id_enh not in found:
-                found.append(id_enh)
+            md = image_metadata(url_img)
+            id_enh = self._enh_id_from_metadata(md)
+            if id_enh is None:
+                continue
+            if id_enh not in found[SceneDef.FIELD_IDS_SCENE_ENH]:
+                found[SceneDef.FIELD_IDS_SCENE_ENH].append(id_enh)
+            id_origin = self._origin_scene_from_enh(md)
+            if (
+                id_origin is not None
+                and id_origin != scene_id
+                and id_origin not in found[SceneDef.FIELD_LINKED_SOURCED]
+            ):
+                found[SceneDef.FIELD_LINKED_SOURCED].append(id_origin)
         return found
 
-    def scene_seed_enh_links(self, scene_id: str) -> list[str]:
+    def scene_seed_enh_links(self, scene_id: str) -> dict[str, list[str]]:
         """Scan a scene folder's images for enhancer payloads and write the
-        found enhancer scene ids into ``scenes_linked.ids_scene_enh``. Returns
-        the ids found. Shared by the creation-time seeding and the one-time
-        backfill (`script/scenes_linked_backfill.py`)."""
-        found = self.scene_scan_enh_ids(scene_id)
-        for id_enh in found:
+        found enhancer scene ids into ``scenes_linked.ids_scene_enh`` and the
+        payloads' resolved origin scenes into ``scenes_linked.ids_scene_db.
+        sourced``. Returns the `scene_scan_links` result. Shared by the
+        creation-time seeding and the one-time backfill
+        (`script/scenes_linked_backfill.py`)."""
+        found = self.scene_scan_links(scene_id)
+        for id_enh in found[SceneDef.FIELD_IDS_SCENE_ENH]:
             self.link_scene_enh(scene_id, id_enh)
+        for id_origin in found[SceneDef.FIELD_LINKED_SOURCED]:
+            self.link_scene_db_sourced(scene_id, id_origin)
         return found
+
+    def _origin_scene_from_enh(self, md: dict | None) -> str | None:
+        """Origin DB scene of an enhancer payload: its ``url`` (the enhancer
+        scene's canonical image path) resolved as a registered image
+        (→ ``SceneImage.scene_id``), else the url's directory as a scene url.
+        None when unresolvable (url null / outside the scenes tree / dir not
+        a scene). Only the payload's ``url`` bridges to DB scenes — the
+        payload's ``scene_id`` is an ENHANCER scene id and never resolves
+        against `scenes`."""
+        enh = md.get('enhancer') if md else None
+        url = enh.get('url') if isinstance(enh, dict) else None
+        if not isinstance(url, str) or not url:
+            return None
+        scene_id = self._scene_of_registered_img(url)
+        if scene_id:
+            return scene_id
+        return self.id_from_url(Path(url).parent)
 
     def _scene_id_for_adoption(self, url: Path, md: dict | None = None) -> str | None:
         """Resolve the owning scene of an image file, DB + provenance only.
@@ -588,17 +670,7 @@ class SceneManager:
         envelopes, depth-capped) — each parent tried as registered image
         (filename id / url), then its directory as a scene url.
         """
-        sim = self.scene_image_manager()
-
-        def _scene_of_registered(img_url: str | Path) -> str | None:
-            id_prefix = SceneDef.id_and_prefix_from_filename(img_url)
-            oid = id_prefix[0] if id_prefix is not None else sim.id_from_url(img_url)
-            if oid and sim.is_id(oid):
-                img = sim.img_from_id(oid)
-                return img.scene_id if img is not None else None
-            return None
-
-        scene_id = _scene_of_registered(url)
+        scene_id = self._scene_of_registered_img(url)
         if scene_id:
             return scene_id
 
@@ -611,13 +683,24 @@ class SceneManager:
             # 'url' as defined by the ait.image.metadata.v1 parent envelope
             parent_url = parent.get('url')
             if isinstance(parent_url, str) and parent_url:
-                scene_id = _scene_of_registered(parent_url)
+                scene_id = self._scene_of_registered_img(parent_url)
                 if scene_id:
                     return scene_id
                 scene_id = self.id_from_url(Path(parent_url).parent)
                 if scene_id:
                     return scene_id
             parent = parent.get('parent')
+        return None
+
+    def _scene_of_registered_img(self, img_url: str | Path) -> str | None:
+        """Owning scene of a REGISTERED image url (``0rig___<id>`` filename or
+        an image-url lookup); None for unregistered/unknown files."""
+        sim = self.scene_image_manager()
+        id_prefix = SceneDef.id_and_prefix_from_filename(img_url)
+        oid = id_prefix[0] if id_prefix is not None else sim.id_from_url(img_url)
+        if oid and sim.is_id(oid):
+            img = sim.img_from_id(oid)
+            return img.scene_id if img is not None else None
         return None
 
     def scenes_update(self) -> None:

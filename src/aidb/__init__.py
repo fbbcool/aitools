@@ -1,4 +1,5 @@
 from .scene import (
+    AdoptOutcome,
     SceneDef,
     Sceneical,
     SceneConfig,
@@ -13,6 +14,7 @@ from .scene import (
 )
 
 __all__ = [
+    'AdoptOutcome',
     'SceneDef',
     'Sceneical',
     'SceneConfig',
