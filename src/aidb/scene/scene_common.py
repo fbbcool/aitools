@@ -138,6 +138,9 @@ class SceneDef:
     FIELD_TIMESTAMP_LABELS_NG_EXTRACTION: Final = 'timestamp_labels_ng_EXTRACTION'
     FIELD_PROTOTYPE: Final = 'prototype'
 
+    # Legacy label-tag sets (scene label `set:<name>`), distinct from DB
+    # SceneSet documents in the sets collection. UI set choices come from
+    # the union of both; these names keep label-filter semantics.
     TAG_PREFIX_SET: Final = f'set{SEPERATOR_ID}'
     TAG_SETS: Final = ['test', 'gts_v3']
 

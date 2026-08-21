@@ -27,6 +27,16 @@
           "skip": false
         }
       ],
+      "face_restore": [
+        {
+          "repo_id": "facefusion/models-3.0.0",
+          "file": "codeformer.onnx",
+          "subdir": "codeformer",
+          "method_download": "huggingface",
+          "rename": "codeformer",
+          "skip": false
+        }
+      ],
       "voice": [
         {
           "repo_id": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",

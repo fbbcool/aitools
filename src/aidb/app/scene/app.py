@@ -200,7 +200,7 @@ class AIDBSceneApp:
             # level so it overlays correctly regardless of which tab is active.
             gr.HTML(value=AppSceneImageCell.html_lightbox_modal())
 
-            with gr.Tab('Scene Search'):  # Renamed tab for clarity
+            with gr.Tab('Scene Search') as scene_search_tab:  # Renamed tab for clarity
                 gr.Markdown('## Advanced Scene Search with Mandatory and Optional Tags')
                 gr.Markdown(
                     'Select up to 3 mandatory tags (all must be present) and up to 3 optional tags (contribute to score).'
@@ -237,7 +237,7 @@ class AIDBSceneApp:
                 with gr.Row():
                     set_dropdown = gr.Dropdown(
                         label='Set',
-                        choices=['Ignore', 'Empty'] + list(SceneDef.TAG_SETS),
+                        choices=self._rate_set_choices(),
                         value='Ignore',
                         allow_custom_value=False,
                         interactive=True,
@@ -249,6 +249,13 @@ class AIDBSceneApp:
                         allow_custom_value=False,
                         interactive=True,
                     )
+                # Re-query set choices whenever the tab is (re)selected so
+                # SceneSets created mid-session show up without a restart.
+                scene_search_tab.select(
+                    lambda: gr.update(choices=self._rate_set_choices()),
+                    inputs=[],
+                    outputs=[set_dropdown],
+                )
 
                 search_button = gr.Button('Search Scenes')
 
@@ -339,7 +346,7 @@ class AIDBSceneApp:
                 # scene without links renders no extra section at all.
                 simg_editor_linked_html = gr.HTML(label='Linked Scenes')
 
-            with gr.Tab('Set Editor'):
+            with gr.Tab('Set Editor') as set_editor_tab:
                 gr.Markdown('## Set Editor')
                 gr.Markdown(
                     'Select a set to edit all images contained in it '
@@ -354,6 +361,13 @@ class AIDBSceneApp:
                         allow_custom_value=False,
                         interactive=True,
                     )
+                # Re-query set choices whenever the tab is (re)selected so
+                # SceneSets created mid-session show up without a restart.
+                set_editor_tab.select(
+                    lambda: gr.update(choices=self._set_names()),
+                    inputs=[],
+                    outputs=[set_editor_name],
+                )
                 with gr.Tabs():
                     with gr.Tab('Images'):
                         with gr.Row():
@@ -974,6 +988,11 @@ class AIDBSceneApp:
                 names.append(name)
         names.sort()
         return names
+
+    def _rate_set_choices(self) -> list[str]:
+        # Legacy label tags (TAG_SETS) and DB SceneSets share one dropdown;
+        # TAG_SETS names keep their label-filter semantics on collision.
+        return ['Ignore', 'Empty'] + sorted(set(SceneDef.TAG_SETS) | set(self._set_names()))
 
     def _set_editor_filter_imgs(
         self,
@@ -1991,18 +2010,30 @@ class AIDBSceneApp:
             r_max = int(rating_max)
         labels = None  # legacy FIELD_LABELS filter UI was removed
 
+        # 'Set' filter: TAG_SETS names filter by the set:<name> label tag
+        # (legacy semantics); every other name is resolved as a DB SceneSet
+        # and filters by its scene membership.
+        set_query: dict | None = None
+        set_ids: set[str] | None = None
         if opt_set is None or opt_set in ['Ignore', 'None']:
-            set_query = None
+            pass
         elif opt_set == 'Empty':
             set_query = {
                 SceneDef.FIELD_LABELS: {
                     '$not': {'$regex': f'^{SceneDef.TAG_PREFIX_SET}'}
                 }
             }
-        else:
+        elif opt_set in SceneDef.TAG_SETS:
             set_query = {
                 SceneDef.FIELD_LABELS: f'{SceneDef.TAG_PREFIX_SET}{opt_set}'
             }
+        else:
+            try:
+                sset = self._ssm.set_from_id_or_name(opt_set)
+                set_ids = set(sset.ids_scene)
+            except ValueError:
+                print(f'Set [{opt_set}] not found in DB, no scenes match.')
+                set_ids = set()
 
         ids = list(self._scm.ids_from_rating(r_min, r_max, labels=labels))
         if set_query is not None:
@@ -2012,6 +2043,8 @@ class AIDBSceneApp:
                     SceneDef.COLLECTION_SCENES, ids, [set_query]
                 )
             ]
+        if set_ids is not None:
+            ids = [id for id in ids if id in set_ids]
         scenes = [self._scm.scene_from_id_or_url(id) for id in ids]
         if opt_subdir is not None and opt_subdir not in ('Ignore', 'None', ''):
             scenes = [
