@@ -248,6 +248,37 @@ step). A same-named file already in the scene folder is only accepted when
 byte-identical (idempotent re-adopt); different content → `False`, never
 overwritten.
 
+**Image↔scene membership — use the canonical API (board task 70).** The three
+`SceneManager` primitives are the recommended (and only supported) way to
+change which images belong to which scene:
+
+```python
+scm.img_add('/outside/render.png', scene_id)         # move in (default); move=False copies
+scm.img_delete(img_or_url)                           # file url, 0rig___<id> name, or image id
+scm.img_move(img_or_url, scene_id_target)            # scene → scene, doc kept consistent
+```
+
+- **Timestamp contract**: every call bumps `timestamp_updated` of **every
+  involved scene iff a change actually happened** — no bump on a no-op
+  (byte-identical re-add, already-in-target move) or an aborted call (name
+  collision with different content → `False`). Scene docs are also born with
+  `timestamp_created`/`timestamp_updated` at creation. This guarantee is what
+  the scene self-scan staleness rule (board task 69) relies on — which is why
+  **direct file moves into/out of scene folders are unsupported**: they leave
+  the timestamp untouched and the scan cache stale (recoverable only via
+  `force`).
+- `img_add` places the file as an *unregistered* render under the same
+  never-overwrite rule as `scene_adopt_img`; registration stays a curator
+  step. `scene_adopt_img` remains the right call for *loose* renders whose
+  scene must be resolved — internally it places through the same primitive.
+- `img_delete` on a **registered** image is a **hard delete**: the image doc
+  is removed from `images` together with the file (no trash tier — ratings/
+  labels on that doc are gone). Unregistered files must live inside a scene
+  folder; deleting arbitrary files is refused.
+- `img_move` of a registered image rewrites the doc (`url_parent`/`url`) so
+  doc ↔ file stay resolvable; both scenes get the bump. A source outside any
+  scene degrades to add semantics.
+
 **`scenes_linked` semantics** — optional scene-doc object with
 `ids_scene_enh` (enhancer scene ids present among the scene's images) and
 `ids_scene_db`, an object `{neighbors: [str], sourced: [str]}` of DB-scene →

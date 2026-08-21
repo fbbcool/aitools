@@ -6,7 +6,6 @@ class TestSceneManager:
         scm = SceneManager(config='test')
 
         assert isinstance(scm, SceneManager)
-        assert isinstance(scm, int)
 
     def test_scenes_update(self):
         scm = SceneManager(config='test')

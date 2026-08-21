@@ -11,7 +11,6 @@ from ait.tools.files import (
     imgs_and_vids_from_url,
     is_img_or_vid,
     subdir_inc,
-    urls_to_dir,
     is_dir,
 )
 from ait.tools.images import metadata as image_metadata
@@ -225,7 +224,12 @@ class SceneManager:
         # does scene url already exist?
         oid = self.id_from_url(url)
         if oid is None:
-            oid = self._dbc.insert_document(self._collection, meta)
+            # scene docs are born with both timestamps so the scan staleness
+            # rule (board tasks 69/70) is sound from creation on
+            insert_data = dict(meta)
+            insert_data |= {SceneDef.FIELD_TIMESTAMP_CREATED: SceneDef.now_ts()}
+            insert_data |= SceneDef.update_ts()
+            oid = self._dbc.insert_document(self._collection, insert_data)
             self._log('scene added: {url}.', level='message')
         else:
             self._log(f'scene not added, already exists: {url} oid={oid}.', level='debug')
@@ -313,14 +317,19 @@ class SceneManager:
         if not url_imgs:
             return None
 
-        # physical files movement
+        # scene dir + doc first, then each file through the membership
+        # primitive — one code path places files (board task 70)
         self.url_scenes.mkdir(parents=True, exist_ok=True)
         dir_scene = subdir_inc(self.url_scenes)
-        urls_to_dir(url_imgs, dir_scene)
-
-        # db entry
+        dir_scene.mkdir(parents=True, exist_ok=True)
         oid = self.update_from_url(dir_scene)
-
+        if not oid:
+            self._log(f'scene creation failed for {dir_scene}', level='error')
+            return None
+        for url_img in url_imgs:
+            if not Path(url_img).is_file():
+                continue
+            self._img_to_scene_dir(Path(url_img), oid, move=True)
         return oid
 
     def _scene_new_dir(self, dir: str | Path) -> None | str:
@@ -332,6 +341,18 @@ class SceneManager:
 
     def _dbc_to_id(self, id: str):
         self._dbc.to_oid(id)
+
+    def scene_touch(self, scene_id: str) -> bool:
+        """Bump a scene's ``timestamp_updated`` — single-field ``$set``, no
+        full-document store. The membership primitives (`img_add` /
+        `img_delete` / `img_move`) call this iff a change actually happened,
+        which keeps the scan staleness rule of board task 69 sound."""
+        dbc = self._dbc_scenes
+        oid = self._dbc.to_oid(scene_id)
+        if dbc is None or oid is None:
+            return False
+        result = dbc.update_one({SceneDef.FIELD_OID: oid}, {'$set': SceneDef.update_ts()})
+        return result is not None and result.matched_count > 0
 
     def _db_update_scene(self, data: dict) -> bool:
         dbc = self._dbc_scenes
@@ -443,7 +464,11 @@ class SceneManager:
     def _img_to_scene_dir(self, url: Path, scene_id: str, move: bool) -> str | bool:
         """Place a file into a scene folder under the never-overwrite rule:
         a same-named file must be byte-identical (idempotent re-adopt), else
-        the placement aborts with ``False``."""
+        the placement aborts with ``False``.
+
+        The single code path that puts an image file into a scene folder
+        (board task 70): iff the file actually lands (no no-op re-adopt, no
+        collision abort), the scene's ``timestamp_updated`` is bumped."""
         url_scene = self.url_from_id(scene_id)
         if url_scene is None or not Path(url_scene).is_dir():
             self._log(
@@ -461,15 +486,151 @@ class SceneManager:
                     level='error',
                 )
                 return False
+            # idempotent re-adopt: dest already holds the file, membership
+            # unchanged — remove the source only, no timestamp bump
             if move:
                 url.unlink()
+            return scene_id
         elif move:
             shutil.move(str(url), str(dest))
         else:
             shutil.copy2(url, dest)
 
+        self.scene_touch(scene_id)
         self._log(f'scene_adopt_img: {url.name} -> scene[{scene_id}] ({url_scene})')
         return scene_id
+
+    def img_add(self, url: str | Path, scene_id: str, move: bool = True) -> str | bool:
+        """Bring an image file from outside the scene DB into a scene's folder
+        as an *unregistered* render (board task 70 — membership primitive).
+
+        Never-overwrite rule as in `scene_adopt_img`: a same-named file in the
+        scene folder must be byte-identical (idempotent re-add; ``move=True``
+        then removes the source), differing content aborts with ``False``.
+        No image document is inserted — registration stays a separate curator
+        step.
+
+        Timestamp contract: the scene's ``timestamp_updated`` is bumped iff
+        the file actually lands — no bump on no-op re-add or abort. Returns
+        the scene id (truthy str) on success/no-op, ``False`` otherwise.
+        """
+        url = Path(url)
+        if not url.is_file() or not is_img_or_vid(url):
+            self._log(f'img_add: not an image file: {url}', level='warning')
+            return False
+        return self._img_to_scene_dir(url, scene_id, move)
+
+    def img_delete(self, img_or_url: str | Path) -> bool:
+        """Remove an image from its scene (board task 70 — membership
+        primitive). Accepts a file url, a registered filename or an image id.
+
+        Registered images are HARD-deleted: the image document is removed
+        from `images` together with the file — there is no trash/archive
+        tier, the doc's ratings/labels are gone with it. Unregistered files
+        must live inside a scene folder; deleting arbitrary files outside the
+        scene DB is refused.
+
+        Timestamp contract: the owning scene's ``timestamp_updated`` is
+        bumped iff something was actually removed (file and/or doc); resolve
+        failures return ``False`` with no bump.
+        """
+        img, url, scene_id = self._resolve_member(img_or_url)
+        if scene_id is None:
+            self._log(f'img_delete: not a scene member: {img_or_url}', level='warning')
+            return False
+
+        changed = False
+        if url is not None and url.is_file():
+            url.unlink()
+            changed = True
+        if img is not None:
+            n = self._dbc.delete_document(
+                SceneDef.COLLECTION_IMAGES, {SceneDef.FIELD_OID: self._dbc.to_oid(img.id)}
+            )
+            changed = bool(n) or changed
+        if changed:
+            self.scene_touch(scene_id)
+            self._log(f'img_delete: {img_or_url} removed from scene[{scene_id}]')
+        return changed
+
+    def img_move(self, img_or_url: str | Path, scene_id_target: str) -> str | bool:
+        """Relocate an image scene→scene (board task 70 — membership
+        primitive). Accepts a file url, a registered filename or an image id;
+        a source outside any scene degrades to `img_add` semantics (no source
+        bump). For a registered image the image doc is updated
+        (``url_parent`` / ``url``) so doc ↔ file stay consistently
+        resolvable.
+
+        Placement follows the never-overwrite rule (byte-identical dest =
+        idempotent, source removed; differing content aborts with ``False``).
+
+        Timestamp contract: ``timestamp_updated`` of source AND target is
+        bumped iff that scene actually changed — a no-op (already in the
+        target scene) or an abort bumps nothing. Returns the target scene id
+        (truthy str) on success/no-op, ``False`` otherwise.
+        """
+        img, url, scene_src = self._resolve_member(img_or_url)
+        if url is None or not url.is_file():
+            self._log(f'img_move: no file resolves for: {img_or_url}', level='warning')
+            return False
+
+        placed = self._img_to_scene_dir(url, scene_id_target, move=True)
+        if not isinstance(placed, str):
+            return placed
+        if scene_src is not None and scene_src != scene_id_target and not url.exists():
+            self.scene_touch(scene_src)
+        if img is not None and scene_src != scene_id_target:
+            url_target = self.url_from_id(scene_id_target)
+            img._data |= {
+                SceneDef.FIELD_URL_PARENT: str(url_target),
+                SceneDef.FIELD_URL: str(Path(str(url_target)) / url.name),
+            }
+            img.db_store()
+        return placed
+
+    def _resolve_member(self, img_or_url: str | Path) -> tuple[Any | None, Path | None, str | None]:
+        """Resolve a membership reference — file url, registered filename or
+        image id — to ``(registered image | None, file path | None, owning
+        scene id | None)``. The file path may be None for a registered image
+        whose file is missing on disk; the scene id comes from the registered
+        doc (``url_parent``) or, for unregistered files, the file's directory
+        resolved as a scene url."""
+        sim = self.scene_image_manager()
+        img = None
+        url: Path | None = None
+
+        as_path = Path(str(img_or_url))
+        if as_path.is_file():
+            url = as_path
+            id_prefix = SceneDef.id_and_prefix_from_filename(as_path)
+            oid = id_prefix[0] if id_prefix is not None else sim.id_from_url(as_path)
+            if oid and sim.is_id(oid):
+                img = sim.img_from_id(oid)
+        elif sim.is_id(str(img_or_url)):
+            img = sim.img_from_id(str(img_or_url))
+            url = self._registered_file(img)
+
+        if img is not None:
+            scene_id = img.scene_id
+        elif url is not None:
+            scene_id = self.id_from_url(url.parent)
+        else:
+            scene_id = None
+        return img, url, scene_id
+
+    def _registered_file(self, img: Any) -> Path | None:
+        """The on-disk file of a registered image: ``url_from_data`` when
+        present, else a suffix-agnostic ``0rig___<id>.*`` lookup (registered
+        videos keep their own suffix)."""
+        url = img.url_from_data
+        if url is not None and url.is_file():
+            return url
+        parent = img._data.get(SceneDef.FIELD_URL_PARENT, None)
+        if not parent or not Path(parent).is_dir():
+            return None
+        pattern = f'{SceneDef.PREFIX_ORIG}{SceneDef.SEPERATOR_ID}{img.id}.*'
+        matches = [p for p in Path(parent).glob(pattern) if p.is_file()]
+        return matches[0] if matches else None
 
     def _adopt_by_enh_id(
         self, url: Path, id_enh: str, move: bool, subdir_new: str | None, md: dict | None
@@ -527,17 +688,15 @@ class SceneManager:
             self.url_scenes.mkdir(parents=True, exist_ok=True)
             dir_scene = subdir_inc(self.url_scenes)
             dir_scene.mkdir(parents=True, exist_ok=True)
-            dest = dir_scene / url.name
-            if move:
-                shutil.move(str(url), str(dest))
-            else:
-                shutil.copy2(url, dest)
             scene_id = self.update_from_url(dir_scene)
         finally:
             self._subdir_scenes = prev_subdir
 
         if not scene_id:
             self._log(f'scene_adopt_img: scene creation failed for {dir_scene}', level='error')
+            return False
+        placed = self._img_to_scene_dir(url, scene_id, move)
+        if not isinstance(placed, str):
             return False
         self.link_scene_enh(scene_id, id_enh)
         if id_origin is not None:

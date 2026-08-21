@@ -225,6 +225,12 @@ class SceneDef:
         return datetime.datetime.now().timestamp()
 
     @classmethod
+    def update_ts(cls) -> dict:
+        """The field payload bumping ``timestamp_updated`` to now — the one
+        way to stamp the staleness timestamp (board task 70)."""
+        return {cls.FIELD_TIMESTAMP_UPDATED: cls.now_ts()}
+
+    @classmethod
     def prepare_data_for_update(cls, data: dict) -> dict:
         # copy
         update_data = deepcopy(data)
@@ -233,7 +239,7 @@ class SceneDef:
         update_data.pop(cls.FIELD_OID, None)
 
         # set update ts
-        update_data |= {cls.FIELD_TIMESTAMP_UPDATED: cls.now_ts()}
+        update_data |= cls.update_ts()
 
         return update_data
 
