@@ -5,7 +5,6 @@ rejection of malformed sources.
 """
 import json
 import os
-import re
 from copy import deepcopy
 from pathlib import Path
 
@@ -34,6 +33,21 @@ def source() -> dict:
     return data
 
 
+def _source_label_count(source: dict) -> int:
+    """Number of labels declared in the source — the invariant under test is
+    that composition flattens every source label exactly once, not any
+    particular skin size (the count drifts as the skin evolves)."""
+    total = 0
+    for ent in (source.get('entities') or {}).values():
+        if not isinstance(ent, dict):
+            continue
+        for grp in (ent.get('label_groups') or {}).values():
+            total += len(grp.get('labels') or [])
+    for grp in ((source.get('interaction') or {}).get('label_groups') or {}).values():
+        total += len(grp.get('labels') or [])
+    return total
+
+
 # --- compose_built basics ---
 
 
@@ -47,11 +61,9 @@ def test_compose_built_keys(source):
 
 def test_compose_built_label_count(source):
     built = compose_built(source)
-    # primary: 5 attribute + 7 pose + 6 action = 18
-    # secondary: 2 attribute + 7 pose + 2 action = 11
-    # interaction: 11 touch + 16 insertion + 1 act = 28
-    # total = 57
-    assert len(built['labels']) == 74
+    # every label declared in the source appears exactly once in the flat
+    # path-keyed lookup — path-keying means no cross-group collisions swallow any
+    assert len(built['labels']) == _source_label_count(source)
 
 
 def test_compose_built_interpolation(source):
@@ -144,7 +156,7 @@ def test_loader_recomposes_when_built_missing(tmp_path, source):
     reg = SkinRegistry(srcdir=tmp_path, log=lambda m: seen_msgs.append(m))
     skin = reg.get('1xlasm')
     assert skin.directive
-    assert len(skin.labels) == 74
+    assert len(skin.labels) == _source_label_count(source)
     # warning message emitted
     assert any('skin_build' in m for m in seen_msgs)
 
@@ -169,7 +181,7 @@ def test_loader_recomposes_when_built_stale(tmp_path, source):
     reg = SkinRegistry(srcdir=tmp_path, log=lambda m: seen_msgs.append(m))
     skin = reg.get('1xlasm')
     assert skin.directive != 'STALE'
-    assert len(skin.labels) == 74
+    assert len(skin.labels) == _source_label_count(source)
     assert any('stale' in m or 'skin_build' in m for m in seen_msgs)
 
 
