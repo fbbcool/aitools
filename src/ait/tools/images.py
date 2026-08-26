@@ -127,9 +127,19 @@ def metadata(url: Path | str) -> dict | None:
 
 
 def _metadata_from_pil(url: Path, pil: PILImage.Image) -> dict:
-    """Core of `metadata()`: build the v1 schema dict from an opened image.
+    """`metadata()` for an opened image: PNG text chunks + PIL dimensions.
     Shared with the `image_info_from_url` adapter so the file is opened once."""
-    info_ext = pil.info or {}
+    return _metadata_from_chunks(url, pil.info or {}, pil.width, pil.height)
+
+
+def _metadata_from_chunks(url: Path, info_ext: dict, width: int, height: int) -> dict:
+    """Core of `metadata()`: build the v1 schema dict from embedded metadata
+    chunks. `info_ext` maps chunk names (`prompt`, `workflow`,
+    `parent_metadata`) to their raw values — PNG text chunks for images,
+    Matroska container tags for the video branch (`ait.tools.videos.metadata`,
+    board task 82). Both carriers hold the same JSON content, so parent
+    normalization, prompt/`prompt_index` reconstruction and lora/seed
+    extraction are shared verbatim."""
 
     prompt_graph = _parse_json_chunk(info_ext.get('prompt'))
     workflow = _parse_json_chunk(info_ext.get('workflow'))
@@ -254,9 +264,9 @@ def _metadata_from_pil(url: Path, pil: PILImage.Image) -> dict:
         'schema': METADATA_SCHEMA,
         'url': str(url),
         'image': {
-            'width': pil.width,
-            'height': pil.height,
-            'size': pil.width * pil.height,
+            'width': width,
+            'height': height,
+            'size': width * height,
             'timestamp_created': url.stat().st_ctime,
         },
         'comfy': {'prompt_graph': prompt_graph, 'workflow': workflow},

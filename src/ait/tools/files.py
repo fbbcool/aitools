@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Final
 
 SUFFIX_IMG: Final = ['png', 'webp', 'jpg', 'jpeg', 'gif']
-SUFFIX_VID: Final = ['mov', 'mp4']
+SUFFIX_VID: Final = ['mov', 'mp4', 'mkv']
 
 
 def suffix_img() -> list[str]:

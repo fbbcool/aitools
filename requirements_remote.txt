@@ -2,6 +2,7 @@ numpy
 scipy
 pandas
 pillow
+av
 huggingface_hub
 hf_transfer
 tqdm
