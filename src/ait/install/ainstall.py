@@ -326,6 +326,7 @@ class AInstaller:
             'text_encoder': 'models/text_encoders',
             'latent_upscale': 'models/latent_upscale_models',
             'face_detector': 'models/face_detector',
+            'detection': 'models/detection',
             'voice': 'models/voice',
             'asr': 'models/asr',
             'diarize': 'models/diarize',
