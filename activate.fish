@@ -2,8 +2,7 @@ set -xg AIT_WORKSPACE $WORKSPACE/aitools
 set -xg AIT_TMP $HOME/Downloads/000_tmp
 set -xg AIDB_SCENE_DEFAULT 0000
 set -xg AIDB_SCENE_CONFIG default
-set -xg HF_HUB_ENABLE_HF_TRANSFER 1
-set -xg HF_HUB_DISABLE_XET 1
+set -xg HF_XET_HIGH_PERFORMANCE 1
 
 function ait_update
     echo "update aitools ..."
