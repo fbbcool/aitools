@@ -34,9 +34,9 @@ gpu = '5090'
 trigger = 'xlchloe'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 caption_trigger = None
-num_repeats = 8
-lr = 1e-4
-rank = 8
+num_repeats = 2
+lr = 2e-4
+rank = 32
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
