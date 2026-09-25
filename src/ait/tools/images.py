@@ -18,6 +18,12 @@ METADATA_SCHEMA: Final = 'ait.image.metadata.v1'
 # clipboard payloads) exists only at execution time and never appears in the graph.
 PARENT_METADATA_CHUNK: Final = 'parent_metadata'
 
+# PNG iTXt chunk carrying the 1xlasm-datasetter per-image trainer metadata (JSON), recognised
+# by its `schema_id` prefix. Authoritative schema: 1xlasm-datasetter
+# docs/trainer-metadata.md (board INFO task 100).
+TRAINER_META_CHUNK: Final = '1xlasm_trainer'
+TRAINER_META_SCHEMA_PREFIX: Final = '1xlasm_datasetter.trainer.'
+
 
 def image_from_url(url: str | Path, verbose: bool = False) -> PILImage.Image | None:
     url = Path(url)
@@ -323,6 +329,37 @@ def _parse_json_chunk(chunk) -> dict | None:
     except (ValueError, TypeError):
         return None
     return parsed if isinstance(parsed, dict) else None
+
+
+def trainer_meta_from_info(info: dict | None) -> dict | None:
+    """The 1xlasm trainer metadata from a PIL `info` dict, or None (absent/foreign/invalid)."""
+    if not isinstance(info, dict):
+        return None
+    meta = _parse_json_chunk(info.get(TRAINER_META_CHUNK))
+    if meta is None or not str(meta.get('schema_id', '')).startswith(TRAINER_META_SCHEMA_PREFIX):
+        return None
+    return meta
+
+
+def trainer_caption_from_info(info: dict | None) -> str | None:
+    """The embedded trainer caption text (`caption.text`), or None when absent or empty."""
+    meta = trainer_meta_from_info(info)
+    if meta is None:
+        return None
+    caption = meta.get('caption')
+    text = caption.get('text') if isinstance(caption, dict) else None
+    if not isinstance(text, str) or not text.strip():
+        return None
+    return text
+
+
+def trainer_caption(url: Path | str) -> str | None:
+    """Read-only: the trainer caption embedded in an image file; never raises."""
+    try:
+        with PILImage.open(url) as im:
+            return trainer_caption_from_info(im.info)
+    except Exception:
+        return None
 
 
 def image_info_from_url(url: Path | str, include_info_ext: bool = False) -> dict | None:

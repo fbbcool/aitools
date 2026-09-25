@@ -1181,6 +1181,9 @@ class AppSceneImageCell:
     LIGHTBOX_PROTOTYPE_ID: str = 'simg-lightbox-prototype'
     LIGHTBOX_EXCLUDE_ID: str = 'simg-lightbox-exclude'
     LIGHTBOX_CONTENT_CLASS: str = 'simg-lightbox-content'
+    LIGHTBOX_TRAINER_CAPTION_ID: str = 'simg-lightbox-trainer-caption'
+    LIGHTBOX_TRAINER_CAPTION_TEXT_ID: str = 'simg-lightbox-trainer-caption-text'
+    LIGHTBOX_TRAINER_CAPTION_CLASS: str = 'simg-lightbox-with-trainer-caption'
 
     @staticmethod
     def html_lightbox_modal() -> str:
@@ -1199,6 +1202,9 @@ class AppSceneImageCell:
           - Click on the 'X' close button -> closes WITHOUT saving.
           - Clicks on the image / textarea do NOT propagate so the modal
             stays open while the user views/edits.
+          - When the file embeds a 1xlasm_trainer caption, it is shown
+            read-only in a separate labelled panel right of the image (any
+            target type). It is never saved; both close paths clear it.
         """
         overlay_id = AppSceneImageCell.LIGHTBOX_OVERLAY_ID
         img_id = AppSceneImageCell.LIGHTBOX_IMG_ID
@@ -1206,6 +1212,17 @@ class AppSceneImageCell:
         prototype_id = AppSceneImageCell.LIGHTBOX_PROTOTYPE_ID
         exclude_id = AppSceneImageCell.LIGHTBOX_EXCLUDE_ID
         content_cls = AppSceneImageCell.LIGHTBOX_CONTENT_CLASS
+        tcap_id = AppSceneImageCell.LIGHTBOX_TRAINER_CAPTION_ID
+        tcap_text_id = AppSceneImageCell.LIGHTBOX_TRAINER_CAPTION_TEXT_ID
+        tcap_cls = AppSceneImageCell.LIGHTBOX_TRAINER_CAPTION_CLASS
+
+        # Shared by both close paths: drop the read-only trainer caption.
+        tcap_clear_js = (
+            f"const tt = document.getElementById('{tcap_text_id}');"
+            f"if (tt) {{ tt.textContent = ''; }}"
+            f"const tk = document.querySelector('.{content_cls}');"
+            f"if (tk) {{ tk.classList.remove('{tcap_cls}'); }}"
+        )
 
         cmd_btn_id = AppHtml.elem_id_cmd_button()
         cmd_bus_id = AppHtml.elem_id_cmd_databus()
@@ -1259,6 +1276,7 @@ class AppSceneImageCell:
             f"if (c) {{ c.value = ''; }}"
             f"if (p) {{ p.checked = false; }}"
             f"if (x) {{ x.checked = false; }}"
+            f"{tcap_clear_js}"
         )
 
         # ---- save-and-close: clicking the overlay background -------------
@@ -1289,6 +1307,7 @@ class AppSceneImageCell:
             f"if (p2) {{ p2.checked = false; }}"
             f"const x2 = document.getElementById('{exclude_id}');"
             f"if (x2) {{ x2.checked = false; }}"
+            f"{tcap_clear_js}"
         )
 
         # The textarea also gets stopPropagation on keystrokes so e.g. Esc
@@ -1348,6 +1367,41 @@ class AppSceneImageCell:
             }}
             .{content_cls}.simg-lightbox-with-caption #{caption_id} {{
                 display: block;
+            }}
+            .{content_cls}.{tcap_cls} #{img_id} {{
+                max-width: calc(100vw - 460px);
+            }}
+            .{content_cls}.simg-lightbox-with-caption.{tcap_cls} #{img_id} {{
+                max-width: calc(100vw - 960px);
+            }}
+            #{tcap_id} {{
+                display: none;
+                flex-direction: column;
+                gap: 6px;
+                width: 420px;
+                max-height: min(80vh, 700px);
+                padding: 8px 12px;
+                background-color: #1a1a24;
+                color: #d8d8e8;
+                border: 1px dashed #7a7aa8;
+                border-radius: 4px;
+                font-size: 0.9em;
+                cursor: default;
+                box-sizing: border-box;
+            }}
+            .{content_cls}.{tcap_cls} #{tcap_id} {{
+                display: flex;
+            }}
+            #{tcap_id} .simg-lightbox-trainer-caption-label {{
+                font-size: 0.8em;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #9a9ac8;
+            }}
+            #{tcap_text_id} {{
+                overflow-y: auto;
+                white-space: pre-wrap;
+                user-select: text;
             }}
             #simg-lightbox-close {{
                 position: absolute;
@@ -1427,6 +1481,12 @@ class AppSceneImageCell:
                 <textarea id="{caption_id}" placeholder="caption"
                           onclick="event.stopPropagation();"
                           onkeydown="{textarea_keydown_js}"></textarea>
+                <div id="{tcap_id}" onclick="event.stopPropagation();">
+                    <span class="simg-lightbox-trainer-caption-label">
+                        trainer caption (read-only)
+                    </span>
+                    <div id="{tcap_text_id}"></div>
+                </div>
             </div>
         </div>
         """

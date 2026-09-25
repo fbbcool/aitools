@@ -13,7 +13,7 @@ from aidb.app.cell_scene_image import AppSceneImageCell, set_active_skin
 from aidb.app.html import AppHtml, AppOpMmode, AppHelper, HtmlHelper
 
 from ait.tools.files import imgs_from_url
-from ait.tools.images import image_from_url
+from ait.tools.images import image_from_url, trainer_caption_from_info
 
 
 class AIDBSceneApp:
@@ -747,7 +747,7 @@ class AIDBSceneApp:
             )
 
             # Lightbox: thumbnail click -> server reads the full image and
-            # returns a JSON payload `{b64, type, image_id?, caption?}`.
+            # returns a JSON payload `{b64, type, image_id?, caption?, trainer_caption?}`.
             # The JS .then() callback decodes it, sets the modal image,
             # populates the editable caption textarea (registered only) and
             # shows the overlay (fit-to-screen via CSS).
@@ -771,9 +771,23 @@ class AIDBSceneApp:
                     const caption  = document.getElementById('simg-lightbox-caption');
                     const proto    = document.getElementById('simg-lightbox-prototype');
                     const excl     = document.getElementById('simg-lightbox-exclude');
+                    const tcap     = document.getElementById('simg-lightbox-trainer-caption');
+                    const tcapText = document.getElementById('simg-lightbox-trainer-caption-text');
                     if (!img || !overlay) return;
 
                     img.src = 'data:image/png;base64,' + data.b64;
+
+                    // Read-only embedded trainer caption (1xlasm_trainer chunk), any target type.
+                    if (tcap && tcapText) {
+                        const tc = overlay.querySelector('.simg-lightbox-content');
+                        if (data.trainer_caption) {
+                            tcapText.textContent = data.trainer_caption;
+                            if (tc) { tc.classList.add('simg-lightbox-with-trainer-caption'); }
+                        } else {
+                            tcapText.textContent = '';
+                            if (tc) { tc.classList.remove('simg-lightbox-with-trainer-caption'); }
+                        }
+                    }
 
                     const content = overlay.querySelector('.simg-lightbox-content');
                     if (data.type === 'registered' && data.image_id) {
@@ -2815,7 +2829,9 @@ class AIDBSceneApp:
               "b64":      "<image bytes base64>",
               "type":     "registered" | "unregistered",
               "image_id": "<oid>",        # only for registered targets
-              "caption":  "<current caption>"  # only for registered targets
+              "caption":  "<current caption>", # only for registered targets
+              "trainer_caption": "<text>"  # both types; only when the file embeds a
+                                           # 1xlasm_trainer chunk with a caption (read-only)
             }
 
         Returns '' on failure (the JS callback no-ops).
@@ -2840,6 +2856,7 @@ class AIDBSceneApp:
         pil = None
         b64: Optional[str] = None
         caption_text: Optional[str] = None
+        trainer_caption: Optional[str] = None
         prototype_flag: bool = False
         excluded_flag: bool = False
         try:
@@ -2880,6 +2897,9 @@ class AIDBSceneApp:
                 print(f'ERROR: lightbox base64 encode failed: {e}')
                 gr.Warning(f'Lightbox encode failed: {e}')
                 return ''
+
+            # The encode has loaded the image, so `info` also holds chunks stored after IDAT.
+            trainer_caption = trainer_caption_from_info(getattr(pil, 'info', None))
         finally:
             # Eagerly drop the PIL handle and any large temporary buffers,
             # then flush so subsequent renders / GPU users start clean.
@@ -2902,6 +2922,8 @@ class AIDBSceneApp:
             if set_id_in:
                 result['set_id'] = set_id_in
                 result['excluded'] = excluded_flag
+        if trainer_caption:
+            result['trainer_caption'] = trainer_caption
         return json.dumps(result)
 
     def _caption_set_generate(self, image_id_str: Optional[str]) -> str:

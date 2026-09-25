@@ -31,7 +31,7 @@ model = 'krea2'  # 'qwen' | 'krea2'
 variant = 'gts-app-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlface-alex'  # dataset-dict key (selects `datasets[trigger]`)
+trigger = 'xlchloe'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 caption_trigger = None
 num_repeats = 8
@@ -228,7 +228,7 @@ config_dataset = {
     # 1fem_alexandra is 768px max-edge across all 35 imgs → train native, no
     # upscale. Use [1024] for the gts-v3 sets (all max-side 1024, AR bucketed:
     # 1:1, 3:4/4:3, 2:3/3:2, 3:5/5:3).
-    'resolutions': [768],
+    'resolutions': [1024],
     #'resolutions_arr': [
     #    [1024, 1024],  # 137 images
     #    [768, 1024],  # 27
@@ -401,6 +401,9 @@ datasets = {
     ],
     'xlface-alex': [
         ('fbbcool/1fem_alexandra', 0),
+    ],
+    'xlchloe': [
+        ('fbbcool/xlchloe', 0),
     ],
 }
 
