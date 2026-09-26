@@ -43,6 +43,9 @@ class AIDBSceneApp:
         from aidb.app.tab_penis_mask import PenisMaskTab
         self._penis_mask_tab = PenisMaskTab(self._scm)
 
+        from aidb.app.tab_review import ReviewTab
+        self._review_tab = ReviewTab(self._dbc)
+
         self._interface = self._create_interface()
 
     # head HTML injected into the page <head> so the penis-mask annotator's
@@ -51,7 +54,8 @@ class AIDBSceneApp:
     @property
     def _blocks_head(self) -> str:
         from aidb.app.tab_penis_mask import PENIS_MASK_HEAD
-        return PENIS_MASK_HEAD
+        from aidb.app.tab_review import REVIEW_HEAD
+        return PENIS_MASK_HEAD + REVIEW_HEAD
 
     def _create_interface(self):
         """
@@ -527,6 +531,10 @@ class AIDBSceneApp:
             # first activation of the tab; results persist to the
             # claude_penis_masks collection + on-disk mask store.
             self._penis_mask_tab.build()
+
+            # Review tab (board task 102): throwaway image review lists from
+            # the review_imgs collection, created via script/review_list.py.
+            self._review_tab.build()
 
             # Link hidden triggers to functions
             button_hidden_cmd.click(

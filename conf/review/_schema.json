@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aitools.review_imgs.v1",
+  "title": "review_imgs list document (aitools.review_imgs.v1)",
+  "description": "One throwaway image review list in the `review_imgs` collection of the aidb DB (per profile). The creator writes it once via script/review_list.py; afterwards the aidb app Review tab is the only writer (items[].response, comment). See conf/review/README.md.",
+  "type": "object",
+  "required": ["schema_id", "list_id", "title", "form", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_id": {"const": "aitools.review_imgs.v1"},
+    "list_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "description": "Unique, human-readable key of the list."
+    },
+    "title": {"type": "string", "minLength": 1},
+    "created": {
+      "type": "string",
+      "description": "Creation time, ISO-ish local time (e.g. 2026-09-26T14:10). Filled by the CLI when absent."
+    },
+    "created_by": {"type": "string", "description": "Board username of the creating agent/person."},
+    "show_context": {
+      "type": "boolean",
+      "default": false,
+      "description": "false = hide items[].context (blind calibration)."
+    },
+    "form": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Per-image review interface, identical for all items.",
+      "items": {"$ref": "#/$defs/field"}
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/item"}
+    },
+    "comment": {
+      "type": ["string", "null"],
+      "description": "List-level free comment, written by the app."
+    }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "required": ["key", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "type": {"enum": ["bool", "choice", "multi", "text"]},
+        "label": {"type": "string"},
+        "options": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"enum": ["choice", "multi"]}}},
+          "then": {"required": ["options"], "properties": {"options": {"minItems": 1}}}
+        }
+      ]
+    },
+    "item": {
+      "type": "object",
+      "required": ["id", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "description": "Unique within the list."},
+        "url": {"type": "string", "minLength": 1, "description": "Local file path, as current at creation time. Missing files render as a placeholder."},
+        "context": {"type": ["string", "null"], "description": "Optional free text, shown only if show_context."},
+        "response": {
+          "type": ["object", "null"],
+          "description": "{form key: value} — bool -> true/false, choice -> string, multi -> list of strings, text -> string. Written by the app."
+        }
+      }
+    }
+  }
+}

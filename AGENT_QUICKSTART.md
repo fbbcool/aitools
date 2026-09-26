@@ -415,6 +415,11 @@ python script/aidb_scene.py app          # gradio review/rating UI on :7861
 python script/aidb_scene.py imgs_info config=test
 ```
 
+**Operator feedback on ad-hoc images** (renders, crops, candidates — registered or
+not): post a throwaway review list with `script/review_list.py create <list.json>`,
+the operator answers it in the app's **Review** tab, read it back with
+`review_list.py get <list_id>`. Cheatsheet: `conf/review/README.md`.
+
 ---
 
 ## 8. Guardrails — read before you write
