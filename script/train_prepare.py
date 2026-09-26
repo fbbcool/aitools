@@ -28,6 +28,7 @@ from trainer import Trainer
 # }
 
 model = 'krea2'  # 'qwen' | 'krea2'
+base = None  # krea2: None = snofs0.75 merged base | 're' = Realism Engine v3.1 @0.75 merged base
 variant = 'gts-app-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
@@ -411,6 +412,7 @@ Trainer(
     model,
     datasets[trigger],
     variant=variant,
+    base=base,
     config_trainer=config_trainer[model][variant],
     config_dataset=config_dataset,
     trigger=caption_trigger,  # prepends '1alexandra,' to each caption .txt

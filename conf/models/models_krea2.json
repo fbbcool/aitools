@@ -93,6 +93,12 @@
           "file": "krea2-turbo-snofs0.75-fp8-scaled.safetensors",
           "rename": "krea2-turbo-snofs0.75-fp8-scaled",
           "skip": false
+        },
+        {
+          "repo_id": "fbbcool/krea2-re-75",
+          "file": "krea2-turbo-re0.75-fp8-scaled.safetensors",
+          "rename": "krea2-turbo-re0.75-fp8-scaled",
+          "skip": true
         }
       ]
     }

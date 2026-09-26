@@ -27,6 +27,7 @@ class Trainer:
         model: str,
         repo_ids_hfd: list[str] | list[tuple[str, int]],
         variant: str | None = None,
+        base: str | None = None,  # alternate merged base -> installer group 'train_<model>-<base>'
         config_trainer: dict | None = None,
         config_dataset: dict | None = None,
         multithread: bool = False,
@@ -42,6 +43,7 @@ class Trainer:
 
         self.model = model
         self.variant = variant
+        self.base = base
 
         self._config_trainer = {}
         if config_trainer is not None:
@@ -90,6 +92,8 @@ class Trainer:
     @property
     def _group_installer(self) -> str:
         group = f'{self.PREFIX_INSTALLER_GROUP}{self.model}'
+        if self.base is not None:
+            group += f'-{self.base}'
 
         if self.variant is not None:
             group += f':{self.variant}'
