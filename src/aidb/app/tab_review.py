@@ -143,7 +143,9 @@ class ReviewTab:
             cards.append(
                 f'<div class="rv-card" id="rv-card-{i}" data-idx="{i}">'
                 f'<div class="rv-thumb" data-idx="{i}" title="open fullscreen">{img}</div>'
-                f'<div class="rv-meta">#{i + 1} · {html.escape(str(it["id"]))}</div>'
+                f'<div class="rv-meta"><span>#{i + 1} · {html.escape(str(it["id"]))}</span>'
+                f'<button type="button" class="rv-url" data-idx="{i}" '
+                f'title="copy image url to clipboard">url</button></div>'
                 f'{ctx}'
                 f'<div class="rv-form" data-scope="c" data-idx="{i}"></div>'
                 '</div>'
@@ -313,7 +315,13 @@ REVIEW_HEAD = r"""
 .rv-missing { padding: 16px; text-align: center; color: #d29922; font-size: 0.85em;
   word-break: break-all; }
 .rv-missing span { opacity: 0.7; }
-#rv-root .rv-meta { font-size: 0.85em; opacity: 0.8; }
+#rv-root .rv-meta { font-size: 0.85em; display: flex; justify-content: space-between;
+  align-items: center; gap: 6px; }
+#rv-root .rv-meta > span { opacity: 0.8; word-break: break-all; }
+.rv-url { flex: none; border: 1px solid var(--rv-line, #666); border-radius: 4px; padding: 0 6px;
+  background: transparent; color: inherit; cursor: pointer; font-size: 0.85em; }
+.rv-url:hover { border-color: #1f6feb; }
+.rv-url.rv-copied { background: #2ea043; border-color: #2ea043; color: #fff; }
 .rv-ctx { font-size: 0.85em; white-space: pre-wrap; background: rgba(128,128,128,0.15);
   border-radius: 4px; padding: 4px 6px; }
 .rv-field { margin: 3px 0; }
@@ -343,6 +351,7 @@ REVIEW_HEAD = r"""
 #rv-m-close { cursor: pointer; font-size: 28px; line-height: 1; padding: 0 6px; }
 #rv-m-close:hover { color: #f85149; }
 #rv-m-id { font-size: 0.85em; opacity: 0.8; word-break: break-all; }
+#rv-m-idrow { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
 #rv-m-state { font-size: 0.85em; }
 #rv-m-state.rv-ok { color: #2ea043; }
 #rv-modal .rv-help { color: #aaa; }
@@ -489,6 +498,23 @@ REVIEW_HEAD = r"""
     setValue(i, key, v, true); schedule();
   }
 
+  // ---------------- url -> clipboard ----------------
+  function copyUrl(btn){
+    const it = RV.data.items[+btn.dataset.idx]; if (!it || !it.url) return;
+    const v = String(it.url);
+    const ok = () => { btn.classList.add('rv-copied'); btn.textContent = 'copied';
+      setTimeout(() => { btn.classList.remove('rv-copied'); btn.textContent = 'url'; }, 900); };
+    const fallback = () => {   // navigator.clipboard needs a secure context (LAN http has none)
+      const ta = document.createElement('textarea');
+      ta.value = v; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { if (document.execCommand('copy')) ok(); } catch(_) {}
+      ta.remove();
+    };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(v).then(ok).catch(fallback);
+    else fallback();
+  }
+
   // ---------------- navigation / filter ----------------
   function visible(i){ return !(RV.unanswered && answered(i) && i !== RV.cur); }
   function applyFilter(){
@@ -522,7 +548,9 @@ REVIEW_HEAD = r"""
       '<div class="rv-m-img"><img id="rv-m-img" alt=""><div id="rv-m-missing" class="rv-missing"></div></div>' +
       '<div class="rv-m-side">' +
         '<div class="rv-m-head"><span id="rv-m-pos"></span><span id="rv-m-close" title="close (Esc)">&times;</span></div>' +
-        '<div id="rv-m-id"></div><div id="rv-m-count"></div>' +
+        '<div id="rv-m-idrow"><div id="rv-m-id"></div>' +
+          '<button type="button" class="rv-url" id="rv-m-url" title="copy image url to clipboard">url</button></div>' +
+        '<div id="rv-m-count"></div>' +
         '<div id="rv-m-ctx" class="rv-ctx"></div>' +
         '<div id="rv-m-form" class="rv-form" data-scope="m"></div>' +
         '<div id="rv-m-state"></div>' +
@@ -535,6 +563,7 @@ REVIEW_HEAD = r"""
     const i = RV.cur, it = RV.data.items[i];
     document.getElementById('rv-m-pos').textContent = '#' + (i + 1) + ' / ' + n();
     document.getElementById('rv-m-id').textContent = it.id;
+    document.getElementById('rv-m-url').dataset.idx = i;
     const ctx = document.getElementById('rv-m-ctx');
     ctx.textContent = it.context || '';
     ctx.style.display = (RV.data.show_context && it.context) ? '' : 'none';
@@ -609,6 +638,8 @@ REVIEW_HEAD = r"""
     const b = e.target.closest('.rv-opt');
     if (b) { e.preventDefault(); const i = +b.dataset.idx; if (i !== RV.cur) setCur(i, false);
              clickOpt(i, b.dataset.key, b.dataset.val); return; }
+    const u = e.target.closest('.rv-url');
+    if (u) { e.preventDefault(); e.stopPropagation(); copyUrl(u); return; }
     if (e.target.id === 'rv-m-close' || e.target.id === 'rv-modal' ||
         (e.target.classList && e.target.classList.contains('rv-m-img'))) { closeModal(); return; }
     const th = e.target.closest('#rv-root .rv-thumb');

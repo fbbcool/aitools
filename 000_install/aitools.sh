@@ -178,6 +178,19 @@ train_run() {
   cd $HOME_TRAINER
   ./train.sh
 }
+train_tmux() {
+  # runs train_run detached in tmux session 'train', logging to $WORKSPACE/train.log.
+  # expects this script at $WORKSPACE/aitools.sh (re-sourced inside the session).
+  # attach: tmux a -t train | follow log: tail -f $WORKSPACE/train.log
+  if tmux has-session -t train 2>/dev/null; then
+    echo "tmux session 'train' already exists: tmux a -t train"
+    return 1
+  fi
+  tmux new -d -s train "bash -c 'source $WORKSPACE/aitools.sh && train_run 2>&1 | tee $WORKSPACE/train.log; exec bash'"
+  echo "training started in tmux session 'train'"
+  echo "  attach: tmux a -t train"
+  echo "  log:    tail -f $WORKSPACE/train.log"
+}
 clean_train() {
   rm -rf $DIR_TRAIN
 }
