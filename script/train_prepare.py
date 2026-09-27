@@ -376,7 +376,7 @@ GTS_V3_NEUTRAL_IDS_XLLEGGY = [
 
 datasets = {
     'xlasm': [
-        ('fbbcool/gts-v3', 0),
+        ('fbbcool/xlasm_v4_train_1024', 0),
     ],
     'xlbusty': [
         ('fbbcool/1busty', 0),
