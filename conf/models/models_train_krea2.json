@@ -3,6 +3,11 @@
     "common": {
       "transformer": [
         {
+          "repo_id": "fbbcool/krea2-re-75",
+          "file": "krea2-raw-re0.75-fp8.safetensors",
+          "skip": false
+        },
+        {
           "repo_id": "fbbcool/krea2-snofs-75",
           "file": "krea2-raw-snofs0.75-bf16.safetensors",
           "skip": true
@@ -10,7 +15,7 @@
         {
           "repo_id": "fbbcool/krea2-snofs-75",
           "file": "krea2-raw-snofs0.75-fp8.safetensors",
-          "skip": false
+          "skip": true
         }
       ],
       "vae": [

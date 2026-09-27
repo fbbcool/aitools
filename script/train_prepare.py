@@ -29,15 +29,15 @@ from trainer import Trainer
 
 model = 'krea2'  # 'qwen' | 'krea2'
 base = None  # krea2: None = snofs0.75 merged base | 're' = Realism Engine v3.1 @0.75 merged base
-variant = 'gts-app-atomic'
+variant = 'gts-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
-trigger = 'xlchloe'  # dataset-dict key (selects `datasets[trigger]`)
+trigger = 'xlasm'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 caption_trigger = None
 num_repeats = 2
 lr = 2e-4
-rank = 32
+rank = 64
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -154,7 +154,7 @@ config_trainer_krea2_gts_atomic = {
     'checkpoint_every_n_epochs': 1,
     'caching_batch_size': 4,
     'steps_per_print': 10,
-    'adapter___rank': 8,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___rank': 64,  # 32 for xlasm, 16 for xlasm-childs
     #'adapter___alpha': 4,  # will break; is set automatically!
     #'optimizer___lr': 5e-5,
     'optimizer___lr': 2e-4,
