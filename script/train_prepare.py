@@ -35,14 +35,14 @@ gpu = '5090'
 trigger = 'xlasm'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 caption_trigger = None
-num_repeats = 2
+num_repeats = 1
 lr = 2e-4
 rank = 64
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
     '5090': {
-        'micro_batch_size_per_gpu': 3,  # krea2 fp8: ~27GB at b=2, ~3GB/item -> b=3 fits 32GB; b=4 likely OOMs
+        'micro_batch_size_per_gpu': 2,  # krea2 fp8 r64: b=3 OOMs in first backward (2026-09-27, 23.9 GB alloc + 4.1 GB fragmented)
     },
     'h100': {
         'micro_batch_size_per_gpu': 12,  # maybe 1
