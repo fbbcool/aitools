@@ -36,8 +36,7 @@ trigger = 'xlasm'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 caption_trigger = None
 num_repeats = 1
-lr = 1e-4
-rank = 32
+# lr / rank: set `optimizer___lr` / `adapter___rank` in the variant's config_trainer_* dict below.
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
