@@ -123,9 +123,11 @@ ${model___vae}
 ${model___dtype}
 #diffusion_model_dtype = 'float8'
 ${model___diffusion_model_dtype}
-timestep_sample_method = 'logit_normal'
-# Flow-matching shift, matches ComfyUI Krea2 sampling_settings (shift = 1.15).
-shift = 1.15
+# Timesteps: uniform + multiplicative shift (diffpipe: t' = t*s/(1+(s-1)t)). ComfyUI's krea2
+# 1.15 is mu (log domain) = multiplicative 3.16; Krea's own res-aware schedule is mu 0.5->1.15
+# over 256->1280px = ~2.5 @1024 (musubi/ai-toolkit). NOT logit_normal (sigmoid-weighted).
+${model___timestep_sample_method}
+${model___shift}
 #min_t = 0.875
 ${model___min_t}
 #max_t = 1

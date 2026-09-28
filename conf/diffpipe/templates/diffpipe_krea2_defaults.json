@@ -6,5 +6,7 @@
   "model___type": "krea2",
   "model___diffusion_model_dtype": "float8",
   "adapter___rank": 32,
-  "optimizer___lr": 5e-5
+  "optimizer___lr": 5e-05,
+  "model___timestep_sample_method": "uniform",
+  "model___shift": 2.5
 }

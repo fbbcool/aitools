@@ -28,7 +28,7 @@ from trainer import Trainer
 # }
 
 model = 'krea2'  # 'qwen' | 'krea2'
-base = None  # krea2: None = snofs0.75 merged base | 're' = Realism Engine v3.1 @0.75 merged base
+base = None  # krea2: None = group train_krea2 (currently raw re0.75 fp8; snofs entries skip:true in models_train_krea2.json) | 're' = group train_krea2-re (raw re0.75 fp8, no variant groups)
 variant = 'gts-atomic'
 gpu = '5090'
 # gpu = 'h100-nvl'
@@ -158,6 +158,10 @@ config_trainer_krea2_gts_atomic = {
     #'adapter___alpha': 4,  # will break; is set automatically!
     #'optimizer___lr': 5e-5,
     'optimizer___lr': 1e-4,
+    # board task 110: old run (logit_normal + shift 1.15) under-learned the size ratio.
+    # Krea's res-aware schedule ~ multiplicative 2.5 @1024; uniform, not sigmoid-weighted.
+    'model___timestep_sample_method': 'uniform',
+    'model___shift': 2.5,
 }
 
 config_trainer_krea2_gts_domain = {
