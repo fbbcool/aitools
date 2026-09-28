@@ -3,5 +3,6 @@
   "resolutions": [
     1024
   ],
-  "path": "/workspace/train/dataset"
+  "path": "/workspace/train/dataset",
+  "mask_path": ""
 }

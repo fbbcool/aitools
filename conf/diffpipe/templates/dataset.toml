@@ -57,6 +57,7 @@ $path
 # and converted to the mask weight.
 # The mask_path can point to any directory containing mask images.
 #mask_path = '/home/anon/data/images/grayscale/masks'
+$mask_path
 
 # How many repeats for 1 epoch. The dataset will act like it is duplicated this many times.
 # The semantics of this are the same as sd-scripts: num_repeats=1 means one epoch is a single pass over all examples (no duplication).
