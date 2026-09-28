@@ -19,7 +19,7 @@ class TemplaterVariable:
         items: list[dict[str, Any]] | None = None,
         join: str = '\n\n',
     ) -> None:
-        self._typelist = [str, int, float]
+        self._typelist = [str, int, float, bool]
         self.name = name
         self._items = items
         self._join = join
@@ -77,7 +77,9 @@ class TemplaterVariable:
             return self._join.join(rendered)
 
         # setup value
-        if isinstance(self.value, str):
+        if isinstance(self.value, bool):
+            value = 'true' if self.value else 'false'  # TOML bools are lowercase
+        elif isinstance(self.value, str):
             value = f"'{self.value}'"
         else:
             value = str(self.value)

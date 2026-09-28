@@ -87,8 +87,9 @@ ${caching_batch_size}
 # especially for video data.
 #map_num_proc = 32
 
-# Use torch.compile on the model. Can speed up training throughput by a decent amount. Not tested on all models.
-#compile = true
+# Use torch.compile on the model. Untested on krea2 (ComfyPipeline, fp8 on-the-fly casts, 16 AR
+# buckets -> recompiles); benchmark on/off ~50 steps before enabling. Default off (krea2 defaults).
+${compile}
 
 # How often deepspeed logs to console.
 #steps_per_print = 10
