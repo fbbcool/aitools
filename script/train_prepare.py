@@ -155,8 +155,8 @@ config_trainer_krea2_gts_atomic = {
     'steps_per_print': 10,
     'adapter___rank': 32,  # 32 for xlasm, 16 for xlasm-childs
     #'adapter___alpha': 4,  # will break; is set automatically!
-    #'optimizer___lr': 5e-5,
-    'optimizer___lr': 1e-4,
+    #'optimizer___lr': 1e-4,
+    'optimizer___lr': 5e-5,  # substrate: cold-start anchor; ~9K steps/30 ep on 607 imgs is ample
     # board task 110: old run (logit_normal + shift 1.15) under-learned the size ratio.
     # Krea's res-aware schedule ~ multiplicative 2.5 @1024; uniform, not sigmoid-weighted.
     'model___timestep_sample_method': 'uniform',
