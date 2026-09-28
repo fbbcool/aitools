@@ -362,7 +362,7 @@ class PenisMaskTab:
         # (see PENIS_MASK_HEAD) — <script> inside gr.HTML is NOT executed by the
         # browser (innerHTML-inserted scripts don't run), so it must live in
         # <head>. The style block below is harmless if duplicated in head.
-        with gr.Tab('Penis Masks', elem_id='pm_tab') as tab:
+        with gr.Tab('P-Masks', elem_id='pm_tab') as tab:
             gr.Markdown(
                 '## penis-mask annotator (scene DB)\n'
                 'YOLO-proposed box → SAM2 mask on load; accept or refine.  \n'
