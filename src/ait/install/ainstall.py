@@ -330,6 +330,7 @@ class AInstaller:
             'voice': 'models/voice',
             'asr': 'models/asr',
             'diarize': 'models/diarize',
+            'mesh3d': 'models/mesh3d',
         }
         target = item.get('target', 'unknown')
         target_dir = map_target_dirs.get(target, '')

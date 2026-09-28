@@ -36,8 +36,8 @@ trigger = 'xlasm'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 caption_trigger = None
 num_repeats = 1
-lr = 2e-4
-rank = 64
+lr = 1e-4
+rank = 32
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -152,12 +152,12 @@ config_trainer_krea2_gts_atomic = {
     ),  # small cushion for LR=2e-4 early-spike risk
     'save_every_n_epochs': 1,  # ~225 steps/epoch → ~5 ckpts at 3K cancel
     'checkpoint_every_n_epochs': 1,
-    'caching_batch_size': 4,
+    'caching_batch_size': 2,
     'steps_per_print': 10,
-    'adapter___rank': 64,  # 32 for xlasm, 16 for xlasm-childs
+    'adapter___rank': 32,  # 32 for xlasm, 16 for xlasm-childs
     #'adapter___alpha': 4,  # will break; is set automatically!
     #'optimizer___lr': 5e-5,
-    'optimizer___lr': 2e-4,
+    'optimizer___lr': 1e-4,
 }
 
 config_trainer_krea2_gts_domain = {

@@ -68,6 +68,69 @@
           "skip": false
         }
       ]
+    },
+    "mesh3d": {
+      "mesh3d": [
+        {
+          "repo_id": "tencent/Hunyuan3D-2.1",
+          "method_download": "huggingface",
+          "skip": false
+        },
+        {
+          "repo_id": "facebook/dinov2-giant",
+          "method_download": "huggingface",
+          "ignore_patterns": [
+            "pytorch_model.bin"
+          ],
+          "skip": false
+        },
+        {
+          "repo_id": "lllyasviel/Annotators",
+          "file": "RealESRGAN_x4plus.pth",
+          "method_download": "huggingface",
+          "skip": false
+        },
+        {
+          "repo_id": "tomjackson2023/rembg",
+          "file": "isnet-general-use.onnx",
+          "method_download": "huggingface",
+          "skip": false
+        }
+      ]
+    },
+    "trellis2": {
+      "mesh3d": [
+        {
+          "repo_id": "microsoft/TRELLIS.2-4B",
+          "method_download": "huggingface",
+          "skip": false
+        },
+        {
+          "repo_id": "microsoft/TRELLIS-image-large",
+          "file": "ckpts/ss_dec_conv3d_16l8_fp16.json",
+          "method_download": "huggingface",
+          "skip": false
+        },
+        {
+          "repo_id": "microsoft/TRELLIS-image-large",
+          "file": "ckpts/ss_dec_conv3d_16l8_fp16.safetensors",
+          "method_download": "huggingface",
+          "skip": false
+        },
+        {
+          "repo_id": "facebook/dinov3-vitl16-pretrain-lvd1689m",
+          "method_download": "huggingface",
+          "skip": false
+        },
+        {
+          "repo_id": "briaai/RMBG-2.0",
+          "ignore_patterns": [
+            "onnx/*"
+          ],
+          "method_download": "huggingface",
+          "skip": false
+        }
+      ]
     }
   }
 }
