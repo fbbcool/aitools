@@ -342,8 +342,11 @@ REVIEW_HEAD = r"""
   display: flex; color: #eee; }
 #rv-modal.rv-hidden { display: none; }
 #rv-modal .rv-m-img { flex: 1; display: flex; align-items: center; justify-content: center;
-  min-width: 0; padding: 10px; }
-#rv-modal .rv-m-img img { max-width: 100%; max-height: calc(100vh - 20px); object-fit: contain; }
+  min-width: 0; padding: 10px; overflow: hidden; }
+#rv-modal .rv-m-img img { max-width: 100%; max-height: calc(100vh - 20px); object-fit: contain;
+  transform-origin: 0 0; user-select: none; -webkit-user-drag: none; }
+#rv-modal .rv-m-img img.rv-zoomed { cursor: grab; }
+#rv-modal .rv-m-img img.rv-panning { cursor: grabbing; }
 #rv-modal .rv-m-side { width: 360px; flex: none; background: #161b22; padding: 14px;
   overflow-y: auto; display: flex; flex-direction: column; gap: 8px; --rv-line: #555; }
 #rv-modal .rv-m-head { display: flex; justify-content: space-between; align-items: center;
@@ -554,13 +557,60 @@ REVIEW_HEAD = r"""
         '<div id="rv-m-ctx" class="rv-ctx"></div>' +
         '<div id="rv-m-form" class="rv-form" data-scope="m"></div>' +
         '<div id="rv-m-state"></div>' +
-        '<div class="rv-help">1-9 = first choice field (0 clears) · ←/→ ↑/↓ j/k = prev/next · Esc = close</div>' +
+        '<div class="rv-help">1-9 = first choice field (0 clears) · ←/→ ↑/↓ j/k = prev/next · Esc = close' +
+          '<br>wheel = zoom at pointer · drag = pan · double-click = reset zoom</div>' +
       '</div>';
     document.body.appendChild(m);
+    const box = m.querySelector('.rv-m-img');
+    box.addEventListener('wheel', onWheel, { passive: false });
+    box.addEventListener('mousedown', onPanStart);
+    box.addEventListener('dblclick', e => { e.preventDefault(); zReset(); });
+    window.addEventListener('mousemove', onPanMove);
+    window.addEventListener('mouseup', onPanEnd);
     return m;
+  }
+  // ---------------- zoom / pan (modal image) ----------------
+  // transform = translate(tx,ty) scale(s) with origin 0 0; zooming keeps the
+  // image pixel under the pointer fixed: tx' = tx + (cx - left) * (1 - s'/s)
+  const Z = { s: 1, tx: 0, ty: 0, drag: null, moved: false };
+  function zApply(){
+    const img = document.getElementById('rv-m-img'); if (!img) return;
+    img.style.transform = Z.s === 1 ? '' : 'translate(' + Z.tx + 'px,' + Z.ty + 'px) scale(' + Z.s + ')';
+    img.classList.toggle('rv-zoomed', Z.s !== 1);
+  }
+  function zReset(){ Z.s = 1; Z.tx = 0; Z.ty = 0; Z.drag = null; zApply(); }
+  function onWheel(e){
+    const img = document.getElementById('rv-m-img');
+    if (!RV.modal || !img || img.style.display === 'none') return;
+    e.preventDefault();
+    const r = img.getBoundingClientRect();
+    const ns = Math.min(20, Math.max(1, Z.s * Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0015))));
+    if (ns === Z.s) return;
+    if (ns <= 1.001) { zReset(); return; }
+    const f = 1 - ns / Z.s;
+    Z.tx += (e.clientX - r.left) * f; Z.ty += (e.clientY - r.top) * f; Z.s = ns;
+    zApply();
+  }
+  function onPanStart(e){
+    if (e.button !== 0 || Z.s === 1 || e.target.id !== 'rv-m-img') return;
+    e.preventDefault();
+    Z.drag = { x: e.clientX, y: e.clientY, tx: Z.tx, ty: Z.ty }; Z.moved = false;
+    e.target.classList.add('rv-panning');
+  }
+  function onPanMove(e){
+    if (!Z.drag) return;
+    const dx = e.clientX - Z.drag.x, dy = e.clientY - Z.drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) Z.moved = true;
+    Z.tx = Z.drag.tx + dx; Z.ty = Z.drag.ty + dy; zApply();
+  }
+  function onPanEnd(){
+    if (!Z.drag) return;
+    Z.drag = null;
+    const img = document.getElementById('rv-m-img'); if (img) img.classList.remove('rv-panning');
   }
   function fillModal(){
     const i = RV.cur, it = RV.data.items[i];
+    zReset();
     document.getElementById('rv-m-pos').textContent = '#' + (i + 1) + ' / ' + n();
     document.getElementById('rv-m-id').textContent = it.id;
     document.getElementById('rv-m-url').dataset.idx = i;
@@ -588,7 +638,21 @@ REVIEW_HEAD = r"""
     RV.full[d.idx] = 'data:image/jpeg;base64,' + d.b64;
     RV.fullOrder.push(d.idx);
     while (RV.fullOrder.length > 30) delete RV.full[RV.fullOrder.shift()];
-    if (RV.modal && RV.cur === d.idx) document.getElementById('rv-m-img').src = RV.full[d.idx];
+    if (RV.modal && RV.cur === d.idx) {
+      const img = document.getElementById('rv-m-img');
+      if (Z.s !== 1) {   // already zoomed into the thumb: keep the same on-screen rect after the swap
+        const r0 = img.getBoundingClientRect();
+        img.onload = () => {
+          img.onload = null;
+          if (Z.s === 1) return;
+          const r1 = img.getBoundingClientRect();
+          const lw = r1.width / Z.s, lh = r1.height / Z.s, lx = r1.left - Z.tx, ly = r1.top - Z.ty;
+          if (!lw || !lh) return;
+          Z.s = r0.width / lw; Z.tx = r0.left - lx; Z.ty = r0.top - ly; zApply();
+        };
+      }
+      img.src = RV.full[d.idx];
+    }
   };
   function openModal(i){
     ensureModal().classList.remove('rv-hidden');
@@ -596,7 +660,7 @@ REVIEW_HEAD = r"""
   }
   function closeModal(){
     const m = document.getElementById('rv-modal'); if (m) m.classList.add('rv-hidden');
-    RV.modal = false;
+    RV.modal = false; zReset();
     const c = document.getElementById('rv-card-' + RV.cur);
     if (RV.unanswered) applyFilter();
     if (c) c.scrollIntoView({block: 'nearest'});
@@ -640,6 +704,7 @@ REVIEW_HEAD = r"""
              clickOpt(i, b.dataset.key, b.dataset.val); return; }
     const u = e.target.closest('.rv-url');
     if (u) { e.preventDefault(); e.stopPropagation(); copyUrl(u); return; }
+    if (Z.moved) { Z.moved = false; if (e.target.closest('#rv-modal')) return; }   // end of a pan drag
     if (e.target.id === 'rv-m-close' || e.target.id === 'rv-modal' ||
         (e.target.classList && e.target.classList.contains('rv-m-img'))) { closeModal(); return; }
     const th = e.target.closest('#rv-root .rv-thumb');
