@@ -19,6 +19,7 @@
   "model___dtype": "bfloat16",
   "model___min_t": "",
   "model___max_t": "",
+  "model___slider_from_mask": "",
   "adapter___rank": "",
   "adapter___dtype": "bfloat16",
   "optimizer___lr": 5e-5,

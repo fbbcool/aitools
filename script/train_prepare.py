@@ -37,6 +37,10 @@ trigger = 'xlasm'  # dataset-dict key (selects `datasets[trigger]`)
 caption_trigger = None
 num_repeats = 1
 # lr / rank: set `optimizer___lr` / `adapter___rank` in the variant's config_trainer_* dict below.
+# Self-contained experiment run (see `experiments` below the datasets): None = the normal run configured
+# above; a key overrides variant/trigger/num_repeats and merges its own trainer + dataset config.
+# experiment = None
+experiment = 'hr-slider'
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -411,12 +415,57 @@ datasets = {
     ],
 }
 
+# ──────────────────────────────────────────────────────
+# Experiments: one self-contained section per test run; selected by `experiment` at the top.
+experiments = {
+    # hr-slider (agent-lora, 2026-09-29): tendency test for a RAW high-noise "xlasm man pixel-size slider".
+    # 54 hand-rated imgs (fbbcool/xlasm-hr-slider-test, size words stripped from the captions); each image's
+    # mask is a constant grey v -> LoRA strength s = 2v - 1 for that step (big man -1 .. tiny man +1), the loss
+    # itself is unmasked. Needs the fork's models/krea2.py `slider_from_mask` (micro-batch 1) and the
+    # ${model___slider_from_mask} template knob. Raw re0.75, high-noise band only (min_t 0.8), 512 px.
+    'hr-slider': {
+        'variant': 'gts-atomic',
+        'trigger': 'xlasm-slider',
+        'num_repeats': 2,  # 54 imgs x 2 = 108 steps/epoch at micro-batch 1
+        'masks_from': 'fbbcool/xlasm-hr-slider-test',  # its train/masks/ -> mask_path
+        'config_trainer': {
+            'micro_batch_size_per_gpu': 1,  # slider_from_mask: one strength per forward
+            'warmup_steps': 20,
+            'checkpoint_every_n_epochs': 5,
+            'adapter___rank': 16,
+            'optimizer___lr': 4e-4,  # tendency test, not a keeper LR
+            'model___min_t': 0.8,
+            'model___slider_from_mask': True,
+        },
+        'config_dataset': {
+            'resolutions': [512],
+        },
+    },
+}
+datasets['xlasm-slider'] = [('fbbcool/xlasm-hr-slider-test', 0)]
+
+config_trainer_run = config_trainer[model][variant]
+if experiment is not None:
+    exp = experiments[experiment]
+    variant = exp.get('variant', variant)
+    trigger = exp.get('trigger', trigger)
+    config_trainer_run = config_trainer[model][variant] | exp.get('config_trainer', {})
+    config_dataset = config_dataset | {'num_repeats': exp.get('num_repeats', num_repeats)} | exp.get('config_dataset', {})
+    if exp.get('masks_from'):
+        from pathlib import Path
+        from huggingface_hub import snapshot_download
+
+        config_dataset['mask_path'] = str(
+            Path(snapshot_download(repo_id=exp['masks_from'], repo_type='dataset')) / 'train' / 'masks'
+        )
+    print(f'experiment {experiment}: variant {variant}, trigger {trigger}')
+
 Trainer(
     model,
     datasets[trigger],
     variant=variant,
     base=base,
-    config_trainer=config_trainer[model][variant],
+    config_trainer=config_trainer_run,
     config_dataset=config_dataset,
     trigger=caption_trigger,  # prepends '1alexandra,' to each caption .txt
     multithread=True,

@@ -133,6 +133,9 @@ ${model___shift}
 ${model___min_t}
 #max_t = 1
 ${model___max_t}
+# Slider training (fork models/krea2.py): each image's mask is a constant grey v -> LoRA strength
+# s = 2v - 1 for that step; the loss is NOT masked. Needs mask_path + micro_batch_size_per_gpu = 1.
+${model___slider_from_mask}
 
 # For models that support full fine tuning, simply delete or comment out the [adapter] table to FFT.
 [adapter]
