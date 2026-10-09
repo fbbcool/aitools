@@ -41,7 +41,7 @@ num_repeats = 1
 # above; a key overrides variant/trigger/num_repeats and merges its own trainer + dataset config.
 # experiment = None
 # experiment = 'hr-slider'
-experiment = 'tongue'
+experiment = 'xltongue'
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -442,12 +442,12 @@ experiments = {
             'resolutions': [512],
         },
     },
-    # tongue (agent-lora, 2026-10-09): standalone concept LoRA on raw re0.75, NO frozen LoRA
-    # (gts-atomic = no runtime_adapters group). 113 imgs, all 512x512 face close-ups, triggerless
-    # JoyCaption prose (every caption names the tongue) -> train native 512, no upscale.
-    'tongue': {
+    # xltongue (agent-lora, 2026-10-09): standalone concept LoRA on raw re0.75, NO frozen LoRA
+    # (gts-atomic = no runtime_adapters group). fbbcool/xltongue (ex 1tng-v1): 113 imgs, all 512x512 face
+    # close-ups, JoyCaption prose with the trigger inline ('xltongue tongue') -> train native 512, no upscale.
+    'xltongue': {
         'variant': 'gts-atomic',
-        'trigger': 'tongue',
+        'trigger': 'xltongue',
         'num_repeats': 4,  # 113 x 4 = 452 img-views/epoch; ~7K-view peak -> ~ep15, epochs=30 is the sentinel
         'config_trainer': {
             'adapter___rank': 32,
@@ -459,7 +459,7 @@ experiments = {
     },
 }
 datasets['xlasm-slider'] = [('fbbcool/xlasm-hr-slider-test', 0)]
-datasets['tongue'] = [('fbbcool/1tng-v1', 0)]
+datasets['xltongue'] = [('fbbcool/xltongue', 0)]
 
 config_trainer_run = config_trainer[model][variant]
 if experiment is not None:
