@@ -40,7 +40,8 @@ num_repeats = 1
 # Self-contained experiment run (see `experiments` below the datasets): None = the normal run configured
 # above; a key overrides variant/trigger/num_repeats and merges its own trainer + dataset config.
 # experiment = None
-experiment = 'hr-slider'
+# experiment = 'hr-slider'
+experiment = 'tongue'
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -426,7 +427,7 @@ experiments = {
     'hr-slider': {
         'variant': 'gts-atomic',
         'trigger': 'xlasm-slider',
-        'num_repeats': 2,  # 54 imgs x 2 = 108 steps/epoch at micro-batch 1
+        'num_repeats': 4,  # 54 imgs x 4 = 216 steps/epoch at micro-batch 1 (was 2; resumed at global_step1620)
         'masks_from': 'fbbcool/xlasm-hr-slider-test',  # its train/masks/ -> mask_path
         'config_trainer': {
             'micro_batch_size_per_gpu': 1,  # slider_from_mask: one strength per forward
@@ -441,8 +442,24 @@ experiments = {
             'resolutions': [512],
         },
     },
+    # tongue (agent-lora, 2026-10-09): standalone concept LoRA on raw re0.75, NO frozen LoRA
+    # (gts-atomic = no runtime_adapters group). 113 imgs, all 512x512 face close-ups, triggerless
+    # JoyCaption prose (every caption names the tongue) -> train native 512, no upscale.
+    'tongue': {
+        'variant': 'gts-atomic',
+        'trigger': 'tongue',
+        'num_repeats': 4,  # 113 x 4 = 452 img-views/epoch; ~7K-view peak -> ~ep15, epochs=30 is the sentinel
+        'config_trainer': {
+            'adapter___rank': 32,
+            'optimizer___lr': 1e-4,
+        },
+        'config_dataset': {
+            'resolutions': [512],
+        },
+    },
 }
 datasets['xlasm-slider'] = [('fbbcool/xlasm-hr-slider-test', 0)]
+datasets['tongue'] = [('fbbcool/1tng-v1', 0)]
 
 config_trainer_run = config_trainer[model][variant]
 if experiment is not None:
