@@ -40,10 +40,12 @@ num_repeats = 1
 # lr / rank: set `optimizer___lr` / `adapter___rank` in the variant's config_trainer_* dict below.
 # Self-contained experiment run (see `experiments` below the datasets): None = the normal run configured
 # above; a key overrides variant/trigger/num_repeats and merges its own trainer + dataset config.
-# experiment = None
 # experiment = 'hr-slider'
 # experiment = 'xltongue'
-experiment = 'mmh3-test'
+# experiment = 'mmh3-test'
+# experiment = None
+# experiment = 'mmh3-xlasm-s12'
+experiment = 'mmh3-xlasm-v5'
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -77,7 +79,9 @@ gpu_config_mmh3 = {
         'micro_batch_size_per_gpu': 4,
         'image_micro_batch_size_per_gpu': 4,
         'blocks_to_swap': 0,
+        # 2026-10-19 xlasm @1024 b4: checkpointing on = 33 GB VRAM, 5.7 s/step; OFF = OOM (83 GB alloc + 8.6 frag).
         'activation_checkpointing': True,  # on-GPU checkpointing; 'unsloth' offloads to RAM (slower)
+        'compile': True,
     },
 }
 
@@ -520,7 +524,37 @@ experiments = {
             'resolutions': [512],
         },
     },
+    # mmh3-xlasm-s12 (agent-lora, 2026-10-19): run 2 of the H3 xlasm track. Run 1 (defaults: image_shift 1, LR 1e-4)
+    # learned erect anatomy from ep05 but no size differential on cue-free prompts by ep09-13. image_shift 1 + uniform puts
+    # ~10 % of steps at sigma >= 0.9 vs ~57 % of the inference path (H3 video shift 12) -> composition under-trained.
+    # Operator: image_shift 12 + LR 2e-4 (upper edge) + rank 32 (run 1 was r16).
+    'mmh3-xlasm-s12': {
+        'variant': 'gts-atomic',
+        'trigger': 'xlasm',
+        'config_trainer': {
+            'adapter___rank': 32,
+            'optimizer___lr': 2e-4,
+            'model___image_shift': 12,
+        },
+    },
+    # mmh3-xlasm-v5 (agent-lora, 2026-10-19): run 3 of the H3 xlasm track on the size-stripped dataset (board task 135).
+    # 4-img overfit tests proved the pipeline works and that the trigger only learns size when the captions don't state
+    # it; runs 1/2 failed on size-stating captions + ~13-16 views/img. 150 imgs x 5 repeats = 750 views/epoch, so
+    # epoch 10 = 50 views/img (~7.5k image-views, keeper window). image_shift 1 as in the passing overfits.
+    # H3 loss is noise -> judge per epoch with the cue-free size grid. checkpoint every 2 epochs: run 2 filled 80 GB.
+    'mmh3-xlasm-v5': {
+        'variant': 'gts-atomic',
+        'trigger': 'xlasm-v5',
+        'num_repeats': 5,
+        'config_trainer': {
+            'adapter___rank': 32,
+            'optimizer___lr': 2e-4,
+            'model___image_shift': 1,
+            'checkpoint_every_n_epochs': 2,
+        },
+    },
 }
+datasets['xlasm-v5'] = [('fbbcool/xlasm-v5-nosize-1024', 0)]
 datasets['xlasm-slider'] = [('fbbcool/xlasm-hr-slider-test', 0)]
 datasets['xltongue'] = [('fbbcool/xltongue', 0)]
 

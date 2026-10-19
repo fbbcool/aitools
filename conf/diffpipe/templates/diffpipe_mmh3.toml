@@ -29,6 +29,9 @@ gradient_clipping = 1.0
 ${warmup_steps}
 #save_every_n_epochs = 1
 ${save_every_n_epochs}
+# Checkpoint the training state every n epochs or minutes (set only one); resume with --resume_from_checkpoint.
+#checkpoint_every_n_epochs = 1
+${checkpoint_every_n_epochs}
 #checkpoint_every_n_minutes = 120
 # H3 needs the offloaded unsloth variant ('unsloth', a string) to fit a 32GB card.
 #activation_checkpointing = 'unsloth'

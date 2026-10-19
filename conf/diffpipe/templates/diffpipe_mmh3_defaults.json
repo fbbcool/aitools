@@ -4,6 +4,7 @@
   "micro_batch_size_per_gpu": 1,
   "image_micro_batch_size_per_gpu": 1,
   "warmup_steps": 20,
+  "checkpoint_every_n_epochs": 1,
   "caching_batch_size": 1,
   "activation_checkpointing": "unsloth",
   "video_clip_mode": "single_beginning",
