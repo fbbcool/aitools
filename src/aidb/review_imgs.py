@@ -175,6 +175,10 @@ class ReviewImgs:
     def delete(self, list_id: str) -> bool:
         return self._col.delete_one({'list_id': list_id}).deleted_count > 0
 
+    def delete_all(self) -> int:
+        """Delete every review list; returns how many were removed."""
+        return self._col.delete_many({}).deleted_count
+
     def ls(self) -> list[dict]:
         """Summaries, newest first: list_id, title, created, created_by, answered, total."""
         out = []

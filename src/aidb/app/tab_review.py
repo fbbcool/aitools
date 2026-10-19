@@ -47,6 +47,8 @@ ELEM_FULL_BUS = 'rv-full-bus'
 ELEM_FULL_BTN = 'rv-full-btn'
 ELEM_FULL_OUT = 'rv-full-out'
 
+CONFIRM_ALL = '__delete_all__'
+
 
 def _jpeg_b64(url: str, size: int, quality: int) -> str | None:
     """Downscaled JPEG as base64, None for missing/unreadable/non-image files."""
@@ -181,6 +183,21 @@ class ReviewTab:
         value = current if current in values else None
         return gr.update(choices=choices, value=value)
 
+    # list_id / CONFIRM_ALL arrive only after the JS confirm(); None = cancelled
+    def _on_delete(self, list_id: str | None):
+        if not list_id:
+            return gr.update(), gr.update()
+        ok = self._rv.delete(list_id)
+        self._log(f'delete {list_id}: {ok}')
+        return self._on_refresh(None), self._render(None)
+
+    def _on_delete_all(self, confirmed: str | None):
+        if confirmed != CONFIRM_ALL:
+            return gr.update(), gr.update()
+        n = self._rv.delete_all()
+        self._log(f'delete all: {n} lists')
+        return self._on_refresh(None), self._render(None)
+
     def _on_save(self, payload: str | None) -> str:
         if not payload:
             return ''
@@ -232,19 +249,20 @@ class ReviewTab:
                 'Throwaway image review lists (`review_imgs`). Agents create them with '
                 '`script/review_list.py` — cheatsheet: `conf/review/README.md`.'
             )
+            # lists created after launch arrive via ↻ / tab select; custom
+            # values keep the server-side choice validation out of the way
+            dropdown = gr.Dropdown(
+                choices=self._choices(),
+                value=None,
+                allow_custom_value=True,
+                label='Review list (newest first, answered/total)',
+                interactive=True,
+            )
             with gr.Row():
-                # lists created after launch arrive via ↻ / tab select; custom
-                # values keep the server-side choice validation out of the way
-                dropdown = gr.Dropdown(
-                    choices=self._choices(),
-                    value=None,
-                    allow_custom_value=True,
-                    label='Review list (newest first, answered/total)',
-                    interactive=True,
-                    scale=6,
-                )
                 refresh_btn = gr.Button('↻ lists', scale=1)
                 reload_btn = gr.Button('reload list', scale=1)
+                delete_btn = gr.Button('delete', variant='stop', scale=1)
+                delete_all_btn = gr.Button('delete lists', variant='stop', scale=1)
             list_html = gr.HTML()
 
             save_bus = gr.Textbox(visible='hidden', elem_id=ELEM_SAVE_BUS)
@@ -258,6 +276,20 @@ class ReviewTab:
             refresh_btn.click(self._on_refresh, [dropdown], [dropdown])
             dropdown.change(self._render, [dropdown], [list_html])
             reload_btn.click(self._render, [dropdown], [list_html])
+            delete_btn.click(
+                self._on_delete,
+                [dropdown],
+                [dropdown, list_html],
+                js='(lid) => (lid && confirm("Delete review list " + lid + "?\\n'
+                'Its answers are lost.")) ? lid : null',
+            )
+            delete_all_btn.click(
+                self._on_delete_all,
+                [dropdown],
+                [dropdown, list_html],
+                js='() => confirm("Delete ALL review lists?\\nAll answers are lost.") '
+                f'? "{CONFIRM_ALL}" : null',
+            )
 
             # every flush must reach the server (acks drive the JS dirty map)
             save_btn.click(
@@ -318,20 +350,26 @@ REVIEW_HEAD = r"""
 #rv-root .rv-meta { font-size: 0.85em; display: flex; justify-content: space-between;
   align-items: center; gap: 6px; }
 #rv-root .rv-meta > span { opacity: 0.8; word-break: break-all; }
-.rv-url { flex: none; border: 1px solid var(--rv-line, #666); border-radius: 4px; padding: 0 6px;
-  background: transparent; color: inherit; cursor: pointer; font-size: 0.85em; }
-.rv-url:hover { border-color: #1f6feb; }
-.rv-url.rv-copied { background: #2ea043; border-color: #2ea043; color: #fff; }
+/* button rules are id-scoped: gr.HTML content sits in .gradio-style, whose
+   `.gradio-container-x .gradio-style button` theme rule outranks plain classes */
+:is(#rv-root, #rv-modal) .rv-url { flex: none; border: 1px solid var(--rv-line, #666);
+  border-radius: 4px; padding: 0 6px; background: transparent; color: inherit; cursor: pointer;
+  font-size: 0.85em; }
+:is(#rv-root, #rv-modal) .rv-url:hover { border-color: #1f6feb; }
+:is(#rv-root, #rv-modal) .rv-url.rv-copied { background: #2ea043; border-color: #2ea043;
+  color: #fff; }
 .rv-ctx { font-size: 0.85em; white-space: pre-wrap; background: rgba(128,128,128,0.15);
   border-radius: 4px; padding: 4px 6px; }
 .rv-field { margin: 3px 0; }
 .rv-flabel { font-size: 0.8em; opacity: 0.75; margin-bottom: 2px; }
 .rv-opts { display: flex; flex-wrap: wrap; gap: 4px; }
-.rv-opt { border: 1px solid var(--rv-line, #666); border-radius: 4px; padding: 2px 8px;
-  background: transparent; color: inherit; cursor: pointer; font-size: 0.9em; }
-.rv-opt:hover { border-color: #1f6feb; }
-.rv-opt.rv-on { background: #1f6feb; border-color: #1f6feb; color: #fff; }
-.rv-opt .rv-k { opacity: 0.6; margin-right: 3px; font-size: 0.85em; }
+:is(#rv-root, #rv-modal) .rv-opt { border: 1px solid var(--rv-line, #666); border-radius: 4px;
+  padding: 2px 8px; background: transparent; color: inherit; cursor: pointer; font-size: 0.9em;
+  font-weight: 400; }
+:is(#rv-root, #rv-modal) .rv-opt:hover { border-color: #1f6feb; background: rgba(31,111,235,0.12); }
+:is(#rv-root, #rv-modal) .rv-opt.rv-on { background: #1f6feb; border-color: #1f6feb; color: #fff;
+  font-weight: 600; box-shadow: 0 0 0 1px #1f6feb; }
+:is(#rv-root, #rv-modal) .rv-opt .rv-k { opacity: 0.6; margin-right: 3px; font-size: 0.85em; }
 .rv-text { width: 100%; box-sizing: border-box; font-size: 0.9em; background: transparent;
   color: inherit; border: 1px solid var(--rv-line, #666); border-radius: 4px; padding: 3px; }
 #rv-root .rv-comment { margin-top: 14px; }

@@ -331,6 +331,7 @@ class AInstaller:
             'asr': 'models/asr',
             'diarize': 'models/diarize',
             'mesh3d': 'models/mesh3d',
+            'veda': 'models/veda',
         }
         target = item.get('target', 'unknown')
         target_dir = map_target_dirs.get(target, '')
