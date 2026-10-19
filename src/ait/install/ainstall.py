@@ -382,6 +382,7 @@ class AInstaller:
             },
             'diffuser': {'model___diffusers_path': {'type': 'str'}},
             'vae': {'model___vae_path': {'type': 'str'}, 'model___vae': {'type': 'str'}},
+            'audio_vae': {'model___audio_vae': {'type': 'str'}},
             'lora': {
                 'model___merge_adapters': {'type': 'list_str'},
                 'adapter___init_from_existing': {'type': 'str'},
@@ -412,6 +413,11 @@ class AInstaller:
                     'parameter': 'text_encoders',
                     'format': '${parameter} = [{path = ${value}, type = "krea2"}]',
                 },
+                'model___text_encoders_minimax': {
+                    'type': 'str',
+                    'parameter': 'text_encoders',
+                    'format': '${parameter} = [{path = ${value}, type = "minimax"}]',
+                },
             },
         }
         # build target url
@@ -419,6 +425,7 @@ class AInstaller:
             'ckpt': 'data/ckpt',
             'dataset': 'data/datasets',
             'vae': 'data/vae',
+            'audio_vae': 'data/vae',
             'controlnet': 'data/controlnet',
             'lora': 'data/loras',
             'embedding': 'data/embeddings',

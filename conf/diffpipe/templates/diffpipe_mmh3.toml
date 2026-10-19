@@ -1,0 +1,103 @@
+# Output path for training runs. Each training run makes a new directory in here.
+#output_dir = '{self.DIR_OUTPUT}'
+${output_dir}
+#dataset = '{self.FILE_CONFIG_DATASET}'
+${dataset}
+
+# training settings
+
+# I usually set this to a really high value because I don't know how long I want to train.
+#epochs = 40
+${epochs}
+# Hard stop after this many steps (smoke tests); empty = train all epochs.
+#max_steps = 8
+${max_steps}
+# Batch size of a single forward/backward pass for one GPU.
+#micro_batch_size_per_gpu = {self._batch_size}
+${micro_batch_size_per_gpu}
+# Batch size for still images (frame bucket 1), if different from micro_batch_size_per_gpu.
+#image_micro_batch_size_per_gpu = 1
+${image_micro_batch_size_per_gpu}
+# Pipeline parallelism degree. A single instance of the model is divided across this many GPUs.
+pipeline_stages = 1
+# Number of micro-batches sent through the pipeline for each training step.
+gradient_accumulation_steps = 1
+# Grad norm clipping.
+gradient_clipping = 1.0
+# Learning rate warmup.
+#warmup_steps = 100
+${warmup_steps}
+#save_every_n_epochs = 1
+${save_every_n_epochs}
+#checkpoint_every_n_minutes = 120
+# H3 needs the offloaded unsloth variant ('unsloth', a string) to fit a 32GB card.
+#activation_checkpointing = 'unsloth'
+${activation_checkpointing}
+partition_method = 'parameters'
+
+# dtype for saving the LoRA or model, if different from training dtype
+#save_dtype = 'bfloat16'
+${save_dtype}
+# Batch size for caching latents and text embeddings (Qwen3-VL-32B encoder: keep small).
+#caching_batch_size = {self._batch_size}
+${caching_batch_size}
+
+#steps_per_print = 10
+${steps_per_print}
+#video_clip_mode = 'single_beginning'
+${video_clip_mode}
+
+# Block swapping keeps this many transformer blocks offloaded to RAM. Increasing it lowers VRAM
+# use with a performance penalty. LoRA-only, requires pipeline_stages=1. RTX 5090: 48.
+#blocks_to_swap = 48
+${blocks_to_swap}
+#compile = false
+${compile}
+
+# MiniMax H3 (diffusion-pipe fork branch feature-mmh3): ComfyUI-native video/audio model.
+# int8 convrot transformer, video VAE + audio VAE, Qwen3-VL-32B nvfp4 text encoder (TE type 'minimax').
+[model]
+#type = 'minimax_h3'
+${model___type}
+# transformer / text encoder / vae / audio vae paths are bound by the installer from models_train_mmh3.json
+${model___diffusion_model}
+${model___vae}
+${model___audio_vae}
+${model___text_encoders_minimax}
+#dtype = 'bfloat16'
+${model___dtype}
+#timestep_sample_method = 'uniform'
+${model___timestep_sample_method}
+# multiplicative shift for video latents, image_shift for stills (frame bucket 1)
+#shift = 12
+${model___shift}
+#image_shift = 1
+${model___image_shift}
+# Training-time CFG. Mutually exclusive with the training adapter below: Trainer comments it out
+# whenever runtime adapters are bound.
+#cfg = 4.0
+${model___cfg}
+
+# For models that support full fine tuning, simply delete or comment out the [adapter] table to FFT.
+[adapter]
+type = 'lora'
+#rank = {int(self._config_train['netdim'])}
+${adapter___rank}
+# Dtype for the LoRA weights you are training.
+#dtype = 'bfloat16'
+${adapter___dtype}
+
+# Training adapter (ostris minimax_h3_training_adapter): de-distillation crutch, frozen during
+# training, OFF at inference. One [[adapter.runtime_adapters]] block per lora entry in the model JSON.
+${adapter___frozen_loras}
+
+[optimizer]
+# AdamW from the optimi library is a good default since it automatically uses Kahan summation when training bfloat16 weights.
+#type = 'adamw_optimi'
+${optimizer___type}
+#lr = {self._lr}
+${optimizer___lr}
+betas = [0.9, 0.99]
+#weight_decay = 0.01
+${optimizer___weight_decay}
+eps = 1e-8

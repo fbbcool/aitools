@@ -1,0 +1,37 @@
+# MiniMax H3 dataset. Resolutions = square side lengths; images are AR-bucketed, then resized to
+# ALL listed areas (multi-resolution training duplicates the dataset per entry).
+#resolutions = [512]
+$resolutions
+
+# Enable aspect ratio bucketing. For the different AR buckets, the final size will be such that
+# the areas match the resolutions you configured above.
+enable_ar_bucket = true
+# Min and max aspect ratios, given as width/height ratio.
+min_ar = 0.5
+max_ar = 2.0
+# Total number of aspect ratio buckets, evenly spaced (in log space) between min_ar and max_ar.
+num_ar_buckets = 9
+
+# Frame buckets: [1] for stills. Video sets need longer buckets, e.g. [1, 34, 68, 102, 136]
+# (videos go to the longest bucket they fill; too-short videos are dropped).
+#frame_buckets = [1]
+${frame_buckets}
+
+[[directory]]
+# Path to directory of images/videos, and corresponding caption files (same name, .txt).
+#path = '/home/xxx'
+$path
+
+# Masked training: white = train on this, black = mask out (R channel used as loss weight).
+#mask_path = '/home/anon/data/images/grayscale/masks'
+$mask_path
+
+# How many repeats for 1 epoch (num_repeats=1: one pass over all examples).
+#num_repeats = 1
+${num_repeats}
+
+# Per-directory overrides for video sets (empty = use the top-level values above).
+#resolutions = [256]
+${directory___resolutions}
+#frame_buckets = [1, 34, 68, 102, 136]
+${directory___frame_buckets}

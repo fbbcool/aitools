@@ -72,6 +72,13 @@ class Trainer:
 
         self._config_trainer |= {'dataset': str(self._templater_dataset.file_saved)}
         self._config_trainer |= self._installer.vars_bound
+        # training-time cfg and runtime (frozen) adapters are mutually exclusive (mmh3: the
+        # de-distillation training adapter) -> render cfg commented out when adapters are bound
+        if 'adapter___frozen_loras' in self._installer.vars_bound and self._config_trainer.get(
+            'model___cfg'
+        ):
+            print(' WARN: model___cfg disabled, runtime adapters are bound')
+            self._config_trainer['model___cfg'] = ''
 
         print(self.config_trainer)
         self._templater_diffpipe = Templater(

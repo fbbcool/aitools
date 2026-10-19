@@ -1,0 +1,43 @@
+{
+  "train_mmh3": {
+    "common": {
+      "transformer": [
+        {
+          "repo_id": "Comfy-Org/MiniMax-H3",
+          "file": "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+          "skip": false
+        }
+      ],
+      "vae": [
+        {
+          "repo_id": "Comfy-Org/MiniMax-H3",
+          "file": "vae/minimax_h3_video_vae_fp16.safetensors",
+          "skip": false
+        }
+      ],
+      "audio_vae": [
+        {
+          "repo_id": "Comfy-Org/MiniMax-H3",
+          "file": "vae/minimax_h3_audio_vae_fp32.safetensors",
+          "skip": false
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/MiniMax-H3",
+          "file": "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+          "skip": false
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "ostris/minimax_h3_training_adapter",
+          "file": "minimax_h3_training_adapter_v3.safetensors",
+          "weight": 1.0,
+          "skip": false
+        }
+      ]
+    },
+    "gts-atomic": {}
+  }
+}

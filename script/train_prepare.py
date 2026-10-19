@@ -27,7 +27,7 @@ from trainer import Trainer
 #    'optimizer___type': 'adamw_optimi',
 # }
 
-model = 'krea2'  # 'qwen' | 'krea2'
+model = 'krea2'  # 'qwen' | 'krea2' | 'mmh3'
 base = None  # krea2: None = group train_krea2 (currently raw re0.75 fp8; snofs entries skip:true in models_train_krea2.json) | 're' = group train_krea2-re (raw re0.75 fp8, no variant groups)
 variant = 'gts-atomic'
 gpu = '5090'
@@ -54,6 +54,16 @@ gpu_config = {
     'h100-nvl': {
         'micro_batch_size_per_gpu': 20,  # maybe 1
         'warmup_steps': 5,  # small cushion for LR=2e-4 early-spike risk
+    },
+}
+
+# mmh3 (MiniMax H3) per-gpu knobs; 5090 values from agent-lora's smoke run (2026-10-19:
+# 512 px stills, r16, ~4.1 s/step, ~44 GB peak host RAM). Others untested -> template defaults.
+gpu_config_mmh3 = {
+    '5090': {
+        'micro_batch_size_per_gpu': 1,
+        'image_micro_batch_size_per_gpu': 1,
+        'blocks_to_swap': 48,
     },
 }
 
@@ -213,6 +223,24 @@ config_trainer_krea2_gts_app = {
     'optimizer___lr': 5e-5,
 }
 
+# mmh3 (MiniMax H3, diffpipe fork branch feature-mmh3). The ostris training adapter
+# (models_train_mmh3.json common lora, frozen, OFF at inference) is always bound; model___cfg is
+# then forced off by Trainer. Video sets: config_dataset 'frame_buckets' (e.g. [1, 34, 68, 102, 136])
+# + 'directory___resolutions'.
+config_trainer_mmh3_default = {
+    'epochs': 30,  # sentinel, manual cancel
+    **gpu_config_mmh3.get(gpu, {}),
+    'warmup_steps': 20,
+    'save_every_n_epochs': 1,
+    'caching_batch_size': 1,
+    'steps_per_print': 10,
+    'adapter___rank': 16,
+    'optimizer___lr': 1e-4,
+    'model___timestep_sample_method': 'uniform',
+    'model___shift': 12,
+    'model___image_shift': 1,
+}
+
 # config_trainer[model][variant] -> the per-run trainer overrides.
 config_trainer = {
     'qwen': {
@@ -228,6 +256,9 @@ config_trainer = {
         'gts-app-atomic': config_trainer_krea2_gts_app_atomic,
         'gts-app': config_trainer_krea2_gts_app,
         'gts-app-xlbusty': config_trainer_krea2_gts_app,
+    },
+    'mmh3': {
+        'gts-atomic': config_trainer_mmh3_default,
     },
 }
 
