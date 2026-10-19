@@ -27,11 +27,12 @@ from trainer import Trainer
 #    'optimizer___type': 'adamw_optimi',
 # }
 
-model = 'krea2'  # 'qwen' | 'krea2' | 'mmh3'
+model = 'mmh3'  # 'qwen' | 'krea2' | 'mmh3'
 base = None  # krea2: None = group train_krea2 (currently raw re0.75 fp8; snofs entries skip:true in models_train_krea2.json) | 're' = group train_krea2-re (raw re0.75 fp8, no variant groups)
 variant = 'gts-atomic'
-gpu = '5090'
+# gpu = '5090'
 # gpu = 'h100-nvl'
+gpu = '6000'  # RTX PRO 6000 Blackwell, 96 GB
 trigger = 'xlasm'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 caption_trigger = None
@@ -41,7 +42,8 @@ num_repeats = 1
 # above; a key overrides variant/trigger/num_repeats and merges its own trainer + dataset config.
 # experiment = None
 # experiment = 'hr-slider'
-experiment = 'xltongue'
+# experiment = 'xltongue'
+experiment = 'mmh3-test'
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -55,6 +57,9 @@ gpu_config = {
         'micro_batch_size_per_gpu': 20,  # maybe 1
         'warmup_steps': 5,  # small cushion for LR=2e-4 early-spike risk
     },
+    '6000': {
+        'micro_batch_size_per_gpu': 8,  # untested; 96 GB, H100-NVL sweet spot (agent-lora 2026-10-19)
+    },
 }
 
 # mmh3 (MiniMax H3) per-gpu knobs; 5090 values from agent-lora's smoke run (2026-10-19:
@@ -64,6 +69,15 @@ gpu_config_mmh3 = {
         'micro_batch_size_per_gpu': 1,
         'image_micro_batch_size_per_gpu': 1,
         'blocks_to_swap': 48,
+    },
+    # RTX PRO 6000 (96 GB): untested, deliberately aggressive (operator 2026-10-19: start high, back off
+    # on OOM). Back-off order: activation_checkpointing 'unsloth' -> micro-batch 2 -> blocks_to_swap
+    # 8/16/24 -> micro-batch 1.
+    '6000': {
+        'micro_batch_size_per_gpu': 4,
+        'image_micro_batch_size_per_gpu': 4,
+        'blocks_to_swap': 0,
+        'activation_checkpointing': True,  # on-GPU checkpointing; 'unsloth' offloads to RAM (slower)
     },
 }
 
@@ -483,6 +497,24 @@ experiments = {
         'config_trainer': {
             'adapter___rank': 32,
             'optimizer___lr': 1e-4,
+        },
+        'config_dataset': {
+            'resolutions': [512],
+        },
+    },
+    # mmh3-test (agent-lora, 2026-10-19): FIRST H3 run on a rented RTX PRO 6000 = a test, not a prod shot.
+    # Known small set (xltongue, 113 x 512 face close-ups, trigger inline) so the read is "does H3 learn a
+    # still concept + how fast", comparable to the krea2 xltongue run (keeper read ep05-07 there).
+    # Fast side: LR 2e-4 (upper edge, never a keeper LR), r32. ostris training adapter frozen (model JSON).
+    # Batch 4 (gpu_config_mmh3['6000']) -> 113 x 4 views / 4 = 113 steps/epoch; ~7K-view peak ~ep15 at
+    # 1e-4, expect earlier at 2e-4.
+    'mmh3-test': {
+        'variant': 'gts-atomic',
+        'trigger': 'xltongue',
+        'num_repeats': 4,
+        'config_trainer': {
+            'adapter___rank': 32,
+            'optimizer___lr': 2e-4,
         },
         'config_dataset': {
             'resolutions': [512],
