@@ -49,6 +49,9 @@ class AIDBSceneApp:
         from aidb.app.tab_hf_datasets import HFDatasetsTab
         self._hf_datasets_tab = HFDatasetsTab(self._dbc)
 
+        from aidb.app.tab_refdef import RefdefTab
+        self._refdef_tab = RefdefTab(self._dbc)
+
         self._interface = self._create_interface()
 
     # head HTML injected into the page <head> so the penis-mask annotator's
@@ -59,7 +62,8 @@ class AIDBSceneApp:
         from aidb.app.tab_penis_mask import PENIS_MASK_HEAD
         from aidb.app.tab_review import REVIEW_HEAD
         from aidb.app.tab_hf_datasets import HF_DATASETS_HEAD
-        return PENIS_MASK_HEAD + REVIEW_HEAD + HF_DATASETS_HEAD
+        from aidb.app.tab_refdef import REFDEF_HEAD
+        return PENIS_MASK_HEAD + REVIEW_HEAD + HF_DATASETS_HEAD + REFDEF_HEAD
 
     def _create_interface(self):
         """
@@ -543,6 +547,10 @@ class AIDBSceneApp:
             # HF datasets tab: browse the operator's active HF dataset repos
             # (hf_datasets collection) from the local HF cache.
             self._hf_datasets_tab.build()
+
+            # refdef tab: 3 ref slots + roles + prompt/hint; displays/edits the
+            # enhancer clipspace payload and writes refdef.v1 (board task 150).
+            self._refdef_tab.build()
 
             # Link hidden triggers to functions
             button_hidden_cmd.click(
