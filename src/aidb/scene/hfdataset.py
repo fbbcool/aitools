@@ -8,6 +8,8 @@ from aidb.scene.scene_common import SceneDef
 
 class HFDataset:
     FILE_META: Final = 'metadata.jsonl'
+    # edit-pair sets (file_name = target): source image, loss mask and edit instruction, paths like file_name
+    FIELDS_EDIT: Final = ('source', 'mask', 'instruction')
 
     def __init__(self, repo_id: str, file_jsonl: str = FILE_META, force_meta_dl: bool = False):
         self._repo_id = repo_id
@@ -60,6 +62,11 @@ class HFDataset:
 
             if caption is not None:
                 data_id |= {SceneDef.FIELD_CAPTION: caption}
+
+            for field in self.FIELDS_EDIT:
+                value = item.get(field, None)
+                if value is not None:
+                    data_id |= {field: value}
 
             if data_id:
                 data_ids |= {id: data_id}
@@ -126,6 +133,24 @@ class HFDataset:
         if file_name is None:
             return None
         return self.cache() / SceneDef.DIR_TRAIN / file_name
+
+    def instruction_from_id(self, id: str) -> Optional[str]:
+        data_id = self.data_from_id(id)
+        if data_id is None:
+            return None
+        return data_id.get('instruction', None)
+
+    def url_source_from_id(self, id: str) -> Optional[Path]:
+        data_id = self.data_from_id(id)
+        if data_id is None or data_id.get('source', None) is None:
+            return None
+        return self.cache() / SceneDef.DIR_TRAIN / data_id['source']
+
+    def url_mask_from_id(self, id: str) -> Optional[Path]:
+        data_id = self.data_from_id(id)
+        if data_id is None or data_id.get('mask', None) is None:
+            return None
+        return self.cache() / SceneDef.DIR_TRAIN / data_id['mask']
 
     def set_caption(self, id: str, caption: str) -> bool:
         if not id or not caption:

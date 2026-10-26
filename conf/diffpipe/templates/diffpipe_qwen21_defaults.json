@@ -1,0 +1,22 @@
+{
+  "epochs": 30,
+  "micro_batch_size_per_gpu": 1,
+  "warmup_steps": 50,
+  "checkpoint_every_n_epochs": "",
+  "checkpoint_every_n_minutes": 60,
+  "activation_checkpointing": true,
+  "caching_batch_size": 1,
+  "compile": false,
+  "model___diffusion_model": "",
+  "model___vae": "",
+  "model___text_encoders_qwen21": "",
+  "model___diffusion_model_dtype": "",
+  "model___timestep_sample_method": "logit_normal",
+  "model___flux_shift": true,
+  "model___shift": "",
+  "model___edit_resolution": 1024,
+  "model___mask_floor": "",
+  "adapter___rank": 16,
+  "adapter___frozen_loras": "",
+  "optimizer___lr": 7e-5
+}

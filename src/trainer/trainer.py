@@ -21,6 +21,9 @@ class Trainer:
     FILE_TRAIN_SCRIPT: Final = f'{PREFIX}.sh'
     PREFIX_INSTALLER_GROUP: Final = f'{PREFIX}_'
     DIR_DATASET: Final = 'dataset'
+    # edit-pair sets: sources (diffpipe control_path) and loss masks, stem-matched to the targets in DIR_DATASET
+    DIR_DATASET_CONTROL: Final = 'dataset_control'
+    DIR_DATASET_MASK: Final = 'dataset_mask'
 
     def __init__(
         self,
@@ -35,6 +38,7 @@ class Trainer:
         trigger: str | None = None,
         rank: int | None = None,
         lr: float | None = None,
+        edit: bool = False,  # edit-pair sets: target + source (+ mask), caption = the edit instruction
     ) -> None:
         if root is None:
             self.root = self.ROOT
@@ -44,6 +48,8 @@ class Trainer:
         self.model = model
         self.variant = variant
         self.base = base
+        self.edit = edit
+        self._n_masks = 0
 
         self._config_trainer = {}
         if config_trainer is not None:
@@ -61,7 +67,17 @@ class Trainer:
         self._installer = AInstaller(self.root, group=self._group_installer, method='diffpipe')
         # print(f'installer vars dataset: {self._installer.vars_bound}')
 
+        # dataset first: an edit set's mask_path is only rendered when the set has masks (diffpipe
+        # skips every image whose mask is missing)
+        self._repo_ids_hfd: list[str] | list[tuple[str, int]] = repo_ids_hfd
+        self._trigger = trigger
+        self._make_dataset(multithread=multithread)
+
         self._config_dataset |= {'path': str(self.dir_dataset)}
+        if self.edit:
+            self._config_dataset |= {'control_path': str(self.dir_dataset_control)}
+            if self._n_masks:
+                self._config_dataset.setdefault('mask_path', str(self.dir_dataset_mask))
         self._templater_dataset = Templater(
             'dataset',
             self.model,
@@ -89,11 +105,6 @@ class Trainer:
         )
         self._templater_diffpipe.save(self.root)
 
-        self._repo_ids_hfd: list[str] | list[tuple[str, int]] = repo_ids_hfd
-
-        self._trigger = trigger
-
-        self._make_dataset(multithread=multithread)
         self._make_file_train_script()
 
     @property
@@ -119,8 +130,19 @@ class Trainer:
     def dir_dataset(self) -> Path:
         return self.root / self.DIR_DATASET
 
+    @property
+    def dir_dataset_control(self) -> Path:
+        return self.root / self.DIR_DATASET_CONTROL
+
+    @property
+    def dir_dataset_mask(self) -> Path:
+        return self.root / self.DIR_DATASET_MASK
+
     def _make_dataset(self, multithread: bool = False) -> None:
         self.dir_dataset.mkdir(parents=True, exist_ok=True)
+        if self.edit:
+            self.dir_dataset_control.mkdir(parents=True, exist_ok=True)
+            self.dir_dataset_mask.mkdir(parents=True, exist_ok=True)
         for item in self._repo_ids_hfd:
             repo_id = ''
             max_imgs = 0
@@ -231,14 +253,29 @@ class Trainer:
             if url_img is None:
                 continue
 
+            if self.edit:
+                url_source = hfd.url_source_from_id(id)
+                if url_source is None:
+                    lost += 1
+                    print(f'edit source missing for {id}!')
+                    continue
+
             # symlink file to dataset folder
             img_file = self.dir_dataset / url_img.name
             url_symlink_to(url_img, img_file)
 
+            if self.edit:
+                # source + mask under the target's file name: diffpipe matches them by stem
+                url_symlink_to(url_source, self.dir_dataset_control / url_img.name)
+                url_mask = hfd.url_mask_from_id(id)
+                if url_mask is not None:
+                    url_symlink_to(url_mask, self.dir_dataset_mask / url_img.name)
+                    self._n_masks += 1
+
             #
-            # caption
+            # caption (edit sets: the edit instruction)
             #
-            caption = hfd.caption_from_id(id)
+            caption = hfd.instruction_from_id(id) if self.edit else hfd.caption_from_id(id)
             if not caption:
                 lost += 1
                 print(f'caption missing for {id}!')

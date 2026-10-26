@@ -1,25 +1,32 @@
 """Refdef tab of the AIDB scene app (reference definition).
 
 Three fixed reference slots (image + short role text) plus one prompt /
-prompt-hint box. The clipspace is the only input (``⟲ pull clipspace``)
-and the only output (``⇪ deploy``); the tab is stateless otherwise.
+prompt-hint box. The clipspace is the only input (``⟲ pull``, plus a ⟲ per
+slot) and the only output (``⇪ deploy``); the tab is stateless otherwise.
 
 Pull is smart: enhancer data (``1xlasm_enhancer.iteration.*``) or a
 refdef.v1 instruction loads as a whole; an img url / url list / img id /
-scene id clipspace is added to the free slots (extras dropped); anything else only
-shows a 0.5 s toast. What deploy writes depends on what was pulled:
+scene id clipspace is added to the free slots (extras dropped); anything
+else only shows a 0.5 s toast. A slot's own ⟲ puts the first image of any
+pull data into just that slot. What deploy writes depends on what was
+pulled:
 
-  * **enhancer mode** (enhancer data pulled): the exact payload goes back,
-    only image urls the user replaced are patched (slot 1 = ``url``, slots
-    2/3 = mmh3 ``prompts_vid.refs.first/last``) and ``edited_by: 'refdef'``
-    is set. Prompt and roles are display-only (roles read the per-media
-    ``url_desc`` / ``desc`` fields, board task 150). ◀ ▶ step through
-    story/batch entries.
+  * **enhancer mode** (enhancer data pulled): the tab keeps the WHOLE
+    payload as a working copy and shows one section at a time — the
+    *view* (main / vid / inp / next = ``prompts`` / ``prompts_vid`` /
+    ``prompts_inp`` / ``prompts_next``; default = the section the latest
+    enhancer step produced). Replaced slot images are patched into the
+    working copy (on view switch and on deploy); deploy writes the full
+    payload back with ``edited_by: 'refdef'`` and never triggers the
+    enhancer, which ignores such payloads (task 150). Prompt and roles are
+    display-only (roles = the media ``url_desc`` / ``desc``).
   * **instruction mode** (images only / reset): a ``1xlasm_enhancer.refdef.v1``
     instruction with the selected verb (replicate / enh / pickup / inp-mask /
-    inp-nomask) that the enhancer builds its enhancer data from (task 150).
+    inp-nomask) that the enhancer builds its enhancer data from. With
+    *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
+    session ``xlasm`` with ``/refdef`` — only when it is idle.
 
-Payload logic is in pure module functions (``parse_payload``,
+Payload logic is in pure module functions (``parse_payload``, ``with_view``,
 ``patch_iteration``, ``refdef_payload``) so it can be tested without gradio.
 """
 
@@ -49,8 +56,6 @@ SCHEMA_REFDEF: Final = '1xlasm_enhancer.refdef.v1'
 EDITED_BY: Final = 'refdef'
 KINDS: Final = ('prompt', 'hint')
 VERBS: Final = ('replicate', 'enh', 'pickup', 'inp-mask', 'inp-nomask')
-# fallback roles when an iteration payload carries no media desc (task 150)
-ROLES_ITERATION: Final = ('main img', 'mmh3 first frame', 'mmh3 last frame')
 VID_REF_KEYS: Final = ('first', 'last')  # prompts_vid.refs keys for slots 2/3
 PREVIEW_SIZE: Final = 768  # slot preview edge (px)
 MAX_PULL_LINES: Final = 50  # longer clipspaces are no image lists
@@ -86,9 +91,88 @@ def _vid_refs(payload: dict) -> dict:
     return refs if isinstance(refs, dict) else {}
 
 
+# enhancer data views: each payload section the tab can show in the 3 slots
+VIEWS: Final = ('main', 'vid', 'inp', 'next')
+VIEW_SECTION: Final = {'vid': 'prompts_vid', 'inp': 'prompts_inp', 'next': 'prompts_next'}
+# fallback roles per view when a media object carries no desc (task 150)
+VIEW_ROLES: Final = {
+    'main': ('main img', '', ''),
+    'vid': ('first frame', 'last frame', ''),
+    'inp': ('edit target', 'image 2', 'image 3'),
+    'next': ('src', 'identity ref', ''),
+}
+
+
+def _section_entry(payload: dict, view: str) -> dict | None:
+    """Current entry of a prompts_vid/_inp/_next section, None when absent."""
+    sec = payload.get(VIEW_SECTION.get(view, ''))
+    if not isinstance(sec, dict):
+        return None
+    data = [e for e in sec.get('prompt_data') or [] if isinstance(e, dict)]
+    cur = sec.get('current', 0)
+    if not data:
+        return None
+    return data[cur] if isinstance(cur, int) and 0 <= cur < len(data) else data[0]
+
+
+def available_views(payload: dict) -> list[str]:
+    return ['main'] + [v for v in VIEW_SECTION if _section_entry(payload, v) is not None]
+
+
+def default_view(payload: dict) -> str:
+    """The section the latest enhancer step produced: its entry's ``from_rev``
+    is the payload's ``rev`` (newest ``ts`` wins); else ``main``."""
+    rev = payload.get('rev')
+    fresh = []
+    for v in available_views(payload)[1:]:
+        e = _section_entry(payload, v) or {}
+        if rev is not None and e.get('from_rev') == rev:
+            fresh.append((str(e.get('ts') or ''), v))
+    return max(fresh)[1] if fresh else 'main'
+
+
+def _view_media(payload: dict, view: str) -> list[dict | None]:
+    """Live media objects ({url[, desc, w, h]}) of a view, slot order.
+    ``main`` is the top-level url — returned as a detached dict."""
+    if view == 'main':
+        return [{'url': payload.get('url'), 'desc': payload.get('url_desc')}]
+    if view == 'vid':
+        refs = _vid_refs(payload)
+        return [refs.get(k) if isinstance(refs.get(k), dict) else None for k in VID_REF_KEYS]
+    e = _section_entry(payload, view) or {}
+    src = e.get('src') if isinstance(e.get('src'), dict) else None
+    if view == 'inp':
+        inp_refs = [r if isinstance(r, dict) else None for r in e.get('refs') or []]
+        return [src, *inp_refs[: N_SLOTS - 1]]
+    if view == 'next':
+        ref = e.get('ref') if isinstance(e.get('ref'), dict) else None
+        return [src, ref]
+    return []
+
+
+def view_slots(payload: dict, view: str) -> list[dict]:
+    slots = empty_slots()
+    for i, m in enumerate(_view_media(payload, view)[:N_SLOTS]):
+        if m and m.get('url'):
+            role = m.get('desc') or VIEW_ROLES[view][i]
+            slots[i] = {'url': m['url'], 'id': None, 'role': role}
+    return slots
+
+
+def view_text(payload: dict, view: str, idx: int = 0) -> str:
+    if view == 'main':
+        return entry_prompt(payload, idx)
+    e = _section_entry(payload, view) or {}
+    if view == 'vid':
+        return str(e.get('prompt') or '')
+    # inp: one engine per entry (qwen21 default, frozen krea2 on request)
+    return str(e.get('prompt_qwen21') or e.get('prompt') or '')
+
+
 def parse_payload(text: str | None) -> dict | None:
     """Clipspace text → ``{kind: 'iteration'|'refdef', payload, slots, text,
-    prompt_kind, verb, idx}``; None when it is no enhancer payload."""
+    prompt_kind, verb, idx, views, view}``; None when it is no enhancer
+    payload."""
     try:
         payload = json.loads(text or '')
     except (json.JSONDecodeError, TypeError):
@@ -117,29 +201,30 @@ def parse_payload(text: str | None) -> dict | None:
             'prompt_kind': kind if kind in KINDS else 'hint',
             'verb': verb if verb in VERBS else VERBS[0],
             'idx': 0,
+            'views': [],
+            'view': None,
         }
 
     if schema.startswith(SCHEMA_ITERATION):
-        slots = empty_slots()
-        role = payload.get('url_desc') or ROLES_ITERATION[0]
-        slots[0] = {'url': payload.get('url'), 'id': None, 'role': role}
-        refs = _vid_refs(payload)
-        for i, key in enumerate(VID_REF_KEYS, start=1):
-            ref = refs.get(key)
-            if isinstance(ref, dict) and ref.get('url'):
-                role = ref.get('desc') or ROLES_ITERATION[i]
-                slots[i] = {'url': ref['url'], 'id': None, 'role': role}
-        idx = _current(payload)
-        return {
-            'kind': 'iteration',
-            'payload': payload,
-            'slots': slots,
-            'text': entry_prompt(payload, idx),
-            'prompt_kind': 'prompt',
-            'verb': None,
-            'idx': idx,
-        }
+        return with_view(
+            {
+                'kind': 'iteration',
+                'payload': payload,
+                'prompt_kind': 'prompt',
+                'verb': None,
+                'views': available_views(payload),
+                'changed': [],  # field names patched into the working copy so far
+            },
+            default_view(payload),
+        )
     return None
+
+
+def with_view(st: dict, view: str) -> dict:
+    """Iteration state switched to ``view`` (slots + text re-derived)."""
+    p = st['payload']
+    idx = _current(p)
+    return dict(st, view=view, idx=idx, slots=view_slots(p, view), text=view_text(p, view, idx))
 
 
 def entry_prompt(payload: dict, idx: int) -> str:
@@ -149,43 +234,85 @@ def entry_prompt(payload: dict, idx: int) -> str:
     return ''
 
 
+def _img_dims(url: str) -> tuple[int, int] | None:
+    try:
+        with Image.open(url) as im:
+            return im.size
+    except Exception:  # noqa: BLE001 - remote/unreadable -> keep the old dims
+        return None
+
+
+def _replace_media(obj: dict, url: str) -> None:
+    obj['url'] = url
+    obj.pop('frame', None)  # src-clip frame provenance no longer applies
+    if 'w' in obj or 'h' in obj:
+        dims = _img_dims(url)
+        if dims:
+            obj['w'], obj['h'] = dims
+
+
 def patch_iteration(
     payload: dict,
+    view: str,
     urls: list[str | None],
 ) -> tuple[dict, list[str], list[str]]:
-    """Copy of an iteration payload with only the image urls patched.
+    """Copy of an iteration payload with only the image urls of ``view``
+    patched (slot order as in ``view_slots``). Everything else is deployed
+    verbatim.
 
-    ``urls`` are the slot urls as edited (slot 1 → ``url``, slots 2/3 →
-    ``prompts_vid.refs.first/last.url``). Everything else is deployed
-    verbatim. Returns the patched payload, the changed field names and the
-    edits that could not be deployed; ``edited_by`` is set only when
-    something changed.
+    Replacing an image is always allowed (``w``/``h`` follow the new file).
+    Structural changes are reported, not deployed, where the prompt names
+    images by number: adding/removing an inp ref, clearing an inp/next src
+    or the next ref. Returns the patched payload, the changed field names
+    and the skipped edits; ``edited_by`` is set only when something changed.
     """
     out = copy.deepcopy(payload)
     changed: list[str] = []
     skipped: list[str] = []
+    urls = [u or None for u in urls]
 
-    if (urls[0] or None) != (out.get('url') or None):
-        out['url'] = urls[0] or None
-        changed.append('url')
+    if view == 'main':
+        if urls[0] != (out.get('url') or None):
+            out['url'] = urls[0]
+            changed.append('url')
+        skipped += [f'slot {i + 1} (main has one image)' for i in (1, 2) if urls[i]]
 
-    refs = _vid_refs(out)
-    for i, key in enumerate(VID_REF_KEYS, start=1):
-        new = urls[i] or None
-        ref = refs.get(key)
-        old = ref.get('url') if isinstance(ref, dict) else None
-        if new == (old or None):
-            continue
-        if not refs:
-            skipped.append(f'slot {i + 1} (payload has no prompts_vid.refs)')
-            continue
-        if new is None:
-            refs[key] = None
-        elif isinstance(ref, dict):
-            ref['url'] = new
-        else:
-            refs[key] = {'url': new}
-        changed.append(f'prompts_vid.refs.{key}')
+    elif view == 'vid':
+        refs = _vid_refs(out)
+        for i, key in enumerate(VID_REF_KEYS):
+            new = urls[i]
+            ref = refs.get(key)
+            old = ref.get('url') if isinstance(ref, dict) else None
+            if new == (old or None):
+                continue
+            if new is None:
+                refs[key] = None
+            elif isinstance(ref, dict):
+                _replace_media(ref, new)
+            else:
+                refs[key] = {'url': new}
+            changed.append(f'prompts_vid.refs.{key}')
+        if urls[2]:
+            skipped.append('slot 3 (vid has first/last only)')
+
+    elif view in ('inp', 'next'):
+        sec = VIEW_SECTION[view]
+        media = _view_media(out, view)
+        names = ['src', 'refs[0]', 'refs[1]'] if view == 'inp' else ['src', 'ref', '']
+        for i in range(N_SLOTS):
+            obj = media[i] if i < len(media) else None
+            old = obj.get('url') if obj else None
+            new = urls[i]
+            if new == (old or None):
+                continue
+            if obj is not None and new is not None:
+                _replace_media(obj, new)
+                changed.append(f'{sec}.{names[i]}')
+            elif not names[i]:
+                skipped.append(f'slot {i + 1} ({view} has no slot {i + 1})')
+            else:
+                what = 'removing' if new is None else 'adding'
+                skipped.append(f'slot {i + 1} ({what} {names[i]} would renumber the prompt)')
 
     if changed:
         out['edited_by'] = EDITED_BY
@@ -351,6 +478,36 @@ class RefdefTab:
             out.append((url, id_img))
         return out
 
+    def first_image_from_clipspace(self, text: str | None) -> tuple[str, str | None] | None:
+        """First type-matching (image) entry of any pull data: enhancer data
+        (top-level url, then every section's media), a refdef instruction
+        (slots in order) or an img/id list (first usable line)."""
+        st = parse_payload(text)
+        if st is not None:
+            p = st['payload']
+            if st['kind'] == 'refdef':
+                cands = [(s.get('id') or s.get('url')) for s in st['slots']]
+            else:
+                cands = [p.get('url')] + [
+                    (m or {}).get('url') for v in st['views'] for m in _view_media(p, v)
+                ]
+        else:
+            lines = [ln.strip() for ln in (text or '').splitlines() if ln.strip()]
+            cands = lines[:MAX_PULL_LINES]
+        for c in cands:
+            url, id_img = self.resolve_ref(c)
+            if url is not None and self._is_usable(url):
+                return url, id_img
+        return None
+
+    def _on_slot_pull(self):
+        hit = self.first_image_from_clipspace(pyperclip.paste())
+        if hit is None:
+            gr.Info('nothing usable to pull', duration=0.5)
+            return gr.update(), gr.update()
+        url, id_img = hit
+        return self._preview(url), id_img or url
+
     @staticmethod
     def _preview(url: str | None) -> Image.Image | str | None:
         """Slot display value. Local files go in as a downscaled PIL image:
@@ -385,14 +542,21 @@ class RefdefTab:
                 '(pull enhancer data to switch to enhancer mode)'
             )
         p = state['payload']  # type: ignore[index]
-        prompts = p.get('prompts') or {}
-        n = len(_entries(p))
+        view = state['view']  # type: ignore[index]
         md = (
             '**mode: enhancer data** — deploy writes it back verbatim, only replaced '
-            f'img urls patched · `{p.get("schema_id")}` · scene `{p.get("scene_id")}` · '
-            f'prompts.type=`{prompts.get("type")}` · entry **{idx + 1}/{n}** '
-            f'(current={_current(p) + 1})'
+            f'img urls of the view patched · `{p.get("schema_id")}` · scene '
+            f'`{p.get("scene_id")}` · rev {p.get("rev")} · view **{view}**'
         )
+        if view == 'main':
+            prompts = p.get('prompts') or {}
+            md += (
+                f' · prompts.type=`{prompts.get("type")}` · entry **{idx + 1}/'
+                f'{len(_entries(p))}** (current={_current(p) + 1})'
+            )
+        else:
+            e = _section_entry(p, view) or {}
+            md += f' · from_rev {e.get("from_rev")}'
         if p.get('edited_by'):
             md += f' · edited_by=`{p["edited_by"]}`'
         return md
@@ -401,13 +565,23 @@ class RefdefTab:
     def _entry_md(cls, state: dict | None, idx: int) -> str:
         if not cls._is_enh(state):
             return ''
-        entries = _entries(state['payload'])  # type: ignore[index]
-        if not 0 <= idx < len(entries):
-            return ''
-        e = entries[idx]
+        p, view = state['payload'], state['view']  # type: ignore[index]
+        if view == 'main':
+            entries = _entries(p)
+            e = entries[idx] if 0 <= idx < len(entries) else {}
+        else:
+            e = _section_entry(p, view) or {}
         concepts = ', '.join(e.get('concepts') or []) or '–'
         triggers = ', '.join(e.get('triggers') or []) or '–'
-        return f'**concepts:** {concepts}  \n**triggers:** {triggers}'
+        md = f'**concepts:** {concepts}  \n**triggers:** {triggers}'
+        if view == 'inp':
+            md += (
+                f'  \n**engine:** {e.get("engine") or "krea2"} · **mode:** {e.get("mode")} '
+                f'· **mask:** {"yes" if e.get("mask") else "none"}'
+            )
+        if e.get('hints'):
+            md += f'  \n**hints:** {e["hints"]}'
+        return md
 
     # -- handlers ------------------------------------------------------- #
     @staticmethod
@@ -420,7 +594,8 @@ class RefdefTab:
 
     def _load(self, st: dict | None) -> list[Any]:
         """Outputs for a freshly loaded state (None = reset to empty instruction).
-        Order: state, idx, raw, 3×(img, ref, role), kind, verb, text, source, entry."""
+        Order: state, idx, raw, 3×(img, ref, role), kind, verb, text, source, entry,
+        view."""
         enh = self._is_enh(st)
         slots = st['slots'] if st else empty_slots()
         slot_vals: list[Any] = []
@@ -440,10 +615,34 @@ class RefdefTab:
             gr.update(value=st['text'] if st else '', interactive=not enh),
             self._source_md(st, idx),
             self._entry_md(st, idx),
+            gr.update(
+                choices=st['views'] if st and enh else [],
+                value=st['view'] if st and enh else None,
+                visible=enh,
+            ),
         ]
 
+    def _commit(self, state: dict, refs: list[str]) -> tuple[dict, list[str], list[str]]:
+        """Patch the current view's slot images into the working payload
+        (``state['payload']``), so every view's replacements reach deploy."""
+        urls = [self.resolve_ref(r)[0] for r in refs]
+        work, changed, skipped = patch_iteration(state['payload'], state['view'], urls)
+        before = state.get('changed', [])
+        merged = before + [c for c in changed if c not in before]
+        return dict(state, payload=work, changed=merged), changed, skipped
+
+    def _on_view(self, state: dict | None, view: str | None, *refs: str):
+        """Switch the enhancer-data view; the old view's slot replacements
+        are committed to the working payload first."""
+        if not self._is_enh(state) or not view or view == state['view']:  # type: ignore[index]
+            return [gr.update()] * (3 + 3 * N_SLOTS + 7)
+        st, changed, skipped = self._commit(state, list(refs))  # type: ignore[arg-type]
+        note = f' · kept: {", ".join(changed)}' if changed else ''
+        note += f' · NOT kept: {", ".join(skipped)}' if skipped else ''
+        return [*self._load(with_view(st, view)), f'view `{view}`{note}']
+
     def _on_pull(self, state: dict | None, *refs: str):
-        n_out = 3 + 3 * N_SLOTS + 6
+        n_out = 3 + 3 * N_SLOTS + 7
         text = pyperclip.paste()
         st = parse_payload(text)
         if st is not None:
@@ -465,13 +664,13 @@ class RefdefTab:
             upd[3 * i : 3 * i + 3] = [self._preview(url), id_img or url, role]
         dropped = f' ({n_drop} dropped, no free slot)' if n_drop else ''
         status = f'pulled {len(slots)} img(s) → slot {", ".join(str(i + 1) for i in slots)}'
-        return [*[gr.update()] * 3, *upd, *[gr.update()] * 5, status + dropped]
+        return [*[gr.update()] * 3, *upd, *[gr.update()] * 6, status + dropped]
 
     def _on_reset(self):
         return [*self._load(None), 'reset']
 
     def _on_nav(self, state: dict | None, idx: int, step: int):
-        if not self._is_enh(state):
+        if not self._is_enh(state) or state['view'] != 'main':  # type: ignore[index]
             return idx, gr.update(), gr.update(), gr.update()
         p = state['payload']  # type: ignore[index]
         new = max(0, min(len(_entries(p)) - 1, idx + step))
@@ -495,10 +694,12 @@ class RefdefTab:
     ):
         slots = self._slots_from_ui(list(refs_roles))
         if self._is_enh(state):
-            urls = [s['url'] for s in slots]
-            out, changed, skipped = patch_iteration(state['payload'], urls)  # type: ignore[index]
-            clip_copy(json.dumps(out, ensure_ascii=False))
+            refs = [refs_roles[2 * i] for i in range(N_SLOTS)]
+            st, _, skipped = self._commit(state, refs)  # type: ignore[arg-type]
+            # the full payload (all sections) goes back; never triggers the enhancer
+            clip_copy(json.dumps(st['payload'], ensure_ascii=False))
             note = f' · NOT deployed: {", ".join(skipped)}' if skipped else ''
+            changed = st['changed']
             what = f'img urls patched: {", ".join(changed)}' if changed else 'unchanged'
             return f'deployed enhancer data ({what}){note}'
         origin = None
@@ -537,6 +738,7 @@ class RefdefTab:
                     f'{HERDR_AGENT}, only when idle',
                     scale=1,
                 )
+            view = gr.Radio([], label='view (enhancer data section)', visible=False)
             with gr.Row():
                 prev_btn = gr.Button('◀', scale=0, min_width=40)
                 source_md = gr.Markdown(self._source_md(None, 0))
@@ -544,7 +746,7 @@ class RefdefTab:
 
             # input is the clipspace only: images are display-only, the slot
             # ref (img id or url) rides in a per-slot State
-            imgs, refs, roles, clears = [], [], [], []
+            imgs, refs, roles, slot_pulls, clears = [], [], [], [], []
             with gr.Row(equal_height=True):
                 for i in range(N_SLOTS):
                     with gr.Column():
@@ -566,21 +768,23 @@ class RefdefTab:
                                     scale=5,
                                 )
                             )
+                            slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
                             clears.append(gr.Button('✕', scale=0, min_width=40))
 
             status = gr.Markdown()
             text = gr.Textbox(label='prompt / prompt hint', lines=8, max_lines=30)
             with gr.Accordion('concepts / triggers', open=False):
                 entry_md = gr.Markdown()
-            with gr.Accordion('raw payload (as pulled)', open=False):
+            with gr.Accordion('raw payload (as pulled / last view switch)', open=False):
                 raw = gr.Code(language='json', interactive=False)
 
             refs_roles = [c for pair in zip(refs, roles, strict=True) for c in pair]
             slot_outs = [c for trip in zip(imgs, refs, roles, strict=True) for c in trip]
-            load_outs = [state, idx, raw, *slot_outs, kind, verb, text, source_md, entry_md]
+            load_outs = [state, idx, raw, *slot_outs, kind, verb, text, source_md, entry_md, view]
 
             pull_btn.click(self._on_pull, [state, *refs], [*load_outs, status])
             reset_btn.click(self._on_reset, [], [*load_outs, status])
+            view.input(self._on_view, [state, view, *refs], [*load_outs, status])
             for btn, step in ((prev_btn, -1), (next_btn, 1)):
                 btn.click(
                     lambda s, i, step=step: self._on_nav(s, i, step),
@@ -590,6 +794,8 @@ class RefdefTab:
             for img, ref, clear in zip(imgs, refs, clears, strict=True):
                 # role stays: in enhancer mode it is payload-owned
                 clear.click(lambda: (None, ''), [], [img, ref])
+            for img, ref, slot_pull in zip(imgs, refs, slot_pulls, strict=True):
+                slot_pull.click(self._on_slot_pull, [], [img, ref])
             deploy_btn.click(
                 self._on_deploy,
                 [state, verb, kind, auto, text, *refs_roles],

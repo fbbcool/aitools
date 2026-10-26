@@ -1,0 +1,85 @@
+# Output path for training runs. Each training run makes a new directory in here.
+${output_dir}
+${dataset}
+
+# training settings
+
+# I usually set this to a really high value because I don't know how long I want to train.
+#epochs = 40
+${epochs}
+# Batch size of a single forward/backward pass for one GPU. 5090 bf16 @1024 edit (target + reference): 1 (25.4 GB).
+#micro_batch_size_per_gpu = 1
+${micro_batch_size_per_gpu}
+pipeline_stages = 1
+gradient_accumulation_steps = 1
+gradient_clipping = 1.0
+#warmup_steps = 50
+${warmup_steps}
+#save_every_n_epochs = 1
+${save_every_n_epochs}
+# Checkpoint the training state every n epochs or minutes (set only one); resume with --resume_from_checkpoint.
+#checkpoint_every_n_epochs = 1
+${checkpoint_every_n_epochs}
+#checkpoint_every_n_minutes = 60
+${checkpoint_every_n_minutes}
+#activation_checkpointing = true
+${activation_checkpointing}
+partition_method = 'parameters'
+
+#save_dtype = 'bfloat16'
+${save_dtype}
+# Edit pairs are encoded one caption at a time (the text encoder sees each source image).
+#caching_batch_size = 1
+${caching_batch_size}
+#steps_per_print = 10
+${steps_per_print}
+#compile = false
+${compile}
+
+# Qwen-Image 2.1 (diffusion-pipe fork, models/qwen_image21.py): 7B single-stream DiT, Qwen3-VL-8B text
+# encoder (TE type 'qwen_image'), 64-ch RGBA 16x VAE, all ComfyUI format. Edit datasets (control_path):
+# the source rides along as reference image, like ComfyUI's TextEncodeQwenImage21 node.
+[model]
+type = 'qwen_image21'
+# diffusion model / text encoder / vae paths are bound by the installer from models_train_qwen21.json
+${model___diffusion_model}
+${model___vae}
+${model___text_encoders_qwen21}
+#dtype = 'bfloat16'
+${model___dtype}
+# 'float8' halves the DiT's VRAM (untested on 2.1); empty = bf16
+#diffusion_model_dtype = 'float8'
+${model___diffusion_model_dtype}
+#timestep_sample_method = 'logit_normal'
+${model___timestep_sample_method}
+# model's own resolution-dependent schedule; set flux_shift empty + shift for a fixed one (2.0 == comfy 0.69)
+#flux_shift = true
+${model___flux_shift}
+#shift = 2.0
+${model___shift}
+# reference size for the text encoder, == the ComfyUI node's `resolution`
+#edit_resolution = 1024
+${model___edit_resolution}
+# loss weight outside mask_path masks (0 = ignored)
+#mask_floor = 0.1
+${model___mask_floor}
+
+[adapter]
+type = 'lora'
+#rank = 16
+${adapter___rank}
+#dtype = 'bfloat16'
+${adapter___dtype}
+
+# Frozen prior LoRAs (train regime == inference regime), one block per lora entry in the model JSON.
+${adapter___frozen_loras}
+
+[optimizer]
+#type = 'adamw_optimi'
+${optimizer___type}
+#lr = 7e-5
+${optimizer___lr}
+betas = [0.9, 0.99]
+#weight_decay = 0.01
+${optimizer___weight_decay}
+eps = 1e-8

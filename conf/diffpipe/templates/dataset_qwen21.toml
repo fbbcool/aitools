@@ -1,0 +1,25 @@
+# Qwen-Image 2.1 dataset. Resolutions = square side lengths (area); images are AR-bucketed to the sizes below.
+#resolutions = [1024]
+$resolutions
+
+# Exact sizes ComfyUI's TextEncodeQwenImage21 gives a 1:1 / 2:3 / 3:2 reference at resolution 1024 (about
+# 1024^2 px, multiples of 32): edit targets must train at the size the node gives the reference at inference.
+enable_ar_bucket = true
+ar_buckets = [[1024, 1024], [832, 1248], [1248, 832]]
+frame_buckets = [1]
+
+[[directory]]
+# Target images + caption .txt (for edit sets: the edit instruction).
+#path = '/home/xxx'
+$path
+
+# Edit sets: source images with the same file stems as the targets (empty = T2I set).
+#control_path = '/workspace/train/dataset_control'
+$control_path
+
+# Masked training: white = train on this, black = mask out (R channel used as loss weight).
+#mask_path = '/workspace/train/dataset_mask'
+$mask_path
+
+#num_repeats = 1
+${num_repeats}

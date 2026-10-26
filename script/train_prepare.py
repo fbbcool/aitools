@@ -27,7 +27,7 @@ from trainer import Trainer
 #    'optimizer___type': 'adamw_optimi',
 # }
 
-model = 'mmh3'  # 'qwen' | 'krea2' | 'mmh3'
+model = 'mmh3'  # 'qwen' | 'krea2' | 'mmh3' | 'qwen21' (Qwen-Image 2.1, edit only: experiment 'qwen21-xlasm-add')
 base = None  # krea2: None = group train_krea2 (currently raw re0.75 fp8; snofs entries skip:true in models_train_krea2.json) | 're' = group train_krea2-re (raw re0.75 fp8, no variant groups)
 variant = 'gts-atomic'
 # gpu = '5090'
@@ -82,6 +82,14 @@ gpu_config_mmh3 = {
         # 2026-10-19 xlasm @1024 b4: checkpointing on = 33 GB VRAM, 5.7 s/step; OFF = OOM (83 GB alloc + 8.6 frag).
         'activation_checkpointing': True,  # on-GPU checkpointing; 'unsloth' offloads to RAM (slower)
         'compile': True,
+    },
+}
+
+# qwen21 (Qwen-Image 2.1 edit, bf16 DiT): 5090 @1024 b1 = 25.4 GB, 3.8 s/step (agent-lora 2026-10-26, local
+# replica). b2 needs model___diffusion_model_dtype 'float8' (untested) and buys ~no throughput (8.3k tokens/sample).
+gpu_config_qwen21 = {
+    '5090': {
+        'micro_batch_size_per_gpu': 1,
     },
 }
 
@@ -259,6 +267,20 @@ config_trainer_mmh3_default = {
     'model___image_shift': 1,
 }
 
+# qwen21 (Qwen-Image 2.1, diffpipe fork models/qwen_image21.py): EDIT training only (operator 2026-10-25: krea2 owns
+# T2I). Edit-pair HF sets (metadata `source` / `mask` / `instruction`) need Trainer(edit=True) -> experiment 'edit'.
+config_trainer_qwen21_edit = {
+    'epochs': 80,  # sentinel, manual cancel at the peak
+    **gpu_config_qwen21.get(gpu, {}),
+    'warmup_steps': 50,
+    'save_every_n_epochs': 1,
+    'caching_batch_size': 1,
+    'steps_per_print': 10,
+    'adapter___rank': 16,
+    'optimizer___lr': 7e-5,
+    'model___mask_floor': 0.1,
+}
+
 # config_trainer[model][variant] -> the per-run trainer overrides.
 config_trainer = {
     'qwen': {
@@ -277,6 +299,9 @@ config_trainer = {
     },
     'mmh3': {
         'gts-atomic': config_trainer_mmh3_default,
+    },
+    'qwen21': {
+        'edit': config_trainer_qwen21_edit,
     },
 }
 
@@ -553,12 +578,27 @@ experiments = {
             'checkpoint_every_n_epochs': 2,
         },
     },
+    # qwen21-xlasm-add (agent-lora, 2026-10-26): Qwen-Image 2.1 EDIT LoRA "add an xlasm man" on board task 151's pairs
+    # (source = v5 image with the man removed, target = v5, mask = man region). 4-pair overfit (r32 1e-4 mask_floor 0.1)
+    # passed on the local replica. Prod: r16, 7e-5, mask_floor 0.1, b1; 6 pairs held out for generalization renders.
+    # 129 steps/epoch at b1; ~7K-view peak ~ep50 (~7.5 h on a 5090), epochs=80 is the sentinel.
+    'qwen21-xlasm-add': {
+        'variant': 'edit',
+        'trigger': 'xlasm-add',
+        'edit': True,
+        'exclude_ids': [
+            '1af88b0d9d65759b', '31b5702b93c41f23', 'e47225a8b0dcac83',
+            '7c331cab6f8438ff', '7e949e1e15a8acc0', 'b4f93c4268ae21a3',
+        ],
+    },
 }
+datasets['xlasm-add'] = [('fbbcool/xlasm-v5-edit-augment-1024', 0)]
 datasets['xlasm-v5'] = [('fbbcool/xlasm-v5-nosize-1024', 0)]
 datasets['xlasm-slider'] = [('fbbcool/xlasm-hr-slider-test', 0)]
 datasets['xltongue'] = [('fbbcool/xltongue', 0)]
 
 config_trainer_run = config_trainer[model][variant]
+edit = False
 if experiment is not None:
     exp = experiments[experiment]
     variant = exp.get('variant', variant)
@@ -572,7 +612,17 @@ if experiment is not None:
         config_dataset['mask_path'] = str(
             Path(snapshot_download(repo_id=exp['masks_from'], repo_type='dataset')) / 'train' / 'masks'
         )
-    print(f'experiment {experiment}: variant {variant}, trigger {trigger}')
+    edit = exp.get('edit', False)
+    if exp.get('exclude_ids'):
+        # hold pairs out: restrict every repo of the trigger to its ids minus the excluded ones
+        from aidb import HFDataset
+
+        excluded = set(exp['exclude_ids'])
+        repos = [item if isinstance(item, str) else item[0] for item in datasets[trigger]]
+        datasets[trigger] = [
+            (repo, 0, [i for i in HFDataset(repo, force_meta_dl=True).ids if i not in excluded]) for repo in repos
+        ]
+    print(f'experiment {experiment}: variant {variant}, trigger {trigger}, edit {edit}')
 
 Trainer(
     model,
@@ -583,6 +633,7 @@ Trainer(
     config_dataset=config_dataset,
     trigger=caption_trigger,  # prepends '1alexandra,' to each caption .txt
     multithread=True,
+    edit=edit,
 )
 
 """

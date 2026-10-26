@@ -418,6 +418,11 @@ class AInstaller:
                     'parameter': 'text_encoders',
                     'format': '${parameter} = [{path = ${value}, type = "minimax"}]',
                 },
+                'model___text_encoders_qwen21': {
+                    'type': 'str',
+                    'parameter': 'text_encoders',
+                    'format': '${parameter} = [{path = ${value}, type = "qwen_image"}]',
+                },
             },
         }
         # build target url
