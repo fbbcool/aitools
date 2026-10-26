@@ -112,16 +112,15 @@ def test_patch_slot_without_vid_refs_is_skipped():
     assert 'prompts_vid' not in out and 'edited_by' not in out
 
 
-def test_place_images_fills_empty_slots_first():
+def test_place_images_adds_to_free_slots_only():
     from aidb.app.tab_refdef import RefdefTab
 
     assert RefdefTab.place_images(1, ['a', '', '']) == [1]
     assert RefdefTab.place_images(2, ['a', '', '']) == [1, 2]
     assert RefdefTab.place_images(1, ['', 'b', '']) == [0]
-    # not enough empty slots -> overwrite from slot 1
-    assert RefdefTab.place_images(2, ['a', 'b', '']) == [0, 1]
-    assert RefdefTab.place_images(1, ['a', 'b', 'c']) == [0]
-    # more images than slots -> capped
+    # second pull adds; overflow is dropped, never overwrites
+    assert RefdefTab.place_images(2, ['a', 'b', '']) == [2]
+    assert RefdefTab.place_images(1, ['a', 'b', 'c']) == []
     assert RefdefTab.place_images(5, ['', '', '']) == [0, 1, 2]
 
 

@@ -6,7 +6,7 @@ and the only output (``⇪ deploy``); the tab is stateless otherwise.
 
 Pull is smart: enhancer data (``1xlasm_enhancer.iteration.*``) or a
 refdef.v1 instruction loads as a whole; an img url / url list / img id /
-scene id clipspace fills slots (empty slots first); anything else only
+scene id clipspace is added to the free slots (extras dropped); anything else only
 shows a 0.5 s toast. What deploy writes depends on what was pulled:
 
   * **enhancer mode** (enhancer data pulled): the exact payload goes back,
@@ -36,6 +36,7 @@ from urllib.parse import unquote
 
 import gradio as gr
 import pyperclip
+from PIL import Image, ImageOps
 
 from ait.tools.files import is_img
 from aidb.scene.scene_common import SceneDef
@@ -51,6 +52,7 @@ VERBS: Final = ('replicate', 'enh', 'pickup', 'inp-mask', 'inp-nomask')
 # fallback roles when an iteration payload carries no media desc (task 150)
 ROLES_ITERATION: Final = ('main img', 'mmh3 first frame', 'mmh3 last frame')
 VID_REF_KEYS: Final = ('first', 'last')  # prompts_vid.refs keys for slots 2/3
+PREVIEW_SIZE: Final = 768  # slot preview edge (px)
 MAX_PULL_LINES: Final = 50  # longer clipspaces are no image lists
 # auto-trigger: after an instruction deploy, prompt the enhancer agent in its
 # herdr session with TRIGGER_CMD (board task 150) — only when it is idle
@@ -216,6 +218,29 @@ def refdef_payload(
     }
 
 
+def clip_copy(text: str) -> None:
+    """Write the clipspace so it outlives the app.
+
+    pyperclip's wl-copy daemon stays in the app's process group, so the
+    Ctrl-C that restarts the app (tmux) kills it and empties the clipboard.
+    On Wayland, run wl-copy in its own session instead.
+    """
+    exe = shutil.which('wl-copy')
+    if exe and os.environ.get('WAYLAND_DISPLAY'):
+        subprocess.run(
+            [exe],
+            input=text,
+            text=True,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            check=True,
+        )
+        return
+    pyperclip.copy(text)
+
+
 def _herdr(*args: str) -> dict:
     """Run a herdr CLI command against HERDR_SESSION → parsed JSON.
 
@@ -327,12 +352,25 @@ class RefdefTab:
         return out
 
     @staticmethod
-    def _preview(url: str | None) -> str | None:
+    def _preview(url: str | None) -> Image.Image | str | None:
+        """Slot display value. Local files go in as a downscaled PIL image:
+        gradio refuses to serve paths outside cwd/tmp (allowed_paths), and
+        refs live anywhere (scenes, comfy output, …). The slot ref keeps the
+        real path for deploy."""
         if not url:
             return None
         if url.startswith(('http://', 'https://')):
             return url
-        return url if is_img(url) and Path(url).is_file() else None
+        if not (is_img(url) and Path(url).is_file()):
+            return None
+        try:
+            with Image.open(url) as src:
+                src.draft('RGB', (PREVIEW_SIZE, PREVIEW_SIZE))
+                im = ImageOps.exif_transpose(src).convert('RGB')
+            im.thumbnail((PREVIEW_SIZE, PREVIEW_SIZE))
+            return im
+        except Exception:  # noqa: BLE001 - unreadable file -> empty slot preview
+            return None
 
     # -- state helpers -------------------------------------------------- #
     @staticmethod
@@ -374,11 +412,11 @@ class RefdefTab:
     # -- handlers ------------------------------------------------------- #
     @staticmethod
     def place_images(n_imgs: int, refs: list[str]) -> list[int]:
-        """Slot indices for n pulled images: the empty slots in order when
-        they suffice, else slots 1..n (overwrite)."""
-        n_imgs = min(n_imgs, N_SLOTS)
+        """Slot indices for n pulled images: pulls add to what is there, so
+        only empty slots (in order) are used; images beyond them are dropped
+        (reset first to start over)."""
         empty = [i for i, r in enumerate(refs) if not (r or '').strip()]
-        return empty[:n_imgs] if n_imgs <= len(empty) else list(range(n_imgs))
+        return empty[:n_imgs]
 
     def _load(self, st: dict | None) -> list[Any]:
         """Outputs for a freshly loaded state (None = reset to empty instruction).
@@ -416,11 +454,16 @@ class RefdefTab:
             return [gr.update()] * n_out
         upd: list[Any] = [gr.update()] * (3 * N_SLOTS)
         slots = self.place_images(len(imgs), list(refs))
+        n_drop = len(imgs) - len(slots)
+        if n_drop:
+            gr.Info(f'no free slot: {n_drop} img(s) dropped', duration=0.5)
+        if not slots:
+            return [gr.update()] * n_out
         for i, (url, id_img) in zip(slots, imgs, strict=False):
             # enhancer mode keeps the (payload-owned) role; instruction mode starts blank
             role = gr.update() if self._is_enh(state) else ''
             upd[3 * i : 3 * i + 3] = [self._preview(url), id_img or url, role]
-        dropped = f' ({len(imgs) - len(slots)} dropped)' if len(imgs) > len(slots) else ''
+        dropped = f' ({n_drop} dropped, no free slot)' if n_drop else ''
         status = f'pulled {len(slots)} img(s) → slot {", ".join(str(i + 1) for i in slots)}'
         return [*[gr.update()] * 3, *upd, *[gr.update()] * 5, status + dropped]
 
@@ -454,7 +497,7 @@ class RefdefTab:
         if self._is_enh(state):
             urls = [s['url'] for s in slots]
             out, changed, skipped = patch_iteration(state['payload'], urls)  # type: ignore[index]
-            pyperclip.copy(json.dumps(out, ensure_ascii=False))
+            clip_copy(json.dumps(out, ensure_ascii=False))
             note = f' · NOT deployed: {", ".join(skipped)}' if skipped else ''
             what = f'img urls patched: {", ".join(changed)}' if changed else 'unchanged'
             return f'deployed enhancer data ({what}){note}'
@@ -462,10 +505,12 @@ class RefdefTab:
         if state and state['kind'] == 'refdef':
             origin = (state['payload'].get('origin') or {}).get('scene_id')
         payload = refdef_payload(slots, verb, kind, text, origin)
-        pyperclip.copy(json.dumps(payload, ensure_ascii=False))
+        clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
         msg = f'deployed instruction `{verb}` ({n}/{N_SLOTS} slots, kind={kind})'
-        return f'{msg} · {trigger_enhancer()}' if auto else msg
+        note = trigger_enhancer() if auto else 'auto-trigger off'
+        print(f'[refdef_tab:info] deploy {verb}: {note}')
+        return f'{msg} · {note}'
 
     # -- UI build (call inside the app's gr.Blocks context) ------------- #
     def build(self) -> None:
@@ -486,7 +531,7 @@ class RefdefTab:
                 )
                 kind = gr.Radio(list(KINDS), value='hint', label='text is a', scale=1)
                 auto = gr.Checkbox(
-                    value=False,
+                    value=True,
                     label=f'auto-trigger enhancer ({TRIGGER_CMD})',
                     info=f'instruction deploy → {TRIGGER_CMD} to herdr {HERDR_SESSION}/'
                     f'{HERDR_AGENT}, only when idle',
