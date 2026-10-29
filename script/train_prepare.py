@@ -27,12 +27,14 @@ from trainer import Trainer
 #    'optimizer___type': 'adamw_optimi',
 # }
 
-model = 'mmh3'  # 'qwen' | 'krea2' | 'mmh3' | 'qwen21' (Qwen-Image 2.1, edit only: experiment 'qwen21-xlasm-add')
+# model = 'mmh3'
+model = 'moss'  # 'qwen' | 'krea2' | 'mmh3' | 'qwen21' (Qwen-Image 2.1, edit only: experiment 'qwen21-xlasm-add') | 'moss' (MOSS-Image)
 base = None  # krea2: None = group train_krea2 (currently raw re0.75 fp8; snofs entries skip:true in models_train_krea2.json) | 're' = group train_krea2-re (raw re0.75 fp8, no variant groups)
 variant = 'gts-atomic'
 # gpu = '5090'
 # gpu = 'h100-nvl'
-gpu = '6000'  # RTX PRO 6000 Blackwell, 96 GB
+# gpu = '6000'  # RTX PRO 6000 Blackwell, 96 GB
+gpu = '5090'
 trigger = 'xlasm'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 caption_trigger = None
@@ -45,7 +47,8 @@ num_repeats = 1
 # experiment = 'mmh3-test'
 # experiment = None
 # experiment = 'mmh3-xlasm-s12'
-experiment = 'mmh3-xlasm-v5'
+# experiment = 'mmh3-xlasm-v5'
+experiment = 'moss-xlasm-v5'
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -90,6 +93,15 @@ gpu_config_mmh3 = {
 gpu_config_qwen21 = {
     '5090': {
         'micro_batch_size_per_gpu': 1,
+    },
+}
+
+# moss (MOSS-Image, bf16 5B DiT): 5090 values untested (agent-lora 2026-10-27); ~10 GB weights + r32 LoRA,
+# activation checkpointing on. OOM back-off: micro-batch 1 -> blocks_to_swap 8/16.
+gpu_config_moss = {
+    '5090': {
+        'micro_batch_size_per_gpu': 2,
+        'activation_checkpointing': True,
     },
 }
 
@@ -281,6 +293,19 @@ config_trainer_qwen21_edit = {
     'model___mask_floor': 0.1,
 }
 
+# moss (MOSS-Image, diffpipe fork branch feature-moss, models/moss_image.py). Upstream defaults: logit_normal,
+# shift 3. Base (not SFT) DiT is trained, like raw->turbo on krea2.
+config_trainer_moss_default = {
+    'epochs': 30,  # sentinel, manual cancel at the peak
+    **gpu_config_moss.get(gpu, {}),
+    'warmup_steps': 50,
+    'save_every_n_epochs': 1,
+    'caching_batch_size': 4,
+    'steps_per_print': 10,
+    'adapter___rank': 32,
+    'optimizer___lr': 1e-4,
+}
+
 # config_trainer[model][variant] -> the per-run trainer overrides.
 config_trainer = {
     'qwen': {
@@ -302,6 +327,9 @@ config_trainer = {
     },
     'qwen21': {
         'edit': config_trainer_qwen21_edit,
+    },
+    'moss': {
+        'gts-atomic': config_trainer_moss_default,
     },
 }
 
@@ -590,6 +618,19 @@ experiments = {
             '1af88b0d9d65759b', '31b5702b93c41f23', 'e47225a8b0dcac83',
             '7c331cab6f8438ff', '7e949e1e15a8acc0', 'b4f93c4268ae21a3',
         ],
+    },
+    # moss-xlasm-v5 (agent-lora, 2026-10-27): first MOSS-Image run, xlasm on the size-stripped v5 set (same data as the
+    # mmh3 run-3 keeper ep24) for a direct comparison. 150 imgs x 5 repeats = 750 views/epoch = 375 steps at b2;
+    # ~7K-view window ~ep10, H3 peaked at ~120 views/img (~ep24). r32 1e-4 (krea2 community anchor). Judge per epoch
+    # with the cue-free size grid, not loss. checkpoint every 2 epochs.
+    'moss-xlasm-v5': {
+        'variant': 'gts-atomic',
+        'trigger': 'xlasm-v5',
+        'num_repeats': 5,
+        'config_trainer': {
+            'checkpoint_every_n_epochs': 2,
+            'checkpoint_every_n_minutes': '',
+        },
     },
 }
 datasets['xlasm-add'] = [('fbbcool/xlasm-v5-edit-augment-1024', 0)]

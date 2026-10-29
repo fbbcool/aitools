@@ -1,0 +1,80 @@
+# Output path for training runs. Each training run makes a new directory in here.
+${output_dir}
+${dataset}
+
+# training settings
+
+# I usually set this to a really high value because I don't know how long I want to train.
+#epochs = 40
+${epochs}
+# Batch size of a single forward/backward pass for one GPU.
+#micro_batch_size_per_gpu = 2
+${micro_batch_size_per_gpu}
+pipeline_stages = 1
+gradient_accumulation_steps = 1
+gradient_clipping = 1.0
+#warmup_steps = 50
+${warmup_steps}
+#save_every_n_epochs = 1
+${save_every_n_epochs}
+# Checkpoint the training state every n epochs or minutes (set only one); resume with --resume_from_checkpoint.
+#checkpoint_every_n_epochs = 1
+${checkpoint_every_n_epochs}
+#checkpoint_every_n_minutes = 60
+${checkpoint_every_n_minutes}
+#activation_checkpointing = true
+${activation_checkpointing}
+#blocks_to_swap = 8
+${blocks_to_swap}
+partition_method = 'parameters'
+
+#save_dtype = 'bfloat16'
+${save_dtype}
+#caching_batch_size = 4
+${caching_batch_size}
+#steps_per_print = 10
+${steps_per_print}
+#compile = false
+${compile}
+
+# MOSS-Image (diffusion-pipe fork branch feature-moss, models/moss_image.py): 5B single-stream DiT (42 layers),
+# Qwen3.5-9B text encoder (TE type 'moss_image'), Flux2 VAE / 128-ch latents, all ComfyUI format.
+# The DiT must be bf16: LoRA training on the int8-convrot DiT diverges (upstream; the pipeline refuses it).
+[model]
+type = 'moss_image'
+# diffusion model / text encoder / vae paths are bound by the installer from models_train_moss.json
+${model___diffusion_model}
+${model___vae}
+${model___text_encoders_moss}
+#dtype = 'bfloat16'
+${model___dtype}
+# 'float8' halves the DiT's VRAM (untested on MOSS, some quality loss); empty = bf16
+#diffusion_model_dtype = 'float8'
+${model___diffusion_model_dtype}
+#timestep_sample_method = 'logit_normal'
+${model___timestep_sample_method}
+# fixed multiplicative shift (upstream default 3); or flux_shift = true for the resolution-dependent one
+#shift = 3
+${model___shift}
+#flux_shift = true
+${model___flux_shift}
+
+[adapter]
+type = 'lora'
+#rank = 32
+${adapter___rank}
+#dtype = 'bfloat16'
+${adapter___dtype}
+
+# Frozen prior LoRAs (train regime == inference regime), one block per lora entry in the model JSON.
+${adapter___frozen_loras}
+
+[optimizer]
+#type = 'adamw_optimi'
+${optimizer___type}
+#lr = 1e-4
+${optimizer___lr}
+betas = [0.9, 0.99]
+#weight_decay = 0.01
+${optimizer___weight_decay}
+eps = 1e-8

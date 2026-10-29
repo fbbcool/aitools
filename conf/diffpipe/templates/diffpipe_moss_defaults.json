@@ -1,0 +1,21 @@
+{
+  "epochs": 30,
+  "micro_batch_size_per_gpu": 2,
+  "warmup_steps": 50,
+  "checkpoint_every_n_epochs": "",
+  "checkpoint_every_n_minutes": 60,
+  "activation_checkpointing": true,
+  "blocks_to_swap": "",
+  "caching_batch_size": 4,
+  "compile": false,
+  "model___diffusion_model": "",
+  "model___vae": "",
+  "model___text_encoders_moss": "",
+  "model___diffusion_model_dtype": "",
+  "model___timestep_sample_method": "logit_normal",
+  "model___shift": 3,
+  "model___flux_shift": "",
+  "adapter___rank": 32,
+  "adapter___frozen_loras": "",
+  "optimizer___lr": 1e-4
+}

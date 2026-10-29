@@ -423,6 +423,11 @@ class AInstaller:
                     'parameter': 'text_encoders',
                     'format': '${parameter} = [{path = ${value}, type = "qwen_image"}]',
                 },
+                'model___text_encoders_moss': {
+                    'type': 'str',
+                    'parameter': 'text_encoders',
+                    'format': '${parameter} = [{path = ${value}, type = "moss_image"}]',
+                },
             },
         }
         # build target url

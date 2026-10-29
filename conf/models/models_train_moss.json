@@ -1,0 +1,27 @@
+{
+  "train_moss": {
+    "common": {
+      "transformer": [
+        {
+          "repo_id": "Comfy-Org/MOSS-Image",
+          "file": "diffusion_models/moss_image_base_bf16.safetensors",
+          "skip": false
+        }
+      ],
+      "vae": [
+        {
+          "repo_id": "Comfy-Org/MOSS-Image",
+          "file": "vae/flux2-vae.safetensors",
+          "skip": false
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/MOSS-Image",
+          "file": "text_encoders/qwen3.5_9b_int8_convrot.safetensors",
+          "skip": false
+        }
+      ]
+    }
+  }
+}
