@@ -8,6 +8,7 @@ from aidb.app.tab_refdef import (
     parse_payload,
     patch_iteration,
     refdef_payload,
+    update_payload,
     with_view,
 )
 
@@ -246,3 +247,75 @@ def test_patches_across_views_accumulate_in_working_copy():
     assert work['url'] == '/main2.png'
     assert work['prompts_inp']['prompt_data'][0]['refs'][0]['url'] == '/c/face2.png'
     assert work['prompts_vid'] == p['prompts_vid'] and work['edited_by'] == EDITED_BY
+
+
+# -- update (clipspace refs ← slots) ---------------------------------------- #
+def _slot(url=None, id_=None):
+    return {'url': url, 'id': id_, 'role': 'ignored'}
+
+
+def test_update_iteration_main_keeps_empty_slots():
+    p = _iteration()
+    res = update_payload(json.dumps(p), [_slot(), _slot(), _slot()])
+    out, view, changed, _ = res
+    assert view == 'main' and changed == [] and out['url'] == p['url']
+    out, _, changed, _ = update_payload(json.dumps(p), [_slot('/n.png'), _slot(), _slot()])
+    assert changed == ['url'] and out['url'] == '/n.png'
+    assert out['edited_by'] == EDITED_BY
+    assert out['unknown_future_field'] == {'keep': True}
+
+
+def test_update_iteration_uses_given_view_else_default():
+    p = _iteration(prompts_inp=_inp())
+    text = json.dumps(p)
+    out, view, changed, _ = update_payload(text, [_slot(), _slot('/c/new.png'), _slot()])
+    assert view == default_view(p) == 'inp'
+    assert changed == ['prompts_inp.refs[0]']
+    out, view, changed, _ = update_payload(text, [_slot('/m.png'), _slot(), _slot()], 'main')
+    assert view == 'main' and changed == ['url']
+    _, view, _, _ = update_payload(text, [_slot()] * 3, 'vid')  # absent view → default
+    assert view == 'inp'
+
+
+def test_update_refdef_replaces_url_and_id_only():
+    slots = [_slot('/a.png', 'i1'), _slot(), _slot()]
+    instr = refdef_payload(
+        [{'url': '/a.png', 'id': 'i1', 'role': 'main img'}, _slot(), _slot('/c.png')],
+        'enh',
+        'hint',
+        'txt',
+    )
+    out, view, changed, _ = update_payload(
+        json.dumps(instr), [_slot('/b.png', 'i2'), _slot('/x.png'), _slot()]
+    )
+    assert view == '' and changed == ['refs[slot 1]', 'refs[slot 2]']
+    assert out['refs'][0] == {'slot': 1, 'url': '/b.png', 'id': 'i2', 'role': 'main img'}
+    assert out['refs'][1]['url'] == '/x.png' and out['refs'][1]['id'] is None
+    assert out['refs'][2]['url'] == '/c.png'  # empty slot keeps the clipspace ref
+    assert out['verb'] == 'enh' and out['text'] == 'txt'
+    _, _, changed, _ = update_payload(json.dumps(instr), slots)
+    assert changed == []
+
+
+def test_update_rejects_foreign_clipspace():
+    assert update_payload('free text', [_slot('/a.png')] * 3) is None
+
+
+def test_update_picks_view_that_takes_the_filled_slots():
+    # default view is main (inp entry is stale: from_rev != rev), slot 2 filled
+    p = _iteration(prompts_inp=_inp(from_rev=0))
+    assert default_view(p) == 'main'
+    slots = [_slot('/c/src.png'), _slot('/c/new.png'), _slot()]
+    out, view, changed, skipped = update_payload(json.dumps(p), slots)
+    assert view == 'inp' and changed == ['prompts_inp.refs[0]'] and skipped == []
+    # tab view main, slot 2 filled → still inp
+    _, view, _, _ = update_payload(json.dumps(p), slots, 'main')
+    assert view == 'inp'
+
+
+def test_update_reports_skips_when_no_view_fits():
+    p = _iteration()  # main only
+    out, view, changed, skipped = update_payload(
+        json.dumps(p), [_slot(), _slot('/c/new.png'), _slot()]
+    )
+    assert view == 'main' and changed == [] and skipped

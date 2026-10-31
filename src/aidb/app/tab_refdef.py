@@ -2,7 +2,14 @@
 
 Three fixed reference slots (image + short role text) plus one prompt /
 prompt-hint box. The clipspace is the only input (``⟲ pull``, plus a ⟲ per
-slot) and the only output (``⇪ deploy``); the tab is stateless otherwise.
+slot) and the only output (``⇪ deploy``, ``⇄ update``); the tab is stateless
+otherwise.
+
+``⇄ update`` is script-only (no agent, no trigger): it re-reads the CURRENT
+clipspace and rewrites its reference image urls from the filled slots —
+enhancer data via ``patch_iteration`` on the tab's view (else the clipspace's
+default view), a refdef.v1 instruction slot by slot (url/id only). Empty
+slots leave the clipspace's ref untouched.
 
 Pull is smart: enhancer data (``1xlasm_enhancer.iteration.*``) or a
 refdef.v1 instruction loads as a whole; an img url / url list / img id /
@@ -344,6 +351,66 @@ def refdef_payload(
         'text': text or '',
         'origin': {'scene_id': origin_scene_id} if origin_scene_id else None,
     }
+
+
+def update_payload(
+    text: str | None,
+    slots: list[dict],
+    view: str | None = None,
+) -> tuple[dict, str, list[str], list[str]] | None:
+    """Clipspace text with its reference urls replaced by the filled
+    ``slots`` (``{url, id}``; empty slot = keep the clipspace's ref).
+
+    Enhancer data: one view is patched with ``patch_iteration`` rules — the
+    first that takes every filled slot without skips, in the order ``view``
+    (the tab's), the payload's default view, then the other views newest
+    first (e.g. slot 2 filled on a payload whose default is ``main`` →
+    ``inp``). If none fits cleanly, the first candidate is patched and its
+    skips are reported. refdef.v1: url/id of each
+    filled slot replaced; roles, verb and text stay. Returns
+    ``(payload, view, changed, skipped)``; None when the clipspace is no
+    enhancer payload.
+    """
+    st = parse_payload(text)
+    if st is None:
+        return None
+    p = st['payload']
+    slots = (list(slots) + empty_slots())[:N_SLOTS]
+
+    if st['kind'] == 'refdef':
+        out = copy.deepcopy(p)
+        refs = out.setdefault('refs', [])
+        by_slot = {r.get('slot'): r for r in refs if isinstance(r, dict)}
+        changed: list[str] = []
+        for i, s in enumerate(slots):
+            if not s.get('url'):
+                continue
+            new = {'url': s.get('url'), 'id': s.get('id') or None}
+            ref = by_slot.get(i + 1)
+            if ref is None:
+                refs.append({'slot': i + 1, **new, 'role': ''})
+            elif (ref.get('url'), ref.get('id') or None) != (new['url'], new['id']):
+                ref.update(new)
+            else:
+                continue
+            changed.append(f'refs[slot {i + 1}]')
+        refs.sort(key=lambda r: r.get('slot', 0) if isinstance(r, dict) else 0)
+        return out, '', changed, []
+
+    def ts(v: str) -> str:
+        return str((_section_entry(p, v) or {}).get('ts') or '')
+
+    others = sorted(st['views'], key=ts, reverse=True)
+    cands = list(dict.fromkeys([v for v in (view, st['view'], *others) if v in st['views']]))
+    results = []
+    for v in cands:
+        olds = [s.get('url') for s in view_slots(p, v)]
+        urls = [s.get('url') or old for s, old in zip(slots, olds, strict=True)]
+        out, changed, skipped = patch_iteration(p, v, urls)
+        if not skipped:
+            return out, v, changed, skipped
+        results.append((out, v, changed, skipped))
+    return results[0]
 
 
 def clip_copy(text: str) -> None:
@@ -714,6 +781,32 @@ class RefdefTab:
         print(f'[refdef_tab:info] deploy {verb}: {note}')
         return f'{msg} · {note}'
 
+    def _on_update(self, state: dict | None, *refs_roles):
+        """Rewrite the CURRENT clipspace's reference urls from the slots —
+        script only, never triggers the enhancer."""
+        slots = self._slots_from_ui(list(refs_roles))
+        view = state['view'] if self._is_enh(state) else None  # type: ignore[index]
+        res = update_payload(pyperclip.paste(), slots, view)
+        if res is None:
+            gr.Warning('update: clipspace is no enhancer data / refdef', duration=0.5)
+            return 'update: clipspace is no enhancer data / refdef instruction'
+        payload, used_view, changed, skipped = res
+        where = f' (view `{used_view}`)' if used_view else ''
+        note = f' · NOT updated: {", ".join(skipped)}' if skipped else ''
+        if not changed and skipped:
+            gr.Warning(f'update: nothing updated, {len(skipped)} NOT updated', duration=0.5)
+            return f'update{where}: nothing updated, clipspace untouched{note}'
+        if not changed:
+            gr.Info('update: refs already match', duration=0.5)
+            return f'update{where}: refs already match, clipspace untouched'
+        clip_copy(json.dumps(payload, ensure_ascii=False))
+        print(f'[refdef_tab:info] update{where}: {", ".join(changed)}')
+        if skipped:
+            gr.Warning(f'updated {len(changed)}, {len(skipped)} NOT updated', duration=0.5)
+        else:
+            gr.Success(f'updated {len(changed)} ref(s)', duration=0.5)
+        return f'updated clipspace{where}: {", ".join(changed)}{note}'
+
     # -- UI build (call inside the app's gr.Blocks context) ------------- #
     def build(self) -> None:
         with gr.Tab('refdef', elem_id='refdef_tab'):
@@ -723,6 +816,7 @@ class RefdefTab:
             with gr.Row():
                 pull_btn = gr.Button('⟲ pull', variant='primary', scale=1)
                 deploy_btn = gr.Button('⇪ deploy', elem_id='refdef-deploy', scale=1)
+                update_btn = gr.Button('⇄ update', scale=1)
                 reset_btn = gr.Button('reset', scale=0, min_width=80)
             with gr.Row():
                 verb = gr.Radio(
@@ -802,6 +896,7 @@ class RefdefTab:
                 [state, verb, kind, auto, text, *refs_roles],
                 [status],
             )
+            update_btn.click(self._on_update, [state, *refs_roles], [status])
 
 
 REFDEF_HEAD = r"""
