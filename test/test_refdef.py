@@ -123,6 +123,16 @@ def test_refdef_roundtrip():
     assert st['slots'][2]['url'] == 'https://h/c.png'
 
 
+def test_refdef_sketch_without_images():
+    empty = [{'url': None, 'id': None, 'role': ''}] * 3
+    payload = refdef_payload(empty, 'sketch', 'hint', 'xlgts, beach, low angle')
+    assert payload['verb'] == 'sketch'
+    assert all(r['url'] is None and r['id'] is None for r in payload['refs'])
+    st = parse_payload(json.dumps(payload))
+    assert st is not None and st['verb'] == 'sketch'
+    assert st['text'] == 'xlgts, beach, low angle'
+
+
 # -- patch ------------------------------------------------------------------ #
 def test_patch_unchanged_is_verbatim():
     p = _iteration(prompts_inp=_inp())

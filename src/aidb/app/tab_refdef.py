@@ -22,7 +22,8 @@ pulled:
     display-only (roles = the media ``url_desc`` / ``desc``).
   * **instruction mode** (images only / reset): a ``1xlasm_enhancer.refdef.v1``
     instruction with the selected verb (replicate / enh / pickup / inp-mask /
-    inp-nomask) that the enhancer builds its enhancer data from. With
+    inp-nomask / sketch) that the enhancer builds its enhancer data from.
+    ``sketch`` = a fresh scene from the hint text alone (slots may be empty). With
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
     session ``xlasm`` with ``/refdef`` — only when it is idle.
 
@@ -55,7 +56,7 @@ SCHEMA_ITERATION: Final = '1xlasm_enhancer.iteration'  # version-tolerant prefix
 SCHEMA_REFDEF: Final = '1xlasm_enhancer.refdef.v1'
 EDITED_BY: Final = 'refdef'
 KINDS: Final = ('prompt', 'hint')
-VERBS: Final = ('replicate', 'enh', 'pickup', 'inp-mask', 'inp-nomask')
+VERBS: Final = ('replicate', 'enh', 'pickup', 'inp-mask', 'inp-nomask', 'sketch')
 VID_REF_KEYS: Final = ('first', 'last')  # prompts_vid.refs keys for slots 2/3
 PREVIEW_SIZE: Final = 768  # slot preview edge (px)
 MAX_PULL_LINES: Final = 50  # longer clipspaces are no image lists
