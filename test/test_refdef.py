@@ -319,3 +319,86 @@ def test_update_reports_skips_when_no_view_fits():
         json.dumps(p), [_slot(), _slot('/c/new.png'), _slot()]
     )
     assert view == 'main' and changed == [] and skipped
+
+
+# -- ref verb / prompts_ref view (board task 159) ---------------------------- #
+def test_refdef_ref_verb():
+    slots = [
+        {'url': '/a.png', 'id': 'i1', 'role': 'woman'},
+        {'url': '/b.png', 'id': None, 'role': 'beach'},
+        {'url': None, 'id': None, 'role': ''},
+    ]
+    payload = refdef_payload(slots, 'ref', 'hint', 'walks into the sea')
+    assert payload['schema_id'] == SCHEMA_REFDEF and payload['verb'] == 'ref'
+    st = parse_payload(json.dumps(payload))
+    assert st is not None and st['verb'] == 'ref'
+    assert [s['url'] for s in st['slots']] == ['/a.png', '/b.png', None]
+
+
+def _ref(from_rev=2) -> dict:
+    return {
+        'current': 0,
+        'prompt_data': [
+            {
+                'prompt': '<Picture 1> walks along <Picture 2>',
+                'from_rev': from_rev,
+                'ts': '2026-11-02T18:00:00Z',
+                'refs': [
+                    {'url': '/r/p1.png', 'w': 832, 'h': 1248, 'desc': 'woman'},
+                    {'url': '/r/p2.png', 'desc': 'beach'},
+                ],
+            }
+        ],
+    }
+
+
+def test_ref_view_slots_and_patch():
+    p = _iteration(schema_id='1xlasm_enhancer.iteration.v6.6', prompts_ref=_ref())
+    assert 'ref' in available_views(p) and default_view(p) == 'ref'
+    st = parse_payload(json.dumps(p))
+    assert st is not None and st['view'] == 'ref'
+    assert [s['url'] for s in st['slots']] == ['/r/p1.png', '/r/p2.png', None]
+    assert [s['role'] for s in st['slots']][:2] == ['woman', 'beach']
+    assert st['text'] == '<Picture 1> walks along <Picture 2>'
+    # replacing a picture is allowed; adding picture 3 would renumber -> skipped
+    out, changed, skipped = patch_iteration(p, 'ref', ['/r/p1.png', '/n/p2.png', '/n/p3.png'])
+    assert changed == ['prompts_ref.refs[1]'] and len(skipped) == 1
+    refs = out['prompts_ref']['prompt_data'][0]['refs']
+    assert refs[1]['url'] == '/n/p2.png' and len(refs) == 2
+    assert out['edited_by'] == 'refdef'
+
+
+# -- clips in pull / preview (pull loads vids too) --------------------------- #
+def _clip(path, w=64, h=48, n=3) -> str:
+    import av
+    import numpy as np
+
+    with av.open(str(path), 'w') as out:
+        st = out.add_stream('mpeg4', rate=8)
+        st.width, st.height, st.pix_fmt = w, h, 'yuv420p'
+        for i in range(n):
+            arr = np.full((h, w, 3), 40 * i, dtype=np.uint8)
+            for pkt in st.encode(av.VideoFrame.from_ndarray(arr, format='rgb24')):
+                out.mux(pkt)
+        for pkt in st.encode():
+            out.mux(pkt)
+    return str(path)
+
+
+def test_clip_is_usable_and_previews(tmp_path):
+    from aidb.app.tab_refdef import RefdefTab, _img_dims
+
+    clip = _clip(tmp_path / 'c.mp4')
+    assert RefdefTab._is_usable(clip)
+    assert not RefdefTab._is_usable(str(tmp_path / 'missing.mp4'))
+    im = RefdefTab._preview(clip)
+    assert im is not None and im.size == (64, 48)
+    assert _img_dims(clip) == (64, 48)
+
+
+def test_patch_clip_dims(tmp_path):
+    clip = _clip(tmp_path / 'c.mp4', w=80, h=40)
+    p = _iteration(prompts_inp=_inp())
+    out, changed, _ = patch_iteration(p, 'inp', ['/c/src.png', clip, None])
+    ref = out['prompts_inp']['prompt_data'][0]['refs'][0]
+    assert changed == ['prompts_inp.refs[0]'] and (ref['w'], ref['h']) == (80, 40)

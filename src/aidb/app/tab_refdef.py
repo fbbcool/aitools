@@ -20,17 +20,19 @@ pulled:
 
   * **enhancer mode** (enhancer data pulled): the tab keeps the WHOLE
     payload as a working copy and shows one section at a time — the
-    *view* (main / vid / inp / next = ``prompts`` / ``prompts_vid`` /
-    ``prompts_inp`` / ``prompts_next``; default = the section the latest
+    *view* (main / vid / inp / next / ref = ``prompts`` / ``prompts_vid`` /
+    ``prompts_inp`` / ``prompts_next`` / ``prompts_ref``; default = the section the latest
     enhancer step produced). Replaced slot images are patched into the
     working copy (on view switch and on deploy); deploy writes the full
     payload back with ``edited_by: 'refdef'`` and never triggers the
     enhancer, which ignores such payloads (task 150). Prompt and roles are
     display-only (roles = the media ``url_desc`` / ``desc``).
-  * **instruction mode** (images only / reset): a ``1xlasm_enhancer.refdef.v1``
+  * **instruction mode** (images/clips only / reset): a ``1xlasm_enhancer.refdef.v1``
     instruction with the selected verb (replicate / enh / pickup / inp-mask /
-    inp-nomask / sketch) that the enhancer builds its enhancer data from.
-    ``sketch`` = a fresh scene from the hint text alone (slots may be empty). With
+    inp-nomask / sketch / ref) that the enhancer builds its enhancer data from.
+    ``sketch`` = a fresh scene from the hint text alone (slots may be empty).
+    ``ref`` = the slots are MiniMax H3 ref2va picture references
+    (``<Picture i>``, board task 159); like ``enh``: slot 1 required, stills. With
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
     session ``xlasm`` with ``/refdef`` — only when it is idle.
 
@@ -49,11 +51,13 @@ from pathlib import Path
 from typing import Any, Final
 from urllib.parse import unquote
 
+import av
 import gradio as gr
 import pyperclip
-from PIL import Image, ImageOps
+from PIL import Image, ImageDraw, ImageOps
 
-from ait.tools.files import is_img
+from ait.tools.files import is_img, is_img_or_vid, is_vid
+from ait.tools.videos import ref_frame
 from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
@@ -63,7 +67,7 @@ SCHEMA_ITERATION: Final = '1xlasm_enhancer.iteration'  # version-tolerant prefix
 SCHEMA_REFDEF: Final = '1xlasm_enhancer.refdef.v1'
 EDITED_BY: Final = 'refdef'
 KINDS: Final = ('prompt', 'hint')
-VERBS: Final = ('replicate', 'enh', 'pickup', 'inp-mask', 'inp-nomask', 'sketch')
+VERBS: Final = ('replicate', 'enh', 'pickup', 'inp-mask', 'inp-nomask', 'sketch', 'ref')
 VID_REF_KEYS: Final = ('first', 'last')  # prompts_vid.refs keys for slots 2/3
 PREVIEW_SIZE: Final = 768  # slot preview edge (px)
 MAX_PULL_LINES: Final = 50  # longer clipspaces are no image lists
@@ -100,14 +104,20 @@ def _vid_refs(payload: dict) -> dict:
 
 
 # enhancer data views: each payload section the tab can show in the 3 slots
-VIEWS: Final = ('main', 'vid', 'inp', 'next')
-VIEW_SECTION: Final = {'vid': 'prompts_vid', 'inp': 'prompts_inp', 'next': 'prompts_next'}
+VIEWS: Final = ('main', 'vid', 'inp', 'next', 'ref')
+VIEW_SECTION: Final = {
+    'vid': 'prompts_vid',
+    'inp': 'prompts_inp',
+    'next': 'prompts_next',
+    'ref': 'prompts_ref',  # H3 ref2va: refs[i] = <Picture i+1> (v6.6, task 159)
+}
 # fallback roles per view when a media object carries no desc (task 150)
 VIEW_ROLES: Final = {
     'main': ('main img', '', ''),
     'vid': ('first frame', 'last frame', ''),
     'inp': ('edit target', 'image 2', 'image 3'),
     'next': ('src', 'identity ref', ''),
+    'ref': ('picture 1', 'picture 2', 'picture 3'),
 }
 
 
@@ -148,6 +158,8 @@ def _view_media(payload: dict, view: str) -> list[dict | None]:
         refs = _vid_refs(payload)
         return [refs.get(k) if isinstance(refs.get(k), dict) else None for k in VID_REF_KEYS]
     e = _section_entry(payload, view) or {}
+    if view == 'ref':
+        return [r if isinstance(r, dict) else None for r in e.get('refs') or []][:N_SLOTS]
     src = e.get('src') if isinstance(e.get('src'), dict) else None
     if view == 'inp':
         inp_refs = [r if isinstance(r, dict) else None for r in e.get('refs') or []]
@@ -243,7 +255,14 @@ def entry_prompt(payload: dict, idx: int) -> str:
 
 
 def _img_dims(url: str) -> tuple[int, int] | None:
+    """(w, h) of a local image or clip (first video stream); None keeps the old dims."""
     try:
+        if is_vid(url):
+            with av.open(url) as container:
+                for stream in container.streams.video:
+                    if stream.width and stream.height:
+                        return stream.width, stream.height
+            return None
         with Image.open(url) as im:
             return im.size
     except Exception:  # noqa: BLE001 - remote/unreadable -> keep the old dims
@@ -270,7 +289,7 @@ def patch_iteration(
 
     Replacing an image is always allowed (``w``/``h`` follow the new file).
     Structural changes are reported, not deployed, where the prompt names
-    images by number: adding/removing an inp ref, clearing an inp/next src
+    images by number: adding/removing an inp/ref ref, clearing an inp/next src
     or the next ref. Returns the patched payload, the changed field names
     and the skipped edits; ``edited_by`` is set only when something changed.
     """
@@ -303,10 +322,14 @@ def patch_iteration(
         if urls[2]:
             skipped.append('slot 3 (vid has first/last only)')
 
-    elif view in ('inp', 'next'):
+    elif view in ('inp', 'next', 'ref'):
         sec = VIEW_SECTION[view]
         media = _view_media(out, view)
-        names = ['src', 'refs[0]', 'refs[1]'] if view == 'inp' else ['src', 'ref', '']
+        names = {
+            'inp': ['src', 'refs[0]', 'refs[1]'],
+            'next': ['src', 'ref', ''],
+            'ref': ['refs[0]', 'refs[1]', 'refs[2]'],
+        }[view]
         for i in range(N_SLOTS):
             obj = media[i] if i < len(media) else None
             old = obj.get('url') if obj else None
@@ -527,14 +550,15 @@ class RefdefTab:
 
     @staticmethod
     def _is_usable(url: str | None) -> bool:
-        if not url or not is_img(url):
+        """Pullable slot media: an existing image or video/clip file."""
+        if not url or not is_img_or_vid(url):
             return False
         return url.startswith(('http://', 'https://')) or Path(url).is_file()
 
     def images_from_clipspace(self, text: str | None) -> list[tuple[str, str | None]]:
-        """Clipspace → [(url, img_id)] for an img url / url list / img id /
-        scene id clipspace; [] when any non-blank line is not a usable image
-        (so freeform text never half-fills slots)."""
+        """Clipspace → [(url, img_id)] for an img/clip url / url list / img id /
+        scene id clipspace; [] when any non-blank line is not a usable image or
+        clip (so freeform text never half-fills slots)."""
         lines = [ln.strip() for ln in (text or '').splitlines() if ln.strip()]
         if not lines or len(lines) > MAX_PULL_LINES:
             return []
@@ -547,7 +571,7 @@ class RefdefTab:
         return out
 
     def first_image_from_clipspace(self, text: str | None) -> tuple[str, str | None] | None:
-        """First type-matching (image) entry of any pull data: enhancer data
+        """First type-matching (image or clip) entry of any pull data: enhancer data
         (top-level url, then every section's media), a refdef instruction
         (slots in order) or an img/id list (first usable line)."""
         st = parse_payload(text)
@@ -581,11 +605,18 @@ class RefdefTab:
         """Slot display value. Local files go in as a downscaled PIL image:
         gradio refuses to serve paths outside cwd/tmp (allowed_paths), and
         refs live anywhere (scenes, comfy output, …). The slot ref keeps the
-        real path for deploy."""
+        real path for deploy. A clip shows its first frame with a ▶ mark."""
         if not url:
             return None
         if url.startswith(('http://', 'https://')):
             return url
+        if is_vid(url):
+            frame = ref_frame(url, 'first')
+            if frame is None:
+                return None
+            im = frame.convert('RGB')
+            im.thumbnail((PREVIEW_SIZE, PREVIEW_SIZE))
+            return RefdefTab._mark_clip(im)
         if not (is_img(url) and Path(url).is_file()):
             return None
         try:
@@ -596,6 +627,20 @@ class RefdefTab:
             return im
         except Exception:  # noqa: BLE001 - unreadable file -> empty slot preview
             return None
+
+    @staticmethod
+    def _mark_clip(im: Image.Image) -> Image.Image:
+        """Overlay a play badge (top-left) so clip slots read as clips."""
+        r = max(12, min(im.size) // 14)
+        cx = cy = r + r // 2
+        draw = ImageDraw.Draw(im, 'RGBA')
+        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(0, 0, 0, 160))
+        k = r * 0.55
+        draw.polygon(
+            [(cx - k * 0.6, cy - k), (cx - k * 0.6, cy + k), (cx + k, cy)],
+            fill=(255, 255, 255, 230),
+        )
+        return im
 
     # -- state helpers -------------------------------------------------- #
     @staticmethod
@@ -723,7 +768,7 @@ class RefdefTab:
         slots = self.place_images(len(imgs), list(refs))
         n_drop = len(imgs) - len(slots)
         if n_drop:
-            gr.Info(f'no free slot: {n_drop} img(s) dropped', duration=0.5)
+            gr.Info(f'no free slot: {n_drop} item(s) dropped', duration=0.5)
         if not slots:
             return [gr.update()] * n_out
         for i, (url, id_img) in zip(slots, imgs, strict=False):
@@ -731,7 +776,9 @@ class RefdefTab:
             role = gr.update() if self._is_enh(state) else ''
             upd[3 * i : 3 * i + 3] = [self._preview(url), id_img or url, role]
         dropped = f' ({n_drop} dropped, no free slot)' if n_drop else ''
-        status = f'pulled {len(slots)} img(s) → slot {", ".join(str(i + 1) for i in slots)}'
+        n_clips = sum(1 for _, (url, _id) in zip(slots, imgs, strict=False) if is_vid(url))
+        what = f'{len(slots) - n_clips} img(s)' + (f' + {n_clips} clip(s)' if n_clips else '')
+        status = f'pulled {what} → slot {", ".join(str(i + 1) for i in slots)}'
         return [*[gr.update()] * 3, *upd, *[gr.update()] * 6, status + dropped]
 
     def _on_reset(self):
