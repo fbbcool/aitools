@@ -31,10 +31,23 @@ pulled:
     instruction with the selected verb (replicate / enh / pickup / inp-mask /
     inp-nomask / sketch / ref) that the enhancer builds its enhancer data from.
     ``sketch`` = a fresh scene from the hint text alone (slots may be empty).
+    ``ref-novis`` = like ``ref``, but the enhancer never looks at the media (no
+    vision, saves tokens): the ref prompt is built from the slot roles (+ hint)
+    alone. Slot 1 needs media + a role (``missing_roles``); it references the
+    other slots by refdef slot number ("slot 3"), whose roles may be empty.
     ``ref`` = the slots are MiniMax H3 ref2va picture references
     (``<Picture i>``, board task 159); like ``enh``: slot 1 required, stills. With
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
     session ``xlasm`` with ``/refdef`` — only when it is idle.
+
+``💾 save`` stores the whole tab config (state + slots + roles + verb / kind /
+text) in the Mongo collection ``refdef_saves``; ◀ / ▶ step through those saves
+(oldest … newest), and the current — possibly unsaved — config always sits
+after the newest save, so ▶ past the newest save brings it back. Pull / reset /
+save make the shown config the current one; 🗑 deletes the shown save (click
+twice). The category dropdown next to 💾
+filters ◀ / ▶ and files a save under it; ``(all)`` = no filter / uncategorized,
+a typed-in name starts a new category.
 
 Payload logic is in pure module functions (``parse_payload``, ``with_view``,
 ``patch_iteration``, ``refdef_payload``) so it can be tested without gradio.
@@ -47,6 +60,7 @@ import json
 import os
 import shutil
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Final
 from urllib.parse import unquote
@@ -56,18 +70,43 @@ import gradio as gr
 import pyperclip
 from PIL import Image, ImageDraw, ImageOps
 
-from ait.tools.files import is_img, is_img_or_vid, is_vid
+from ait.tools.files import (
+    is_aud,
+    is_img,
+    is_img_or_vid,
+    is_vid,
+    suffix_aud,
+    suffix_img,
+    suffix_vid,
+)
 from ait.tools.videos import ref_frame
 from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
 
-N_SLOTS: Final = 3
+N_SLOTS: Final = 6
+SLOTS_PER_ROW: Final = 3
 SCHEMA_ITERATION: Final = '1xlasm_enhancer.iteration'  # version-tolerant prefix
 SCHEMA_REFDEF: Final = '1xlasm_enhancer.refdef.v1'
 EDITED_BY: Final = 'refdef'
 KINDS: Final = ('prompt', 'hint')
-VERBS: Final = ('replicate', 'enh', 'pickup', 'inp-mask', 'inp-nomask', 'sketch', 'ref')
+VERBS: Final = (
+    'replicate',
+    'enh',
+    'pickup',
+    'inp-mask',
+    'inp-nomask',
+    'sketch',
+    'ref',
+    'ref-novis',
+)
+# verbs whose prompt is built from the slot roles alone (enhancer never looks at
+# the media): slot 1 needs media + a role; it references the other slots by number
+ROLE_ONLY_VERBS: Final = ('ref-novis',)
+# ⇄ update: the enhancer-data view (section) a verb owns (board task 162). A verb
+# here patches ONLY its view; the other verbs never touch these views.
+VERB_VIEW: Final = {'inp-mask': 'inp', 'inp-nomask': 'inp', 'ref': 'ref', 'ref-novis': 'ref'}
+STILL_VIEWS: Final = ('inp',)  # qwen21 still slots: images only
 VID_REF_KEYS: Final = ('first', 'last')  # prompts_vid.refs keys for slots 2/3
 PREVIEW_SIZE: Final = 768  # slot preview edge (px)
 MAX_PULL_LINES: Final = 50  # longer clipspaces are no image lists
@@ -78,6 +117,9 @@ HERDR_AGENT: Final = 'enhancer'
 TRIGGER_CMD: Final = '/refdef'
 HERDR_READY: Final = ('idle', 'done')
 HERDR_TIMEOUT_S: Final = 10
+SAVES_COLLECTION: Final = 'refdef_saves'  # 💾 save history (see build)
+CAT_ALL: Final = '(all)'  # category filter = every save; saved as uncategorized
+SNAP_KEYS: Final = ('state', 'idx', 'refs', 'roles', 'verb', 'kind', 'text')
 
 
 # ---------------------------------------------------------------------- #
@@ -113,11 +155,11 @@ VIEW_SECTION: Final = {
 }
 # fallback roles per view when a media object carries no desc (task 150)
 VIEW_ROLES: Final = {
-    'main': ('main img', '', ''),
-    'vid': ('first frame', 'last frame', ''),
-    'inp': ('edit target', 'image 2', 'image 3'),
-    'next': ('src', 'identity ref', ''),
-    'ref': ('picture 1', 'picture 2', 'picture 3'),
+    'main': ('main img',),
+    'vid': ('first frame', 'last frame'),
+    'inp': ('edit target', *(f'image {i}' for i in range(2, N_SLOTS + 1))),
+    'next': ('src', 'identity ref'),
+    'ref': tuple(f'picture {i}' for i in range(1, N_SLOTS + 1)),
 }
 
 
@@ -149,6 +191,21 @@ def default_view(payload: dict) -> str:
     return max(fresh)[1] if fresh else 'main'
 
 
+def _ref_slots(entry: dict) -> list[dict | None]:
+    """``prompts_ref`` refs placed at their slot. The list is compacted in slot
+    order; since v6.8 each ref carries ``slot`` (1..6), older refs go by
+    list position."""
+    out: list[dict | None] = [None] * N_SLOTS
+    for i, r in enumerate(entry.get('refs') or []):
+        if not isinstance(r, dict):
+            continue
+        n = r.get('slot')
+        k = n - 1 if isinstance(n, int) and 1 <= n <= N_SLOTS else i
+        if k < N_SLOTS and out[k] is None:
+            out[k] = r
+    return out
+
+
 def _view_media(payload: dict, view: str) -> list[dict | None]:
     """Live media objects ({url[, desc, w, h]}) of a view, slot order.
     ``main`` is the top-level url — returned as a detached dict."""
@@ -159,7 +216,7 @@ def _view_media(payload: dict, view: str) -> list[dict | None]:
         return [refs.get(k) if isinstance(refs.get(k), dict) else None for k in VID_REF_KEYS]
     e = _section_entry(payload, view) or {}
     if view == 'ref':
-        return [r if isinstance(r, dict) else None for r in e.get('refs') or []][:N_SLOTS]
+        return _ref_slots(e)
     src = e.get('src') if isinstance(e.get('src'), dict) else None
     if view == 'inp':
         inp_refs = [r if isinstance(r, dict) else None for r in e.get('refs') or []]
@@ -174,7 +231,8 @@ def view_slots(payload: dict, view: str) -> list[dict]:
     slots = empty_slots()
     for i, m in enumerate(_view_media(payload, view)[:N_SLOTS]):
         if m and m.get('url'):
-            role = m.get('desc') or VIEW_ROLES[view][i]
+            roles = VIEW_ROLES[view]
+            role = m.get('desc') or (roles[i] if i < len(roles) else '')
             slots[i] = {'url': m['url'], 'id': None, 'role': role}
     return slots
 
@@ -296,13 +354,13 @@ def patch_iteration(
     out = copy.deepcopy(payload)
     changed: list[str] = []
     skipped: list[str] = []
-    urls = [u or None for u in urls]
+    urls = ([u or None for u in urls] + [None] * N_SLOTS)[:N_SLOTS]
 
     if view == 'main':
         if urls[0] != (out.get('url') or None):
             out['url'] = urls[0]
             changed.append('url')
-        skipped += [f'slot {i + 1} (main has one image)' for i in (1, 2) if urls[i]]
+        skipped += [f'slot {i + 1} (main has one image)' for i in range(1, N_SLOTS) if urls[i]]
 
     elif view == 'vid':
         refs = _vid_refs(out)
@@ -319,22 +377,39 @@ def patch_iteration(
             else:
                 refs[key] = {'url': new}
             changed.append(f'prompts_vid.refs.{key}')
-        if urls[2]:
-            skipped.append('slot 3 (vid has first/last only)')
+        skipped += [
+            f'slot {i + 1} (vid has first/last only)'
+            for i in range(len(VID_REF_KEYS), N_SLOTS)
+            if urls[i]
+        ]
 
     elif view in ('inp', 'next', 'ref'):
         sec = VIEW_SECTION[view]
         media = _view_media(out, view)
-        names = {
-            'inp': ['src', 'refs[0]', 'refs[1]'],
-            'next': ['src', 'ref', ''],
-            'ref': ['refs[0]', 'refs[1]', 'refs[2]'],
-        }[view]
+        if view == 'ref':  # refs sit at their slot, named by list position
+            refs_list = (_section_entry(out, 'ref') or {}).get('refs') or []
+            pos = {id(r): j for j, r in enumerate(refs_list)}
+            names = [f'refs[{pos[id(m)]}]' if m is not None else 'a ref' for m in media]
+        else:
+            names = {
+                'inp': ['src', *(f'refs[{i}]' for i in range(N_SLOTS - 1))],
+                'next': ['src', 'ref', *([''] * (N_SLOTS - 2))],
+            }[view]
         for i in range(N_SLOTS):
             obj = media[i] if i < len(media) else None
             old = obj.get('url') if obj else None
             new = urls[i]
             if new == (old or None):
+                continue
+            if view in STILL_VIEWS and new and media_kind(new) != 'image':
+                skipped.append(f'slot {i + 1} ({media_kind(new)} in a qwen21 still slot)')
+                continue
+            # a ref's kind sets its <Picture/Video/Audio N> tag: no kind swaps
+            kind_old = (obj or {}).get('kind') or 'image'
+            if view == 'ref' and obj is not None and new and media_kind(new) != kind_old:
+                skipped.append(
+                    f'slot {i + 1} ({kind_old} → {media_kind(new)} would renumber the prompt)'
+                )
                 continue
             if obj is not None and new is not None:
                 _replace_media(obj, new)
@@ -348,6 +423,30 @@ def patch_iteration(
     if changed:
         out['edited_by'] = EDITED_BY
     return out, changed, skipped
+
+
+def media_kind(url: str | None) -> str | None:
+    """'image' / 'video' / 'audio' by file suffix (None when empty / unknown)."""
+    if not url:
+        return None
+    suf = Path(url.split('?')[0]).suffix.lower()
+    if suf in suffix_img():
+        return 'image'
+    if suf in suffix_vid():
+        return 'video'
+    if suf in suffix_aud():
+        return 'audio'
+    return None
+
+
+def missing_roles(slots: list[dict], verb: str) -> list[int]:
+    """1-based slots whose role a role-only verb requires but lacks. Only slot 1
+    must carry media + a role: it holds the prompt and references the other
+    slots by their refdef slot number, whose roles may stay empty."""
+    if verb not in ROLE_ONLY_VERBS or not slots:
+        return []
+    s1 = slots[0]
+    return [] if s1.get('url') and (s1.get('role') or '').strip() else [1]
 
 
 def refdef_payload(
@@ -367,6 +466,7 @@ def refdef_payload(
                 'url': s.get('url') or None,
                 'id': s.get('id') or None,
                 'role': (s.get('role') or '').strip(),
+                'media': media_kind(s.get('url')),
             }
             for i, s in enumerate(slots[:N_SLOTS])
         ],
@@ -380,6 +480,7 @@ def update_payload(
     text: str | None,
     slots: list[dict],
     view: str | None = None,
+    verb: str | None = None,
 ) -> tuple[dict, str, list[str], list[str]] | None:
     """Clipspace text with its reference urls replaced by the filled
     ``slots`` (``{url, id}``; empty slot = keep the clipspace's ref).
@@ -387,9 +488,12 @@ def update_payload(
     Enhancer data: one view is patched with ``patch_iteration`` rules — the
     first that takes every filled slot without skips, in the order ``view``
     (the tab's), the payload's default view, then the other views newest
-    first (e.g. slot 2 filled on a payload whose default is ``main`` →
-    ``inp``). If none fits cleanly, the first candidate is patched and its
-    skips are reported. refdef.v1: url/id of each
+    first. The ``verb`` decides first (board task 162): a verb in
+    ``VERB_VIEW`` (inp-* → ``inp``, ref / ref-novis → ``ref``) patches only
+    that view, every other verb only the views no verb owns (main / vid /
+    next), so sections the verb doesn't address stay byte-identical. If none
+    fits cleanly, the first candidate is patched and its skips are reported;
+    a missing section changes nothing. refdef.v1: url/id of each
     filled slot replaced; roles, verb and text stay. Returns
     ``(payload, view, changed, skipped)``; None when the clipspace is no
     enhancer payload.
@@ -409,11 +513,12 @@ def update_payload(
             if not s.get('url'):
                 continue
             new = {'url': s.get('url'), 'id': s.get('id') or None}
+            new_media = media_kind(s.get('url'))
             ref = by_slot.get(i + 1)
             if ref is None:
-                refs.append({'slot': i + 1, **new, 'role': ''})
+                refs.append({'slot': i + 1, **new, 'role': '', 'media': new_media})
             elif (ref.get('url'), ref.get('id') or None) != (new['url'], new['id']):
-                ref.update(new)
+                ref.update(new, media=new_media)
             else:
                 continue
             changed.append(f'refs[slot {i + 1}]')
@@ -423,8 +528,19 @@ def update_payload(
     def ts(v: str) -> str:
         return str((_section_entry(p, v) or {}).get('ts') or '')
 
-    others = sorted(st['views'], key=ts, reverse=True)
-    cands = list(dict.fromkeys([v for v in (view, st['view'], *others) if v in st['views']]))
+    owned = set(VERB_VIEW.values())
+    if verb in VERB_VIEW:
+        target = VERB_VIEW[verb]
+        if target not in st['views']:
+            sec = VIEW_SECTION.get(target, target)
+            return copy.deepcopy(p), target, [], [f'payload has no {sec} for verb {verb}']
+        cands = [target]
+    else:
+        others = sorted(st['views'], key=ts, reverse=True)
+        chain = (view, st['view'], *others)
+        cands = list(dict.fromkeys(v for v in chain if v in st['views'] and v not in owned))
+        if not cands:
+            return copy.deepcopy(p), '', [], [f'no section for verb {verb} in the payload']
     results = []
     for v in cands:
         olds = [s.get('url') for s in view_slots(p, v)]
@@ -434,6 +550,52 @@ def update_payload(
             return out, v, changed, skipped
         results.append((out, v, changed, skipped))
     return results[0]
+
+
+def hist_step(pos: int | None, n: int, step: int) -> int | None:
+    """Save-history pointer after one ◀ (-1) / ▶ (+1) step over ``n`` saves
+    (oldest first). ``None`` = the current (working) config, which always sits
+    after the newest save."""
+    cur = n if pos is None else min(pos, n)
+    new = max(0, min(n, cur + step))
+    return None if new >= n else new
+
+
+def enh_clip(text: str | None) -> str | None:
+    """Clipspace text → compact enhancer-data JSON, None for anything else."""
+    st = parse_payload(text)
+    if st is None or st['kind'] != 'iteration':
+        return None
+    return json.dumps(st['payload'], ensure_ascii=False)
+
+
+def snap_to_doc(snap: dict) -> dict:
+    """UI snapshot → Mongo doc. The state rides as a JSON string (enhancer
+    payloads may hold keys Mongo rejects); verb / mode / scene are queryable."""
+    st = snap.get('state') or {}
+    p = st.get('payload') or {}
+    return {
+        **{k: snap.get(k) for k in SNAP_KEYS if k != 'state'},
+        'state_json': json.dumps(snap.get('state'), ensure_ascii=False),
+        'mode': 'enhancer' if st.get('kind') == 'iteration' else 'instruction',
+        'scene_id': p.get('scene_id') or (p.get('origin') or {}).get('scene_id'),
+        # the clipspace's enhancer data at save time (restored while browsing)
+        'clip_json': snap.get('clip'),
+        'has_clip': bool(snap.get('clip')),
+    }
+
+
+def norm_cat(cat: str | None) -> str | None:
+    """Category dropdown value → stored category / filter (None = all / none)."""
+    cat = (cat or '').strip()
+    return None if not cat or cat == CAT_ALL else cat
+
+
+def doc_to_snap(doc: dict) -> dict:
+    snap = {k: doc.get(k) for k in SNAP_KEYS if k != 'state'}
+    snap['state'] = json.loads(doc.get('state_json') or 'null')
+    snap['clip'] = doc.get('clip_json')
+    return snap
 
 
 def clip_copy(text: str) -> None:
@@ -512,6 +674,7 @@ class RefdefTab:
     def __init__(self, dbc, verbose: int = 0) -> None:
         self._sim = SceneImageManager(dbc=dbc, verbose=0)
         self._scm = SceneManager(dbc=dbc, verbose=0)
+        self._dbc = dbc
         self._verbose = verbose
 
     def _log(self, msg: str, level: str = 'info') -> None:
@@ -550,8 +713,8 @@ class RefdefTab:
 
     @staticmethod
     def _is_usable(url: str | None) -> bool:
-        """Pullable slot media: an existing image or video/clip file."""
-        if not url or not is_img_or_vid(url):
+        """Pullable slot media: an existing image, video/clip or audio file."""
+        if not url or not (is_img_or_vid(url) or is_aud(url)):
             return False
         return url.startswith(('http://', 'https://')) or Path(url).is_file()
 
@@ -610,6 +773,8 @@ class RefdefTab:
             return None
         if url.startswith(('http://', 'https://')):
             return url
+        if is_aud(url):
+            return RefdefTab._waveform(url)
         if is_vid(url):
             frame = ref_frame(url, 'first')
             if frame is None:
@@ -627,6 +792,35 @@ class RefdefTab:
             return im
         except Exception:  # noqa: BLE001 - unreadable file -> empty slot preview
             return None
+
+    @staticmethod
+    def _waveform(url: str) -> Image.Image | None:
+        """Audio slot preview: min/max waveform + ♪ badge + name/duration."""
+        w, h = PREVIEW_SIZE, PREVIEW_SIZE // 2
+        try:
+            peaks: list[float] = []
+            dur = 0.0
+            with av.open(url) as container:
+                stream = container.streams.audio[0]
+                for frame in container.decode(stream):
+                    a = frame.to_ndarray()
+                    peaks.append(float(abs(a).max()) if a.size else 0.0)
+                    dur += frame.samples / (frame.sample_rate or 1)
+        except Exception:  # noqa: BLE001 - unreadable audio -> empty preview
+            return None
+        im = Image.new('RGB', (w, h), (24, 28, 36))
+        draw = ImageDraw.Draw(im)
+        if peaks:
+            top = max(peaks) or 1.0
+            mid = h // 2
+            for x in range(w):
+                v = peaks[min(len(peaks) - 1, x * len(peaks) // w)] / top
+                d = max(1, int(v * (h // 2 - 16)))
+                draw.line([(x, mid - d), (x, mid + d)], fill=(110, 170, 255))
+        badge = ImageDraw.Draw(im, 'RGBA')
+        badge.rectangle((0, h - 30, w, h), fill=(0, 0, 0, 150))
+        badge.text((10, h - 24), f'♪ {Path(url).name} · {dur:.1f}s', fill=(255, 255, 255))
+        return im
 
     @staticmethod
     def _mark_clip(im: Image.Image) -> Image.Image:
@@ -776,20 +970,218 @@ class RefdefTab:
             role = gr.update() if self._is_enh(state) else ''
             upd[3 * i : 3 * i + 3] = [self._preview(url), id_img or url, role]
         dropped = f' ({n_drop} dropped, no free slot)' if n_drop else ''
-        n_clips = sum(1 for _, (url, _id) in zip(slots, imgs, strict=False) if is_vid(url))
-        what = f'{len(slots) - n_clips} img(s)' + (f' + {n_clips} clip(s)' if n_clips else '')
+        placed = [url for _, (url, _id) in zip(slots, imgs, strict=False)]
+        n_clips = sum(1 for url in placed if is_vid(url))
+        n_aud = sum(1 for url in placed if is_aud(url))
+        what = f'{len(placed) - n_clips - n_aud} img(s)'
+        what += (f' + {n_clips} clip(s)' if n_clips else '') + (
+            f' + {n_aud} audio' if n_aud else ''
+        )
         status = f'pulled {what} → slot {", ".join(str(i + 1) for i in slots)}'
         return [*[gr.update()] * 3, *upd, *[gr.update()] * 6, status + dropped]
 
     def _on_reset(self):
         return [*self._load(None), 'reset']
 
-    def _on_nav(self, state: dict | None, idx: int, step: int):
-        if not self._is_enh(state) or state['view'] != 'main':  # type: ignore[index]
-            return idx, gr.update(), gr.update(), gr.update()
-        p = state['payload']  # type: ignore[index]
-        new = max(0, min(len(_entries(p)) - 1, idx + step))
-        return new, entry_prompt(p, new), self._source_md(state, new), self._entry_md(state, new)
+    # -- save history ------------------------------------------------- #
+    @staticmethod
+    def _snap(state, idx, verb, kind, text, *refs_roles) -> dict:
+        """UI config + the clipspace's enhancer data (if it holds any)."""
+        return {
+            'clip': enh_clip(pyperclip.paste()),
+            'state': state,
+            'idx': idx,
+            'refs': [refs_roles[2 * i] or '' for i in range(N_SLOTS)],
+            'roles': [refs_roles[2 * i + 1] or '' for i in range(N_SLOTS)],
+            'verb': verb,
+            'kind': kind,
+            'text': text or '',
+        }
+
+    @staticmethod
+    def _restore_clip(snap: dict | None) -> str:
+        """Put a snapshot's enhancer data back on the (volatile) clipspace →
+        status note ('' when it carries none)."""
+        clip = (snap or {}).get('clip')
+        if not clip:
+            return ''
+        clip_copy(clip)
+        p = json.loads(clip)
+        return f' · clipspace ← enhancer data (scene `{p.get("scene_id")}`, rev {p.get("rev")})'
+
+    def _load_snap(self, snap: dict) -> list[Any]:
+        """``_load`` outputs for a saved / drafted UI snapshot."""
+        st = snap.get('state')
+        enh = self._is_enh(st)
+        idx = snap.get('idx') or 0
+        slot_vals: list[Any] = []
+        pad = [''] * N_SLOTS  # saves from before a slot-count change
+        for ref, role in zip(
+            (list(snap['refs']) + pad)[:N_SLOTS],
+            (list(snap['roles']) + pad)[:N_SLOTS],
+            strict=True,
+        ):
+            url = self.resolve_ref(ref)[0] if ref else None
+            slot_vals += [self._preview(url), ref, gr.update(value=role, interactive=not enh)]
+        raw = json.dumps(st['payload'], indent=2, ensure_ascii=False) if st else ''
+        return [
+            st,
+            idx,
+            raw,
+            *slot_vals,
+            gr.update(value=snap.get('kind') or 'hint', interactive=not enh),
+            snap.get('verb') or VERBS[0],
+            gr.update(value=snap.get('text') or '', interactive=not enh),
+            self._source_md(st, idx),
+            self._entry_md(st, idx),
+            gr.update(
+                choices=st['views'] if enh else [],
+                value=st['view'] if enh else None,
+                visible=enh,
+            ),
+        ]
+
+    def _col(self):
+        return self._dbc._get_collection(SAVES_COLLECTION)
+
+    def _save_ids(self, cat: str | None = None) -> list[dict]:
+        """[{_id, ts, category}] of the saves in category ``cat`` (all when
+        unset), oldest first ([] without a DB)."""
+        col = self._col()
+        if col is None:
+            return []
+        flt = {'category': c} if (c := norm_cat(cat)) else {}
+        proj = {'_id': 1, 'ts': 1, 'category': 1, 'has_clip': 1}
+        return list(col.find(flt, proj).sort([('ts', 1), ('_id', 1)]))
+
+    def _categories(self) -> list[str]:
+        col = self._col()
+        cats = sorted(c for c in col.distinct('category') if c) if col is not None else []
+        return [CAT_ALL, *cats]
+
+    @staticmethod
+    def _ts_str(ts: datetime | None) -> str:
+        if ts is None:
+            return '?'
+        return ts.replace(tzinfo=timezone.utc).astimezone().strftime('%Y-%m-%d %H:%M:%S')
+
+    @classmethod
+    def _hist_md(cls, pos: int | None, saves: list[dict]) -> str:
+        n = len(saves)
+        if pos is None:
+            return f'**current** · {n} save{"s" if n != 1 else ""}'
+        s = saves[pos]
+        cat = f' · `{s["category"]}`' if s.get('category') else ''
+        clip = ' · ⎘ enh' if s.get('has_clip') else ''
+        return f'**save {pos + 1}/{n}** · {cls._ts_str(s.get("ts"))}{cat}{clip}'
+
+    def _on_save(self, cat, state, idx, verb, kind, text, *refs_roles):
+        """Save the shown config under category ``cat`` (a new typed-in one
+        joins the dropdown)."""
+        cur = {'pos': None, 'draft': None}
+        col = self._col()
+        if col is None:
+            gr.Warning('save: no DB connection', duration=0.5)
+            return 'save: no DB connection', cur, gr.update(), gr.update()
+        doc = snap_to_doc(self._snap(state, idx, verb, kind, text, *refs_roles))
+        doc['category'] = norm_cat(cat)
+        last = col.find_one({}, sort=[('ts', -1), ('_id', -1)])
+        if last and all(last.get(k) == v for k, v in doc.items()):
+            gr.Info('unchanged since the last save', duration=0.5)
+            md = self._hist_md(None, self._save_ids(cat))
+            return 'save: unchanged since the last save', cur, md, gr.update()
+        doc['ts'] = datetime.now(timezone.utc).replace(tzinfo=None)
+        col.insert_one(doc)
+        saves = self._save_ids(cat)
+        where = f' in `{doc["category"]}`' if doc['category'] else ''
+        gr.Success(f'saved #{len(saves)}{where}', duration=0.5)
+        return (
+            f'saved #{len(saves)}{where} ({doc["mode"]}'
+            f'{" + clipspace enhancer data" if doc["has_clip"] else ""})'
+            f' · {self._ts_str(doc["ts"])}',
+            cur,
+            self._hist_md(None, saves),
+            gr.update(choices=self._categories(), value=cat),
+        )
+
+    def _on_cat(self, hist: dict | None, cat):
+        """Category filter changed: a shown save's index no longer applies, so
+        go back to the current config (the parked draft)."""
+        n_out = 3 + 3 * N_SLOTS + 7
+        hist = hist or {'pos': None, 'draft': None}
+        md = self._hist_md(None, self._save_ids(cat))
+        if hist['pos'] is None or not hist['draft']:
+            return [*[gr.update()] * n_out, {'pos': None, 'draft': None}, md]
+        msg = f'category `{norm_cat(cat) or CAT_ALL}` · back to the current config'
+        msg += self._restore_clip(hist['draft'])
+        return [*self._load_snap(hist['draft']), msg, {'pos': None, 'draft': None}, md]
+
+    def _on_del(self, hist: dict | None, cat):
+        """Delete the shown save — two clicks: the first arms it (any other
+        action disarms). Then show the next older save, else the next newer,
+        else the current config."""
+        n_out = 3 + 3 * N_SLOTS + 7
+        hist = hist or {'pos': None, 'draft': None}
+        saves, col = self._save_ids(cat), self._col()
+        pos = hist['pos']
+        keep = [*[gr.update()] * n_out]
+        if pos is None or pos >= len(saves) or col is None:
+            gr.Info('no save shown (◀ to pick one)', duration=0.5)
+            return [*keep, 'delete: no save shown', hist, gr.update(), gr.update()]
+        target = saves[pos]['_id']
+        if hist.get('arm') != str(target):
+            gr.Warning('click 🗑 again to delete this save', duration=1)
+            msg = f'delete save {pos + 1}/{len(saves)}? click 🗑 again'
+            return [*keep, msg, dict(hist, arm=str(target)), gr.update(), gr.update()]
+        col.delete_one({'_id': target})
+        saves = self._save_ids(cat)
+        new = pos - 1 if pos > 0 else (0 if saves else None)
+        msg = f'deleted save {pos + 1}'
+        doc = col.find_one({'_id': saves[new]['_id']}) if new is not None else None
+        if doc is None:
+            new, snap, hist = None, hist['draft'], {'pos': None, 'draft': None}
+            msg += ' · back to the current config'
+        else:
+            snap, hist = doc_to_snap(doc), {'pos': new, 'draft': hist['draft']}
+            msg += f' · showing save {new + 1}/{len(saves)}'
+        gr.Success(f'deleted save {pos + 1}', duration=0.5)
+        msg += self._restore_clip(snap)
+        outs = self._load_snap(snap) if snap else keep
+        cats = gr.update(choices=self._categories())
+        return [*outs, msg, hist, self._hist_md(new, saves), cats]
+
+    def _on_hist(
+        self, hist: dict | None, step: int, cat, state, idx, verb, kind, text, *refs_roles
+    ):
+        """◀ / ▶ through the saves of category ``cat``; leaving the current
+        config drafts it so ▶ past the newest save restores it (even when it
+        was never saved)."""
+        n_out = 3 + 3 * N_SLOTS + 7
+        hist = hist or {'pos': None, 'draft': None}
+        saves = self._save_ids(cat)
+        pos = hist['pos']
+        if pos is not None and pos >= len(saves):  # saves vanished meanwhile
+            pos = len(saves) - 1 if saves else None
+        new = hist_step(pos, len(saves), step)
+        if new == pos:
+            edge = 'oldest save' if step < 0 else 'current config'
+            gr.Info(f'already at the {edge}', duration=0.5)
+            return [*[gr.update()] * n_out, hist, self._hist_md(pos, saves)]
+        draft = hist['draft']
+        if pos is None:
+            draft = self._snap(state, idx, verb, kind, text, *refs_roles)
+        if new is None:
+            snap, hist, msg = draft, {'pos': None, 'draft': None}, 'back to the current config'
+        else:
+            col = self._col()
+            doc = col.find_one({'_id': saves[new]['_id']}) if col is not None else None
+            if doc is None:
+                gr.Warning('save not found', duration=0.5)
+                return [*[gr.update()] * n_out, hist, self._hist_md(pos, saves)]
+            snap, hist = doc_to_snap(doc), {'pos': new, 'draft': draft}
+            msg = f'loaded save {new + 1}/{len(saves)} · {self._ts_str(doc.get("ts"))}'
+        msg += self._restore_clip(snap)
+        return [*self._load_snap(snap), msg, hist, self._hist_md(new, saves)]
 
     def _slots_from_ui(self, refs_roles: list[str]) -> list[dict]:
         slots = []
@@ -817,6 +1209,13 @@ class RefdefTab:
             changed = st['changed']
             what = f'img urls patched: {", ".join(changed)}' if changed else 'unchanged'
             return f'deployed enhancer data ({what}){note}'
+        if miss := missing_roles(slots, verb):
+            where = ', '.join(str(n) for n in miss)
+            gr.Warning(f'{verb}: slot {where} needs media + a role', duration=1)
+            return (
+                f'NOT deployed: `{verb}` builds the prompt from roles only — '
+                f'slot {where} needs media + a role'
+            )
         origin = None
         if state and state['kind'] == 'refdef':
             origin = (state['payload'].get('origin') or {}).get('scene_id')
@@ -828,12 +1227,12 @@ class RefdefTab:
         print(f'[refdef_tab:info] deploy {verb}: {note}')
         return f'{msg} · {note}'
 
-    def _on_update(self, state: dict | None, *refs_roles):
+    def _on_update(self, state: dict | None, verb: str | None, *refs_roles):
         """Rewrite the CURRENT clipspace's reference urls from the slots —
         script only, never triggers the enhancer."""
         slots = self._slots_from_ui(list(refs_roles))
         view = state['view'] if self._is_enh(state) else None  # type: ignore[index]
-        res = update_payload(pyperclip.paste(), slots, view)
+        res = update_payload(pyperclip.paste(), slots, view, verb)
         if res is None:
             gr.Warning('update: clipspace is no enhancer data / refdef', duration=0.5)
             return 'update: clipspace is no enhancer data / refdef instruction'
@@ -859,6 +1258,9 @@ class RefdefTab:
         with gr.Tab('refdef', elem_id='refdef_tab'):
             state = gr.State(None)  # parse_payload() result of the last enhancer pull
             idx = gr.State(0)  # pointed prompt_data entry (display only)
+            # save-history pointer: pos None = current config; draft = the current
+            # config parked while a save is shown
+            hist = gr.State({'pos': None, 'draft': None})
 
             with gr.Row():
                 pull_btn = gr.Button('⟲ pull', variant='primary', scale=1)
@@ -875,47 +1277,64 @@ class RefdefTab:
                 kind = gr.Radio(list(KINDS), value='hint', label='text is a', scale=1)
                 auto = gr.Checkbox(
                     value=True,
-                    label=f'auto-trigger enhancer ({TRIGGER_CMD})',
-                    info=f'instruction deploy → {TRIGGER_CMD} to herdr {HERDR_SESSION}/'
-                    f'{HERDR_AGENT}, only when idle',
+                    # instruction deploy → TRIGGER_CMD to the herdr agent, only when idle
+                    label='auto trigger enhancer',
                     scale=1,
                 )
             view = gr.Radio([], label='view (enhancer data section)', visible=False)
-            with gr.Row():
+            with gr.Row(equal_height=True):
                 prev_btn = gr.Button('◀', scale=0, min_width=40)
-                source_md = gr.Markdown(self._source_md(None, 0))
+                with gr.Column(scale=0, min_width=230):
+                    hist_md = gr.Markdown(self._hist_md(None, self._save_ids()))
                 next_btn = gr.Button('▶', scale=0, min_width=40)
+                save_btn = gr.Button('💾', scale=0, min_width=40)
+                del_btn = gr.Button('🗑', scale=0, min_width=40)
+                # ◀ ▶ filter; 💾 files under it; typing a name starts a new one
+                with gr.Column(scale=0, min_width=80):
+                    gr.Markdown('category:', elem_id='refdef-cat-label')
+                cat = gr.Dropdown(
+                    self._categories(),
+                    value=CAT_ALL,
+                    allow_custom_value=True,
+                    show_label=False,
+                    container=False,
+                    scale=2,
+                    min_width=200,
+                )
+                gr.Column(scale=3)  # spacer
 
             # input is the clipspace only: images are display-only, the slot
             # ref (img id or url) rides in a per-slot State
             imgs, refs, roles, slot_pulls, clears = [], [], [], [], []
-            with gr.Row(equal_height=True):
-                for i in range(N_SLOTS):
-                    with gr.Column():
-                        imgs.append(
-                            gr.Image(
-                                type='filepath',
-                                label=f'slot {i + 1}',
-                                height=360,
-                                interactive=False,
-                            )
-                        )
-                        refs.append(gr.State(''))
-                        with gr.Row():
-                            roles.append(
-                                gr.Textbox(
-                                    placeholder='role: what this ref is for',
-                                    show_label=False,
-                                    lines=2,
-                                    scale=5,
+            for row0 in range(0, N_SLOTS, SLOTS_PER_ROW):
+                with gr.Row(equal_height=True):
+                    for i in range(row0, min(N_SLOTS, row0 + SLOTS_PER_ROW)):
+                        with gr.Column():
+                            imgs.append(
+                                gr.Image(
+                                    type='filepath',
+                                    label=f'slot {i + 1}',
+                                    height=300,
+                                    interactive=False,
                                 )
                             )
-                            slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
-                            clears.append(gr.Button('✕', scale=0, min_width=40))
+                            refs.append(gr.State(''))
+                            with gr.Row():
+                                roles.append(
+                                    gr.Textbox(
+                                        placeholder='role: what this ref is for',
+                                        show_label=False,
+                                        lines=2,
+                                        scale=5,
+                                    )
+                                )
+                                slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
+                                clears.append(gr.Button('✕', scale=0, min_width=40))
 
             status = gr.Markdown()
             text = gr.Textbox(label='prompt / prompt hint', lines=8, max_lines=30)
-            with gr.Accordion('concepts / triggers', open=False):
+            with gr.Accordion('source / concepts / triggers', open=False):
+                source_md = gr.Markdown(self._source_md(None, 0))
                 entry_md = gr.Markdown()
             with gr.Accordion('raw payload (as pulled / last view switch)', open=False):
                 raw = gr.Code(language='json', interactive=False)
@@ -924,14 +1343,32 @@ class RefdefTab:
             slot_outs = [c for trip in zip(imgs, refs, roles, strict=True) for c in trip]
             load_outs = [state, idx, raw, *slot_outs, kind, verb, text, source_md, entry_md, view]
 
-            pull_btn.click(self._on_pull, [state, *refs], [*load_outs, status])
-            reset_btn.click(self._on_reset, [], [*load_outs, status])
+            snap_ins = [state, idx, verb, kind, text, *refs_roles]
+            cur_hist = {'pos': None, 'draft': None}
+
+            def pull(h, *a):
+                out = self._on_pull(*a)
+                # a pull that changed something makes the shown config the current one
+                return [*out, cur_hist if isinstance(out[-1], str) else h]
+
+            def hist_refresh(h, c):
+                return self._hist_md(h['pos'], self._save_ids(c))
+
+            pull_btn.click(pull, [hist, state, *refs], [*load_outs, status, hist]).then(
+                hist_refresh, [hist, cat], [hist_md]
+            )
+            reset_btn.click(
+                lambda: [*self._on_reset(), cur_hist], [], [*load_outs, status, hist]
+            ).then(hist_refresh, [hist, cat], [hist_md])
+            save_btn.click(self._on_save, [cat, *snap_ins], [status, hist, hist_md, cat])
+            del_btn.click(self._on_del, [hist, cat], [*load_outs, status, hist, hist_md, cat])
+            cat.input(self._on_cat, [hist, cat], [*load_outs, status, hist, hist_md])
             view.input(self._on_view, [state, view, *refs], [*load_outs, status])
             for btn, step in ((prev_btn, -1), (next_btn, 1)):
                 btn.click(
-                    lambda s, i, step=step: self._on_nav(s, i, step),
-                    [state, idx],
-                    [idx, text, source_md, entry_md],
+                    lambda h, c, *a, step=step: self._on_hist(h, step, c, *a),
+                    [hist, cat, *snap_ins],
+                    [*load_outs, status, hist, hist_md],
                 )
             for img, ref, clear in zip(imgs, refs, clears, strict=True):
                 # role stays: in enhancer mode it is payload-owned
@@ -943,13 +1380,14 @@ class RefdefTab:
                 [state, verb, kind, auto, text, *refs_roles],
                 [status],
             )
-            update_btn.click(self._on_update, [state, *refs_roles], [status])
+            update_btn.click(self._on_update, [state, verb, *refs_roles], [status])
 
 
 REFDEF_HEAD = r"""
 <style>
 #refdef-deploy { background: #2e7d32 !important; border-color: #2e7d32 !important;
   color: #fff !important; }
+#refdef-cat-label { text-align: right; }
 #refdef-deploy:hover { background: #388e3c !important; }
 </style>
 """

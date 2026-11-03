@@ -78,8 +78,8 @@ def test_inp_view_is_default_when_fresh():
     st = parse_payload(json.dumps(_iteration(prompts_inp=_inp(), url_desc='main img')))
     assert st is not None
     assert st['views'] == ['main', 'inp'] and st['view'] == 'inp'
-    assert [s['url'] for s in st['slots']] == ['/c/src.png', '/c/face.png', None]
-    assert [s['role'] for s in st['slots']] == ['main', 'new face', '']
+    assert [s['url'] for s in st['slots'][:3]] == ['/c/src.png', '/c/face.png', None]
+    assert [s['role'] for s in st['slots'][:3]] == ['main', 'new face', '']
     assert st['text'] == 'Replace the face with the face in image 2'
 
 
@@ -93,7 +93,7 @@ def test_with_view_switches_slots_and_text():
     st = parse_payload(json.dumps(_iteration(prompts_inp=_inp(), prompts_vid=_vid())))
     assert st is not None and st['view'] == 'inp'
     vid = with_view(st, 'vid')
-    assert [s['url'] for s in vid['slots']] == ['/f.png', None, None]
+    assert [s['url'] for s in vid['slots'][:3]] == ['/f.png', None, None]
     assert vid['slots'][0]['role'] == 'dress' and vid['text'] == 'vid p'
     main = with_view(st, 'main')
     assert main['slots'][0]['role'] == 'main img' and main['text'] == 'p1'
@@ -265,16 +265,20 @@ def test_update_iteration_main_keeps_empty_slots():
     assert out['unknown_future_field'] == {'keep': True}
 
 
-def test_update_iteration_uses_given_view_else_default():
+def test_update_iteration_verb_owns_its_view():
     p = _iteration(prompts_inp=_inp())
     text = json.dumps(p)
-    out, view, changed, _ = update_payload(text, [_slot(), _slot('/c/new.png'), _slot()])
-    assert view == default_view(p) == 'inp'
-    assert changed == ['prompts_inp.refs[0]']
-    out, view, changed, _ = update_payload(text, [_slot('/m.png'), _slot(), _slot()], 'main')
+    assert default_view(p) == 'inp'
+    slots = [_slot(), _slot('/c/new.png'), _slot()]
+    out, view, changed, _ = update_payload(text, slots, verb='inp-nomask')
+    assert view == 'inp' and changed == ['prompts_inp.refs[0]']
+    # a verb owning no view never touches inp/ref, even when inp is the default
+    out, view, changed, _ = update_payload(text, [_slot('/m.png'), _slot(), _slot()], 'inp')
     assert view == 'main' and changed == ['url']
-    _, view, _, _ = update_payload(text, [_slot()] * 3, 'vid')  # absent view → default
-    assert view == 'inp'
+    assert out['prompts_inp'] == p['prompts_inp']
+    # verb whose section is absent → nothing changes
+    out, view, changed, skipped = update_payload(text, slots, verb='ref')
+    assert view == 'ref' and changed == [] and skipped and out == p
 
 
 def test_update_refdef_replaces_url_and_id_only():
@@ -289,7 +293,13 @@ def test_update_refdef_replaces_url_and_id_only():
         json.dumps(instr), [_slot('/b.png', 'i2'), _slot('/x.png'), _slot()]
     )
     assert view == '' and changed == ['refs[slot 1]', 'refs[slot 2]']
-    assert out['refs'][0] == {'slot': 1, 'url': '/b.png', 'id': 'i2', 'role': 'main img'}
+    assert out['refs'][0] == {
+        'slot': 1,
+        'url': '/b.png',
+        'id': 'i2',
+        'role': 'main img',
+        'media': 'image',
+    }
     assert out['refs'][1]['url'] == '/x.png' and out['refs'][1]['id'] is None
     assert out['refs'][2]['url'] == '/c.png'  # empty slot keeps the clipspace ref
     assert out['verb'] == 'enh' and out['text'] == 'txt'
@@ -306,10 +316,10 @@ def test_update_picks_view_that_takes_the_filled_slots():
     p = _iteration(prompts_inp=_inp(from_rev=0))
     assert default_view(p) == 'main'
     slots = [_slot('/c/src.png'), _slot('/c/new.png'), _slot()]
-    out, view, changed, skipped = update_payload(json.dumps(p), slots)
+    out, view, changed, skipped = update_payload(json.dumps(p), slots, verb='inp-mask')
     assert view == 'inp' and changed == ['prompts_inp.refs[0]'] and skipped == []
-    # tab view main, slot 2 filled → still inp
-    _, view, _, _ = update_payload(json.dumps(p), slots, 'main')
+    # tab view main, slot 2 filled → still inp (the verb decides)
+    _, view, _, _ = update_payload(json.dumps(p), slots, 'main', 'inp-mask')
     assert view == 'inp'
 
 
@@ -332,7 +342,7 @@ def test_refdef_ref_verb():
     assert payload['schema_id'] == SCHEMA_REFDEF and payload['verb'] == 'ref'
     st = parse_payload(json.dumps(payload))
     assert st is not None and st['verb'] == 'ref'
-    assert [s['url'] for s in st['slots']] == ['/a.png', '/b.png', None]
+    assert [s['url'] for s in st['slots'][:3]] == ['/a.png', '/b.png', None]
 
 
 def _ref(from_rev=2) -> dict:
@@ -357,7 +367,7 @@ def test_ref_view_slots_and_patch():
     assert 'ref' in available_views(p) and default_view(p) == 'ref'
     st = parse_payload(json.dumps(p))
     assert st is not None and st['view'] == 'ref'
-    assert [s['url'] for s in st['slots']] == ['/r/p1.png', '/r/p2.png', None]
+    assert [s['url'] for s in st['slots'][:3]] == ['/r/p1.png', '/r/p2.png', None]
     assert [s['role'] for s in st['slots']][:2] == ['woman', 'beach']
     assert st['text'] == '<Picture 1> walks along <Picture 2>'
     # replacing a picture is allowed; adding picture 3 would renumber -> skipped
@@ -398,7 +408,181 @@ def test_clip_is_usable_and_previews(tmp_path):
 
 def test_patch_clip_dims(tmp_path):
     clip = _clip(tmp_path / 'c.mp4', w=80, h=40)
+    old = {'kind': 'video', 'slot': 1, 'url': '/r/old.mp4', 'vid': 1, 'w': 1, 'h': 1}
+    p = _iteration(prompts_ref=_ref_section([old]))
+    out, changed, _ = patch_iteration(p, 'ref', [clip])
+    ref = out['prompts_ref']['prompt_data'][0]['refs'][0]
+    assert changed == ['prompts_ref.refs[0]'] and (ref['w'], ref['h']) == (80, 40)
+    # a clip never lands in a qwen21 still slot (board task 162)
     p = _iteration(prompts_inp=_inp())
-    out, changed, _ = patch_iteration(p, 'inp', ['/c/src.png', clip, None])
-    ref = out['prompts_inp']['prompt_data'][0]['refs'][0]
-    assert changed == ['prompts_inp.refs[0]'] and (ref['w'], ref['h']) == (80, 40)
+    out, changed, skipped = patch_iteration(p, 'inp', [clip, '/c/face.png'])
+    assert changed == [] and skipped == ['slot 1 (video in a qwen21 still slot)']
+    assert out['prompts_inp'] == p['prompts_inp']
+
+
+# --- 💾 save history ---------------------------------------------------- #
+def test_hist_step():
+    from aidb.app.tab_refdef import hist_step
+
+    assert hist_step(None, 3, -1) == 2  # current → newest save
+    assert hist_step(2, 3, 1) is None  # newest save → current
+    assert hist_step(None, 3, 1) is None  # current is the last stop
+    assert hist_step(0, 3, -1) == 0  # oldest is the first stop
+    assert hist_step(None, 0, -1) is None  # no saves: stays current
+    assert hist_step(5, 3, -1) == 2  # stale pointer clamps
+
+
+def test_snap_doc_roundtrip():
+    from aidb.app.tab_refdef import doc_to_snap, snap_to_doc
+
+    st = parse_payload(json.dumps(_iteration()))
+    st['payload']['$odd.key'] = 1  # Mongo-hostile key survives as JSON
+    snap = {
+        'state': st,
+        'idx': 1,
+        'refs': ['/a.png', '', 'abc'],
+        'roles': ['r1', '', ''],
+        'verb': 'enh',
+        'kind': 'prompt',
+        'text': 't',
+        'clip': json.dumps(_iteration()),
+    }
+    doc = snap_to_doc(snap)
+    assert doc['has_clip'] and isinstance(doc['clip_json'], str)
+    assert doc['mode'] == 'enhancer' and doc['scene_id'] == 'abc'
+    assert isinstance(doc['state_json'], str)
+    assert doc_to_snap(doc) == snap
+    assert snap_to_doc(dict(snap, state=None))['mode'] == 'instruction'
+
+
+def test_norm_cat():
+    from aidb.app.tab_refdef import CAT_ALL, norm_cat
+
+    assert norm_cat(CAT_ALL) is None and norm_cat('  ') is None and norm_cat(None) is None
+    assert norm_cat(' faces ') == 'faces'
+
+
+def test_six_slots_and_media_kind(tmp_path):
+    from aidb.app.tab_refdef import N_SLOTS, RefdefTab, media_kind
+
+    assert N_SLOTS == 6
+    assert [media_kind(u) for u in ('/a.PNG', '/b.mp4', '/c.wav', '/d.txt', None)] == [
+        'image',
+        'video',
+        'audio',
+        None,
+        None,
+    ]
+    slots = [{'url': f'/s{i}.mp3', 'id': None, 'role': ''} for i in range(N_SLOTS)]
+    p = refdef_payload(slots, 'enh', 'hint', '')
+    assert [r['slot'] for r in p['refs']] == list(range(1, N_SLOTS + 1))
+    assert {r['media'] for r in p['refs']} == {'audio'}
+    # extra slots on a 1-image view are skipped, not deployed
+    _, _, skipped = patch_iteration(_iteration(), 'main', [None] * 5 + ['/x.png'])
+    assert skipped == ['slot 6 (main has one image)']
+    # an audio file is pullable and previews as a waveform
+    import av
+    import numpy as np
+
+    wav = tmp_path / 'tone.wav'
+    with av.open(str(wav), 'w') as out:
+        st = out.add_stream('pcm_s16le', rate=8000, layout='mono')
+        sig = (np.sin(np.arange(8000) / 5) * 8000).astype('int16').reshape(1, -1)
+        frame = av.AudioFrame.from_ndarray(sig, format='s16', layout='mono')
+        frame.sample_rate = 8000
+        for pkt in st.encode(frame):
+            out.mux(pkt)
+        for pkt in st.encode(None):
+            out.mux(pkt)
+    assert RefdefTab._is_usable(str(wav))
+    im = RefdefTab._preview(str(wav))
+    assert im is not None and im.size[0] > im.size[1]
+
+
+def test_ref_novis_needs_roles():
+    from aidb.app.tab_refdef import VERBS, missing_roles
+
+    assert 'ref-novis' in VERBS
+    slots = [
+        {'url': '/a.png', 'id': None, 'role': 'red dress'},
+        {'url': '/b.wav', 'id': None, 'role': '  '},
+        {'url': None, 'id': None, 'role': ''},
+    ]
+    assert missing_roles(slots, 'ref-novis') == []  # only slot 1 needs a role
+    assert missing_roles([dict(slots[0], role=' '), *slots[1:]], 'ref-novis') == [1]
+    assert missing_roles([dict(slots[0], url=None), *slots[1:]], 'ref-novis') == [1]
+    assert missing_roles([dict(slots[0], role='')], 'ref') == []
+    assert refdef_payload(slots, 'ref-novis', 'hint', '')['verb'] == 'ref-novis'
+
+
+def test_ref_view_v68_slots_and_kinds():
+    """v6.8: compacted refs carry their slot; kinds are never swapped."""
+    p = _iteration(
+        rev=3,
+        prompts_ref={
+            'type': 'single',
+            'current': 0,
+            'prompt_data': [
+                {
+                    'prompt': '<Picture 1> … <Audio 1>',
+                    'from_rev': 3,
+                    'ts': '2026-11-03T08:00:00',
+                    'refs': [
+                        {'kind': 'image', 'slot': 1, 'url': '/r/p1.png', 'pic': 1, 'desc': 'red'},
+                        {'kind': 'audio', 'slot': 4, 'url': '/r/v.wav', 'aud': 1, 'desc': 'voice'},
+                    ],
+                }
+            ],
+        },
+    )
+    st = with_view(parse_payload(json.dumps(p)), 'ref')
+    assert [s['url'] for s in st['slots']] == ['/r/p1.png', None, None, '/r/v.wav', None, None]
+    assert st['slots'][3]['role'] == 'voice'
+    urls = ['/r/p9.png', None, None, '/r/x.png', None, None]
+    out, changed, skipped = patch_iteration(p, 'ref', urls)
+    assert changed == ['prompts_ref.refs[0]']
+    assert skipped == ['slot 4 (audio → image would renumber the prompt)']
+    refs = out['prompts_ref']['prompt_data'][0]['refs']
+    assert refs[0]['url'] == '/r/p9.png' and refs[1]['url'] == '/r/v.wav'
+    _, changed, skipped = patch_iteration(p, 'ref', ['/r/p1.png', None, None, '/r/w.mp3'])
+    assert changed == ['prompts_ref.refs[1]'] and not skipped
+    _, _, skipped = patch_iteration(p, 'ref', ['/r/p1.png', '/r/n.png', None, '/r/v.wav'])
+    assert skipped == ['slot 2 (adding a ref would renumber the prompt)']
+
+
+def test_enh_clip():
+    from aidb.app.tab_refdef import enh_clip
+
+    assert json.loads(enh_clip(json.dumps(_iteration())))['scene_id'] == 'abc'
+    assert enh_clip(json.dumps({'schema_id': SCHEMA_REFDEF, 'refs': []})) is None
+    assert enh_clip('/x/a.png') is None and enh_clip(None) is None
+
+
+def _ref_section(refs) -> dict:
+    return {
+        'type': 'single',
+        'current': 0,
+        'prompt_data': [{'prompt': 'p', 'refs': refs, 'from_rev': 2, 'ts': '2026-11-03T09:40'}],
+    }
+
+
+def test_update_task162_ref_and_inp_sections():
+    """Board task 162: both sections present; the verb decides which is patched."""
+    ref_refs = [
+        {'kind': 'video', 'slot': 1, 'url': '/r/clip.mkv', 'vid': 1},
+        {'kind': 'image', 'slot': 2, 'url': '/r/woman.png', 'pic': 1},
+    ]
+    p = _iteration(prompts_ref=_ref_section(ref_refs), prompts_inp=_inp())
+    text = json.dumps(p)
+    slots = [_slot('/r/clip.mkv'), _slot('/r/new.png')]
+    for verb in ('ref', 'ref-novis'):
+        out, view, changed, skipped = update_payload(text, slots, 'inp', verb)
+        assert view == 'ref' and changed == ['prompts_ref.refs[1]'] and not skipped
+        assert out['prompts_ref']['prompt_data'][0]['refs'][1]['url'] == '/r/new.png'
+        assert json.dumps(out['prompts_inp']) == json.dumps(p['prompts_inp'])
+    for verb in ('inp-mask', 'inp-nomask'):
+        out, view, changed, skipped = update_payload(text, slots, 'ref', verb)
+        assert view == 'inp' and json.dumps(out['prompts_ref']) == json.dumps(p['prompts_ref'])
+        assert out['prompts_inp']['prompt_data'][0]['src']['url'] == '/c/src.png'  # no .mkv
+        assert 'slot 1 (video in a qwen21 still slot)' in skipped
+        assert changed == ['prompts_inp.refs[0]']

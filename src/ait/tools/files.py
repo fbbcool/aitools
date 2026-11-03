@@ -5,6 +5,7 @@ from typing import Any, Final
 
 SUFFIX_IMG: Final = ['png', 'webp', 'jpg', 'jpeg', 'gif']
 SUFFIX_VID: Final = ['mov', 'mp4', 'mkv']
+SUFFIX_AUD: Final = ['wav', 'mp3', 'flac', 'ogg', 'm4a', 'opus', 'aac']
 
 
 def suffix_img() -> list[str]:
@@ -21,6 +22,20 @@ def suffix_vid() -> list[str]:
     ret += [pf.capitalize() for pf in postfixes]
     ret += [pf.upper() for pf in postfixes]
     return [f'.{pf}' for pf in ret]
+
+
+def suffix_aud() -> list[str]:
+    postfixes = SUFFIX_AUD
+    ret = postfixes.copy()
+    ret += [pf.capitalize() for pf in postfixes]
+    ret += [pf.upper() for pf in postfixes]
+    return [f'.{pf}' for pf in ret]
+
+
+def is_aud(url: str | Path) -> bool:
+    """True if url is an existing audio file."""
+    url = Path(url)
+    return url.is_file() and url.suffix in suffix_aud()
 
 
 def is_img_or_vid(url: Any) -> bool:
