@@ -3,6 +3,7 @@ scipy
 pandas
 pillow
 av
+faster-whisper  # ait.tools.videos.voice_ref (task 172)
 huggingface_hub
 tqdm
 gradio

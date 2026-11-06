@@ -40,6 +40,14 @@ pulled:
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
     session ``xlasm`` with ``/refdef`` — only when it is idle.
 
+``pre-vid`` / ``post-vid`` (H3 clip chains, board task 172): slot 1 = the
+anchor clip (video), the other slots optional NEW image / audio refs; the text
+is the beat hint. Deploys like ``ref`` (+ a ``continue`` hint ``{dir, url,
+pin}``); the enhancer writes ``prompts_ref[].continue``. ``⛓ join`` is
+script-only like ⇄ update: slot 1 = the LAST clip of a chain, slot 2 = the
+FIRST (a pre, optional) → ``ait.tools.videos.chain_join`` writes the joined
+master to ``~/Downloads/000_comfy/`` and toasts path + seam summary.
+
 ``💾 save`` stores the whole tab config (state + slots + roles + verb / kind /
 text) in the Mongo collection ``refdef_saves``; ◀ / ▶ step through those saves
 (oldest … newest), and the current — possibly unsaved — config always sits
@@ -79,7 +87,7 @@ from ait.tools.files import (
     suffix_img,
     suffix_vid,
 )
-from ait.tools.videos import ref_frame
+from ait.tools.videos import CHAIN_PIN, chain_join, ref_frame, seam_summary
 from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
@@ -99,7 +107,13 @@ VERBS: Final = (
     'sketch',
     'ref',
     'ref-novis',
+    'pre-vid',
+    'post-vid',
 )
+# H3 clip-chain continuations (board task 172): slot 1 = the anchor clip
+# (FbbcoolSaveVideo master, video only), the other slots optional NEW refs
+# (images / audio); the enhancer writes prompts_ref[].continue = {dir, url, pin}
+CONTINUE_VERBS: Final = {'pre-vid': 'pre', 'post-vid': 'post'}
 # verbs whose prompt is built from the slot roles alone (enhancer never looks at
 # the media): slot 1 needs media + a role; it references the other slots by number
 ROLE_ONLY_VERBS: Final = ('ref-novis',)
@@ -449,6 +463,34 @@ def missing_roles(slots: list[dict], verb: str) -> list[int]:
     return [] if s1.get('url') and (s1.get('role') or '').strip() else [1]
 
 
+def continue_problems(slots: list[dict], verb: str) -> list[str]:
+    """Why a pre-vid / post-vid instruction can't deploy: slot 1 must be the
+    anchor clip (video), the other slots images / audio only."""
+    if verb not in CONTINUE_VERBS or not slots:
+        return []
+    probs = []
+    if media_kind(slots[0].get('url')) != 'video':
+        probs.append('slot 1 needs the anchor clip (video)')
+    probs += [
+        f'slot {i + 1} is a video (new refs: images / audio)'
+        for i, s in enumerate(slots[1:], 1)
+        if media_kind(s.get('url')) == 'video'
+    ]
+    return probs
+
+
+def join_args(slots: list[dict]) -> tuple[str, str | None]:
+    """``chain_join`` inputs from the slots: slot 1 = the LAST clip of the
+    chain, slot 2 = optionally the FIRST clip (a pre). Raises ValueError."""
+    last = slots[0].get('url') if slots else None
+    if media_kind(last) != 'video':
+        raise ValueError('slot 1 needs the last clip of the chain (video)')
+    first = slots[1].get('url') if len(slots) > 1 else None
+    if first and media_kind(first) != 'video':
+        raise ValueError('slot 2 (first clip, optional) must be a video')
+    return str(last), (str(first) if first else None)
+
+
 def refdef_payload(
     slots: list[dict],
     verb: str,
@@ -457,7 +499,7 @@ def refdef_payload(
     origin_scene_id: str | None = None,
 ) -> dict:
     """The instruction payload the enhancer builds its enhancer data from."""
-    return {
+    payload: dict[str, Any] = {
         'schema_id': SCHEMA_REFDEF,
         'verb': verb if verb in VERBS else VERBS[0],
         'refs': [
@@ -474,6 +516,13 @@ def refdef_payload(
         'text': text or '',
         'origin': {'scene_id': origin_scene_id} if origin_scene_id else None,
     }
+    if verb in CONTINUE_VERBS:  # convenience: what the enhancer writes to continue
+        payload['continue'] = {
+            'dir': CONTINUE_VERBS[verb],
+            'url': (slots[0].get('url') or None) if slots else None,
+            'pin': CHAIN_PIN,
+        }
+    return payload
 
 
 def update_payload(
@@ -1219,6 +1268,9 @@ class RefdefTab:
         origin = None
         if state and state['kind'] == 'refdef':
             origin = (state['payload'].get('origin') or {}).get('scene_id')
+        if probs := continue_problems(slots, verb):
+            gr.Warning(f'{verb}: {"; ".join(probs)}', duration=1)
+            return f'NOT deployed: `{verb}` — {"; ".join(probs)}'
         payload = refdef_payload(slots, verb, kind, text, origin)
         clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
@@ -1253,6 +1305,27 @@ class RefdefTab:
             gr.Success(f'updated {len(changed)} ref(s)', duration=0.5)
         return f'updated clipspace{where}: {", ".join(changed)}{note}'
 
+    def _on_join(self, *refs_roles):
+        """⛓ join (board task 172): script only, no agent — walk the chain from
+        slot 1 (last clip) / slot 2 (first clip, optional), write the joined
+        master to CHAIN_OUT_DIR and toast the path + seam summary."""
+        slots = self._slots_from_ui(list(refs_roles))
+        try:
+            last, first = join_args(slots)
+            rep = chain_join(last, first)
+        except Exception as e:
+            gr.Warning(f'join: {e}', duration=3)
+            return f'join failed: {e}'
+        name = Path(rep['out']).name
+        n = len(rep['clips'])
+        summary = seam_summary(rep) or 'single clip'
+        gr.Success(f'joined {n} clips → {name}', duration=3)
+        print(f'[refdef_tab:info] join {rep["out"]}: {summary}')
+        return (
+            f'joined {n} clips ({rep["seconds"]:.1f} s) → `{rep["out"]}`  \n'
+            f'seams (MAD /255, plain→written (motion before/after)): {summary}'
+        )
+
     # -- UI build (call inside the app's gr.Blocks context) ------------- #
     def build(self) -> None:
         with gr.Tab('refdef', elem_id='refdef_tab'):
@@ -1266,6 +1339,7 @@ class RefdefTab:
                 pull_btn = gr.Button('⟲ pull', variant='primary', scale=1)
                 deploy_btn = gr.Button('⇪ deploy', elem_id='refdef-deploy', scale=1)
                 update_btn = gr.Button('⇄ update', scale=1)
+                join_btn = gr.Button('⛓ join', scale=1)
                 reset_btn = gr.Button('reset', scale=0, min_width=80)
             with gr.Row():
                 verb = gr.Radio(
@@ -1381,6 +1455,7 @@ class RefdefTab:
                 [status],
             )
             update_btn.click(self._on_update, [state, verb, *refs_roles], [status])
+            join_btn.click(self._on_join, refs_roles, [status])
 
 
 REFDEF_HEAD = r"""
