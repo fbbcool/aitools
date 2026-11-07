@@ -35,6 +35,9 @@ pulled:
     vision, saves tokens): the ref prompt is built from the slot roles (+ hint)
     alone. Slot 1 needs media + a role (``missing_roles``); it references the
     other slots by refdef slot number ("slot 3"), whose roles may be empty.
+    ``img-fsw-novis`` = qwen21 head swap (``SWAP_VERBS``): slot 1 = target, slot 2 =
+    reference head, both images; the enhancer writes a ``head_swap:`` prompt into
+    ``prompts_inp`` without looking at the images (roles optional, + hint).
     ``ref`` = the slots are MiniMax H3 ref2va picture references
     (``<Picture i>``, board task 159); like ``enh``: slot 1 required, stills. With
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
@@ -47,6 +50,16 @@ pin}``); the enhancer writes ``prompts_ref[].continue``. ``⛓ join`` is
 script-only like ⇄ update: slot 1 = the LAST clip of a chain, slot 2 = the
 FIRST (a pre, optional) → ``ait.tools.videos.chain_join`` writes the joined
 master to ``~/Downloads/000_comfy/`` and toasts path + seam summary.
+
+``🎭`` (per slot, local images) opens a shared brush editor: paint the area to
+mask, ✓ stores it (⎘ = ✓ + the masked image's path on the clipspace, ready for
+a ComfyUI quickload), 🗑 removes it. A mask belongs to the source image (fixed
+path in ``MASK_DIR``; repainting replaces it), so every slot / pull / save
+showing that image shows it (red tint). An instruction deploy adds ``mask`` = a
+``1xlasm_enhancer.mask.v1`` raster object ``{schema_id, type, url, w, h, sha}`` to
+the image's ref (board task 175). Enhancer data: media ``mask`` objects (main =
+``url_mask``; raster or json shapes) are tinted into the slots; patching puts the
+tab's mask on its media and drops the mask of a replaced url.
 
 ``💾 save`` stores the whole tab config (state + slots + roles + verb / kind /
 text) in the Mongo collection ``refdef_saves``; ◀ / ▶ step through those saves
@@ -64,6 +77,7 @@ Payload logic is in pure module functions (``parse_payload``, ``with_view``,
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import shutil
@@ -76,7 +90,7 @@ from urllib.parse import unquote
 import av
 import gradio as gr
 import pyperclip
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageOps, PngImagePlugin
 
 from ait.tools.files import (
     is_aud,
@@ -109,6 +123,7 @@ VERBS: Final = (
     'ref-novis',
     'pre-vid',
     'post-vid',
+    'img-fsw-novis',
 )
 # H3 clip-chain continuations (board task 172): slot 1 = the anchor clip
 # (FbbcoolSaveVideo master, video only), the other slots optional NEW refs
@@ -117,9 +132,20 @@ CONTINUE_VERBS: Final = {'pre-vid': 'pre', 'post-vid': 'post'}
 # verbs whose prompt is built from the slot roles alone (enhancer never looks at
 # the media): slot 1 needs media + a role; it references the other slots by number
 ROLE_ONLY_VERBS: Final = ('ref-novis',)
+# qwen21 head swap (agent-comfy workflows/qwen21-headswap.json, BFS head LoRA): slot 1 =
+# target (body / pose / light / bg = <image1>), slot 2 = reference head (<image2>), both
+# stills, nothing else. The enhancer writes a ``head_swap:`` prompt_qwen21 into
+# prompts_inp without vision — from the roles (optional) + hint alone.
+SWAP_VERBS: Final = ('img-fsw-novis',)
 # ⇄ update: the enhancer-data view (section) a verb owns (board task 162). A verb
 # here patches ONLY its view; the other verbs never touch these views.
-VERB_VIEW: Final = {'inp-mask': 'inp', 'inp-nomask': 'inp', 'ref': 'ref', 'ref-novis': 'ref'}
+VERB_VIEW: Final = {
+    'inp-mask': 'inp',
+    'inp-nomask': 'inp',
+    'img-fsw-novis': 'inp',
+    'ref': 'ref',
+    'ref-novis': 'ref',
+}
 STILL_VIEWS: Final = ('inp',)  # qwen21 still slots: images only
 VID_REF_KEYS: Final = ('first', 'last')  # prompts_vid.refs keys for slots 2/3
 PREVIEW_SIZE: Final = 768  # slot preview edge (px)
@@ -134,6 +160,16 @@ HERDR_TIMEOUT_S: Final = 10
 SAVES_COLLECTION: Final = 'refdef_saves'  # 💾 save history (see build)
 CAT_ALL: Final = '(all)'  # category filter = every save; saved as uncategorized
 SNAP_KEYS: Final = ('state', 'idx', 'refs', 'roles', 'verb', 'kind', 'text')
+# 🎭 hand-drawn masks: one per source image (repainting replaces it), at a fixed
+# path derived from the image path. ``*__mask.png`` = L (white = masked);
+# ``*__masked.png`` = the image as RGBA with alpha 0 where masked — what ComfyUI
+# loaders (FbbcoolImgQuickload, LoadImage) read as their mask (mask = 1 - alpha).
+MASK_DIR: Final = Path.home() / 'Downloads' / '000_comfy' / 'refdef_masks'
+MASK_EDIT_SIZE: Final = 1536  # editor canvas edge (px); the mask is scaled back up
+MASK_TINT: Final = (255, 0, 0)  # slot-preview overlay of the masked area
+SCHEMA_MASK: Final = '1xlasm_enhancer.mask.v1'  # board task 175, comment 628
+SCHEMA_MASK_PREFIX: Final = '1xlasm_enhancer.mask.'
+MASK_KEY_MAIN: Final = 'url_mask'  # the top-level scene image's mask (sibling of url)
 
 
 # ---------------------------------------------------------------------- #
@@ -224,7 +260,13 @@ def _view_media(payload: dict, view: str) -> list[dict | None]:
     """Live media objects ({url[, desc, w, h]}) of a view, slot order.
     ``main`` is the top-level url — returned as a detached dict."""
     if view == 'main':
-        return [{'url': payload.get('url'), 'desc': payload.get('url_desc')}]
+        return [
+            {
+                'url': payload.get('url'),
+                'desc': payload.get('url_desc'),
+                'mask': payload.get(MASK_KEY_MAIN),
+            }
+        ]
     if view == 'vid':
         refs = _vid_refs(payload)
         return [refs.get(k) if isinstance(refs.get(k), dict) else None for k in VID_REF_KEYS]
@@ -248,6 +290,8 @@ def view_slots(payload: dict, view: str) -> list[dict]:
             roles = VIEW_ROLES[view]
             role = m.get('desc') or (roles[i] if i < len(roles) else '')
             slots[i] = {'url': m['url'], 'id': None, 'role': role}
+            if isinstance(m.get('mask'), dict):
+                slots[i]['mask'] = m['mask']
     return slots
 
 
@@ -341,9 +385,28 @@ def _img_dims(url: str) -> tuple[int, int] | None:
         return None
 
 
+def same_mask(a: dict | None, b: dict | None) -> bool:
+    """Whether two mask objects describe the same mask: raster by file + media
+    sha, json by content (post-ops on a payload mask are the enhancer's)."""
+    if not isinstance(a, dict) or not isinstance(b, dict) or a.get('type') != b.get('type'):
+        return False
+    if a.get('type') == 'raster':
+        return (a.get('url'), a.get('sha')) == (b.get('url'), b.get('sha'))
+    return a == b
+
+
+def _set_mask(obj: dict, mask: dict | None) -> bool:
+    """Put the tab's mask on a media object → whether it changed."""
+    if mask is None or same_mask(obj.get('mask'), mask):
+        return False
+    obj['mask'] = mask
+    return True
+
+
 def _replace_media(obj: dict, url: str) -> None:
     obj['url'] = url
     obj.pop('frame', None)  # src-clip frame provenance no longer applies
+    obj.pop('mask', None)  # a mask is bound to its media (task 175)
     if 'w' in obj or 'h' in obj:
         dims = _img_dims(url)
         if dims:
@@ -354,6 +417,7 @@ def patch_iteration(
     payload: dict,
     view: str,
     urls: list[str | None],
+    masks: list[dict | None] | None = None,
 ) -> tuple[dict, list[str], list[str]]:
     """Copy of an iteration payload with only the image urls of ``view``
     patched (slot order as in ``view_slots``). Everything else is deployed
@@ -364,16 +428,25 @@ def patch_iteration(
     images by number: adding/removing an inp/ref ref, clearing an inp/next src
     or the next ref. Returns the patched payload, the changed field names
     and the skipped edits; ``edited_by`` is set only when something changed.
+
+    ``masks`` = the tab's own (🎭) mask object per slot (None = none): it is
+    set on the slot's media object unless that already carries the same mask
+    (``same_mask``). A replaced url drops the old media's mask (task 175).
     """
     out = copy.deepcopy(payload)
     changed: list[str] = []
     skipped: list[str] = []
     urls = ([u or None for u in urls] + [None] * N_SLOTS)[:N_SLOTS]
+    masks = (list(masks or []) + [None] * N_SLOTS)[:N_SLOTS]
 
     if view == 'main':
         if urls[0] != (out.get('url') or None):
             out['url'] = urls[0]
+            out.pop(MASK_KEY_MAIN, None)
             changed.append('url')
+        if urls[0] and masks[0] and not same_mask(out.get(MASK_KEY_MAIN), masks[0]):
+            out[MASK_KEY_MAIN] = masks[0]
+            changed.append(MASK_KEY_MAIN)
         skipped += [f'slot {i + 1} (main has one image)' for i in range(1, N_SLOTS) if urls[i]]
 
     elif view == 'vid':
@@ -383,13 +456,17 @@ def patch_iteration(
             ref = refs.get(key)
             old = ref.get('url') if isinstance(ref, dict) else None
             if new == (old or None):
+                if isinstance(ref, dict) and _set_mask(ref, masks[i]):
+                    changed.append(f'prompts_vid.refs.{key}.mask')
                 continue
             if new is None:
                 refs[key] = None
             elif isinstance(ref, dict):
                 _replace_media(ref, new)
+                _set_mask(ref, masks[i])
             else:
                 refs[key] = {'url': new}
+                _set_mask(refs[key], masks[i])
             changed.append(f'prompts_vid.refs.{key}')
         skipped += [
             f'slot {i + 1} (vid has first/last only)'
@@ -414,6 +491,8 @@ def patch_iteration(
             old = obj.get('url') if obj else None
             new = urls[i]
             if new == (old or None):
+                if obj is not None and _set_mask(obj, masks[i]):
+                    changed.append(f'{sec}.{names[i]}.mask')
                 continue
             if view in STILL_VIEWS and new and media_kind(new) != 'image':
                 skipped.append(f'slot {i + 1} ({media_kind(new)} in a qwen21 still slot)')
@@ -427,6 +506,7 @@ def patch_iteration(
                 continue
             if obj is not None and new is not None:
                 _replace_media(obj, new)
+                _set_mask(obj, masks[i])
                 changed.append(f'{sec}.{names[i]}')
             elif not names[i]:
                 skipped.append(f'slot {i + 1} ({view} has no slot {i + 1})')
@@ -479,6 +559,22 @@ def continue_problems(slots: list[dict], verb: str) -> list[str]:
     return probs
 
 
+def swap_problems(slots: list[dict], verb: str) -> list[str]:
+    """Why a head-swap instruction can't deploy: slot 1 = target image, slot 2 =
+    reference head image, slots 3+ empty (the workflow takes exactly 2 images)."""
+    if verb not in SWAP_VERBS:
+        return []
+    slots = (list(slots) + empty_slots())[:N_SLOTS]
+    probs = [
+        f'slot {i + 1} needs the {what} (image)'
+        for i, what in enumerate(('target', 'reference head'))
+        if media_kind(slots[i].get('url')) != 'image'
+    ]
+    if extra := [str(i + 1) for i, s in enumerate(slots[2:], 2) if s.get('url')]:
+        probs.append(f'slot {", ".join(extra)} must be empty (2 images only)')
+    return probs
+
+
 def join_args(slots: list[dict]) -> tuple[str, str | None]:
     """``chain_join`` inputs from the slots: slot 1 = the LAST clip of the
     chain, slot 2 = optionally the FIRST clip (a pre). Raises ValueError."""
@@ -491,6 +587,140 @@ def join_args(slots: list[dict]) -> tuple[str, str | None]:
     return str(last), (str(first) if first else None)
 
 
+def mask_paths(url: str) -> tuple[Path, Path]:
+    """(mask, masked) file paths of a source image (exist or not)."""
+    src = Path(url).expanduser().resolve()
+    key = hashlib.sha1(str(src).encode()).hexdigest()[:10]
+    base = f'{src.stem}__{key}'
+    return MASK_DIR / f'{base}__mask.png', MASK_DIR / f'{base}__masked.png'
+
+
+def mask_of(url: str | None) -> tuple[str, str] | None:
+    """(mask, masked) paths of a local image's painted mask, None when none."""
+    if not url or url.startswith(('http://', 'https://')) or media_kind(url) != 'image':
+        return None
+    mask, masked = mask_paths(url)
+    return (str(mask), str(masked)) if mask.is_file() and masked.is_file() else None
+
+
+def file_sha(url: str) -> str:
+    """sha1 of a file's bytes, first 12 hex (mask.v1 ``sha`` binding)."""
+    h = hashlib.sha1()
+    with open(url, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()[:12]
+
+
+def mask_object(url: str | None) -> dict | None:
+    """The tab's painted mask of a local image as a ``1xlasm_enhancer.mask.v1``
+    raster object ({schema_id, type, url, w, h, sha}), None when it has none."""
+    hit = mask_of(url)
+    if hit is None or url is None:
+        return None
+    with Image.open(hit[0]) as m:
+        w, h = m.size  # = the EXIF-upright media size
+    return {
+        'schema_id': SCHEMA_MASK,
+        'type': 'raster',
+        'url': hit[0],
+        'w': w,
+        'h': h,
+        'sha': file_sha(url),
+    }
+
+
+def rasterize_mask(mask: dict | None, size: tuple[int, int]) -> Image.Image | None:
+    """L preview (255 = masked) of a mask.v1 object at ``size`` — spatial part
+    only (``ranges`` / dilate / feather are ignored, ``invert`` applies). None
+    for no / unknown / unreadable / time-only masks."""
+    if not isinstance(mask, dict) or not str(mask.get('schema_id', SCHEMA_MASK)).startswith(
+        SCHEMA_MASK_PREFIX
+    ):
+        return None
+    w, h = size
+    if mask.get('type') == 'raster':
+        try:
+            with Image.open(mask['url']) as m:
+                out = m.convert('L').resize(size, Image.Resampling.NEAREST)
+        except Exception:  # noqa: BLE001 - unreadable raster -> no tint
+            return None
+    elif mask.get('type') == 'json' and mask.get('shapes'):
+        out = Image.new('L', size, 0)
+        draw = ImageDraw.Draw(out)
+        for sh in mask['shapes']:
+            if not isinstance(sh, dict):
+                continue
+            fill = 0 if sh.get('op') == 'sub' else 255
+            c = sh.get('coords') or []
+            try:
+                if sh.get('kind') == 'rect':
+                    x, y, rw, rh = c
+                    draw.rectangle([x * w, y * h, (x + rw) * w, (y + rh) * h], fill=fill)
+                elif sh.get('kind') == 'ellipse':
+                    cx, cy, rx, ry = c
+                    box = [(cx - rx) * w, (cy - ry) * h, (cx + rx) * w, (cy + ry) * h]
+                    draw.ellipse(box, fill=fill)
+                elif sh.get('kind') == 'circle':
+                    cx, cy, r = c
+                    rp = r * min(w, h)
+                    draw.ellipse([cx * w - rp, cy * h - rp, cx * w + rp, cy * h + rp], fill=fill)
+                elif sh.get('kind') == 'polygon' and len(c) >= 3:
+                    draw.polygon([(x * w, y * h) for x, y in c], fill=fill)
+            except (TypeError, ValueError):
+                continue
+    else:
+        return None
+    return ImageOps.invert(out) if mask.get('invert') else out
+
+
+def drop_mask(url: str) -> bool:
+    """Delete a source image's mask files → whether there were any."""
+    hit = False
+    for f in mask_paths(url):
+        if f.is_file():
+            f.unlink()
+            hit = True
+    return hit
+
+
+def write_mask(url: str, painted: Image.Image) -> tuple[str, str] | None:
+    """Store ``painted`` (L / any mode; > 0 = masked, any size) as the mask of
+    the source image ``url``: scaled to the (EXIF-upright) image size, then the
+    L mask + the RGBA ``masked`` image (alpha 0 where masked; the source's PNG
+    text chunks kept, so ComfyUI metadata survives). An empty mask deletes the
+    mask files → None."""
+    with Image.open(url) as src:
+        info = {k: v for k, v in src.info.items() if isinstance(k, str) and isinstance(v, str)}
+        im = ImageOps.exif_transpose(src).convert('RGB')
+    m = painted.convert('L').point(lambda v: 255 if v > 0 else 0)
+    if m.size != im.size:
+        m = m.resize(im.size, Image.Resampling.BILINEAR).point(lambda v: 255 if v > 127 else 0)
+    if m.getbbox() is None:
+        drop_mask(url)
+        return None
+    mask_p, masked_p = mask_paths(url)
+    MASK_DIR.mkdir(parents=True, exist_ok=True)
+    m.save(mask_p)
+    rgba = im.convert('RGBA')
+    rgba.putalpha(m.point(lambda v: 255 - v))
+    png = PngImagePlugin.PngInfo()
+    for k, v in info.items():
+        png.add_text(k, v)
+    rgba.save(masked_p, pnginfo=png)
+    return str(mask_p), str(masked_p)
+
+
+def tint_mask(im: Image.Image, url: str | None, mask: dict | None = None) -> Image.Image:
+    """Slot preview with its mask tinted in: the tab's painted mask of ``url``
+    (newest, deployed next), else the payload's mask object ``mask``."""
+    m = rasterize_mask(mask_object(url) if mask_of(url) else mask, im.size)
+    if m is None:
+        return im
+    over = Image.new('RGB', im.size, MASK_TINT)
+    return Image.composite(over, im, m.point(lambda v: v * 45 // 100))
+
+
 def refdef_payload(
     slots: list[dict],
     verb: str,
@@ -498,7 +728,9 @@ def refdef_payload(
     text: str,
     origin_scene_id: str | None = None,
 ) -> dict:
-    """The instruction payload the enhancer builds its enhancer data from."""
+    """The instruction payload the enhancer builds its enhancer data from. A
+    slot's ``mask`` (a mask.v1 object, see ``mask_object``) becomes the ref's
+    ``mask``."""
     payload: dict[str, Any] = {
         'schema_id': SCHEMA_REFDEF,
         'verb': verb if verb in VERBS else VERBS[0],
@@ -509,6 +741,8 @@ def refdef_payload(
                 'id': s.get('id') or None,
                 'role': (s.get('role') or '').strip(),
                 'media': media_kind(s.get('url')),
+                # 🎭 painted mask (only when one exists): mask.v1 object (task 175)
+                **({'mask': s['mask']} if s.get('mask') else {}),
             }
             for i, s in enumerate(slots[:N_SLOTS])
         ],
@@ -563,13 +797,19 @@ def update_payload(
                 continue
             new = {'url': s.get('url'), 'id': s.get('id') or None}
             new_media = media_kind(s.get('url'))
+            mask = mask_object(s.get('url'))
             ref = by_slot.get(i + 1)
             if ref is None:
-                refs.append({'slot': i + 1, **new, 'role': '', 'media': new_media})
+                ref = {'slot': i + 1, **new, 'role': '', 'media': new_media}
+                refs.append(ref)
             elif (ref.get('url'), ref.get('id') or None) != (new['url'], new['id']):
                 ref.update(new, media=new_media)
-            else:
+                ref.pop('mask', None)  # bound to the old media
+            elif not mask or same_mask(ref.get('mask'), mask):
                 continue
+            ref.pop('masked', None)  # pre-v1 provisional field
+            if mask:
+                ref['mask'] = mask
             changed.append(f'refs[slot {i + 1}]')
         refs.sort(key=lambda r: r.get('slot', 0) if isinstance(r, dict) else 0)
         return out, '', changed, []
@@ -594,7 +834,8 @@ def update_payload(
     for v in cands:
         olds = [s.get('url') for s in view_slots(p, v)]
         urls = [s.get('url') or old for s, old in zip(slots, olds, strict=True)]
-        out, changed, skipped = patch_iteration(p, v, urls)
+        masks = [mask_object(s.get('url')) for s in slots]
+        out, changed, skipped = patch_iteration(p, v, urls, masks)
         if not skipped:
             return out, v, changed, skipped
         results.append((out, v, changed, skipped))
@@ -813,7 +1054,7 @@ class RefdefTab:
         return self._preview(url), id_img or url
 
     @staticmethod
-    def _preview(url: str | None) -> Image.Image | str | None:
+    def _preview(url: str | None, mask: dict | None = None) -> Image.Image | str | None:
         """Slot display value. Local files go in as a downscaled PIL image:
         gradio refuses to serve paths outside cwd/tmp (allowed_paths), and
         refs live anywhere (scenes, comfy output, …). The slot ref keeps the
@@ -838,7 +1079,7 @@ class RefdefTab:
                 src.draft('RGB', (PREVIEW_SIZE, PREVIEW_SIZE))
                 im = ImageOps.exif_transpose(src).convert('RGB')
             im.thumbnail((PREVIEW_SIZE, PREVIEW_SIZE))
-            return im
+            return tint_mask(im, url, mask)
         except Exception:  # noqa: BLE001 - unreadable file -> empty slot preview
             return None
 
@@ -958,7 +1199,7 @@ class RefdefTab:
         for s in slots:
             ref = s.get('id') or s.get('url') or ''
             role = gr.update(value=s.get('role') or '', interactive=not enh)
-            slot_vals += [self._preview(s.get('url')), ref, role]
+            slot_vals += [self._preview(s.get('url'), s.get('mask')), ref, role]
         idx = st['idx'] if st else 0
         raw = json.dumps(st['payload'], indent=2, ensure_ascii=False) if st else ''
         return [
@@ -982,7 +1223,8 @@ class RefdefTab:
         """Patch the current view's slot images into the working payload
         (``state['payload']``), so every view's replacements reach deploy."""
         urls = [self.resolve_ref(r)[0] for r in refs]
-        work, changed, skipped = patch_iteration(state['payload'], state['view'], urls)
+        masks = [mask_object(u) for u in urls]
+        work, changed, skipped = patch_iteration(state['payload'], state['view'], urls, masks)
         before = state.get('changed', [])
         merged = before + [c for c in changed if c not in before]
         return dict(state, payload=work, changed=merged), changed, skipped
@@ -1236,7 +1478,10 @@ class RefdefTab:
         slots = []
         for i in range(N_SLOTS):
             url, id_img = self.resolve_ref(refs_roles[2 * i])
-            slots.append({'url': url, 'id': id_img, 'role': refs_roles[2 * i + 1]})
+            slot: dict[str, Any] = {'url': url, 'id': id_img, 'role': refs_roles[2 * i + 1]}
+            if hit := mask_object(url):
+                slot['mask'] = hit
+            slots.append(slot)
         return slots
 
     def _on_deploy(
@@ -1268,7 +1513,7 @@ class RefdefTab:
         origin = None
         if state and state['kind'] == 'refdef':
             origin = (state['payload'].get('origin') or {}).get('scene_id')
-        if probs := continue_problems(slots, verb):
+        if probs := continue_problems(slots, verb) or swap_problems(slots, verb):
             gr.Warning(f'{verb}: {"; ".join(probs)}', duration=1)
             return f'NOT deployed: `{verb}` — {"; ".join(probs)}'
         payload = refdef_payload(slots, verb, kind, text, origin)
@@ -1327,6 +1572,76 @@ class RefdefTab:
         )
 
     # -- UI build (call inside the app's gr.Blocks context) ------------- #
+    # -- 🎭 hand-drawn masks ------------------------------------------- #
+    def _mask_src(self, ref: str | None) -> str | None:
+        """Local image file behind a slot ref, None when it can't be masked."""
+        url = self.resolve_ref(ref)[0] if ref else None
+        if not url or media_kind(url) != 'image' or not Path(url).is_file():
+            return None
+        return url
+
+    def _on_mask_open(self, i: int, ref: str | None):
+        """Open the editor on slot ``i``'s image (existing mask as the layer)."""
+        url = self._mask_src(ref)
+        if url is None:
+            gr.Info(f'slot {i + 1}: masks need a local image', duration=0.5)
+            return gr.update(), gr.update(), gr.update(), gr.update()
+        with Image.open(url) as src:
+            src.draft('RGB', (MASK_EDIT_SIZE, MASK_EDIT_SIZE))
+            bg = ImageOps.exif_transpose(src).convert('RGB')
+        bg.thumbnail((MASK_EDIT_SIZE, MASK_EDIT_SIZE))
+        layer = Image.new('RGBA', bg.size, (0, 0, 0, 0))
+        if hit := mask_of(url):
+            with Image.open(hit[0]) as src_m:
+                m = src_m.convert('L').resize(bg.size, Image.Resampling.NEAREST)
+            layer.paste((*MASK_TINT, 128), mask=m)
+        value = {'background': bg, 'layers': [layer], 'composite': None}
+        return gr.update(visible=True), value, i, f'🎭 slot {i + 1} · `{Path(url).name}`'
+
+    @staticmethod
+    def _painted(value: dict | None) -> Image.Image | None:
+        """Editor value → L mask (> 0 = painted), None when there is no canvas."""
+        if not value or value.get('background') is None:
+            return None
+        layers = [la for la in value.get('layers') or [] if la is not None]
+        if not layers:
+            return Image.new('L', value['background'].size, 0)
+        m = Image.new('L', layers[0].size, 0)
+        for la in layers:
+            a = la.convert('RGBA').getchannel('A').point(lambda v: 255 if v > 0 else 0)
+            m = ImageChops.lighter(m, a.resize(m.size, Image.Resampling.NEAREST))
+        return m
+
+    def _on_mask_apply(self, i: int | None, value: dict | None, copy_masked: bool, *refs):
+        """Store the painted mask for slot ``i``'s image (empty = delete it);
+        ``copy_masked`` also puts the RGBA masked image's path on the clipspace."""
+        keep = [gr.update()] * N_SLOTS
+        url = self._mask_src(refs[i]) if i is not None else None
+        m = self._painted(value)
+        if i is None or url is None or m is None:
+            gr.Warning('mask: no slot image in the editor', duration=0.5)
+            return [*keep, gr.update(), 'mask: no slot image in the editor']
+        hit = write_mask(url, m)
+        imgs: list[Any] = list(keep)
+        imgs[i] = self._preview(url)
+        if hit is None:
+            return [*imgs, gr.update(visible=False), f'slot {i + 1}: empty mask · mask removed']
+        msg = f'slot {i + 1}: mask saved → `{hit[1]}`'
+        if copy_masked:
+            clip_copy(hit[1])
+            msg += ' · clipspace ← masked image'
+        gr.Success(f'slot {i + 1}: mask saved', duration=0.5)
+        return [*imgs, gr.update(visible=False), msg]
+
+    def _on_mask_drop(self, i: int | None, *refs):
+        keep = [gr.update()] * N_SLOTS
+        url = self._mask_src(refs[i]) if i is not None else None
+        if i is None or url is None or not drop_mask(url):
+            return [*keep, gr.update(visible=False), 'mask: nothing to remove']
+        imgs: list[Any] = list(keep)
+        imgs[i] = self._preview(url)
+        return [*imgs, gr.update(visible=False), f'slot {i + 1}: mask removed']
+
     def build(self) -> None:
         with gr.Tab('refdef', elem_id='refdef_tab'):
             state = gr.State(None)  # parse_payload() result of the last enhancer pull
@@ -1379,7 +1694,7 @@ class RefdefTab:
 
             # input is the clipspace only: images are display-only, the slot
             # ref (img id or url) rides in a per-slot State
-            imgs, refs, roles, slot_pulls, clears = [], [], [], [], []
+            imgs, refs, roles, slot_pulls, clears, mask_btns = [], [], [], [], [], []
             for row0 in range(0, N_SLOTS, SLOTS_PER_ROW):
                 with gr.Row(equal_height=True):
                     for i in range(row0, min(N_SLOTS, row0 + SLOTS_PER_ROW)):
@@ -1404,6 +1719,29 @@ class RefdefTab:
                                 )
                                 slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
                                 clears.append(gr.Button('✕', scale=0, min_width=40))
+                                mask_btns.append(gr.Button('🎭', scale=0, min_width=40))
+
+            # 🎭 mask editor (shared by the slots): paint over the area to mask
+            mask_slot = gr.State(None)
+            with gr.Group(visible=False) as mask_box:
+                with gr.Row(equal_height=True):
+                    mask_md = gr.Markdown()
+                    mask_ok = gr.Button('✓', variant='primary', scale=0, min_width=40)
+                    mask_copy = gr.Button('⎘', scale=0, min_width=40)
+                    mask_del = gr.Button('🗑', scale=0, min_width=40)
+                    mask_close = gr.Button('✕', scale=0, min_width=40)
+                mask_ed = gr.ImageEditor(
+                    type='pil',
+                    sources=(),
+                    transforms=(),
+                    layers=False,
+                    brush=gr.Brush(
+                        default_size=40, colors=[(f'rgb{MASK_TINT}', 0.5)], color_mode='fixed'
+                    ),
+                    eraser=gr.Eraser(default_size=40),
+                    height=800,
+                    show_label=False,
+                )
 
             status = gr.Markdown()
             text = gr.Textbox(label='prompt / prompt hint', lines=8, max_lines=30)
@@ -1449,6 +1787,20 @@ class RefdefTab:
                 clear.click(lambda: (None, ''), [], [img, ref])
             for img, ref, slot_pull in zip(imgs, refs, slot_pulls, strict=True):
                 slot_pull.click(self._on_slot_pull, [], [img, ref])
+            for i, mbtn in enumerate(mask_btns):
+                mbtn.click(
+                    lambda r, i=i: self._on_mask_open(i, r),
+                    [refs[i]],
+                    [mask_box, mask_ed, mask_slot, mask_md],
+                )
+            for btn, copy_masked in ((mask_ok, False), (mask_copy, True)):
+                btn.click(
+                    lambda i, v, *r, c=copy_masked: self._on_mask_apply(i, v, c, *r),
+                    [mask_slot, mask_ed, *refs],
+                    [*imgs, mask_box, status],
+                )
+            mask_del.click(self._on_mask_drop, [mask_slot, *refs], [*imgs, mask_box, status])
+            mask_close.click(lambda: gr.update(visible=False), [], [mask_box])
             deploy_btn.click(
                 self._on_deploy,
                 [state, verb, kind, auto, text, *refs_roles],

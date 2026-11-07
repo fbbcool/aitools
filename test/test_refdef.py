@@ -586,3 +586,138 @@ def test_update_task162_ref_and_inp_sections():
         assert out['prompts_inp']['prompt_data'][0]['src']['url'] == '/c/src.png'  # no .mkv
         assert 'slot 1 (video in a qwen21 still slot)' in skipped
         assert changed == ['prompts_inp.refs[0]']
+
+
+def test_img_fsw_novis_swap_problems():
+    from aidb.app.tab_refdef import VERB_VIEW, VERBS, missing_roles, swap_problems
+
+    assert 'img-fsw-novis' in VERBS
+    assert VERB_VIEW['img-fsw-novis'] == 'inp'
+    tgt = {'url': '/target.png', 'id': None, 'role': ''}
+    head = {'url': '/head.jpg', 'id': None, 'role': ''}
+    assert swap_problems([tgt, head], 'img-fsw-novis') == []  # roles optional
+    assert missing_roles([tgt, head], 'img-fsw-novis') == []
+    assert swap_problems([tgt], 'img-fsw-novis') == ['slot 2 needs the reference head (image)']
+    vid = dict(tgt, url='/clip.mp4')
+    assert swap_problems([vid, head], 'img-fsw-novis') == ['slot 1 needs the target (image)']
+    extra = [tgt, head, dict(head, url='/x.png')]
+    assert swap_problems(extra, 'img-fsw-novis') == ['slot 3 must be empty (2 images only)']
+    assert swap_problems([], 'ref') == []
+    p = refdef_payload([tgt, head], 'img-fsw-novis', 'hint', 'keep the freckles')
+    assert p['verb'] == 'img-fsw-novis'
+    assert [r['media'] for r in p['refs'][:2]] == ['image', 'image']
+
+
+def test_hand_mask_roundtrip(tmp_path, monkeypatch):
+    import os
+
+    import aidb.app.tab_refdef as rd
+    from PIL import Image, PngImagePlugin
+
+    monkeypatch.setattr(rd, 'MASK_DIR', tmp_path / 'masks')
+    src = tmp_path / 'target.png'
+    info = PngImagePlugin.PngInfo()
+    info.add_text('ait', '{"x": 1}')
+    Image.new('RGB', (200, 100), (10, 20, 30)).save(src, pnginfo=info)
+    url = str(src)
+    assert rd.mask_of(url) is None
+    # painted at half the editor size: left half masked
+    painted = Image.new('L', (100, 50), 0)
+    painted.paste(200, (0, 0, 50, 50))
+    mask, masked = rd.write_mask(url, painted)
+    assert rd.mask_of(url) == (mask, masked)
+    m = Image.open(mask)
+    assert m.size == (200, 100) and m.getpixel((10, 10)) == 255 and m.getpixel((190, 90)) == 0
+    rgba = Image.open(masked)
+    assert rgba.mode == 'RGBA' and rgba.getpixel((10, 10))[3] == 0
+    assert rgba.getpixel((190, 90)) == (10, 20, 30, 255)
+    assert rgba.info.get('ait') == '{"x": 1}'  # metadata chunks survive
+    tinted = rd.tint_mask(Image.new('RGB', (200, 100), (0, 0, 0)), url)
+    assert tinted.getpixel((10, 10))[0] > 0 and tinted.getpixel((190, 90)) == (0, 0, 0)
+    # deploy carries the mask.v1 raster object on the masked ref only (task 175)
+    obj = rd.mask_object(url)
+    assert obj == {
+        'schema_id': '1xlasm_enhancer.mask.v1',
+        'type': 'raster',
+        'url': mask,
+        'w': 200,
+        'h': 100,
+        'sha': rd.file_sha(url),
+    }
+    assert len(obj['sha']) == 12
+    slots = [{'url': url, 'id': None, 'role': '', 'mask': obj}, {'url': None}]
+    refs = rd.refdef_payload(slots, 'inp-mask', 'hint', '')['refs']
+    assert refs[0]['mask'] == obj and 'masked' not in refs[0]
+    assert 'mask' not in refs[1]
+    # empty paint = remove
+    assert rd.write_mask(url, Image.new('L', (100, 50), 0)) is None
+    assert rd.mask_of(url) is None and not os.path.exists(mask)
+    assert rd.mask_of('/x/clip.mp4') is None
+
+
+def test_painted_from_editor_value():
+    from aidb.app.tab_refdef import RefdefTab
+    from PIL import Image
+
+    bg = Image.new('RGB', (40, 20))
+    layer = Image.new('RGBA', (40, 20), (0, 0, 0, 0))
+    layer.paste((255, 0, 0, 128), (0, 0, 10, 10))
+    m = RefdefTab._painted({'background': bg, 'layers': [layer], 'composite': None})
+    assert m.getpixel((5, 5)) == 255 and m.getpixel((30, 15)) == 0
+    assert RefdefTab._painted({'background': bg, 'layers': []}).getbbox() is None
+    assert RefdefTab._painted(None) is None
+
+
+def test_rasterize_json_mask():
+    from aidb.app.tab_refdef import rasterize_mask
+
+    m = {
+        'schema_id': '1xlasm_enhancer.mask.v1',
+        'type': 'json',
+        'shapes': [
+            {'kind': 'rect', 'coords': [0.0, 0.0, 0.5, 1.0]},
+            {'kind': 'rect', 'op': 'sub', 'coords': [0.0, 0.0, 0.5, 0.5]},
+            {'kind': 'circle', 'coords': [0.75, 0.5, 0.1]},
+        ],
+    }
+    im = rasterize_mask(m, (100, 100))
+    assert im.getpixel((10, 80)) == 255  # rect minus top half
+    assert im.getpixel((10, 10)) == 0  # subtracted
+    assert im.getpixel((75, 50)) == 255 and im.getpixel((95, 95)) == 0  # circle
+    inv = rasterize_mask(dict(m, invert=True), (100, 100))
+    assert inv.getpixel((10, 10)) == 255
+    # time-only (audio) / unknown schema / no mask -> no spatial preview
+    assert rasterize_mask({'type': 'json', 'ranges': [[0, 1]]}, (10, 10)) is None
+    assert rasterize_mask({'schema_id': 'x.mask.v1', 'type': 'json', 'shapes': []}, (9, 9)) is None
+    assert rasterize_mask(None, (10, 10)) is None
+
+
+def test_patch_masks_bound_to_media():
+    from aidb.app.tab_refdef import view_slots
+
+    tab = {'schema_id': '1xlasm_enhancer.mask.v1', 'type': 'raster', 'url': '/m/a.png', 'sha': 's1'}
+    enh = {'schema_id': '1xlasm_enhancer.mask.v1', 'type': 'json', 'shapes': []}
+    p = _iteration(prompts_inp=_inp(), url_mask=enh)
+    p['prompts_inp']['prompt_data'][0]['refs'][0]['mask'] = enh
+    # the view exposes payload masks; main = url_mask
+    assert view_slots(p, 'inp')[1]['mask'] == enh
+    assert view_slots(p, 'main')[0]['mask'] == enh
+    # same url, no tab mask -> payload mask kept, verbatim
+    out, changed, _ = patch_iteration(p, 'inp', ['/c/src.png', '/c/face.png'], [None, None])
+    assert changed == [] and out == p
+    # tab mask on an unchanged url -> set
+    out, changed, _ = patch_iteration(p, 'inp', ['/c/src.png', '/c/face.png'], [tab, None])
+    assert changed == ['prompts_inp.src.mask']
+    assert out['prompts_inp']['prompt_data'][0]['src']['mask'] == tab
+    # the same tab mask again -> no change
+    _, changed, _ = patch_iteration(out, 'inp', ['/c/src.png', '/c/face.png'], [tab, None])
+    assert changed == []
+    # replaced url without a tab mask -> the old media's mask is dropped
+    out, changed, _ = patch_iteration(p, 'inp', ['/c/src.png', '/c/face2.png'])
+    assert changed == ['prompts_inp.refs[0]']
+    assert 'mask' not in out['prompts_inp']['prompt_data'][0]['refs'][0]
+    # main: new url drops url_mask; a tab mask sets it
+    out, changed, _ = patch_iteration(p, 'main', ['/y.png'])
+    assert 'url_mask' not in out and changed == ['url']
+    out, changed, _ = patch_iteration(p, 'main', ['/y.png'], [tab])
+    assert out['url_mask'] == tab and changed == ['url', 'url_mask']
