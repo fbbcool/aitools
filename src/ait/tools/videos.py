@@ -220,6 +220,45 @@ def resolve_clip(url: str | Path, search_dirs: tuple[Path, ...] | None = None) -
     )
 
 
+_ID_TOKEN_RE: Final = re.compile(r'(?<![a-z0-9])([a-z0-9]{5})(?![a-z0-9])')
+
+
+def has_ref_payload(url: str | Path) -> bool:
+    """True iff the clip embeds the enhancer prompts_ref entry it was rendered
+    from (an FbbcoolSaveVideo master; merges / re-encodes carry none)."""
+    try:
+        md = metadata(url)
+    except Exception:  # noqa: BLE001 - unreadable = no payload
+        return False
+    return bool(md) and _rendered_ref_entry(md) is not None
+
+
+def anchor_master(url: str | Path, search_dirs: tuple[Path, ...] | None = None) -> Path | None:
+    """The chain anchor to deploy for ``url``: the clip itself when it carries
+    its enhancer payload, else the FbbcoolSaveVideo master it derives from —
+    looked up by a 5-char temp id in its name (``fbbcool_temp_xxxxx_`` or a
+    5-char token, e.g. ``vid_merge_tgbxm_okhiy.mp4`` → ``fbbcool_temp_tgbxm_*``)
+    in its own dir + `search_dirs`; the newest master with a payload wins.
+    None when no such master exists (the enhancer could inherit no refs)."""
+    path = _clip_path(url)
+    if path.is_file() and has_ref_payload(path):
+        return path
+    tid = _temp_id(path)
+    ids = [tid] if tid else _ID_TOKEN_RE.findall(path.stem)
+    dirs = list(
+        dict.fromkeys([path.parent, *(Path(d) for d in (search_dirs or CHAIN_SEARCH_DIRS))])
+    )
+    hits = [
+        f
+        for i in ids
+        for d in dirs
+        if d.is_dir()
+        for f in d.glob(f'fbbcool_temp_{i}_*')
+        if f.is_file() and f.suffix.lower() in suffix_vid() and has_ref_payload(f)
+    ]
+    return max(hits, key=lambda f: f.stat().st_mtime) if hits else None
+
+
 def _rendered_ref_entry(md: dict) -> dict | None:
     """The prompts_ref entry the clip was rendered from: the entry whose prompt
     is the clip's generation prompt, else ``current`` (+ the client's

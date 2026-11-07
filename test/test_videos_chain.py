@@ -63,6 +63,20 @@ def test_resolve_clip_by_temp_id(tmp_path):
         videos.resolve_clip('/nowhere/fbbcool_temp_zzzzz_00001_.mkv', (tmp_path,))
 
 
+def test_anchor_master_maps_merge_to_master(tmp_path, monkeypatch):
+    master = tmp_path / 'fbbcool_temp_tgbxm_00001_.mkv'
+    merge = tmp_path / 'vid_merge_tgbxm_okhiy.mp4'
+    other = tmp_path / 'vid_merge_8babdf8a_9640d6e7.mp4'
+    for f in (master, merge, other):
+        f.write_bytes(b'x')
+    monkeypatch.setattr(videos, 'has_ref_payload', lambda p: Path(p) == master)
+    assert videos.anchor_master(master, (tmp_path,)) == master  # payload: itself
+    assert videos.anchor_master(merge, (tmp_path,)) == master  # merge -> master by id
+    merge.unlink()  # a deleted merge still maps by its name
+    assert videos.anchor_master(merge, (tmp_path,)) == master
+    assert videos.anchor_master(other, (tmp_path,)) is None  # no master -> refuse
+
+
 def test_rendered_ref_entry_matches_generation_prompt():
     md = {
         'enhancer': {'prompts_ref': {'current': 0, 'prompt_data': [

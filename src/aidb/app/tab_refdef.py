@@ -57,7 +57,10 @@ Chain anchors whose inherited refs break the budget are refused by the enhancer.
 ``pre-vid`` / ``post-vid`` (H3 clip chains, board task 172): slot 1 = the
 anchor clip (video), the other slots optional NEW image / audio refs; the text
 is the beat hint. Deploys like ``ref`` (+ a ``continue`` hint ``{dir, url,
-pin}``); the enhancer writes ``prompts_ref[].continue``. ``⛓ join`` is
+pin}``); the enhancer writes ``prompts_ref[].continue``. Slot 1 must carry its
+enhancer payload (the refs the enhancer inherits): a merge / re-encode is mapped
+to its ``fbbcool_temp_<id>`` master by the 5-char id in its name
+(``anchor_master``), else deploy is refused. ``⛓ join`` is
 script-only like ⇄ update: slot 1 = the LAST clip of a chain, slot 2 = the
 FIRST (a pre, optional) → ``ait.tools.videos.chain_join`` writes the joined
 master to ``~/Downloads/000_comfy/`` and toasts path + seam summary.
@@ -121,7 +124,7 @@ from ait.tools.files import (
     suffix_img,
     suffix_vid,
 )
-from ait.tools.videos import CHAIN_PIN, chain_join, ref_frame, seam_summary
+from ait.tools.videos import CHAIN_PIN, anchor_master, chain_join, ref_frame, seam_summary
 from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
@@ -1738,10 +1741,25 @@ class RefdefTab:
             return f'NOT deployed: `{verb}` — {"; ".join(probs)}'
         if verb in QFIX_VERBS:  # scripted enhancer data, no enhancer (FEATURE 180)
             return self._deploy_qfix(slots, text, origin)
+        anchor_note = ''
+        if verb in CONTINUE_VERBS:  # the enhancer inherits the anchor's refs from its payload
+            url = slots[0]['url']
+            master = anchor_master(url)
+            if master is None:
+                why = (
+                    f'slot 1 {Path(url).name} has no enhancer payload (merge / re-encode?) '
+                    'and no fbbcool_temp master found — use the FbbcoolSaveVideo master'
+                )
+                gr.Warning(f'{verb}: {why}', duration=QFIX_TOAST_WARN_S)
+                return f'NOT deployed: `{verb}` — {why}'
+            if str(master) != url:
+                slots[0] = {**slots[0], 'url': str(master), 'id': None}
+                anchor_note = f' · anchor → {master.name}'
+                gr.Info(f'{verb}: anchor → {master.name}', duration=QFIX_TOAST_WARN_S)
         payload = refdef_payload(slots, verb, kind, text, origin)
         clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
-        msg = f'deployed instruction `{verb}` ({n}/{N_SLOTS} slots, kind={kind})'
+        msg = f'deployed instruction `{verb}` ({n}/{N_SLOTS} slots, kind={kind}){anchor_note}'
         note = trigger_enhancer() if auto else 'auto-trigger off'
         if verb in SWAP_VERBS:  # deploy toast like inp-qfix
             dflt = [r['slot'] for r in payload['refs'][:2] if r['role'] in SWAP_DEFAULT_ROLES]
