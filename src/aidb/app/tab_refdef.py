@@ -1744,7 +1744,11 @@ class RefdefTab:
         anchor_note = ''
         if verb in CONTINUE_VERBS:  # the enhancer inherits the anchor's refs from its payload
             url = slots[0]['url']
-            master = anchor_master(url)
+            try:
+                master = anchor_master(url)
+            except ValueError as e:
+                gr.Warning(f'{verb}: {e}', duration=QFIX_TOAST_WARN_S)
+                return f'NOT deployed: `{verb}` — {e}'
             if master is None:
                 why = (
                     f'slot 1 {Path(url).name} has no enhancer payload (merge / re-encode?) '

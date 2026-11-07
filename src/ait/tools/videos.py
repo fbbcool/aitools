@@ -187,15 +187,66 @@ def _temp_id(path: Path) -> str | None:
     return m.group(1) if m else None
 
 
+# join / merge outputs: never a chain anchor, even when they carry a temp id
+_DERIVED_PREFIXES: Final = ('vid_merge_', 'chain_')
+_ID_TOKEN_RE: Final = re.compile(r'(?<![a-z0-9])([a-z0-9]{5})(?![a-z0-9])')
+
+
+def _has_metadata(path: Path) -> bool:
+    """A rendered master embeds its metadata; merges / joins / re-encodes don't."""
+    try:
+        return metadata(path) is not None
+    except Exception:  # noqa: BLE001 - unreadable = no metadata
+        return False
+
+
+def _masters(tid: str, dirs: Sequence[Path], check) -> list[Path]:
+    """Video files in ``dirs`` that are a master of temp id ``tid``: the id as a
+    name token, not a join / merge output (``_DERIVED_PREFIXES``) and passing
+    ``check``. Identical copies (same size) collapse to the first in ``dirs``
+    order, a ``fbbcool_temp_<id>_`` name first. Raises ValueError when distinct
+    masters remain (ambiguous: never guess)."""
+    token = re.compile(rf'(?<![a-z0-9]){tid}(?![a-z0-9])')
+    seen: set[Path] = set()
+    hits: list[Path] = []
+    for d in dict.fromkeys(dirs):
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob(f'*{tid}*')):
+            name = f.name.lower()
+            if (
+                f in seen
+                or not f.is_file()
+                or f.suffix.lower() not in suffix_vid()
+                or not token.search(name)
+                or name.startswith(_DERIVED_PREFIXES)
+            ):
+                continue
+            seen.add(f)
+            if check(f):
+                hits.append(f)
+    hits.sort(key=lambda f: f'fbbcool_temp_{tid}_' not in f.name)  # stable: dirs order kept
+    by_size: dict[int, Path] = {}
+    for f in hits:
+        by_size.setdefault(f.stat().st_size, f)
+    if len(by_size) > 1:
+        raise ValueError(
+            f'ambiguous master for temp id {tid}: {", ".join(map(str, by_size.values()))}'
+        )
+    return list(by_size.values())
+
+
 def resolve_clip(url: str | Path, search_dirs: tuple[Path, ...] | None = None) -> Path:
     """Locate a chain clip named by a `continue.url`.
 
-    The path itself wins. Otherwise the clip was moved, copied or renamed:
-    it is looked up by the `fbbcool_temp_xxxxx` stem (exact file name first,
-    then any video file whose name carries the 5-char temp id — misw renames
-    e.g. ``fbbcool_temp_jrfjs_00001_.mkv`` → ``chain2_post_jrfjs.mkv``) in
-    `search_dirs` (default: 000_comfy, comfy3 temp / output); the newest match
-    wins. Raises FileNotFoundError when it can't be resolved.
+    The path itself wins. Otherwise the clip was moved, copied or renamed: the
+    exact file name in `search_dirs` (default: 000_comfy, comfy3 temp / output),
+    else the master carrying its 5-char temp id as a name token (misw renames
+    e.g. ``fbbcool_temp_jrfjs_00001_.mkv`` → ``001-fbbcool_temp_jrfjs_00001_.mkv``
+    or ``chain2_post_jrfjs.mkv``). Join / merge outputs (``vid_merge_*``,
+    ``chain_*``, anything without embedded metadata) never qualify (board task
+    184). Raises FileNotFoundError when nothing qualifies, ValueError when
+    distinct masters do.
     """
     path = _clip_path(url)
     if path.is_file():
@@ -206,21 +257,11 @@ def resolve_clip(url: str | Path, search_dirs: tuple[Path, ...] | None = None) -
         for d in dirs:
             if (d / path.name).is_file():
                 return d / path.name
-        hits = [
-            f
-            for d in dirs
-            if d.is_dir()
-            for f in d.glob(f'*{tid}*')
-            if f.is_file() and f.suffix.lower() in suffix_vid()
-        ]
-        if hits:
-            return max(hits, key=lambda f: f.stat().st_mtime)
+        if hits := _masters(tid, dirs, _has_metadata):
+            return hits[0]
     raise FileNotFoundError(
         f'chain clip {url} not found (temp id {tid}; searched {", ".join(map(str, dirs))})'
     )
-
-
-_ID_TOKEN_RE: Final = re.compile(r'(?<![a-z0-9])([a-z0-9]{5})(?![a-z0-9])')
 
 
 def has_ref_payload(url: str | Path) -> bool:
@@ -237,26 +278,22 @@ def anchor_master(url: str | Path, search_dirs: tuple[Path, ...] | None = None) 
     """The chain anchor to deploy for ``url``: the clip itself when it carries
     its enhancer payload, else the FbbcoolSaveVideo master it derives from —
     looked up by a 5-char temp id in its name (``fbbcool_temp_xxxxx_`` or a
-    5-char token, e.g. ``vid_merge_tgbxm_okhiy.mp4`` → ``fbbcool_temp_tgbxm_*``)
-    in its own dir + `search_dirs`; the newest master with a payload wins.
-    None when no such master exists (the enhancer could inherit no refs)."""
+    5-char token, e.g. ``vid_merge_tgbxm_okhiy.mp4`` → the tgbxm master, also
+    when renamed to ``001-fbbcool_temp_tgbxm_00001_.mkv``) in its own dir +
+    `search_dirs`. None when no such master exists (the enhancer could inherit
+    no refs); ValueError when several do (e.g. a merge of anchor + post)."""
     path = _clip_path(url)
     if path.is_file() and has_ref_payload(path):
         return path
     tid = _temp_id(path)
-    ids = [tid] if tid else _ID_TOKEN_RE.findall(path.stem)
-    dirs = list(
-        dict.fromkeys([path.parent, *(Path(d) for d in (search_dirs or CHAIN_SEARCH_DIRS))])
-    )
-    hits = [
-        f
-        for i in ids
-        for d in dirs
-        if d.is_dir()
-        for f in d.glob(f'fbbcool_temp_{i}_*')
-        if f.is_file() and f.suffix.lower() in suffix_vid() and has_ref_payload(f)
-    ]
-    return max(hits, key=lambda f: f.stat().st_mtime) if hits else None
+    ids = [tid] if tid else list(dict.fromkeys(_ID_TOKEN_RE.findall(path.stem.lower())))
+    dirs = [path.parent, *(Path(d) for d in (search_dirs or CHAIN_SEARCH_DIRS))]
+    hits = {i: m[0] for i in ids if (m := _masters(i, dirs, has_ref_payload))}
+    if len(hits) > 1:
+        raise ValueError(
+            f'{path.name} names several masters ({", ".join(hits)}): put the anchor master in slot 1'
+        )
+    return next(iter(hits.values()), None)
 
 
 def _rendered_ref_entry(md: dict) -> dict | None:

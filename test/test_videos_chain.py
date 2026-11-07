@@ -51,7 +51,8 @@ def test_join_args():
 
 
 # -- link resolution / walk --------------------------------------------- #
-def test_resolve_clip_by_temp_id(tmp_path):
+def test_resolve_clip_by_temp_id(tmp_path, monkeypatch):
+    monkeypatch.setattr(videos, '_has_metadata', lambda p: True)
     moved = tmp_path / 'chain2_post_jrfjs.mkv'
     moved.write_bytes(b'x')
     gone = '/nowhere/comfy3/temp/fbbcool_temp_jrfjs_00001_.mkv'
@@ -61,6 +62,27 @@ def test_resolve_clip_by_temp_id(tmp_path):
     assert videos.resolve_clip(gone, (tmp_path,)) == exact  # exact name wins
     with pytest.raises(FileNotFoundError):
         videos.resolve_clip('/nowhere/fbbcool_temp_zzzzz_00001_.mkv', (tmp_path,))
+
+
+def test_resolve_clip_never_picks_merge_outputs(tmp_path, monkeypatch):
+    """Board task 184: a renamed master beats newer vid_merge_* / chain_* outputs."""
+    import os
+
+    master = tmp_path / '001-fbbcool_temp_tgbxm_00001_.mkv'
+    derived = [tmp_path / n for n in ('vid_merge_tgbxm_rjjow.mp4', 'chain_tgbxm_oigin.mkv')]
+    for i, f in enumerate([master, *derived]):
+        f.write_bytes(b'x')
+        os.utime(f, (1000 + i, 1000 + i))  # derived outputs are newer
+    monkeypatch.setattr(videos, '_has_metadata', lambda p: True)  # even with metadata
+    gone = tmp_path / 'fbbcool_temp_tgbxm_00001_.mkv'
+    assert videos.resolve_clip(gone, (tmp_path,)) == master
+    copy = tmp_path / 'sub'
+    copy.mkdir()
+    (copy / 'fbbcool_temp_tgbxm_00001_.mkv').write_bytes(b'x')  # same size = same master
+    assert videos.resolve_clip('/nowhere/fbbcool_temp_tgbxm_00001_.mkv', (tmp_path,)) == master
+    (tmp_path / 'fbbcool_temp_tgbxm_00002_.mkv').write_bytes(b'xy')  # a distinct master
+    with pytest.raises(ValueError, match='ambiguous'):
+        videos.resolve_clip('/nowhere/fbbcool_temp_tgbxm_00001_.mkv', (tmp_path,))
 
 
 def test_anchor_master_maps_merge_to_master(tmp_path, monkeypatch):
@@ -75,6 +97,14 @@ def test_anchor_master_maps_merge_to_master(tmp_path, monkeypatch):
     merge.unlink()  # a deleted merge still maps by its name
     assert videos.anchor_master(merge, (tmp_path,)) == master
     assert videos.anchor_master(other, (tmp_path,)) is None  # no master -> refuse
+    renamed = tmp_path / '001-fbbcool_temp_tgbxm_00001_.mkv'
+    master.rename(renamed)
+    monkeypatch.setattr(videos, 'has_ref_payload', lambda p: Path(p) in (renamed, post))
+    post = tmp_path / 'fbbcool_temp_oigin_00001_.mkv'
+    post.write_bytes(b'x')
+    assert videos.anchor_master(merge, (tmp_path,)) == renamed  # renamed master found
+    with pytest.raises(ValueError, match='several masters'):  # merge of anchor + post
+        videos.anchor_master(tmp_path / 'vid_merge_tgbxm_oigin.mkv', (tmp_path,))
 
 
 def test_rendered_ref_entry_matches_generation_prompt():
