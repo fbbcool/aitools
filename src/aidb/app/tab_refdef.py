@@ -37,7 +37,13 @@ pulled:
     other slots by refdef slot number ("slot 3"), whose roles may be empty.
     ``img-fsw-novis`` = qwen21 head swap (``SWAP_VERBS``): slot 1 = target, slot 2 =
     reference head, both images; the enhancer writes a ``head_swap:`` prompt into
-    ``prompts_inp`` without looking at the images (roles optional, + hint).
+    ``prompts_inp`` without looking at the images (roles optional — an empty one
+    deploys as ``SWAP_DEFAULT_ROLES``: slot 1 head/face replaced by slot 2's; + hint).
+    ``inp-qfix`` = qwen21 quickfix (``QFIX_VERBS``, board FEATURE 180) — NO
+    instruction, NO enhancer: deploy writes enhancer data itself
+    (``qfix_payload``): ``prompts_inp`` with slot 1 = edit target (+ its 🎭 mask
+    → mask mode, else nomask), slots 2.. = 0-2 still refs (image 2 / 3 in slot
+    order), slot 1's role = the ``prompt_qwen21`` edit instruction verbatim.
     ``ref`` = the slots are MiniMax H3 ref2va picture references
     (``<Picture i>``, board task 159); like ``enh``: slot 1 required, stills. With
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
@@ -59,7 +65,11 @@ showing that image shows it (red tint). An instruction deploy adds ``mask`` = a
 ``1xlasm_enhancer.mask.v1`` raster object ``{schema_id, type, url, w, h, sha}`` to
 the image's ref (board task 175). Enhancer data: media ``mask`` objects (main =
 ``url_mask``; raster or json shapes) are tinted into the slots; patching puts the
-tab's mask on its media and drops the mask of a replaced url.
+tab's mask on its media and drops the mask of a replaced url. Per slot, 🟥/⬜
+switches masking on/off (off = no tint, deploy / ⇄ update / patching send the
+slot WITHOUT a mask and drop a payload mask from its media; the painted mask
+file stays; new slot content switches back on), 🧽 deletes the slot image's
+painted mask.
 
 ``💾 save`` stores the whole tab config (state + slots + roles + verb / kind /
 text) in the Mongo collection ``refdef_saves``; ◀ / ▶ step through those saves
@@ -107,7 +117,8 @@ from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
 
 N_SLOTS: Final = 6
-SLOTS_PER_ROW: Final = 3
+SLOTS_PER_ROW: Final = 3  # slots 2.. (slot 1 has its own row)
+ROLE_LINES: Final = 2  # role box height (slot 1: double)
 SCHEMA_ITERATION: Final = '1xlasm_enhancer.iteration'  # version-tolerant prefix
 SCHEMA_REFDEF: Final = '1xlasm_enhancer.refdef.v1'
 EDITED_BY: Final = 'refdef'
@@ -124,6 +135,7 @@ VERBS: Final = (
     'pre-vid',
     'post-vid',
     'img-fsw-novis',
+    'inp-qfix',
 )
 # H3 clip-chain continuations (board task 172): slot 1 = the anchor clip
 # (FbbcoolSaveVideo master, video only), the other slots optional NEW refs
@@ -137,12 +149,30 @@ ROLE_ONLY_VERBS: Final = ('ref-novis',)
 # stills, nothing else. The enhancer writes a ``head_swap:`` prompt_qwen21 into
 # prompts_inp without vision — from the roles (optional) + hint alone.
 SWAP_VERBS: Final = ('img-fsw-novis',)
+# empty swap roles = the default swap semantics (slot 1 head/face replaced by slot 2's),
+# written into the instruction so the enhancer never sees a blank role
+SWAP_DEFAULT_ROLES: Final = (
+    'target: keep body, pose, outfit, light and background; its head/face gets replaced',
+    'reference head: the head/face that replaces the head/face of slot 1',
+)
+# qwen21 quickfix (board FEATURE 180, ComfyUI userdata workflows/qwen21-quickfix.json):
+# NO enhancer roundtrip — deploy scripts the enhancer data itself (``qfix_payload``):
+# slot 1 = edit target (+ its 🎭 mask → mask mode, else nomask), slots 2.. = 0-2
+# still refs (= image 2 / image 3, in slot order), slot 1's role = the prompt_qwen21
+# edit instruction verbatim. Never triggers the enhancer.
+QFIX_VERBS: Final = ('inp-qfix',)
+QFIX_MAX_REFS: Final = 2
+QFIX_TOAST_OK_S: Final = 0.5  # deploy success toast
+QFIX_TOAST_WARN_S: Final = 2  # guard refusal / failure toast
+SCHEMA_ITERATION_OUT: Final = '1xlasm_enhancer.iteration.v6.10'  # what qfix writes
+QFIX_MADE_BY: Final = 'refdef.inp-qfix'  # its payload marker (pull: instruction → slot 1 role)
 # ⇄ update: the enhancer-data view (section) a verb owns (board task 162). A verb
 # here patches ONLY its view; the other verbs never touch these views.
 VERB_VIEW: Final = {
     'inp-mask': 'inp',
     'inp-nomask': 'inp',
     'img-fsw-novis': 'inp',
+    'inp-qfix': 'inp',
     'ref': 'ref',
     'ref-novis': 'ref',
 }
@@ -170,6 +200,8 @@ MASK_TINT: Final = (255, 0, 0)  # slot-preview overlay of the masked area
 SCHEMA_MASK: Final = '1xlasm_enhancer.mask.v1'  # board task 175, comment 628
 SCHEMA_MASK_PREFIX: Final = '1xlasm_enhancer.mask.'
 MASK_KEY_MAIN: Final = 'url_mask'  # the top-level scene image's mask (sibling of url)
+MASK_ICON_ON: Final = '🟥'  # per-slot masking switch: on (mask deployed / tinted)
+MASK_ICON_OFF: Final = '⬜'  # off: slot deployed without any mask
 
 
 # ---------------------------------------------------------------------- #
@@ -292,6 +324,9 @@ def view_slots(payload: dict, view: str) -> list[dict]:
             slots[i] = {'url': m['url'], 'id': None, 'role': role}
             if isinstance(m.get('mask'), dict):
                 slots[i]['mask'] = m['mask']
+    # an inp-qfix payload pulls its edit instruction back into slot 1's role
+    if view == 'inp' and payload.get('made_by') == QFIX_MADE_BY and slots[0]['url']:
+        slots[0]['role'] = view_text(payload, view) or slots[0]['role']
     return slots
 
 
@@ -395,9 +430,12 @@ def same_mask(a: dict | None, b: dict | None) -> bool:
     return a == b
 
 
-def _set_mask(obj: dict, mask: dict | None) -> bool:
-    """Put the tab's mask on a media object → whether it changed."""
-    if mask is None or same_mask(obj.get('mask'), mask):
+def _set_mask(obj: dict, mask: dict | bool | None) -> bool:
+    """Put the tab's mask on a media object (False = masking off: drop its
+    mask) → whether it changed."""
+    if mask is False:
+        return obj.pop('mask', None) is not None
+    if not isinstance(mask, dict) or same_mask(obj.get('mask'), mask):
         return False
     obj['mask'] = mask
     return True
@@ -417,7 +455,7 @@ def patch_iteration(
     payload: dict,
     view: str,
     urls: list[str | None],
-    masks: list[dict | None] | None = None,
+    masks: list[dict | bool | None] | None = None,
 ) -> tuple[dict, list[str], list[str]]:
     """Copy of an iteration payload with only the image urls of ``view``
     patched (slot order as in ``view_slots``). Everything else is deployed
@@ -432,6 +470,7 @@ def patch_iteration(
     ``masks`` = the tab's own (🎭) mask object per slot (None = none): it is
     set on the slot's media object unless that already carries the same mask
     (``same_mask``). A replaced url drops the old media's mask (task 175).
+    False = masking switched off for the slot: its media's mask is dropped.
     """
     out = copy.deepcopy(payload)
     changed: list[str] = []
@@ -444,7 +483,14 @@ def patch_iteration(
             out['url'] = urls[0]
             out.pop(MASK_KEY_MAIN, None)
             changed.append('url')
-        if urls[0] and masks[0] and not same_mask(out.get(MASK_KEY_MAIN), masks[0]):
+        if masks[0] is False:
+            if out.pop(MASK_KEY_MAIN, None) is not None:
+                changed.append(MASK_KEY_MAIN)
+        elif (
+            urls[0]
+            and isinstance(masks[0], dict)
+            and not same_mask(out.get(MASK_KEY_MAIN), masks[0])
+        ):
             out[MASK_KEY_MAIN] = masks[0]
             changed.append(MASK_KEY_MAIN)
         skipped += [f'slot {i + 1} (main has one image)' for i in range(1, N_SLOTS) if urls[i]]
@@ -575,6 +621,76 @@ def swap_problems(slots: list[dict], verb: str) -> list[str]:
     return probs
 
 
+def qfix_problems(slots: list[dict], verb: str) -> list[str]:
+    """Why an inp-qfix deploy can't happen: slot 1 = the edit target (image),
+    the other filled slots 0-2 still refs, slot 1's role = the edit instruction."""
+    if verb not in QFIX_VERBS:
+        return []
+    probs = []
+    if not slots or media_kind(slots[0].get('url')) != 'image':
+        probs.append('slot 1 needs the edit target (image)')
+    refs = [(i + 1, s) for i, s in enumerate(slots[1:], 1) if s.get('url')]
+    probs += [f'slot {n} must be a still image' for n, s in refs if media_kind(s['url']) != 'image']
+    if len(refs) > QFIX_MAX_REFS:
+        probs.append(f'max {QFIX_MAX_REFS} refs (image 2 / image 3), got {len(refs)}')
+    if slots and not (slots[0].get('role') or '').strip():
+        probs.append('slot 1 role (the qwen21 edit instruction) is empty')
+    return probs
+
+
+def _qfix_media(slot: dict, desc: str) -> dict:
+    """{url, w, h, desc[, mask]} media object of a qfix slot."""
+    url = str(slot['url'])
+    obj: dict[str, Any] = {'url': url}
+    if dims := _img_dims(url):
+        obj['w'], obj['h'] = dims
+    obj['desc'] = (slot.get('role') or '').strip() or desc
+    if isinstance(slot.get('mask'), dict) and not slot.get('mask_off'):
+        obj['mask'] = slot['mask']
+    return obj
+
+
+def qfix_payload(slots: list[dict], text: str = '', origin_scene_id: str | None = None) -> dict:
+    """The enhancer data an ``inp-qfix`` deploy writes — built here, no enhancer
+    (board FEATURE 180): a ``prompts_inp`` entry exactly as the enhancer's
+    ``/inpaint`` commits it (engine qwen21, ``src.mask`` = the slot 1 🎭 mask →
+    mode mask, else nomask; refs = the filled slots 2.. in order; ``prompt_qwen21``
+    = slot 1's role verbatim, the tab text only rides as ``hints``) on a payload
+    whose top-level url is the edit target. ``rev`` = ``from_rev`` = 0, so a
+    pull opens it on the ``inp`` view; ``edited_by`` keeps the enhancer away.
+    Call ``qfix_problems`` first."""
+    src = _qfix_media(dict(slots[0], role=''), 'edit target')  # its role = the prompt
+    refs = [
+        _qfix_media(s, f'image {n + 2}') for n, s in enumerate(s for s in slots[1:] if s.get('url'))
+    ]
+    entry: dict[str, Any] = {
+        'prompt_qwen21': (slots[0].get('role') or '').strip(),
+        'engine': 'qwen21',
+        'concepts': [],
+        'src': src,
+        'mask': None,  # legacy mirror; null for a raster src.mask
+        'mode': 'mask' if src.get('mask') else 'nomask',
+        **({'refs': refs} if refs else {}),
+        'hints': (text or '').strip() or None,
+        'from_rev': 0,
+        'ts': SceneDef.now_ts(),
+    }
+    payload: dict[str, Any] = {
+        'schema_id': SCHEMA_ITERATION_OUT,
+        'scene_id': origin_scene_id,
+        'url': src['url'],
+        'url_desc': src['desc'],
+        'prompts': {'type': 'single', 'current': 0, 'prompt_data': []},
+        'rev': 0,
+        'prompts_inp': {'type': 'single', 'current': 0, 'prompt_data': [entry]},
+        'edited_by': EDITED_BY,
+        'made_by': QFIX_MADE_BY,
+    }
+    if src.get('mask'):
+        payload[MASK_KEY_MAIN] = src['mask']
+    return payload
+
+
 def join_args(slots: list[dict]) -> tuple[str, str | None]:
     """``chain_join`` inputs from the slots: slot 1 = the LAST clip of the
     chain, slot 2 = optionally the FIRST clip (a pre). Raises ValueError."""
@@ -628,6 +744,12 @@ def mask_object(url: str | None) -> dict | None:
         'h': h,
         'sha': file_sha(url),
     }
+
+
+def slot_mask(slot: dict) -> dict | bool | None:
+    """``patch_iteration`` mask of a ``{url, mask_off}`` slot: False when its
+    masking is switched off, else the painted mask object (None = none)."""
+    return False if slot.get('mask_off') else mask_object(slot.get('url'))
 
 
 def rasterize_mask(mask: dict | None, size: tuple[int, int]) -> Image.Image | None:
@@ -721,6 +843,15 @@ def tint_mask(im: Image.Image, url: str | None, mask: dict | None = None) -> Ima
     return Image.composite(over, im, m.point(lambda v: v * 45 // 100))
 
 
+def _instruction_role(slot: dict, i: int, verb: str) -> str:
+    """A slot's role as deployed: stripped; an empty swap-verb role (slot 1 / 2)
+    falls back to ``SWAP_DEFAULT_ROLES``."""
+    role = (slot.get('role') or '').strip()
+    if not role and verb in SWAP_VERBS and i < len(SWAP_DEFAULT_ROLES) and slot.get('url'):
+        return SWAP_DEFAULT_ROLES[i]
+    return role
+
+
 def refdef_payload(
     slots: list[dict],
     verb: str,
@@ -739,7 +870,7 @@ def refdef_payload(
                 'slot': i + 1,
                 'url': s.get('url') or None,
                 'id': s.get('id') or None,
-                'role': (s.get('role') or '').strip(),
+                'role': _instruction_role(s, i, verb),
                 'media': media_kind(s.get('url')),
                 # 🎭 painted mask (only when one exists): mask.v1 object (task 175)
                 **({'mask': s['mask']} if s.get('mask') else {}),
@@ -766,7 +897,8 @@ def update_payload(
     verb: str | None = None,
 ) -> tuple[dict, str, list[str], list[str]] | None:
     """Clipspace text with its reference urls replaced by the filled
-    ``slots`` (``{url, id}``; empty slot = keep the clipspace's ref).
+    ``slots`` (``{url, id}``; empty slot = keep the clipspace's ref;
+    ``mask_off`` = masking switched off: the ref's mask is dropped).
 
     Enhancer data: one view is patched with ``patch_iteration`` rules — the
     first that takes every filled slot without skips, in the order ``view``
@@ -797,7 +929,8 @@ def update_payload(
                 continue
             new = {'url': s.get('url'), 'id': s.get('id') or None}
             new_media = media_kind(s.get('url'))
-            mask = mask_object(s.get('url'))
+            off = bool(s.get('mask_off'))
+            mask = None if off else mask_object(s.get('url'))
             ref = by_slot.get(i + 1)
             if ref is None:
                 ref = {'slot': i + 1, **new, 'role': '', 'media': new_media}
@@ -805,6 +938,9 @@ def update_payload(
             elif (ref.get('url'), ref.get('id') or None) != (new['url'], new['id']):
                 ref.update(new, media=new_media)
                 ref.pop('mask', None)  # bound to the old media
+            elif off:
+                if ref.pop('mask', None) is None:
+                    continue
             elif not mask or same_mask(ref.get('mask'), mask):
                 continue
             ref.pop('masked', None)  # pre-v1 provisional field
@@ -834,7 +970,7 @@ def update_payload(
     for v in cands:
         olds = [s.get('url') for s in view_slots(p, v)]
         urls = [s.get('url') or old for s, old in zip(slots, olds, strict=True)]
-        masks = [mask_object(s.get('url')) for s in slots]
+        masks = [slot_mask(s) for s in slots]
         out, changed, skipped = patch_iteration(p, v, urls, masks)
         if not skipped:
             return out, v, changed, skipped
@@ -1054,7 +1190,9 @@ class RefdefTab:
         return self._preview(url), id_img or url
 
     @staticmethod
-    def _preview(url: str | None, mask: dict | None = None) -> Image.Image | str | None:
+    def _preview(
+        url: str | None, mask: dict | None = None, mask_on: bool = True
+    ) -> Image.Image | str | None:
         """Slot display value. Local files go in as a downscaled PIL image:
         gradio refuses to serve paths outside cwd/tmp (allowed_paths), and
         refs live anywhere (scenes, comfy output, …). The slot ref keeps the
@@ -1079,7 +1217,7 @@ class RefdefTab:
                 src.draft('RGB', (PREVIEW_SIZE, PREVIEW_SIZE))
                 im = ImageOps.exif_transpose(src).convert('RGB')
             im.thumbnail((PREVIEW_SIZE, PREVIEW_SIZE))
-            return tint_mask(im, url, mask)
+            return tint_mask(im, url, mask) if mask_on else im
         except Exception:  # noqa: BLE001 - unreadable file -> empty slot preview
             return None
 
@@ -1219,22 +1357,25 @@ class RefdefTab:
             ),
         ]
 
-    def _commit(self, state: dict, refs: list[str]) -> tuple[dict, list[str], list[str]]:
+    def _commit(
+        self, state: dict, refs: list[str], mask_on: list[bool] | None = None
+    ) -> tuple[dict, list[str], list[str]]:
         """Patch the current view's slot images into the working payload
         (``state['payload']``), so every view's replacements reach deploy."""
         urls = [self.resolve_ref(r)[0] for r in refs]
-        masks = [mask_object(u) for u in urls]
+        on = mask_on or [True] * N_SLOTS
+        masks = [slot_mask({'url': u, 'mask_off': not on[i]}) for i, u in enumerate(urls)]
         work, changed, skipped = patch_iteration(state['payload'], state['view'], urls, masks)
         before = state.get('changed', [])
         merged = before + [c for c in changed if c not in before]
         return dict(state, payload=work, changed=merged), changed, skipped
 
-    def _on_view(self, state: dict | None, view: str | None, *refs: str):
+    def _on_view(self, state: dict | None, view: str | None, mask_on: list[bool], *refs: str):
         """Switch the enhancer-data view; the old view's slot replacements
         are committed to the working payload first."""
         if not self._is_enh(state) or not view or view == state['view']:  # type: ignore[index]
             return [gr.update()] * (3 + 3 * N_SLOTS + 7)
-        st, changed, skipped = self._commit(state, list(refs))  # type: ignore[arg-type]
+        st, changed, skipped = self._commit(state, list(refs), mask_on)  # type: ignore[arg-type]
         note = f' · kept: {", ".join(changed)}' if changed else ''
         note += f' · NOT kept: {", ".join(skipped)}' if skipped else ''
         return [*self._load(with_view(st, view)), f'view `{view}`{note}']
@@ -1474,12 +1615,17 @@ class RefdefTab:
         msg += self._restore_clip(snap)
         return [*self._load_snap(snap), msg, hist, self._hist_md(new, saves)]
 
-    def _slots_from_ui(self, refs_roles: list[str]) -> list[dict]:
+    def _slots_from_ui(
+        self, refs_roles: list[str], mask_on: list[bool] | None = None
+    ) -> list[dict]:
+        on = mask_on or [True] * N_SLOTS
         slots = []
         for i in range(N_SLOTS):
             url, id_img = self.resolve_ref(refs_roles[2 * i])
             slot: dict[str, Any] = {'url': url, 'id': id_img, 'role': refs_roles[2 * i + 1]}
-            if hit := mask_object(url):
+            if not on[i]:
+                slot['mask_off'] = True
+            elif hit := mask_object(url):
                 slot['mask'] = hit
             slots.append(slot)
         return slots
@@ -1491,12 +1637,13 @@ class RefdefTab:
         kind: str,
         auto: bool,
         text: str,
+        mask_on: list[bool],
         *refs_roles,
     ):
-        slots = self._slots_from_ui(list(refs_roles))
+        slots = self._slots_from_ui(list(refs_roles), mask_on)
         if self._is_enh(state):
             refs = [refs_roles[2 * i] for i in range(N_SLOTS)]
-            st, _, skipped = self._commit(state, refs)  # type: ignore[arg-type]
+            st, _, skipped = self._commit(state, refs, mask_on)  # type: ignore[arg-type]
             # the full payload (all sections) goes back; never triggers the enhancer
             clip_copy(json.dumps(st['payload'], ensure_ascii=False))
             note = f' · NOT deployed: {", ".join(skipped)}' if skipped else ''
@@ -1513,21 +1660,55 @@ class RefdefTab:
         origin = None
         if state and state['kind'] == 'refdef':
             origin = (state['payload'].get('origin') or {}).get('scene_id')
-        if probs := continue_problems(slots, verb) or swap_problems(slots, verb):
-            gr.Warning(f'{verb}: {"; ".join(probs)}', duration=1)
+        if probs := (
+            continue_problems(slots, verb)
+            or swap_problems(slots, verb)
+            or qfix_problems(slots, verb)
+        ):
+            # qfix: 2 s app toast (FEATURE 180); the other verbs keep 1 s
+            gr.Warning(
+                f'{verb}: {"; ".join(probs)}',
+                duration=QFIX_TOAST_WARN_S if verb in QFIX_VERBS + SWAP_VERBS else 1,
+            )
             return f'NOT deployed: `{verb}` — {"; ".join(probs)}'
+        if verb in QFIX_VERBS:  # scripted enhancer data, no enhancer (FEATURE 180)
+            return self._deploy_qfix(slots, text, origin)
         payload = refdef_payload(slots, verb, kind, text, origin)
         clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
         msg = f'deployed instruction `{verb}` ({n}/{N_SLOTS} slots, kind={kind})'
         note = trigger_enhancer() if auto else 'auto-trigger off'
+        if verb in SWAP_VERBS:  # deploy toast like inp-qfix
+            dflt = [r['slot'] for r in payload['refs'][:2] if r['role'] in SWAP_DEFAULT_ROLES]
+            roles = f'default roles: slot {", ".join(map(str, dflt))}' if dflt else 'own roles'
+            gr.Success(f'{verb} deployed: {roles} · {note}', duration=QFIX_TOAST_OK_S)
         print(f'[refdef_tab:info] deploy {verb}: {note}')
         return f'{msg} · {note}'
 
-    def _on_update(self, state: dict | None, verb: str | None, *refs_roles):
+    @staticmethod
+    def _deploy_qfix(slots: list[dict], text: str, origin: str | None) -> str:
+        """inp-qfix deploy: script the enhancer data onto the clipspace and read it
+        back; success toast 0.5 s, any failure an error toast 2 s (FEATURE 180)."""
+        try:
+            qp = qfix_payload(slots, text, origin)
+            out = json.dumps(qp, ensure_ascii=False)
+            clip_copy(out)
+            if pyperclip.paste() != out:
+                raise RuntimeError('clipspace write failed (read-back differs)')
+        except Exception as exc:  # noqa: BLE001 - every failure → toast + status
+            gr.Error(f'inp-qfix: {exc}', duration=QFIX_TOAST_WARN_S)
+            print(f'[refdef_tab:error] deploy inp-qfix: {exc}')
+            return f'NOT deployed: `inp-qfix` — {exc}'
+        e = qp['prompts_inp']['prompt_data'][0]
+        msg = f'inp-qfix deployed: {e["mode"]}, {len(e.get("refs") or [])} refs'
+        gr.Success(msg, duration=QFIX_TOAST_OK_S)
+        print(f'[refdef_tab:info] deploy {msg}')
+        return f'{msg} · no enhancer trigger'
+
+    def _on_update(self, state: dict | None, verb: str | None, mask_on: list[bool], *refs_roles):
         """Rewrite the CURRENT clipspace's reference urls from the slots —
         script only, never triggers the enhancer."""
-        slots = self._slots_from_ui(list(refs_roles))
+        slots = self._slots_from_ui(list(refs_roles), mask_on)
         view = state['view'] if self._is_enh(state) else None  # type: ignore[index]
         res = update_payload(pyperclip.paste(), slots, view, verb)
         if res is None:
@@ -1642,6 +1823,31 @@ class RefdefTab:
         imgs[i] = self._preview(url)
         return [*imgs, gr.update(visible=False), f'slot {i + 1}: mask removed']
 
+    @staticmethod
+    def _payload_mask(state: dict | None, i: int, url: str | None) -> dict | None:
+        """The pulled payload's mask of slot ``i`` while it still shows that media."""
+        s = (state or {}).get('slots') or []
+        if i < len(s) and url and s[i].get('url') == url:
+            return s[i].get('mask')
+        return None
+
+    def _on_mask_toggle(self, i: int, mask_on: list[bool], state: dict | None, ref: str | None):
+        """🟥/⬜ switch slot ``i``'s masking → (mask_on, button, preview)."""
+        on = list(mask_on)
+        on[i] = not on[i]
+        url = self.resolve_ref(ref)[0] if ref else None
+        img = self._preview(url, self._payload_mask(state, i, url), on[i]) if url else gr.update()
+        return on, gr.update(value=MASK_ICON_ON if on[i] else MASK_ICON_OFF), img
+
+    def _on_mask_clear(self, i: int, mask_on: list[bool], state: dict | None, ref: str | None):
+        """🧽 delete slot ``i``'s painted mask → (preview, status)."""
+        url = self._mask_src(ref)
+        if url is None or not drop_mask(url):
+            gr.Info(f'slot {i + 1}: no painted mask', duration=0.5)
+            return gr.update(), f'slot {i + 1}: no painted mask'
+        img = self._preview(url, self._payload_mask(state, i, url), mask_on[i])
+        return img, f'slot {i + 1}: mask removed'
+
     def build(self) -> None:
         with gr.Tab('refdef', elem_id='refdef_tab'):
             state = gr.State(None)  # parse_payload() result of the last enhancer pull
@@ -1695,9 +1901,17 @@ class RefdefTab:
             # input is the clipspace only: images are display-only, the slot
             # ref (img id or url) rides in a per-slot State
             imgs, refs, roles, slot_pulls, clears, mask_btns = [], [], [], [], [], []
-            for row0 in range(0, N_SLOTS, SLOTS_PER_ROW):
+            mask_tgls, mask_clrs = [], []
+            mask_on = gr.State([True] * N_SLOTS)  # per-slot masking switch (🟥/⬜)
+            # slot 1 (the main ref) gets its own row, the rest SLOTS_PER_ROW per row;
+            # per slot: image, button row, role row
+            rows = [[0]] + [
+                list(range(r, min(N_SLOTS, r + SLOTS_PER_ROW)))
+                for r in range(1, N_SLOTS, SLOTS_PER_ROW)
+            ]
+            for row in rows:
                 with gr.Row(equal_height=True):
-                    for i in range(row0, min(N_SLOTS, row0 + SLOTS_PER_ROW)):
+                    for i in row:
                         with gr.Column():
                             imgs.append(
                                 gr.Image(
@@ -1709,17 +1923,22 @@ class RefdefTab:
                             )
                             refs.append(gr.State(''))
                             with gr.Row():
-                                roles.append(
-                                    gr.Textbox(
-                                        placeholder='role: what this ref is for',
-                                        show_label=False,
-                                        lines=2,
-                                        scale=5,
-                                    )
-                                )
                                 slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
                                 clears.append(gr.Button('✕', scale=0, min_width=40))
                                 mask_btns.append(gr.Button('🎭', scale=0, min_width=40))
+                                mask_tgls.append(gr.Button(MASK_ICON_ON, scale=0, min_width=40))
+                                mask_clrs.append(gr.Button('🧽', scale=0, min_width=40))
+                            # slot 1: double height, fixed (scrollbar on overflow)
+                            n_lines = ROLE_LINES * 2 if i == 0 else ROLE_LINES
+                            roles.append(
+                                gr.Textbox(
+                                    placeholder='role: what this ref is for',
+                                    show_label=False,
+                                    lines=n_lines,
+                                    max_lines=n_lines if i == 0 else None,
+                                    elem_classes=['refdef-role-main'] if i == 0 else None,
+                                )
+                            )
 
             # 🎭 mask editor (shared by the slots): paint over the area to mask
             mask_slot = gr.State(None)
@@ -1766,27 +1985,68 @@ class RefdefTab:
             def hist_refresh(h, c):
                 return self._hist_md(h['pos'], self._save_ids(c))
 
+            # new slot content switches masking back on (all slots / one slot)
+            on_outs = [mask_on, *mask_tgls]
+
+            def all_on():
+                return [[True] * N_SLOTS, *[gr.update(value=MASK_ICON_ON)] * N_SLOTS]
+
+            def mask_btn_vals(on):
+                return [gr.update(value=MASK_ICON_ON if o else MASK_ICON_OFF) for o in on]
+
+            def painted_on(i, on):
+                on = list(on)
+                if i is not None:
+                    on[i] = True
+                return [on, *mask_btn_vals(on)]
+
+            def one_on(i, on):
+                on = list(on)
+                on[i] = True
+                return on, gr.update(value=MASK_ICON_ON)
+
             pull_btn.click(pull, [hist, state, *refs], [*load_outs, status, hist]).then(
                 hist_refresh, [hist, cat], [hist_md]
-            )
+            ).then(all_on, [], on_outs)
             reset_btn.click(
                 lambda: [*self._on_reset(), cur_hist], [], [*load_outs, status, hist]
-            ).then(hist_refresh, [hist, cat], [hist_md])
+            ).then(hist_refresh, [hist, cat], [hist_md]).then(all_on, [], on_outs)
             save_btn.click(self._on_save, [cat, *snap_ins], [status, hist, hist_md, cat])
-            del_btn.click(self._on_del, [hist, cat], [*load_outs, status, hist, hist_md, cat])
-            cat.input(self._on_cat, [hist, cat], [*load_outs, status, hist, hist_md])
-            view.input(self._on_view, [state, view, *refs], [*load_outs, status])
+            del_btn.click(self._on_del, [hist, cat], [*load_outs, status, hist, hist_md, cat]).then(
+                all_on, [], on_outs
+            )
+            cat.input(self._on_cat, [hist, cat], [*load_outs, status, hist, hist_md]).then(
+                all_on, [], on_outs
+            )
+            view.input(self._on_view, [state, view, mask_on, *refs], [*load_outs, status]).then(
+                all_on, [], on_outs
+            )
             for btn, step in ((prev_btn, -1), (next_btn, 1)):
                 btn.click(
                     lambda h, c, *a, step=step: self._on_hist(h, step, c, *a),
                     [hist, cat, *snap_ins],
                     [*load_outs, status, hist, hist_md],
-                )
-            for img, ref, clear in zip(imgs, refs, clears, strict=True):
+                ).then(all_on, [], on_outs)
+            for i, (img, ref, clear) in enumerate(zip(imgs, refs, clears, strict=True)):
                 # role stays: in enhancer mode it is payload-owned
-                clear.click(lambda: (None, ''), [], [img, ref])
-            for img, ref, slot_pull in zip(imgs, refs, slot_pulls, strict=True):
-                slot_pull.click(self._on_slot_pull, [], [img, ref])
+                clear.click(lambda: (None, ''), [], [img, ref]).then(
+                    lambda on, i=i: one_on(i, on), [mask_on], [mask_on, mask_tgls[i]]
+                )
+            for i, (img, ref, slot_pull) in enumerate(zip(imgs, refs, slot_pulls, strict=True)):
+                slot_pull.click(self._on_slot_pull, [], [img, ref]).then(
+                    lambda on, i=i: one_on(i, on), [mask_on], [mask_on, mask_tgls[i]]
+                )
+            for i, (tgl, clr) in enumerate(zip(mask_tgls, mask_clrs, strict=True)):
+                tgl.click(
+                    lambda on, st, r, i=i: self._on_mask_toggle(i, on, st, r),
+                    [mask_on, state, refs[i]],
+                    [mask_on, tgl, imgs[i]],
+                )
+                clr.click(
+                    lambda on, st, r, i=i: self._on_mask_clear(i, on, st, r),
+                    [mask_on, state, refs[i]],
+                    [imgs[i], status],
+                )
             for i, mbtn in enumerate(mask_btns):
                 mbtn.click(
                     lambda r, i=i: self._on_mask_open(i, r),
@@ -1798,15 +2058,19 @@ class RefdefTab:
                     lambda i, v, *r, c=copy_masked: self._on_mask_apply(i, v, c, *r),
                     [mask_slot, mask_ed, *refs],
                     [*imgs, mask_box, status],
+                ).then(  # a freshly painted mask switches its slot back on
+                    painted_on,
+                    [mask_slot, mask_on],
+                    [mask_on, *mask_tgls],
                 )
             mask_del.click(self._on_mask_drop, [mask_slot, *refs], [*imgs, mask_box, status])
             mask_close.click(lambda: gr.update(visible=False), [], [mask_box])
             deploy_btn.click(
                 self._on_deploy,
-                [state, verb, kind, auto, text, *refs_roles],
+                [state, verb, kind, auto, text, mask_on, *refs_roles],
                 [status],
             )
-            update_btn.click(self._on_update, [state, verb, *refs_roles], [status])
+            update_btn.click(self._on_update, [state, verb, mask_on, *refs_roles], [status])
             join_btn.click(self._on_join, refs_roles, [status])
 
 
@@ -1815,6 +2079,7 @@ REFDEF_HEAD = r"""
 #refdef-deploy { background: #2e7d32 !important; border-color: #2e7d32 !important;
   color: #fff !important; }
 #refdef-cat-label { text-align: right; }
+.refdef-role-main textarea { overflow-y: auto !important; }
 #refdef-deploy:hover { background: #388e3c !important; }
 </style>
 """

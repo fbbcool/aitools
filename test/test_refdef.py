@@ -228,7 +228,7 @@ def test_trigger_enhancer_sends_only_when_idle(monkeypatch):
         note = tab_refdef.trigger_enhancer()
         assert bool(sent) == expect_sent, (status, note)
         if expect_sent:
-            assert sent == [('agent', 'prompt', 'enhancer', '/refdef')]
+            assert sent == [('agent', 'prompt', tab_refdef.HERDR_AGENT, '/refdef')]
 
 
 def test_trigger_enhancer_unreachable(monkeypatch):
@@ -606,6 +606,13 @@ def test_img_fsw_novis_swap_problems():
     p = refdef_payload([tgt, head], 'img-fsw-novis', 'hint', 'keep the freckles')
     assert p['verb'] == 'img-fsw-novis'
     assert [r['media'] for r in p['refs'][:2]] == ['image', 'image']
+    # empty roles deploy as the default swap semantics; own roles stay verbatim
+    from aidb.app.tab_refdef import SWAP_DEFAULT_ROLES
+
+    assert [r['role'] for r in p['refs'][:2]] == list(SWAP_DEFAULT_ROLES)
+    own = refdef_payload([dict(tgt, role='the knight'), head], 'img-fsw-novis', 'hint', '')
+    assert [r['role'] for r in own['refs'][:2]] == ['the knight', SWAP_DEFAULT_ROLES[1]]
+    assert refdef_payload([tgt, head], 'ref', 'hint', '')['refs'][0]['role'] == ''
 
 
 def test_hand_mask_roundtrip(tmp_path, monkeypatch):
@@ -721,3 +728,121 @@ def test_patch_masks_bound_to_media():
     assert 'url_mask' not in out and changed == ['url']
     out, changed, _ = patch_iteration(p, 'main', ['/y.png'], [tab])
     assert out['url_mask'] == tab and changed == ['url', 'url_mask']
+
+
+def test_mask_off_drops_payload_masks():
+    """🟥/⬜ off: patching / ⇄ update drop the slot media's mask, on keeps it."""
+    m = {'schema_id': '1xlasm_enhancer.mask.v1', 'type': 'json', 'shapes': [{'k': 1}]}
+    p = _iteration(url_mask=m)
+    out, changed, _ = patch_iteration(p, 'main', [p['url']], [False])
+    assert changed == ['url_mask'] and 'url_mask' not in out
+    out, changed, _ = patch_iteration(p, 'main', [p['url']], [None])
+    assert changed == [] and out['url_mask'] == m
+    inp = _inp(refs=[{'url': '/c/face.png', 'w': 832, 'h': 1248, 'desc': 'f', 'mask': m}])
+    p = _iteration(prompts_inp=inp)
+    off = dict(_slot('/c/face.png'), mask_off=True)
+    out, view, changed, _ = update_payload(
+        json.dumps(p), [_slot('/c/src.png'), off], 'inp', 'inp-mask'
+    )
+    assert view == 'inp' and changed == ['prompts_inp.refs[0].mask']
+    assert 'mask' not in out['prompts_inp']['prompt_data'][0]['refs'][0]
+    # refdef.v1: off drops the ref's mask
+    instr = refdef_payload([{'url': '/a.png', 'role': 'r', 'mask': m}], 'enh', 'hint', '')
+    out, _, changed, _ = update_payload(json.dumps(instr), [dict(_slot('/a.png'), mask_off=True)])
+    assert changed == ['refs[slot 1]'] and 'mask' not in out['refs'][0]
+
+
+def _png(path, size=(64, 96)):
+    from PIL import Image
+
+    Image.new('RGB', size, (10, 20, 30)).save(path)
+    return str(path)
+
+
+def test_qfix_problems():
+    """inp-qfix (FEATURE 180): slot 1 image, 0-2 still refs, non-empty text."""
+    from aidb.app.tab_refdef import qfix_problems
+
+    ok = [_slot('/a.png'), _slot('/b.png'), _slot('/c.png')]
+    assert qfix_problems(ok, 'inp-qfix') == []  # _slot role = 'ignored' = the instruction
+    assert qfix_problems([], 'enh') == []  # other verbs: no say
+    assert qfix_problems([_slot('/a.mp4')], 'inp-qfix') == ['slot 1 needs the edit target (image)']
+    assert qfix_problems([dict(_slot('/a.png'), role='  ')], 'inp-qfix') == [
+        'slot 1 role (the qwen21 edit instruction) is empty'
+    ]
+    four = [*ok, _slot('/d.png')]
+    assert qfix_problems(four, 'inp-qfix') == ['max 2 refs (image 2 / image 3), got 3']
+    assert qfix_problems([_slot('/a.png'), _slot('/v.mp4')], 'inp-qfix') == [
+        'slot 2 must be a still image'
+    ]
+
+
+def test_qfix_payload_mask_and_nomask(tmp_path):
+    """qfix_payload = enhancer data a SmartInput reads: prompts_inp entry with
+    src(+mask) / refs / prompt_qwen21; pulls back on the inp view."""
+    from aidb.app.tab_refdef import SCHEMA_MASK, qfix_payload
+
+    a, b = _png(tmp_path / 'a.png'), _png(tmp_path / 'b.png', (32, 32))
+    m = {'schema_id': SCHEMA_MASK, 'type': 'raster', 'url': '/m.png', 'w': 64, 'h': 96, 'sha': 's'}
+    role = ' make the hand five-fingered '
+    slots = [dict(_slot(a), role=role, mask=m), _slot(None), dict(_slot(b), role='')]
+    p = qfix_payload(slots, ' a hint ', 'sid1')
+    assert p['schema_id'].startswith('1xlasm_enhancer.iteration.')
+    assert p['url'] == a and p['url_mask'] == m and p['edited_by'] == EDITED_BY
+    assert p['scene_id'] == 'sid1' and p['rev'] == 0
+    e = p['prompts_inp']['prompt_data'][0]
+    assert e['prompt_qwen21'] == 'make the hand five-fingered' and e['engine'] == 'qwen21'
+    assert e['mode'] == 'mask' and e['mask'] is None and e['from_rev'] == 0
+    assert e['hints'] == 'a hint'
+    assert e['src'] == {'url': a, 'w': 64, 'h': 96, 'desc': 'edit target', 'mask': m}
+    assert e['refs'] == [{'url': b, 'w': 32, 'h': 32, 'desc': 'image 2'}]  # slot 3 → image 2
+    st = parse_payload(json.dumps(p))
+    assert st['view'] == 'inp' and st['slots'][0]['url'] == a and st['slots'][1]['url'] == b
+    assert st['text'] == 'make the hand five-fingered'
+    assert st['slots'][0]['role'] == 'make the hand five-fingered'  # pulled back into slot 1
+    assert parse_payload(json.dumps(dict(p, made_by=None)))['slots'][0]['role'] == 'edit target'
+    # nomask: no painted mask, or masking switched off
+    for s1 in (_slot(a), dict(_slot(a), mask=m, mask_off=True)):
+        p = qfix_payload([s1])
+        e = p['prompts_inp']['prompt_data'][0]
+        assert e['mode'] == 'nomask' and 'mask' not in e['src'] and 'refs' not in e
+        assert e['prompt_qwen21'] == 'ignored' and e['hints'] is None
+        assert 'url_mask' not in p and p['scene_id'] is None
+
+
+def test_qfix_update_patches_inp_only(tmp_path):
+    """⇄ update with inp-qfix patches the inp view (VERB_VIEW)."""
+    from aidb.app.tab_refdef import qfix_payload
+
+    a, c = _png(tmp_path / 'a.png'), _png(tmp_path / 'c.png')
+    p = qfix_payload([_slot(a)])
+    out, view, changed, _ = update_payload(json.dumps(p), [_slot(c)], None, 'inp-qfix')
+    assert view == 'inp' and changed == ['prompts_inp.src']
+    assert out['prompts_inp']['prompt_data'][0]['src']['url'] == c
+
+
+def test_qfix_deploy_toasts(tmp_path, monkeypatch):
+    """inp-qfix deploy (FEATURE 180): success toast 0.5 s after a clipspace
+    read-back, failure → error toast 2 s and nothing claimed deployed."""
+    from aidb.app import tab_refdef
+
+    clip = {}
+    toasts = []
+    monkeypatch.setattr(tab_refdef, 'clip_copy', lambda t: clip.update(v=t))
+    monkeypatch.setattr(tab_refdef.pyperclip, 'paste', lambda: clip.get('v'))
+    for kind in ('Success', 'Error'):
+        monkeypatch.setattr(
+            tab_refdef.gr, kind, lambda m, duration=None, k=kind: toasts.append((k, m, duration))
+        )
+    deploy = tab_refdef.RefdefTab._deploy_qfix
+    a = _png(tmp_path / 'a.png')
+    msg = deploy([dict(_slot(a), role='fix it'), _slot(a)], '', None)
+    assert toasts == [('Success', 'inp-qfix deployed: nomask, 1 refs', 0.5)]
+    assert msg.startswith('inp-qfix deployed') and json.loads(clip['v'])['url'] == a
+    toasts.clear()
+    monkeypatch.setattr(tab_refdef.pyperclip, 'paste', lambda: 'stale')
+    msg = deploy([dict(_slot(a), role='fix it')], '', None)
+    assert (
+        toasts[0][0] == 'Error' and toasts[0][2] == 2 and 'clipspace write failed' in toasts[0][1]
+    )
+    assert msg.startswith('NOT deployed')
