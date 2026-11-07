@@ -1,6 +1,6 @@
 """Refdef tab of the AIDB scene app (reference definition).
 
-Three fixed reference slots (image + short role text) plus one prompt /
+N_SLOTS (7) fixed reference slots (image + short role text) plus one prompt /
 prompt-hint box. The clipspace is the only input (``⟲ pull``, plus a ⟲ per
 slot) and the only output (``⇪ deploy``, ``⇄ update``); the tab is stateless
 otherwise.
@@ -56,6 +56,11 @@ pin}``); the enhancer writes ``prompts_ref[].continue``. ``⛓ join`` is
 script-only like ⇄ update: slot 1 = the LAST clip of a chain, slot 2 = the
 FIRST (a pre, optional) → ``ait.tools.videos.chain_join`` writes the joined
 master to ``~/Downloads/000_comfy/`` and toasts path + seam summary.
+
+``👁`` / ``🚫`` (per slot) enables / disables a slot: a disabled slot keeps its
+image + role in the tab (dimmed) but deploys, updates, joins and view-switches as
+an empty slot (enhancer mode: its replacement is not patched in). New content in
+the slot (pull, slot ⟲, ✕) switches it back on.
 
 ``🎭`` (per slot, local images) opens a shared brush editor: paint the area to
 mask, ✓ stores it (⎘ = ✓ + the masked image's path on the clipspace, ready for
@@ -116,7 +121,7 @@ from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
 
-N_SLOTS: Final = 6
+N_SLOTS: Final = 7
 SLOTS_PER_ROW: Final = 3  # slots 2.. (slot 1 has its own row)
 ROLE_LINES: Final = 2  # role box height (slot 1: double)
 SCHEMA_ITERATION: Final = '1xlasm_enhancer.iteration'  # version-tolerant prefix
@@ -202,11 +207,24 @@ SCHEMA_MASK_PREFIX: Final = '1xlasm_enhancer.mask.'
 MASK_KEY_MAIN: Final = 'url_mask'  # the top-level scene image's mask (sibling of url)
 MASK_ICON_ON: Final = '🟥'  # per-slot masking switch: on (mask deployed / tinted)
 MASK_ICON_OFF: Final = '⬜'  # off: slot deployed without any mask
+SLOT_ICON_ON: Final = '👁'  # per-slot enable switch: on (slot deployed)
+SLOT_ICON_OFF: Final = '🚫'  # off: slot kept in the tab but deployed as empty
 
 
 # ---------------------------------------------------------------------- #
 # pure payload logic
 # ---------------------------------------------------------------------- #
+def disable_slots(refs_roles: list[str], slot_on: list[bool] | None) -> list[str]:
+    """The flat ``[ref, role, ...]`` UI values with every disabled slot (👁 off)
+    blanked: deploy / update / join / view switch treat it as empty, the tab keeps
+    its content."""
+    out = list(refs_roles)
+    for i, on in enumerate(slot_on or []):
+        if not on and 2 * i + 1 < len(out):
+            out[2 * i] = out[2 * i + 1] = ''
+    return out
+
+
 def empty_slots() -> list[dict]:
     return [{'url': None, 'id': None, 'role': ''} for _ in range(N_SLOTS)]
 
@@ -1903,6 +1921,8 @@ class RefdefTab:
             imgs, refs, roles, slot_pulls, clears, mask_btns = [], [], [], [], [], []
             mask_tgls, mask_clrs = [], []
             mask_on = gr.State([True] * N_SLOTS)  # per-slot masking switch (🟥/⬜)
+            slot_on = gr.State([True] * N_SLOTS)  # per-slot enable switch (👁/🚫)
+            slot_tgls = []
             # slot 1 (the main ref) gets its own row, the rest SLOTS_PER_ROW per row;
             # per slot: image, button row, role row
             rows = [[0]] + [
@@ -1923,6 +1943,7 @@ class RefdefTab:
                             )
                             refs.append(gr.State(''))
                             with gr.Row():
+                                slot_tgls.append(gr.Button(SLOT_ICON_ON, scale=0, min_width=40))
                                 slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
                                 clears.append(gr.Button('✕', scale=0, min_width=40))
                                 mask_btns.append(gr.Button('🎭', scale=0, min_width=40))
@@ -1986,10 +2007,33 @@ class RefdefTab:
                 return self._hist_md(h['pos'], self._save_ids(c))
 
             # new slot content switches masking back on (all slots / one slot)
-            on_outs = [mask_on, *mask_tgls]
+            on_outs = [mask_on, *mask_tgls, slot_on, *slot_tgls, *imgs]
+
+            def slot_vis(on):  # (button, preview dimming) of one slot
+                return (
+                    gr.update(value=SLOT_ICON_ON if on else SLOT_ICON_OFF),
+                    gr.update(elem_classes=[] if on else ['refdef-slot-off']),
+                )
 
             def all_on():
-                return [[True] * N_SLOTS, *[gr.update(value=MASK_ICON_ON)] * N_SLOTS]
+                vis = [slot_vis(True)] * N_SLOTS
+                return [
+                    [True] * N_SLOTS,
+                    *[gr.update(value=MASK_ICON_ON)] * N_SLOTS,
+                    [True] * N_SLOTS,
+                    *[b for b, _ in vis],
+                    *[im for _, im in vis],
+                ]
+
+            def slot_toggle(i, on):
+                on = list(on)
+                on[i] = not on[i]
+                return on, *slot_vis(on[i])
+
+            def slot_enable(i, on):
+                on = list(on)
+                on[i] = True
+                return on, *slot_vis(True)
 
             def mask_btn_vals(on):
                 return [gr.update(value=MASK_ICON_ON if o else MASK_ICON_OFF) for o in on]
@@ -2018,9 +2062,13 @@ class RefdefTab:
             cat.input(self._on_cat, [hist, cat], [*load_outs, status, hist, hist_md]).then(
                 all_on, [], on_outs
             )
-            view.input(self._on_view, [state, view, mask_on, *refs], [*load_outs, status]).then(
-                all_on, [], on_outs
-            )
+            view.input(
+                lambda st, v, m, so, *rr: self._on_view(
+                    st, v, m, *disable_slots(list(rr), so)[::2]
+                ),
+                [state, view, mask_on, slot_on, *refs_roles],
+                [*load_outs, status],
+            ).then(all_on, [], on_outs)
             for btn, step in ((prev_btn, -1), (next_btn, 1)):
                 btn.click(
                     lambda h, c, *a, step=step: self._on_hist(h, step, c, *a),
@@ -2031,11 +2079,13 @@ class RefdefTab:
                 # role stays: in enhancer mode it is payload-owned
                 clear.click(lambda: (None, ''), [], [img, ref]).then(
                     lambda on, i=i: one_on(i, on), [mask_on], [mask_on, mask_tgls[i]]
-                )
+                ).then(lambda on, i=i: slot_enable(i, on), [slot_on], [slot_on, slot_tgls[i], img])
             for i, (img, ref, slot_pull) in enumerate(zip(imgs, refs, slot_pulls, strict=True)):
                 slot_pull.click(self._on_slot_pull, [], [img, ref]).then(
                     lambda on, i=i: one_on(i, on), [mask_on], [mask_on, mask_tgls[i]]
-                )
+                ).then(lambda on, i=i: slot_enable(i, on), [slot_on], [slot_on, slot_tgls[i], img])
+            for i, stgl in enumerate(slot_tgls):
+                stgl.click(lambda on, i=i: slot_toggle(i, on), [slot_on], [slot_on, stgl, imgs[i]])
             for i, (tgl, clr) in enumerate(zip(mask_tgls, mask_clrs, strict=True)):
                 tgl.click(
                     lambda on, st, r, i=i: self._on_mask_toggle(i, on, st, r),
@@ -2066,12 +2116,22 @@ class RefdefTab:
             mask_del.click(self._on_mask_drop, [mask_slot, *refs], [*imgs, mask_box, status])
             mask_close.click(lambda: gr.update(visible=False), [], [mask_box])
             deploy_btn.click(
-                self._on_deploy,
-                [state, verb, kind, auto, text, mask_on, *refs_roles],
+                lambda st, v, k, a, t, m, so, *rr: self._on_deploy(
+                    st, v, k, a, t, m, *disable_slots(list(rr), so)
+                ),
+                [state, verb, kind, auto, text, mask_on, slot_on, *refs_roles],
                 [status],
             )
-            update_btn.click(self._on_update, [state, verb, mask_on, *refs_roles], [status])
-            join_btn.click(self._on_join, refs_roles, [status])
+            update_btn.click(
+                lambda st, v, m, so, *rr: self._on_update(st, v, m, *disable_slots(list(rr), so)),
+                [state, verb, mask_on, slot_on, *refs_roles],
+                [status],
+            )
+            join_btn.click(
+                lambda so, *rr: self._on_join(*disable_slots(list(rr), so)),
+                [slot_on, *refs_roles],
+                [status],
+            )
 
 
 REFDEF_HEAD = r"""
@@ -2080,6 +2140,7 @@ REFDEF_HEAD = r"""
   color: #fff !important; }
 #refdef-cat-label { text-align: right; }
 .refdef-role-main textarea { overflow-y: auto !important; }
+.refdef-slot-off { opacity: 0.3; }
 #refdef-deploy:hover { background: #388e3c !important; }
 </style>
 """

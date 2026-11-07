@@ -462,10 +462,10 @@ def test_norm_cat():
     assert norm_cat(' faces ') == 'faces'
 
 
-def test_six_slots_and_media_kind(tmp_path):
+def test_seven_slots_and_media_kind(tmp_path):
     from aidb.app.tab_refdef import N_SLOTS, RefdefTab, media_kind
 
-    assert N_SLOTS == 6
+    assert N_SLOTS == 7
     assert [media_kind(u) for u in ('/a.PNG', '/b.mp4', '/c.wav', '/d.txt', None)] == [
         'image',
         'video',
@@ -478,8 +478,8 @@ def test_six_slots_and_media_kind(tmp_path):
     assert [r['slot'] for r in p['refs']] == list(range(1, N_SLOTS + 1))
     assert {r['media'] for r in p['refs']} == {'audio'}
     # extra slots on a 1-image view are skipped, not deployed
-    _, _, skipped = patch_iteration(_iteration(), 'main', [None] * 5 + ['/x.png'])
-    assert skipped == ['slot 6 (main has one image)']
+    _, _, skipped = patch_iteration(_iteration(), 'main', [None] * 6 + ['/x.png'])
+    assert skipped == ['slot 7 (main has one image)']
     # an audio file is pullable and previews as a waveform
     import av
     import numpy as np
@@ -536,7 +536,15 @@ def test_ref_view_v68_slots_and_kinds():
         },
     )
     st = with_view(parse_payload(json.dumps(p)), 'ref')
-    assert [s['url'] for s in st['slots']] == ['/r/p1.png', None, None, '/r/v.wav', None, None]
+    assert [s['url'] for s in st['slots']] == [
+        '/r/p1.png',
+        None,
+        None,
+        '/r/v.wav',
+        None,
+        None,
+        None,
+    ]
     assert st['slots'][3]['role'] == 'voice'
     urls = ['/r/p9.png', None, None, '/r/x.png', None, None]
     out, changed, skipped = patch_iteration(p, 'ref', urls)
@@ -846,3 +854,13 @@ def test_qfix_deploy_toasts(tmp_path, monkeypatch):
         toasts[0][0] == 'Error' and toasts[0][2] == 2 and 'clipspace write failed' in toasts[0][1]
     )
     assert msg.startswith('NOT deployed')
+
+
+def test_disable_slots():
+    from aidb.app.tab_refdef import disable_slots
+
+    rr = ['/a.png', 'role a', '/b.png', 'role b', '', '']
+    assert disable_slots(rr, [True, False, True]) == ['/a.png', 'role a', '', '', '', '']
+    assert disable_slots(rr, [True] * 3) == rr
+    assert disable_slots(rr, None) == rr
+    assert rr[2] == '/b.png'  # input untouched
