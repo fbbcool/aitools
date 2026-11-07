@@ -462,10 +462,10 @@ def test_norm_cat():
     assert norm_cat(' faces ') == 'faces'
 
 
-def test_seven_slots_and_media_kind(tmp_path):
+def test_ten_slots_and_media_kind(tmp_path):
     from aidb.app.tab_refdef import N_SLOTS, RefdefTab, media_kind
 
-    assert N_SLOTS == 7
+    assert N_SLOTS == 10
     assert [media_kind(u) for u in ('/a.PNG', '/b.mp4', '/c.wav', '/d.txt', None)] == [
         'image',
         'video',
@@ -478,8 +478,8 @@ def test_seven_slots_and_media_kind(tmp_path):
     assert [r['slot'] for r in p['refs']] == list(range(1, N_SLOTS + 1))
     assert {r['media'] for r in p['refs']} == {'audio'}
     # extra slots on a 1-image view are skipped, not deployed
-    _, _, skipped = patch_iteration(_iteration(), 'main', [None] * 6 + ['/x.png'])
-    assert skipped == ['slot 7 (main has one image)']
+    _, _, skipped = patch_iteration(_iteration(), 'main', [None] * 9 + ['/x.png'])
+    assert skipped == ['slot 10 (main has one image)']
     # an audio file is pullable and previews as a waveform
     import av
     import numpy as np
@@ -541,9 +541,7 @@ def test_ref_view_v68_slots_and_kinds():
         None,
         None,
         '/r/v.wav',
-        None,
-        None,
-        None,
+        *[None] * 6,
     ]
     assert st['slots'][3]['role'] == 'voice'
     urls = ['/r/p9.png', None, None, '/r/x.png', None, None]
@@ -864,3 +862,68 @@ def test_disable_slots():
     assert disable_slots(rr, [True] * 3) == rr
     assert disable_slots(rr, None) == rr
     assert rr[2] == '/b.png'  # input untouched
+
+
+def test_h3_ref_budget():
+    """FEATURE t181: 6 pictures / 2 clips / 2 audio files, 12 refs with soundtracks."""
+    from aidb.app.tab_refdef import ref_budget_problems
+
+    def sl(*urls, audio=()):
+        return [
+            {'url': u, 'id': None, 'role': '', **({'audio': True} if u in audio else {})}
+            for u in urls
+        ]
+
+    pics = [f'/p{i}.png' for i in range(1, 7)]
+    full = sl(*pics, '/v1.mp4', '/v2.mp4', '/a1.wav', '/a2.wav', audio=('/v1.mp4', '/v2.mp4'))
+    for verb in ('ref', 'ref-novis', 'pre-vid', 'post-vid'):
+        assert ref_budget_problems(full, verb) == []  # exactly 12
+    assert ref_budget_problems(sl(*pics[:4]), 'ref') == []
+    assert ref_budget_problems(sl(*pics, '/p7.png'), 'ref') == ['max 6 pictures, got 7']
+    assert ref_budget_problems(sl('/v1.mp4', '/v2.mp4', '/v3.mp4'), 'ref') == ['max 2 clips, got 3']
+    assert ref_budget_problems(sl('/p.png', '/a.wav', '/b.wav', '/c.mp3'), 'ref-novis') == [
+        'max 2 audios, got 3'
+    ]
+    # 7 + 2 + 2 + 2 soundtracks = 13: per-kind cap and total both fire
+    over = sl(
+        *pics, '/p7.png', '/v1.mp4', '/v2.mp4', '/a1.wav', '/a2.wav', audio=('/v1.mp4', '/v2.mp4')
+    )
+    assert ref_budget_problems(over, 'ref') == [
+        'max 6 pictures, got 7',
+        'max 12 refs in total (soundtracks counted), got 13',
+    ]
+    # a clip without audio: true does not count its soundtrack
+    assert ref_budget_problems(sl(*pics, '/v1.mp4', '/v2.mp4', '/a1.wav', '/a2.wav'), 'ref') == []
+    # the other verbs have their own rules
+    assert ref_budget_problems(sl(*pics, '/p7.png'), 'enh') == []
+
+
+def test_ref_view_ten_slots_skip_and_kind_labels():
+    from aidb.app.tab_refdef import N_SLOTS, _ref_slots, view_slots
+
+    refs = [
+        {'kind': 'image', 'slot': 1, 'url': '/p1.png'},
+        {'kind': 'video', 'slot': 7, 'url': '/v1.mp4', 'audio': True},
+        {'kind': 'image', 'slot': 10, 'url': '/p6.png'},
+        {'kind': 'audio', 'slot': 11, 'url': '/a.wav'},  # out of range: skipped
+        {'kind': 'audio', 'slot': 0, 'url': '/b.wav'},  # out of range: skipped
+    ]
+    out = _ref_slots({'refs': refs})
+    assert len(out) == N_SLOTS
+    assert [r and r['url'] for r in out] == [
+        '/p1.png',
+        *[None] * 5,
+        '/v1.mp4',
+        None,
+        None,
+        '/p6.png',
+    ]
+    p = _iteration(
+        prompts_ref={
+            'type': 'single',
+            'current': 0,
+            'prompt_data': [{'prompt': 'x', 'refs': refs, 'ts': 't'}],
+        }
+    )
+    roles = [s['role'] for s in view_slots(p, 'ref') if s['url']]
+    assert roles == ['picture 1', 'clip 1', 'picture 2']

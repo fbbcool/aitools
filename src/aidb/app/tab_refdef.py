@@ -49,6 +49,11 @@ pulled:
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
     session ``xlasm`` with ``/refdef`` — only when it is idle.
 
+H3 ref budget (``H3_VERBS`` = ref / ref-novis / pre-vid / post-vid, FEATURE t181):
+at most 6 pictures, 2 clips, 2 audio files and 12 refs in total (a clip with
+``audio: true`` counts its soundtrack too); more → 2 s toast, nothing deployed.
+Chain anchors whose inherited refs break the budget are refused by the enhancer.
+
 ``pre-vid`` / ``post-vid`` (H3 clip chains, board task 172): slot 1 = the
 anchor clip (video), the other slots optional NEW image / audio refs; the text
 is the beat hint. Deploys like ``ref`` (+ a ``continue`` hint ``{dir, url,
@@ -121,7 +126,7 @@ from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
 
-N_SLOTS: Final = 7
+N_SLOTS: Final = 10  # H3 max distinct media: 6 pictures + 2 clips + 2 audio files
 SLOTS_PER_ROW: Final = 3  # slots 2.. (slot 1 has its own row)
 ROLE_LINES: Final = 2  # role box height (slot 1: double)
 SCHEMA_ITERATION: Final = '1xlasm_enhancer.iteration'  # version-tolerant prefix
@@ -149,6 +154,13 @@ CONTINUE_VERBS: Final = {'pre-vid': 'pre', 'post-vid': 'post'}
 # verbs whose prompt is built from the slot roles alone (enhancer never looks at
 # the media): slot 1 needs media + a role; it references the other slots by number
 ROLE_ONLY_VERBS: Final = ('ref-novis',)
+# MiniMax H3 ref2va budget (FEATURE t181 plan v3): per kind 6 pictures / 2 clips /
+# 2 audio files, and at most 12 refs in total where a clip's soundtrack counts as
+# one more ref iff the ref carries ``audio: true``. Same rule as the enhancer's
+# refusal; checked before deploy (``ref_budget_problems``).
+H3_VERBS: Final = ('ref', 'ref-novis', 'pre-vid', 'post-vid')
+H3_REF_CAP: Final = {'image': 6, 'video': 2, 'audio': 2}
+H3_REF_TOTAL: Final = 12
 # qwen21 head swap (agent-comfy workflows/qwen21-headswap.json, BFS head LoRA): slot 1 =
 # target (body / pose / light / bg = <image1>), slot 2 = reference head (<image2>), both
 # stills, nothing else. The enhancer writes a ``head_swap:`` prompt_qwen21 into
@@ -181,6 +193,7 @@ VERB_VIEW: Final = {
     'ref': 'ref',
     'ref-novis': 'ref',
 }
+REF_LABEL: Final = {'image': 'picture', 'video': 'clip', 'audio': 'audio'}  # ref view
 STILL_VIEWS: Final = ('inp',)  # qwen21 still slots: images only
 VID_REF_KEYS: Final = ('first', 'last')  # prompts_vid.refs keys for slots 2/3
 PREVIEW_SIZE: Final = 768  # slot preview edge (px)
@@ -259,7 +272,7 @@ VIEW_ROLES: Final = {
     'vid': ('first frame', 'last frame'),
     'inp': ('edit target', *(f'image {i}' for i in range(2, N_SLOTS + 1))),
     'next': ('src', 'identity ref'),
-    'ref': tuple(f'picture {i}' for i in range(1, N_SLOTS + 1)),
+    'ref': tuple(f'picture {i}' for i in range(1, N_SLOTS + 1)),  # see REF_LABEL
 }
 
 
@@ -293,14 +306,20 @@ def default_view(payload: dict) -> str:
 
 def _ref_slots(entry: dict) -> list[dict | None]:
     """``prompts_ref`` refs placed at their slot. The list is compacted in slot
-    order; since v6.8 each ref carries ``slot`` (1..6), older refs go by
-    list position."""
+    order; since v6.8 each ref carries ``slot`` (1..N_SLOTS), older refs go by
+    list position. A ref whose ``slot`` is out of range is skipped (never moved
+    to another slot)."""
     out: list[dict | None] = [None] * N_SLOTS
     for i, r in enumerate(entry.get('refs') or []):
         if not isinstance(r, dict):
             continue
         n = r.get('slot')
-        k = n - 1 if isinstance(n, int) and 1 <= n <= N_SLOTS else i
+        if n is None:
+            k = i
+        elif isinstance(n, int) and 1 <= n <= N_SLOTS:
+            k = n - 1
+        else:
+            continue
         if k < N_SLOTS and out[k] is None:
             out[k] = r
     return out
@@ -335,10 +354,17 @@ def _view_media(payload: dict, view: str) -> list[dict | None]:
 
 def view_slots(payload: dict, view: str) -> list[dict]:
     slots = empty_slots()
+    seen: dict[str, int] = {}  # ref view: fallback label numbered per kind
     for i, m in enumerate(_view_media(payload, view)[:N_SLOTS]):
         if m and m.get('url'):
             roles = VIEW_ROLES[view]
-            role = m.get('desc') or (roles[i] if i < len(roles) else '')
+            if view == 'ref':
+                kind = str(m.get('kind') or 'image')
+                seen[kind] = seen.get(kind, 0) + 1
+                label = f'{REF_LABEL.get(kind, kind)} {seen[kind]}'
+            else:
+                label = roles[i] if i < len(roles) else ''
+            role = m.get('desc') or label
             slots[i] = {'url': m['url'], 'id': None, 'role': role}
             if isinstance(m.get('mask'), dict):
                 slots[i]['mask'] = m['mask']
@@ -620,6 +646,26 @@ def continue_problems(slots: list[dict], verb: str) -> list[str]:
         for i, s in enumerate(slots[1:], 1)
         if media_kind(s.get('url')) == 'video'
     ]
+    return probs
+
+
+def ref_budget_problems(slots: list[dict], verb: str) -> list[str]:
+    """Why an H3 ref2va instruction breaks the ref budget (FEATURE t181): per kind
+    ``H3_REF_CAP``, in total ``H3_REF_TOTAL`` with a clip's soundtrack counted iff
+    its slot carries ``audio: true``."""
+    if verb not in H3_VERBS:
+        return []
+    filled = [s for s in slots if s.get('url')]
+    n = {k: 0 for k in H3_REF_CAP}
+    for s in filled:
+        if (k := media_kind(s['url'])) in n:
+            n[k] += 1
+    probs = [
+        f'max {cap} {REF_LABEL[k]}s, got {n[k]}' for k, cap in H3_REF_CAP.items() if n[k] > cap
+    ]
+    tracks = sum(1 for s in filled if media_kind(s['url']) == 'video' and s.get('audio') is True)
+    if (total := sum(n.values()) + tracks) > H3_REF_TOTAL:
+        probs.append(f'max {H3_REF_TOTAL} refs in total (soundtracks counted), got {total}')
     return probs
 
 
@@ -1680,13 +1726,14 @@ class RefdefTab:
             origin = (state['payload'].get('origin') or {}).get('scene_id')
         if probs := (
             continue_problems(slots, verb)
+            or ref_budget_problems(slots, verb)
             or swap_problems(slots, verb)
             or qfix_problems(slots, verb)
         ):
             # qfix: 2 s app toast (FEATURE 180); the other verbs keep 1 s
             gr.Warning(
                 f'{verb}: {"; ".join(probs)}',
-                duration=QFIX_TOAST_WARN_S if verb in QFIX_VERBS + SWAP_VERBS else 1,
+                duration=QFIX_TOAST_WARN_S if verb in QFIX_VERBS + SWAP_VERBS + H3_VERBS else 1,
             )
             return f'NOT deployed: `{verb}` — {"; ".join(probs)}'
         if verb in QFIX_VERBS:  # scripted enhancer data, no enhancer (FEATURE 180)
