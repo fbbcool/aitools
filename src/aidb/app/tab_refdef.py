@@ -153,7 +153,7 @@ MAX_PULL_LINES: Final = 50  # longer clipspaces are no image lists
 # auto-trigger: after an instruction deploy, prompt the enhancer agent in its
 # herdr session with TRIGGER_CMD (board task 150) — only when it is idle
 HERDR_SESSION: Final = 'xlasm'
-HERDR_AGENT: Final = 'enhancer'
+HERDR_AGENT: Final = 'xlasmos'  # 1xlasm-enhancer's herdr agent name
 TRIGGER_CMD: Final = '/refdef'
 HERDR_READY: Final = ('idle', 'done')
 HERDR_TIMEOUT_S: Final = 10
