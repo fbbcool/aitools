@@ -969,3 +969,106 @@ def test_inherit_list_and_payload():
     assert p['inherit'] == inh and p['continue']['dir'] == 'post'
     assert 'inherit' not in refdef_payload(slots, 'post-vid', 'hint', 'go')
     assert 'inherit' not in refdef_payload(slots, 'ref', 'hint', 'go', inherit=inh)
+
+
+# -- ref-img: qwen21 reference-to-image, novis (FEATURE t187) ------------ #
+def test_ref_img_problems():
+    from aidb.app.tab_refdef import VERB_VIEW, VERBS, img_ref_problems, missing_roles
+
+    assert 'ref-img' in VERBS and 'ref-img' not in VERB_VIEW  # no enhancer view (yet)
+    im = {'url': '/a.png', 'id': None, 'role': ''}
+    e = {'url': '', 'id': None, 'role': ''}
+    for n in (1, 2, 3, 4, 5):
+        assert img_ref_problems([im] * n, 'ref-img') == []
+    assert img_ref_problems([e, e, im], 'ref-img') == []  # gaps ok: compacted downstream
+    assert missing_roles([im], 'ref-img') == []  # roles optional
+    assert img_ref_problems([], 'ref-img') == ['needs 1-5 images in slots 1-5']
+    assert img_ref_problems([dict(im, url='/c.mp4'), im], 'ref-img') == [
+        'slot 1 is video (images only)'
+    ]
+    assert img_ref_problems([im, dict(im, url='/v.wav')], 'ref-img') == [
+        'slot 2 is audio (images only)'
+    ]
+    assert img_ref_problems([im] * 6, 'ref-img') == ['slot 6 must be empty (max 5 images)']
+    assert img_ref_problems([e, e, e, e, im], 'ref-img') == []
+    assert img_ref_problems([im] * 6, 'ref') == []  # other verbs unaffected
+
+
+def test_ref_img_payload_drops_masks_keeps_roles():
+    from aidb.app.tab_refdef import ignored_masks
+
+    mask = {'schema_id': '1xlasm_enhancer.mask.v1', 'type': 'raster', 'url': '/m.png'}
+    slots = [
+        {'url': '/face1.png', 'id': None, 'role': 'the face', 'mask': mask},
+        {'url': '/face2.png', 'id': None, 'role': ''},
+    ]
+    p = refdef_payload(slots, 'ref-img', 'prompt', 'a face sheet, 6 panels')
+    assert p['schema_id'] == SCHEMA_REFDEF and p['verb'] == 'ref-img'
+    assert p['kind'] == 'prompt' and p['text'] == 'a face sheet, 6 panels'
+    assert [(r['slot'], r['role'], r['media']) for r in p['refs'][:2]] == [
+        (1, 'the face', 'image'),
+        (2, '', 'image'),
+    ]  # no default roles
+    assert all('mask' not in r for r in p['refs'])
+    assert 'continue' not in p and 'inherit' not in p
+    assert ignored_masks(slots, 'ref-img') == [1]
+    assert ignored_masks(slots, 'ref') == []
+    assert refdef_payload(slots, 'ref', 'hint', '')['refs'][0]['mask'] == mask  # others keep it
+
+
+class _FakeCol:
+    """Just enough of a pymongo collection for the predefined-prompt helpers."""
+
+    def __init__(self):
+        self.docs = []
+
+    def find(self, flt=None, proj=None):
+        return [{k: v for k, v in d.items() if k != '_id'} for d in self.docs]
+
+    def find_one(self, flt):
+        return next((d for d in self.docs if all(d.get(k) == v for k, v in flt.items())), None)
+
+    def replace_one(self, flt, doc, upsert=False):
+        self.docs = [d for d in self.docs if d.get('name') != flt['name']] + [dict(doc)]
+
+    def delete_one(self, flt):
+        n = len(self.docs)
+        self.docs = [d for d in self.docs if d.get('name') != flt['name']]
+
+        class R:
+            deleted_count = n - len(self.docs)
+
+        return R()
+
+
+def test_predefined_prompts():
+    import pytest
+
+    from aidb.app.tab_refdef import (
+        delete_prompt,
+        list_prompts,
+        parse_models,
+        prompt_label,
+        save_prompt,
+        seed_prompts,
+    )
+
+    assert parse_models('') == ['generic'] and parse_models(None) == ['generic']
+    assert parse_models(' qwen21, h3 ,qwen21') == ['qwen21', 'h3']
+    col = _FakeCol()
+    assert list_prompts(None) == [] and seed_prompts(None) == 0
+    assert seed_prompts(col) == 1 and seed_prompts(col) == 0  # idempotent
+    (fs,) = list_prompts(col)
+    assert fs['name'] == 'facesheet' and fs['models'] == ['qwen21']
+    assert fs['prompt'].startswith('face reference sheet, 3×2 grid')
+    assert prompt_label(fs) == 'character-gen / facesheet [qwen21]'
+    save_prompt(col, 'b', '', '', 'x')
+    assert prompt_label(list_prompts(col)[0]) == '- / b [generic]'  # uncategorized first
+    save_prompt(col, 'b', 'a-cat', 'h3', 'y')  # same name → overwrite
+    assert [d['name'] for d in list_prompts(col)] == ['b', 'facesheet']
+    assert list_prompts(col)[0]['prompt'] == 'y' and len(col.docs) == 2
+    for bad in (('', 'c', '', 'x'), ('n', 'c', '', '  ')):
+        with pytest.raises(ValueError):
+            save_prompt(col, *bad)
+    assert delete_prompt(col, 'b') and not delete_prompt(col, 'b') and not delete_prompt(col, '')
+    assert [d['name'] for d in list_prompts(col)] == ['facesheet']

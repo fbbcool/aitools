@@ -164,6 +164,7 @@ VERBS: Final = (
     'post-vid',
     'img-fsw-novis',
     'inp-qfix',
+    'ref-img',
 )
 # H3 clip-chain continuations (board task 172): slot 1 = the anchor clip
 # (FbbcoolSaveVideo master, video only), the other slots optional NEW refs
@@ -190,6 +191,13 @@ SWAP_DEFAULT_ROLES: Final = (
     'target: keep body, pose, outfit, light and background; its head/face gets replaced',
     'reference head: the head/face that replaces the head/face of slot 1',
 )
+# qwen21 reference-to-image (FEATURE t187, agent-comfy workflows/qwen21-ref.json):
+# NOVIS — the enhancer never looks at the media, the prompt comes from roles + text.
+# Slots 1-5 = equal still refs (5 since t187 comfyos follow-up) (image 1..N compacted in slot order; empty roles
+# stay empty, no defaults), at least one; slots 6+ empty. 🎭 masks are IGNORED:
+# never emitted for this verb (deploy status names the slots).
+IMG_REF_VERBS: Final = ('ref-img',)
+IMG_REF_MAX: Final = 5
 # qwen21 quickfix (board FEATURE 180, ComfyUI userdata workflows/qwen21-quickfix.json):
 # NO enhancer roundtrip — deploy scripts the enhancer data itself (``qfix_payload``):
 # slot 1 = edit target (+ its 🎭 mask → mask mode, else nomask), slots 2.. = 0-2
@@ -224,6 +232,20 @@ TRIGGER_CMD: Final = '/refdef'
 HERDR_READY: Final = ('idle', 'done')
 HERDR_TIMEOUT_S: Final = 10
 SAVES_COLLECTION: Final = 'refdef_saves'  # 💾 save history (see build)
+# predefined prompts (FEATURE t188): {name (unique), category, models, prompt, ts};
+# the dropdown above the text box fills it, ➕ upserts by name, 🗑 deletes
+PROMPTS_COLLECTION: Final = 'refdef_prompts'
+PROMPT_MODELS_DEFAULT: Final = ('generic',)
+PROMPT_SEED: Final = (
+    {
+        'name': 'facesheet',
+        'category': 'character-gen',
+        'models': ['qwen21'],
+        'prompt': 'face reference sheet, 3×2 grid on plain grey: front, three-quarter '
+        'left/right, profile left/right, neutral close-up; same woman as image 1–3, '
+        'landscape, no clothes',
+    },
+)
 CAT_ALL: Final = '(all)'  # category filter = every save; saved as uncategorized
 SNAP_KEYS: Final = ('state', 'idx', 'refs', 'roles', 'verb', 'kind', 'text')
 # 🎭 hand-drawn masks: one per source image (repainting replaces it), at a fixed
@@ -707,6 +729,34 @@ def swap_problems(slots: list[dict], verb: str) -> list[str]:
     return probs
 
 
+def img_ref_problems(slots: list[dict], verb: str) -> list[str]:
+    """Why a ref-img instruction can't deploy: 1-5 still images in slots 1-5,
+    slots 6+ empty."""
+    if verb not in IMG_REF_VERBS:
+        return []
+    slots = (list(slots) + empty_slots())[:N_SLOTS]
+    head = slots[:IMG_REF_MAX]
+    probs = [
+        f'slot {i + 1} is {kind} (images only)'
+        for i, s in enumerate(head)
+        if (kind := media_kind(s.get('url'))) not in (None, 'image')
+    ]
+    if not any(s.get('url') for s in head):
+        probs.append(f'needs 1-{IMG_REF_MAX} images in slots 1-{IMG_REF_MAX}')
+    if extra := [
+        str(i + 1) for i, s in enumerate(slots[IMG_REF_MAX:], IMG_REF_MAX) if s.get('url')
+    ]:
+        probs.append(f'slot {", ".join(extra)} must be empty (max {IMG_REF_MAX} images)')
+    return probs
+
+
+def ignored_masks(slots: list[dict], verb: str) -> list[int]:
+    """1-based slots whose 🎭 mask the verb ignores (ref-img emits no masks)."""
+    if verb not in IMG_REF_VERBS:
+        return []
+    return [i + 1 for i, s in enumerate(slots[:N_SLOTS]) if s.get('url') and s.get('mask')]
+
+
 def qfix_problems(slots: list[dict], verb: str) -> list[str]:
     """Why an inp-qfix deploy can't happen: slot 1 = the edit target (image),
     the other filled slots 0-2 still refs, slot 1's role = the edit instruction."""
@@ -1011,7 +1061,7 @@ def refdef_payload(
                 'role': _instruction_role(s, i, verb),
                 'media': media_kind(s.get('url')),
                 # 🎭 painted mask (only when one exists): mask.v1 object (task 175)
-                **({'mask': s['mask']} if s.get('mask') else {}),
+                **({'mask': s['mask']} if s.get('mask') and verb not in IMG_REF_VERBS else {}),
             }
             for i, s in enumerate(slots[:N_SLOTS])
         ],
@@ -1155,6 +1205,62 @@ def norm_cat(cat: str | None) -> str | None:
     """Category dropdown value → stored category / filter (None = all / none)."""
     cat = (cat or '').strip()
     return None if not cat or cat == CAT_ALL else cat
+
+
+def parse_models(models: str | list | None) -> list[str]:
+    """'a, b' / ['a', 'b'] → ['a', 'b']; empty → ['generic']."""
+    if isinstance(models, str):
+        models = models.split(',')
+    out = [m.strip() for m in models or [] if m and m.strip()]
+    return list(dict.fromkeys(out)) or list(PROMPT_MODELS_DEFAULT)
+
+
+def prompt_label(doc: dict) -> str:
+    """Dropdown label ``category / name [models]``."""
+    models = ', '.join(parse_models(doc.get('models')))
+    return f'{doc.get("category") or "-"} / {doc["name"]} [{models}]'
+
+
+def list_prompts(col) -> list[dict]:
+    """Every predefined prompt, by category then name ([] without a DB)."""
+    if col is None:
+        return []
+    docs = list(col.find({}, {'_id': 0}))
+    return sorted(docs, key=lambda d: ((d.get('category') or '').lower(), d['name'].lower()))
+
+
+def save_prompt(col, name: str, category: str | None, models, prompt: str) -> dict:
+    """Upsert the prompt ``name`` (an existing name is overwritten)."""
+    name, prompt = (name or '').strip(), (prompt or '').strip()
+    if not name:
+        raise ValueError('needs a name')
+    if not prompt:
+        raise ValueError('prompt text is empty')
+    doc = {
+        'name': name,
+        'category': (category or '').strip() or None,
+        'models': parse_models(models),
+        'prompt': prompt,
+        'ts': datetime.now(timezone.utc).replace(tzinfo=None),
+    }
+    col.replace_one({'name': name}, doc, upsert=True)
+    return doc
+
+
+def delete_prompt(col, name: str) -> bool:
+    return bool(name) and col.delete_one({'name': name}).deleted_count > 0
+
+
+def seed_prompts(col) -> int:
+    """Insert the PROMPT_SEED entries whose name is missing; returns how many."""
+    if col is None:
+        return 0
+    n = 0
+    for doc in PROMPT_SEED:
+        if col.find_one({'name': doc['name']}) is None:
+            save_prompt(col, doc['name'], doc['category'], doc['models'], doc['prompt'])
+            n += 1
+    return n
 
 
 def doc_to_snap(doc: dict) -> dict:
@@ -1631,6 +1737,47 @@ class RefdefTab:
         cats = sorted(c for c in col.distinct('category') if c) if col is not None else []
         return [CAT_ALL, *cats]
 
+    def _pcol(self):
+        return self._dbc._get_collection(PROMPTS_COLLECTION)
+
+    def _prompt_choices(self) -> list[tuple[str, str]]:
+        return [(prompt_label(d), d['name']) for d in list_prompts(self._pcol())]
+
+    def _on_prompt_pick(self, name):
+        """Dropdown pick → the text box (replaced) + the ➕ fields (edit = ➕ again)."""
+        col = self._pcol()
+        doc = col.find_one({'name': name}) if col is not None and name else None
+        if doc is None:
+            return gr.update(), gr.update(), gr.update(), gr.update()
+        return (
+            doc['prompt'],
+            doc['name'],
+            doc.get('category') or '',
+            ', '.join(parse_models(doc.get('models'))),
+        )
+
+    def _on_prompt_add(self, name, category, models, text):
+        col = self._pcol()
+        if col is None:
+            gr.Warning('prompt: no DB connection', duration=0.5)
+            return gr.update()
+        try:
+            doc = save_prompt(col, name, category, models, text)
+        except ValueError as e:
+            gr.Warning(f'prompt: {e}', duration=1)
+            return gr.update()
+        gr.Info(f'prompt `{doc["name"]}` saved', duration=0.5)
+        return gr.update(choices=self._prompt_choices(), value=doc['name'])
+
+    def _on_prompt_del(self, name):
+        col = self._pcol()
+        if col is None or not name:
+            gr.Info('no prompt selected', duration=0.5)
+            return gr.update()
+        if delete_prompt(col, name):
+            gr.Info(f'prompt `{name}` deleted', duration=0.5)
+        return gr.update(choices=self._prompt_choices(), value=None)
+
     @staticmethod
     def _ts_str(ts: datetime | None) -> str:
         if ts is None:
@@ -1805,12 +1952,15 @@ class RefdefTab:
             continue_problems(slots, verb)
             or ref_budget_problems(slots, verb)
             or swap_problems(slots, verb)
+            or img_ref_problems(slots, verb)
             or qfix_problems(slots, verb)
         ):
             # qfix: 2 s app toast (FEATURE 180); the other verbs keep 1 s
             gr.Warning(
                 f'{verb}: {"; ".join(probs)}',
-                duration=QFIX_TOAST_WARN_S if verb in QFIX_VERBS + SWAP_VERBS + H3_VERBS else 1,
+                duration=QFIX_TOAST_WARN_S
+                if verb in QFIX_VERBS + SWAP_VERBS + H3_VERBS + IMG_REF_VERBS
+                else 1,
             )
             return f'NOT deployed: `{verb}` — {"; ".join(probs)}'
         if verb in QFIX_VERBS:  # scripted enhancer data, no enhancer (FEATURE 180)
@@ -1843,6 +1993,8 @@ class RefdefTab:
         clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
         msg = f'deployed instruction `{verb}` ({n}/{N_SLOTS} slots, kind={kind}){anchor_note}'
+        if masked := ignored_masks(slots, verb):
+            msg += f' · masks ignored: slot {", ".join(map(str, masked))}'
         note = trigger_enhancer() if auto else 'auto-trigger off'
         if verb in SWAP_VERBS:  # deploy toast like inp-qfix
             dflt = [r['slot'] for r in payload['refs'][:2] if r['role'] in SWAP_DEFAULT_ROLES]
@@ -2212,6 +2364,26 @@ class RefdefTab:
                 )
 
             status = gr.Markdown()
+            # predefined prompts (t188): pick → text box; ➕ upserts by name; 🗑 deletes
+            seed_prompts(self._pcol())
+            with gr.Row(equal_height=True):
+                prompt_dd = gr.Dropdown(
+                    self._prompt_choices(),
+                    value=None,
+                    show_label=False,
+                    container=False,
+                    scale=4,
+                    min_width=300,
+                )
+                p_name = gr.Textbox(placeholder='name', show_label=False, container=False, scale=1)
+                p_cat = gr.Textbox(
+                    placeholder='category', show_label=False, container=False, scale=1
+                )
+                p_models = gr.Textbox(
+                    placeholder='models (generic)', show_label=False, container=False, scale=1
+                )
+                p_add = gr.Button('➕', scale=0, min_width=40)
+                p_del = gr.Button('🗑', scale=0, min_width=40)
             text = gr.Textbox(label='prompt / prompt hint', lines=8, max_lines=30)
             with gr.Accordion('source / concepts / triggers', open=False):
                 source_md = gr.Markdown(self._source_md(None, 0))
@@ -2283,6 +2455,9 @@ class RefdefTab:
             reset_btn.click(
                 lambda: [*self._on_reset(), cur_hist], [], [*load_outs, status, hist]
             ).then(hist_refresh, [hist, cat], [hist_md]).then(all_on, [], on_outs)
+            prompt_dd.input(self._on_prompt_pick, [prompt_dd], [text, p_name, p_cat, p_models])
+            p_add.click(self._on_prompt_add, [p_name, p_cat, p_models, text], [prompt_dd])
+            p_del.click(self._on_prompt_del, [prompt_dd], [prompt_dd])
             save_btn.click(self._on_save, [cat, *snap_ins], [status, hist, hist_md, cat])
             del_btn.click(self._on_del, [hist, cat], [*load_outs, status, hist, hist_md, cat]).then(
                 all_on, [], on_outs
