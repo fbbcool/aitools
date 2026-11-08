@@ -170,3 +170,92 @@ def test_join_clips_lengths_and_root_untouched(tmp_path):
     assert out.is_file()
     info = videos._probe_av(out)
     assert (info['w'], info['h'], info['sr']) == (64, 48, 48000)
+
+
+# -- per-seam joins (board task 183) ------------------------------------ #
+def test_seam_plan_legacy_and_groups():
+    plan, groups = videos._seam_plan(3, 1, 6, None)
+    assert [s['dir'] for s in plan] == ['pre', 'post'] and groups == [(0, 2, 1)]
+    chain_post = {'kind': 'chain', 'pin': 22, 'dir': 'post'}
+    plan, groups = videos._seam_plan(3, 0, 22, [{'kind': 'plain'}, chain_post])
+    assert [s['kind'] for s in plan] == ['plain', 'chain'] and groups == [(0, 0, 0), (1, 2, 1)]
+    pre = {'kind': 'chain', 'pin': 5, 'dir': 'pre'}
+    seams = [chain_post, {'kind': 'plain'}, pre, chain_post]  # R→post | pre→R→post
+    assert videos._seam_plan(5, 0, 22, seams)[1] == [(0, 1, 0), (2, 4, 3)]
+    assert videos._clip_names([(0, 0, 0), (1, 2, 1)]) == ['g1', 'g2.root', 'g2.post1']
+    with pytest.raises(ValueError, match='pre… → root → post'):
+        videos._seam_plan(3, 0, 22, [chain_post, pre])
+    with pytest.raises(ValueError, match='need 2 seams'):
+        videos._seam_plan(3, 0, 22, [chain_post])
+    with pytest.raises(ValueError, match='kind must be'):
+        videos._seam_plan(2, 0, 22, [{'kind': 'cut'}])
+
+
+def _audio_seconds(path: Path) -> float:
+    out = subprocess.run(
+        ['ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_entries', 'format=duration',
+         '-of', 'csv=p=0', str(path)],
+        capture_output=True, text=True, check=True,
+    ).stdout  # fmt: skip
+    return float(out.strip())
+
+
+def test_join_clips_mixed_plain_and_chain(tmp_path):
+    p, r, q = tmp_path / 'p.mkv', tmp_path / 'r.mkv', tmp_path / 'q.mkv'
+    _clip(p, 40)
+    _clip(r, 80)
+    _clip(q, 110)
+    out = tmp_path / 'out.mkv'
+    seams = [{'kind': 'plain'}, {'kind': 'chain', 'pin': 6, 'dir': 'post'}]
+    rep = videos.join_clips([p, r, q], out=out, ramp=8, verbose=0, seams=seams)
+    assert rep['frames'] == 29 + 30 + 30 - 6  # plain drops 1, the chain overlaps pin
+    assert [s['kind'] for s in rep['seams']] == ['plain', 'chain']
+    assert rep['seams'][0]['cut'] == 0 and rep['seams'][0]['frame'] == 29
+    assert rep['roots'] == [0, 1] and rep['root'] == 0
+    # only the post clip is corrected (toward its own root); g1 + g2.root untouched
+    assert [c['clip'] for c in rep['corrections']] == ['g2.post1']
+    assert rep['corrections'][0]['offset'][0] < 0  # 110 → toward 80
+    assert abs(_audio_seconds(out) - rep['seconds']) < 0.05
+    assert '|' in videos.seam_summary(rep) and '→g2.post1' in videos.seam_summary(rep)
+
+
+def test_join_clips_two_chain_groups_no_cross_correction(tmp_path):
+    r1, q1, r2, q2 = (tmp_path / f'{n}.mkv' for n in ('r1', 'q1', 'r2', 'q2'))
+    _clip(r1, 40)
+    _clip(q1, 90)  # brighter than its root → negative offset
+    _clip(r2, 150)
+    _clip(q2, 100)  # darker than its root → positive offset (would be negative toward g1)
+    post = {'kind': 'chain', 'pin': 6, 'dir': 'post'}
+    rep = videos.join_clips(
+        [r1, q1, r2, q2], out=tmp_path / 'o.mkv', ramp=8, verbose=0,
+        seams=[post, {'kind': 'plain'}, post],
+    )  # fmt: skip
+    assert rep['frames'] == (30 + 30 - 6) - 1 + (30 + 30 - 6)
+    assert rep['roots'] == [0, 2]
+    off = {c['clip']: c['offset'][0] for c in rep['corrections']}
+    assert set(off) == {'g1.post1', 'g2.post1'}
+    assert off['g1.post1'] < 0 < off['g2.post1']
+
+
+def test_join_clips_legacy_report_has_kind(tmp_path):
+    a, b = tmp_path / 'a.mkv', tmp_path / 'b.mkv'
+    _clip(a, 60)
+    _clip(b, 70)
+    rep = videos.join_clips([a, b], out=tmp_path / 'o.mkv', pin=6, ramp=8, verbose=0)
+    assert [s['kind'] for s in rep['seams']] == ['chain'] and rep['roots'] == [0]
+    assert [s['left'] for s in rep['seams']] == ['root']
+
+
+def test_join_clips_short_soundtrack_keeps_every_frame(tmp_path):
+    a, b, bs = tmp_path / 'a.mkv', tmp_path / 'b.mkv', tmp_path / 'bs.mkv'
+    _clip(a, 60)
+    _clip(b, 70)
+    subprocess.run(  # b with its audio cut to 1.0 s of its 1.25 s video
+        ['ffmpeg', '-v', 'error', '-y', '-i', str(b), '-c:v', 'copy', '-af', 'atrim=0:1',
+         '-c:a', 'pcm_s16le', str(bs)],
+        check=True,
+    )  # fmt: skip
+    out = tmp_path / 'o.mkv'
+    rep = videos.join_clips([a, bs], out=out, pin=6, ramp=8, verbose=0)
+    written = sum(1 for _ in videos._iter_frames(out, 64, 48))
+    assert written == rep['frames'] == 30 + 30 - 6

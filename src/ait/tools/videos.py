@@ -322,6 +322,19 @@ def _rendered_ref_entry(md: dict) -> dict | None:
     return data[i] if 0 <= i < len(data) else data[0]
 
 
+def clip_refs(url: str | Path) -> list[dict]:
+    """The refs the clip was rendered with (its embedded prompts_ref entry's
+    ``refs``, in payload order) — what a pre-/post-vid continuation inherits.
+    [] for a clip without a payload / refs or an unreadable one."""
+    try:
+        md = metadata(url)
+    except Exception:  # noqa: BLE001 - unreadable = no refs
+        return []
+    entry = _rendered_ref_entry(md) if md else None
+    refs = (entry or {}).get('refs')
+    return [r for r in refs if isinstance(r, dict)] if isinstance(refs, list) else []
+
+
 def chain_link(url: str | Path) -> dict | None:
     """The clip's continuation link ``{dir, url, pin}`` from its embedded
     enhancer payload; None for a chain root / a clip without a payload."""
@@ -492,6 +505,7 @@ def join_clips(
     probe: int = CHAIN_PROBE,
     crf: int = 14,
     verbose: int = 1,
+    seams: Sequence[dict] | None = None,
 ) -> dict:
     """Join an explicit H3 continuation chain (play order; `root` = R's index).
 
@@ -510,19 +524,27 @@ def join_clips(
     ``seams`` (per seam: left/right names, ``cut`` offset, ``pin``, ``plain`` /
     ``written`` MAD /255 on 168×96, motion ``before`` / ``after`` the cut) and
     ``corrections``.
+
+    Per-seam mode (board task 183): `seams` = one dict per seam, ``{'kind':
+    'chain', 'pin': 22, 'dir': 'post'|'pre'}`` or ``{'kind': 'plain'}``; `root`
+    and `pin` are then ignored. A plain seam is a hard cut that drops the left
+    clip's last frame (it seeded the right clip): no search, no exposure match.
+    Plain seams split the list into chain groups ``pre… → root → post…``, each
+    with its own root (= the clip after its last ``pre`` seam, never altered);
+    exposure correction stays inside a group. The report then also carries
+    ``roots`` and ``groups``; ``root`` = the first group's root. Every seam in
+    the report has ``kind`` (chain|plain).
     """
     paths = [Path(c) for c in clips]
     if not paths:
         raise ValueError('no clips')
-    if not 0 <= root < len(paths):
-        raise ValueError(f'root index {root} out of range')
-    pins = list(pin) if isinstance(pin, (list, tuple)) else [pin] * (len(paths) - 1)
-    if len(pins) != len(paths) - 1:
-        raise ValueError(f'{len(paths) - 1} seams but {len(pins)} pins')
-    names = [
-        'root' if i == root else (f'pre{root - i}' if i < root else f'post{i - root}')
-        for i in range(len(paths))
-    ]
+    plan_seams, groups = _seam_plan(len(paths), root, pin, seams)
+    pins = [sm['pin'] for sm in plan_seams]
+    gid = {ci: g for g, (a, b, _) in enumerate(groups) for ci in range(a, b + 1)}
+    roots = [r for _, _, r in groups]
+    root_of = {ci: groups[gid[ci]][2] for ci in range(len(paths))}
+    root = roots[0]
+    names = _clip_names(groups)
 
     def log(msg: str) -> None:
         if verbose > 0:
@@ -544,14 +566,23 @@ def join_clips(
     seam_cut, seams = [], []
     for j in range(len(paths) - 1):
         L, R, pj = small[j], small[j + 1], pins[j]
+        if plan_seams[j]['kind'] == 'plain':  # drop the left's last (seed) frame
+            if n[j] < 2:
+                raise ValueError(f'clip {names[j]} too short for a plain seam')
+            mad = _mad(L[n[j] - 2], R[0])
+            seam_cut.append(0)
+            seams.append({'kind': 'plain', 'left': names[j], 'right': names[j + 1], 'cut': 0,
+                          'pin': 1, 'jump': mad, 'plain': mad})  # fmt: skip
+            log(f'cut {names[j]}->{names[j + 1]}: plain (drop 1 frame, jump {mad:.1f})')
+            continue
         if pj > min(n[j], n[j + 1]):
             raise ValueError(f'pin {pj} longer than clip {names[j]} / {names[j + 1]}')
         cands = range(pj + 1) if search else [pj]
         scores = {i: _geo_jump(L[n[j] - pj + i - 1], R[i]) for i in cands}
         best = min(scores, key=lambda i: scores[i])
         seam_cut.append(best)
-        seams.append({'left': names[j], 'right': names[j + 1], 'cut': best, 'pin': pj,
-                      'jump': scores[best], 'plain': _mad(L[n[j] - 1], R[pj])})  # fmt: skip
+        seams.append({'kind': 'chain', 'left': names[j], 'right': names[j + 1], 'cut': best,
+                      'pin': pj, 'jump': scores[best], 'plain': _mad(L[n[j] - 1], R[pj])})  # fmt: skip
         log(f'cut {names[j]}->{names[j + 1]}: overlap frame {best}/{pj} (jump {scores[best]:.1f})')
 
     keep = []
@@ -566,11 +597,11 @@ def join_clips(
     plan = []  # (clip, neighbour, side)
     if match:
         for ci in range(len(paths)):
-            if ci == root:
+            if ci == root_of[ci]:  # every group root stays untouched
                 continue
-            nb = ci + 1 if ci < root else ci - 1
+            nb = ci + 1 if ci < root_of[ci] else ci - 1
             (s, e), (ns, ne) = keep[ci], keep[nb]
-            if ci < root:
+            if ci < root_of[ci]:
                 need[ci] |= set(range(e - k, e))
                 need[nb] |= set(range(ns, ns + k))
             else:
@@ -590,7 +621,7 @@ def join_clips(
         (s, e), (ns, ne) = keep[ci], keep[nb]
         w = np.zeros(e - s)
         r = min(ramp, e - s)
-        if ci < root:  # pre side: this clip before the cut -> neighbour after it
+        if ci < root_of[ci]:  # pre side: this clip before the cut -> neighbour after it
             src = np.stack([full[(ci, f)] for f in range(e - k, e)])
             dst = np.stack([full[(nb, f)] for f in range(ns, ns + k)])
             off = _exposure_offset(src, dst)
@@ -610,7 +641,14 @@ def join_clips(
 
     out_path = Path(out) if out else _default_chain_out(paths[root], len(paths))
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    chain_tag = json.dumps({'clips': [str(p) for p in paths], 'root': root, 'cuts': seam_cut})
+    chain_tag = json.dumps(
+        {
+            'clips': [str(p) for p in paths],
+            'root': root,
+            'cuts': seam_cut,
+            **({'roots': roots, 'kinds': [sm['kind'] for sm in plan_seams]} if seams else {}),
+        }
+    )
     with tempfile.TemporaryDirectory() as tmp:
         audio_in: list[str] = []
         if sr:
@@ -624,14 +662,19 @@ def join_clips(
                 )
                 cc += f'[a{i}]'
             wav = os.path.join(tmp, 'audio.wav')
+            n_audio = round(sum(e - s for s, e in keep) / fps * sr)
             subprocess.run(
                 ['ffmpeg', '-v', 'error', '-y', *ins, '-filter_complex',
-                 f'{fc}{cc}concat=n={len(paths)}:v=0:a=1[a]', '-map', '[a]',
+                 # exactly the video length (a short soundtrack is padded)
+                 f'{fc}{cc}concat=n={len(paths)}:v=0:a=1,apad=whole_len={n_audio},'
+                 f'atrim=end_sample={n_audio}[a]',
+                 '-map', '[a]',
                  '-c:a', 'pcm_s16le', wav],
                 check=True,
             )  # fmt: skip
-            audio_in = ['-i', wav, '-map', '0:v', '-map', '1:a', '-c:a', 'aac', '-b:a', '192k',
-                        '-shortest']  # fmt: skip
+            # no -shortest: the wav is exactly video-long, and -shortest drops the
+            # last video frame at the interleave boundary
+            audio_in = ['-i', wav, '-map', '0:v', '-map', '1:a', '-c:a', 'aac', '-b:a', '192k']
         enc = subprocess.Popen(
             ['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24',
              '-s', f'{W}x{H}', '-r', f'{fps:g}', '-i', '-', *audio_in,
@@ -683,9 +726,72 @@ def join_clips(
         'seconds': total / fps,
         'clips': [str(p) for p in paths],
         'root': root,
+        'roots': roots,
+        'groups': [{'clips': list(range(a, b + 1)), 'root': r} for a, b, r in groups],
         'seams': seams,
         'corrections': corrections,
     }
+
+
+def _seam_plan(
+    n: int, root: int, pin: int | list[int], seams: Sequence[dict] | None
+) -> tuple[list[dict], list[tuple[int, int, int]]]:
+    """Normalise the seam spec of `join_clips`: ``([{kind, pin, dir}] per seam,
+    [(first, last, root) clip index per group])``. Legacy (``seams`` None): one
+    chain group, `root` given, pins from `pin`."""
+    if seams is None:
+        if not 0 <= root < n:
+            raise ValueError(f'root index {root} out of range')
+        pins = list(pin) if isinstance(pin, (list, tuple)) else [pin] * (n - 1)
+        if len(pins) != n - 1:
+            raise ValueError(f'{n - 1} seams but {len(pins)} pins')
+        plan = [
+            {'kind': 'chain', 'pin': int(p), 'dir': 'pre' if j < root else 'post'}
+            for j, p in enumerate(pins)
+        ]
+        return plan, [(0, n - 1, root)]
+    if len(seams) != n - 1:
+        raise ValueError(f'{n} clips need {n - 1} seams, got {len(seams)}')
+    plan = []
+    for j, sm in enumerate(seams):
+        kind = (sm or {}).get('kind')
+        if kind == 'plain':
+            plan.append({'kind': 'plain', 'pin': 1, 'dir': None})
+        elif kind == 'chain':
+            d = sm.get('dir')
+            if d not in ('pre', 'post'):
+                raise ValueError(f'seam {j + 1}: chain dir must be pre|post, got {d!r}')
+            plan.append({'kind': 'chain', 'pin': int(sm.get('pin', CHAIN_PIN)), 'dir': d})
+        else:
+            raise ValueError(f'seam {j + 1}: kind must be chain|plain, got {kind!r}')
+    groups, a = [], 0
+    for j in [j for j, sm in enumerate(plan) if sm['kind'] == 'plain'] + [n - 1]:
+        b = j  # group = clips a..b (seams a..b-1 inside it are chain seams)
+        dirs = [plan[k]['dir'] for k in range(a, b)]
+        n_pre = 0
+        while n_pre < len(dirs) and dirs[n_pre] == 'pre':
+            n_pre += 1
+        if any(d != 'post' for d in dirs[n_pre:]):
+            raise ValueError(
+                f'clips {a + 1}..{b + 1}: a chain group must be pre… → root → post… ({dirs})'
+            )
+        groups.append((a, b, a + n_pre))
+        a = b + 1
+    return plan, groups
+
+
+def _clip_names(groups: list[tuple[int, int, int]]) -> list[str]:
+    """Report names: root / preK / postK; with several groups prefixed ``gN.``
+    (a single-clip group is just ``gN``)."""
+    out = []
+    multi = len(groups) > 1
+    for g, (a, b, r) in enumerate(groups, 1):
+        for i in range(a, b + 1):
+            nm = 'root' if i == r else (f'pre{r - i}' if i < r else f'post{i - r}')
+            if multi:
+                nm = f'g{g}' if a == b else f'g{g}.{nm}'
+            out.append(nm)
+    return out
 
 
 def chain_join(
@@ -711,9 +817,11 @@ def chain_join(
 
 
 def seam_summary(report: dict) -> str:
-    """One line per seam: ``pre1→root 8.0→1.6 (1.3/2.2)`` (MAD /255, motion in brackets)."""
+    """One line per seam: ``pre1→root 8.0→1.6 (1.3/2.2)`` (MAD /255, motion in
+    brackets); a plain seam reads ``g1|g2.root 3.1→3.1 (…)``."""
     return ' · '.join(
-        f'{s["left"]}→{s["right"]} {s["plain"]:.1f}→{s.get("written", s["jump"]):.1f} '
+        f'{s["left"]}{"|" if s.get("kind") == "plain" else "→"}{s["right"]} '
+        f'{s["plain"]:.1f}→{s.get("written", s["jump"]):.1f} '
         f'({s.get("before", 0):.1f}/{s.get("after", 0):.1f})'
         for s in report.get('seams', [])
     )

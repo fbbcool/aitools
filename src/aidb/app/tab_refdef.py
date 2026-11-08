@@ -65,7 +65,15 @@ script-only like ⇄ update: slot 1 = the LAST clip of a chain, slot 2 = the
 FIRST (a pre, optional) → ``ait.tools.videos.chain_join`` writes the joined
 master to ``~/Downloads/000_comfy/`` and toasts path + seam summary.
 
-``👁`` / ``🚫`` (per slot) enables / disables a slot: a disabled slot keeps its
+Slot-1 area (FEATURE t185): slot 1 sits left; when its clip carries refs (the
+rendered ``prompts_ref`` entry embedded in it, or in its ``fbbcool_temp`` master
+via ``anchor_master`` — ``carry_of``), a panel right of it shows them, one cell
+per ref (preview, ``tag · desc``, ``≡ slot N`` when a slot holds the same media)
+with a ✅/🚫 use switch, all on after every slot-1 change, not saved. A
+pre-/post-vid deploy sends them as refdef.v1 ``inherit: [{n, tag, kind, url,
+desc, use}]`` (``inherit_list``); the enhancer inherits only ``use: true``.
+
+``✅`` / ``🚫`` (per slot) enables / disables a slot: a disabled slot keeps its
 image + role in the tab (dimmed) but deploys, updates, joins and view-switches as
 an empty slot (enhancer mode: its replacement is not patched in). New content in
 the slot (pull, slot ⟲, ✕) switches it back on.
@@ -124,7 +132,14 @@ from ait.tools.files import (
     suffix_img,
     suffix_vid,
 )
-from ait.tools.videos import CHAIN_PIN, anchor_master, chain_join, ref_frame, seam_summary
+from ait.tools.videos import (
+    CHAIN_PIN,
+    anchor_master,
+    chain_join,
+    clip_refs,
+    ref_frame,
+    seam_summary,
+)
 from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
@@ -223,15 +238,19 @@ SCHEMA_MASK_PREFIX: Final = '1xlasm_enhancer.mask.'
 MASK_KEY_MAIN: Final = 'url_mask'  # the top-level scene image's mask (sibling of url)
 MASK_ICON_ON: Final = '🟥'  # per-slot masking switch: on (mask deployed / tinted)
 MASK_ICON_OFF: Final = '⬜'  # off: slot deployed without any mask
-SLOT_ICON_ON: Final = '👁'  # per-slot enable switch: on (slot deployed)
+SLOT_ICON_ON: Final = '✅'  # per-slot enable switch: on (slot deployed)
 SLOT_ICON_OFF: Final = '🚫'  # off: slot kept in the tab but deployed as empty
+# slot 1 carried refs: the refs a clip in slot 1 was rendered with (its payload)
+CARRY_CELLS: Final = H3_REF_TOTAL  # max refs an H3 render can carry
+CARRY_PER_ROW: Final = 4  # big cells: the carried refs get room (t185 v3)
+CARRY_TAG_KEYS: Final = (('pic', 'image'), ('vid', 'video'), ('aud', 'audio'))
 
 
 # ---------------------------------------------------------------------- #
 # pure payload logic
 # ---------------------------------------------------------------------- #
 def disable_slots(refs_roles: list[str], slot_on: list[bool] | None) -> list[str]:
-    """The flat ``[ref, role, ...]`` UI values with every disabled slot (👁 off)
+    """The flat ``[ref, role, ...]`` UI values with every disabled slot (✅ off)
     blanked: deploy / update / join / view switch treat it as empty, the tab keeps
     its content."""
     out = list(refs_roles)
@@ -919,16 +938,68 @@ def _instruction_role(slot: dict, i: int, verb: str) -> str:
     return role
 
 
+def carry_tag(ref: dict) -> str:
+    """Short H3 tag of a carried ref: ``pic 2`` / ``vid 1`` / ``aud 1`` (else its kind)."""
+    for key, kind in CARRY_TAG_KEYS:
+        if isinstance(ref.get(key), int):
+            return f'{key} {ref[key]}'
+        if ref.get('kind') == kind:
+            return key
+    return str(ref.get('kind') or '?')
+
+
+def carry_of(url: str | None) -> dict:
+    """Slot 1's carried refs: ``{anchor, refs, on, error}`` — ``anchor`` = the clip
+    whose payload the refs come from (the slot clip, or its FbbcoolSaveVideo master
+    via ``anchor_master``), ``refs`` = its rendered prompts_ref entry's refs,
+    ``on`` = per-ref use switch (all on)."""
+    out: dict[str, Any] = {'anchor': None, 'refs': [], 'on': [], 'error': None}
+    if not url or media_kind(url) != 'video':
+        return out
+    try:
+        master = anchor_master(url)
+    except ValueError as e:
+        out['error'] = str(e)
+        return out
+    if master is None:
+        return out
+    refs = clip_refs(master)
+    out.update(anchor=str(master), refs=refs, on=[True] * len(refs))
+    return out
+
+
+def inherit_list(carry: dict | None, anchor: str | None) -> list[dict] | None:
+    """The refdef.v1 ``inherit`` list: every ref the anchor carries, in payload
+    order, with ``use`` = its ✅/🚫 switch. None when ``carry`` belongs to another
+    clip than the deployed anchor (stale) or carries nothing."""
+    if not carry or not carry.get('refs') or carry.get('anchor') != anchor:
+        return None
+    on = list(carry.get('on') or [])
+    return [
+        {
+            'n': i + 1,
+            'tag': carry_tag(r),
+            'kind': r.get('kind'),
+            'url': r.get('url'),
+            'desc': r.get('desc') or '',
+            'use': on[i] if i < len(on) else True,
+        }
+        for i, r in enumerate(carry['refs'])
+    ]
+
+
 def refdef_payload(
     slots: list[dict],
     verb: str,
     prompt_kind: str,
     text: str,
     origin_scene_id: str | None = None,
+    inherit: list[dict] | None = None,
 ) -> dict:
     """The instruction payload the enhancer builds its enhancer data from. A
     slot's ``mask`` (a mask.v1 object, see ``mask_object``) becomes the ref's
-    ``mask``."""
+    ``mask``. ``inherit`` (pre-/post-vid only): the anchor's carried refs with
+    their ``use`` switch — the enhancer inherits only ``use: true`` ones."""
     payload: dict[str, Any] = {
         'schema_id': SCHEMA_REFDEF,
         'verb': verb if verb in VERBS else VERBS[0],
@@ -954,6 +1025,8 @@ def refdef_payload(
             'url': (slots[0].get('url') or None) if slots else None,
             'pin': CHAIN_PIN,
         }
+        if inherit:
+            payload['inherit'] = inherit
     return payload
 
 
@@ -1705,6 +1778,7 @@ class RefdefTab:
         auto: bool,
         text: str,
         mask_on: list[bool],
+        carry: dict | None,
         *refs_roles,
     ):
         slots = self._slots_from_ui(list(refs_roles), mask_on)
@@ -1742,6 +1816,7 @@ class RefdefTab:
         if verb in QFIX_VERBS:  # scripted enhancer data, no enhancer (FEATURE 180)
             return self._deploy_qfix(slots, text, origin)
         anchor_note = ''
+        inherit = None
         if verb in CONTINUE_VERBS:  # the enhancer inherits the anchor's refs from its payload
             url = slots[0]['url']
             try:
@@ -1760,7 +1835,11 @@ class RefdefTab:
                 slots[0] = {**slots[0], 'url': str(master), 'id': None}
                 anchor_note = f' · anchor → {master.name}'
                 gr.Info(f'{verb}: anchor → {master.name}', duration=QFIX_TOAST_WARN_S)
-        payload = refdef_payload(slots, verb, kind, text, origin)
+            if inherit := inherit_list(carry, str(master)):
+                off = [r['tag'] for r in inherit if not r['use']]
+                anchor_note += f' · inherit {len(inherit) - len(off)}/{len(inherit)}'
+                anchor_note += f' (off: {", ".join(off)})' if off else ''
+        payload = refdef_payload(slots, verb, kind, text, origin, inherit)
         clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
         msg = f'deployed instruction `{verb}` ({n}/{N_SLOTS} slots, kind={kind}){anchor_note}'
@@ -1791,6 +1870,51 @@ class RefdefTab:
         gr.Success(msg, duration=QFIX_TOAST_OK_S)
         print(f'[refdef_tab:info] deploy {msg}')
         return f'{msg} · no enhancer trigger'
+
+    def _on_carry(self, url: str | None, *others: str | None):
+        """Slot 1 changed → its carried refs panel: header, one cell per ref
+        (preview labelled ``tag · desc``, ``≡ slot N`` when a slot already holds the
+        same media), all switched on; hidden when the clip carries no refs."""
+        url = self.resolve_ref(url)[0] if url else None
+        c = carry_of(url)
+        cells = [gr.update(visible=False, value=None)] * CARRY_CELLS
+        btns = [gr.update(visible=False, value=SLOT_ICON_ON)] * CARRY_CELLS
+        if c['error']:
+            return c, gr.update(visible=True), f'⚠ {c["error"]}', *cells, *btns
+        if not c['refs']:
+            return c, gr.update(visible=False), '', *cells, *btns
+        slot_urls = {self.resolve_ref(o)[0]: n for n, o in enumerate(others, 2) if o}
+        for j, r in enumerate(c['refs'][:CARRY_CELLS]):
+            dup = slot_urls.get(r.get('url'))
+            label = carry_tag(r) + (f' ≡ slot {dup}' if dup else '')
+            desc = (r.get('desc') or '').strip()
+            label += f' · {desc[:90]}' if desc else ''
+            cells[j] = gr.update(
+                visible=True, value=self._preview(r.get('url')), label=label, elem_classes=[]
+            )
+            btns[j] = gr.update(visible=True, value=SLOT_ICON_ON)
+        anchor = Path(c['anchor']).name
+        head = f'⤷ `{anchor}`' if url and Path(url).name != anchor else ''
+        more = (
+            f' · {len(c["refs"]) - CARRY_CELLS} more not shown'
+            if len(c['refs']) > CARRY_CELLS
+            else ''
+        )
+        return c, gr.update(visible=True), head + more, *cells, *btns
+
+    @staticmethod
+    def _on_carry_toggle(carry: dict | None, j: int):
+        """✅/🚫 of carried ref ``j``: flip its use switch, dim its preview."""
+        c = copy.deepcopy(carry) if carry else carry_of(None)
+        if j >= len(c['on']):
+            return c, gr.update(), gr.update()
+        c['on'][j] = not c['on'][j]
+        on = c['on'][j]
+        return (
+            c,
+            gr.update(value=SLOT_ICON_ON if on else SLOT_ICON_OFF),
+            gr.update(elem_classes=[] if on else ['refdef-slot-off']),
+        )
 
     def _on_update(self, state: dict | None, verb: str | None, mask_on: list[bool], *refs_roles):
         """Rewrite the CURRENT clipspace's reference urls from the slots —
@@ -1990,7 +2114,7 @@ class RefdefTab:
             imgs, refs, roles, slot_pulls, clears, mask_btns = [], [], [], [], [], []
             mask_tgls, mask_clrs = [], []
             mask_on = gr.State([True] * N_SLOTS)  # per-slot masking switch (🟥/⬜)
-            slot_on = gr.State([True] * N_SLOTS)  # per-slot enable switch (👁/🚫)
+            slot_on = gr.State([True] * N_SLOTS)  # per-slot enable switch (✅/🚫)
             slot_tgls = []
             # slot 1 (the main ref) gets its own row, the rest SLOTS_PER_ROW per row;
             # per slot: image, button row, role row
@@ -1998,37 +2122,72 @@ class RefdefTab:
                 list(range(r, min(N_SLOTS, r + SLOTS_PER_ROW)))
                 for r in range(1, N_SLOTS, SLOTS_PER_ROW)
             ]
+
+            def make_slot(i: int) -> None:
+                imgs.append(
+                    gr.Image(
+                        type='filepath',
+                        label=f'slot {i + 1}',
+                        height=300,
+                        interactive=False,
+                    )
+                )
+                refs.append(gr.State(''))
+                with gr.Row():
+                    slot_tgls.append(gr.Button(SLOT_ICON_ON, scale=0, min_width=40))
+                    slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
+                    clears.append(gr.Button('✕', scale=0, min_width=40))
+                    mask_btns.append(gr.Button('🎭', scale=0, min_width=40))
+                    mask_tgls.append(gr.Button(MASK_ICON_ON, scale=0, min_width=40))
+                    mask_clrs.append(gr.Button('🧽', scale=0, min_width=40))
+                # slot 1: double height, fixed (scrollbar on overflow)
+                n_lines = ROLE_LINES * 2 if i == 0 else ROLE_LINES
+                roles.append(
+                    gr.Textbox(
+                        placeholder='role: what this ref is for',
+                        show_label=False,
+                        lines=n_lines,
+                        max_lines=n_lines if i == 0 else None,
+                        elem_classes=['refdef-role-main'] if i == 0 else None,
+                    )
+                )
+
+            # slot 1 carried refs: the refs a slot-1 clip was rendered with, each
+            # with a use switch (deployed as refdef.v1 `inherit` on pre-/post-vid)
+            carry = gr.State(carry_of(None))
+            carry_imgs, carry_tgls = [], []
             for row in rows:
                 with gr.Row(equal_height=True):
+                    if row == [0]:
+                        with gr.Column(scale=1):
+                            make_slot(0)
+                        with gr.Column(scale=2, visible=False, elem_id='refdef-carry') as carry_box:
+                            carry_md = gr.Markdown()
+                            for r0 in range(0, CARRY_CELLS, CARRY_PER_ROW):
+                                with gr.Row():
+                                    for _ in range(r0, min(CARRY_CELLS, r0 + CARRY_PER_ROW)):
+                                        with gr.Column(min_width=180):
+                                            carry_imgs.append(
+                                                gr.Image(
+                                                    type='pil',
+                                                    height=240,
+                                                    interactive=False,
+                                                    show_label=True,
+                                                    visible=False,
+                                                )
+                                            )
+                                            carry_tgls.append(
+                                                gr.Button(
+                                                    SLOT_ICON_ON,
+                                                    size='sm',
+                                                    min_width=40,
+                                                    visible=False,
+                                                )
+                                            )
+                        continue
                     for i in row:
                         with gr.Column():
-                            imgs.append(
-                                gr.Image(
-                                    type='filepath',
-                                    label=f'slot {i + 1}',
-                                    height=300,
-                                    interactive=False,
-                                )
-                            )
-                            refs.append(gr.State(''))
-                            with gr.Row():
-                                slot_tgls.append(gr.Button(SLOT_ICON_ON, scale=0, min_width=40))
-                                slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
-                                clears.append(gr.Button('✕', scale=0, min_width=40))
-                                mask_btns.append(gr.Button('🎭', scale=0, min_width=40))
-                                mask_tgls.append(gr.Button(MASK_ICON_ON, scale=0, min_width=40))
-                                mask_clrs.append(gr.Button('🧽', scale=0, min_width=40))
-                            # slot 1: double height, fixed (scrollbar on overflow)
-                            n_lines = ROLE_LINES * 2 if i == 0 else ROLE_LINES
-                            roles.append(
-                                gr.Textbox(
-                                    placeholder='role: what this ref is for',
-                                    show_label=False,
-                                    lines=n_lines,
-                                    max_lines=n_lines if i == 0 else None,
-                                    elem_classes=['refdef-role-main'] if i == 0 else None,
-                                )
-                            )
+                            make_slot(i)
 
             # 🎭 mask editor (shared by the slots): paint over the area to mask
             mask_slot = gr.State(None)
@@ -2184,11 +2343,21 @@ class RefdefTab:
                 )
             mask_del.click(self._on_mask_drop, [mask_slot, *refs], [*imgs, mask_box, status])
             mask_close.click(lambda: gr.update(visible=False), [], [mask_box])
+            carry_outs = [carry, carry_box, carry_md, *carry_imgs, *carry_tgls]
+            refs[0].change(
+                lambda *r: self._on_carry(*r), list(refs), carry_outs, show_progress='hidden'
+            )
+            for j, ctgl in enumerate(carry_tgls):
+                ctgl.click(
+                    lambda c, j=j: self._on_carry_toggle(c, j),
+                    [carry],
+                    [carry, ctgl, carry_imgs[j]],
+                )
             deploy_btn.click(
-                lambda st, v, k, a, t, m, so, *rr: self._on_deploy(
-                    st, v, k, a, t, m, *disable_slots(list(rr), so)
+                lambda st, v, k, a, t, m, so, c, *rr: self._on_deploy(
+                    st, v, k, a, t, m, c, *disable_slots(list(rr), so)
                 ),
-                [state, verb, kind, auto, text, mask_on, slot_on, *refs_roles],
+                [state, verb, kind, auto, text, mask_on, slot_on, carry, *refs_roles],
                 [status],
             )
             update_btn.click(

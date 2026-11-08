@@ -927,3 +927,45 @@ def test_ref_view_ten_slots_skip_and_kind_labels():
     )
     roles = [s['role'] for s in view_slots(p, 'ref') if s['url']]
     assert roles == ['picture 1', 'clip 1', 'picture 2']
+
+
+# -- slot 1 carried refs (refdef.v1 `inherit`) -------------------------- #
+def test_carry_tag():
+    from aidb.app.tab_refdef import carry_tag
+
+    assert carry_tag({'kind': 'image', 'pic': 2}) == 'pic 2'
+    assert carry_tag({'kind': 'video', 'vid': 1}) == 'vid 1'
+    assert carry_tag({'kind': 'audio'}) == 'aud'
+    assert carry_tag({}) == '?'
+
+
+def test_carry_of_non_clip():
+    from aidb.app.tab_refdef import carry_of
+
+    for url in (None, '', '/x/a.png', '/x/a.wav'):
+        assert carry_of(url) == {'anchor': None, 'refs': [], 'on': [], 'error': None}
+
+
+def test_inherit_list_and_payload():
+    from aidb.app.tab_refdef import inherit_list
+
+    carry = {
+        'anchor': '/c/fbbcool_temp_kiwny_00001_.mkv',
+        'refs': [
+            {'kind': 'video', 'vid': 1, 'url': '/r/doll.mov', 'desc': 'doll'},
+            {'kind': 'image', 'pic': 1, 'url': '/r/man.png'},
+        ],
+        'on': [False, True],
+        'error': None,
+    }
+    inh = inherit_list(carry, carry['anchor'])
+    assert [(r['n'], r['tag'], r['use']) for r in inh] == [(1, 'vid 1', False), (2, 'pic 1', True)]
+    assert inh[0]['url'] == '/r/doll.mov' and inh[1]['desc'] == ''
+    assert inherit_list(carry, '/c/other.mkv') is None  # stale panel
+    assert inherit_list(None, carry['anchor']) is None
+
+    slots = [{'url': carry['anchor'], 'role': ''}]
+    p = refdef_payload(slots, 'post-vid', 'hint', 'go', inherit=inh)
+    assert p['inherit'] == inh and p['continue']['dir'] == 'post'
+    assert 'inherit' not in refdef_payload(slots, 'post-vid', 'hint', 'go')
+    assert 'inherit' not in refdef_payload(slots, 'ref', 'hint', 'go', inherit=inh)
