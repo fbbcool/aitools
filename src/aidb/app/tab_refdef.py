@@ -78,6 +78,15 @@ image + role in the tab (dimmed) but deploys, updates, joins and view-switches a
 an empty slot (enhancer mode: its replacement is not patched in). New content in
 the slot (pull, slot ⟲, ✕) switches it back on.
 
+``🖼`` / ``👁`` (per slot, FEATURE t189) switches an image / video slot between a
+direct pixel ref (🖼, default) and vision (👁, a big eye over the preview): the
+deployed ref gets ``use: "vision"``, the enhancer looks at the media (even on
+``*-novis`` verbs), writes it into the prompt as text and ships no pixels for it
+— so it is outside the H3 ref budget and its 🎭 mask is ignored. Locked (always
+🖼): ``img-fsw-novis`` slots 1 + 2, slot 1 of pre-/post-vid, inp-mask,
+inp-nomask, pickup; audio has no 👁. Without the enhancer (inp-qfix, enhancer-data deploys) it is ignored with a
+status note. 💾 saves it; slot ⟲ / ✕ reset it to 🖼.
+
 ``🎭`` (per slot, local images) opens a shared brush editor: paint the area to
 mask, ✓ stores it (⎘ = ✓ + the masked image's path on the clipspace, ready for
 a ComfyUI quickload), 🗑 removes it. A mask belongs to the source image (fixed
@@ -247,7 +256,7 @@ PROMPT_SEED: Final = (
     },
 )
 CAT_ALL: Final = '(all)'  # category filter = every save; saved as uncategorized
-SNAP_KEYS: Final = ('state', 'idx', 'refs', 'roles', 'verb', 'kind', 'text')
+SNAP_KEYS: Final = ('state', 'idx', 'refs', 'roles', 'verb', 'kind', 'text', 'vision')
 # 🎭 hand-drawn masks: one per source image (repainting replaces it), at a fixed
 # path derived from the image path. ``*__mask.png`` = L (white = masked);
 # ``*__masked.png`` = the image as RGBA with alpha 0 where masked — what ComfyUI
@@ -262,6 +271,16 @@ MASK_ICON_ON: Final = '🟥'  # per-slot masking switch: on (mask deployed / tin
 MASK_ICON_OFF: Final = '⬜'  # off: slot deployed without any mask
 SLOT_ICON_ON: Final = '✅'  # per-slot enable switch: on (slot deployed)
 SLOT_ICON_OFF: Final = '🚫'  # off: slot kept in the tab but deployed as empty
+# per-slot pixel / vision switch (FEATURE t189): 🖼 = direct pixel ref (default),
+# 👁 = the enhancer looks at the media and writes it into the prompt as text
+VIS_ICON_PIXEL: Final = '🖼\ufe0f'
+VIS_ICON_VISION: Final = '👁\ufe0f'  # emoji presentation (bare U+1F441 = text glyph)
+VIS_USE: Final = 'vision'  # refdef.v1 ref ``use`` value (absent = pixel)
+VIS_MEDIA: Final = ('image', 'video')  # audio has no pixels
+VISION_LOCK_SLOT1: Final = ('inp-mask', 'inp-nomask', 'pickup')  # + swap / continue verbs
+# load outputs + status: state, idx, raw, 3×slot, kind, verb, text, source, entry,
+# view, vision, status
+N_LOAD_OUT: Final = 3 + 3 * N_SLOTS + 8
 # slot 1 carried refs: the refs a clip in slot 1 was rendered with (its payload)
 CARRY_CELLS: Final = H3_REF_TOTAL  # max refs an H3 render can carry
 CARRY_PER_ROW: Final = 4  # big cells: the carried refs get room (t185 v3)
@@ -449,6 +468,7 @@ def parse_payload(text: str | None) -> dict | None:
                     'url': ref.get('url'),
                     'id': ref.get('id'),
                     'role': ref.get('role') or '',
+                    **({'vision': True} if ref.get('use') == VIS_USE else {}),
                 }
         kind = payload.get('kind')
         verb = payload.get('verb')
@@ -699,7 +719,8 @@ def ref_budget_problems(slots: list[dict], verb: str) -> list[str]:
     its slot carries ``audio: true``."""
     if verb not in H3_VERBS:
         return []
-    filled = [s for s in slots if s.get('url')]
+    # 👁 vision slots ship no pixels → outside the budget (t189)
+    filled = [s for i, s in enumerate(slots) if s.get('url') and not is_vision(s, i, verb)]
     n = {k: 0 for k in H3_REF_CAP}
     for s in filled:
         if (k := media_kind(s['url'])) in n:
@@ -743,6 +764,8 @@ def img_ref_problems(slots: list[dict], verb: str) -> list[str]:
     ]
     if not any(s.get('url') for s in head):
         probs.append(f'needs 1-{IMG_REF_MAX} images in slots 1-{IMG_REF_MAX}')
+    elif all(is_vision(s, i, verb) for i, s in enumerate(head) if s.get('url')):
+        probs.append('needs at least one 🖼 pixel image (all filled slots are 👁)')
     if extra := [
         str(i + 1) for i, s in enumerate(slots[IMG_REF_MAX:], IMG_REF_MAX) if s.get('url')
     ]:
@@ -750,11 +773,49 @@ def img_ref_problems(slots: list[dict], verb: str) -> list[str]:
     return probs
 
 
+def vision_locked(i: int, verb: str) -> bool:
+    """Slot ``i`` (0-based) is one the verb needs as pixels (t189 D2): the swap's
+    target + new face, the pre-/post-vid anchor, the inpaint edit image, the
+    pickup render (the last two per xlasmos' contract reply)."""
+    if verb in SWAP_VERBS:
+        return i < 2
+    return i == 0 and verb in (*CONTINUE_VERBS, *VISION_LOCK_SLOT1)
+
+
+def is_vision(slot: dict, i: int, verb: str) -> bool:
+    """Slot ``i`` deploys as ``use: vision``: 👁 set, image / video media, not
+    locked, and a verb the enhancer handles (inp-qfix is scripted)."""
+    return bool(
+        slot.get('vision')
+        and media_kind(slot.get('url')) in VIS_MEDIA
+        and not vision_locked(i, verb)
+        and verb not in QFIX_VERBS
+    )
+
+
+def vision_slots(slots: list[dict], verb: str) -> list[int]:
+    """1-based slots deployed as ``use: vision``."""
+    return [i + 1 for i, s in enumerate(slots[:N_SLOTS]) if is_vision(s, i, verb)]
+
+
+def vision_ignored(slots: list[dict], verb: str) -> list[int]:
+    """1-based filled slots with 👁 set that deploy as pixel refs anyway
+    (locked slot, audio, inp-qfix)."""
+    return [
+        i + 1
+        for i, s in enumerate(slots[:N_SLOTS])
+        if s.get('vision') and s.get('url') and not is_vision(s, i, verb)
+    ]
+
+
 def ignored_masks(slots: list[dict], verb: str) -> list[int]:
-    """1-based slots whose 🎭 mask the verb ignores (ref-img emits no masks)."""
-    if verb not in IMG_REF_VERBS:
-        return []
-    return [i + 1 for i, s in enumerate(slots[:N_SLOTS]) if s.get('url') and s.get('mask')]
+    """1-based slots whose 🎭 mask the deploy ignores: ref-img emits no masks, a
+    👁 vision slot ships no pixels (t189 D3)."""
+    return [
+        i + 1
+        for i, s in enumerate(slots[:N_SLOTS])
+        if s.get('url') and s.get('mask') and (verb in IMG_REF_VERBS or is_vision(s, i, verb))
+    ]
 
 
 def qfix_problems(slots: list[dict], verb: str) -> list[str]:
@@ -1061,7 +1122,13 @@ def refdef_payload(
                 'role': _instruction_role(s, i, verb),
                 'media': media_kind(s.get('url')),
                 # 🎭 painted mask (only when one exists): mask.v1 object (task 175)
-                **({'mask': s['mask']} if s.get('mask') and verb not in IMG_REF_VERBS else {}),
+                **(
+                    {'mask': s['mask']}
+                    if s.get('mask') and verb not in IMG_REF_VERBS and not is_vision(s, i, verb)
+                    else {}
+                ),
+                # 👁 (t189): the enhancer describes the media into the prompt, no pixels
+                **({'use': VIS_USE} if is_vision(s, i, verb) else {}),
             }
             for i, s in enumerate(slots[:N_SLOTS])
         ],
@@ -1576,7 +1643,7 @@ class RefdefTab:
     def _load(self, st: dict | None) -> list[Any]:
         """Outputs for a freshly loaded state (None = reset to empty instruction).
         Order: state, idx, raw, 3×(img, ref, role), kind, verb, text, source, entry,
-        view."""
+        view, vision."""
         enh = self._is_enh(st)
         slots = st['slots'] if st else empty_slots()
         slot_vals: list[Any] = []
@@ -1601,6 +1668,7 @@ class RefdefTab:
                 value=st['view'] if st and enh else None,
                 visible=enh,
             ),
+            [bool(s.get('vision')) for s in slots],
         ]
 
     def _commit(
@@ -1620,14 +1688,14 @@ class RefdefTab:
         """Switch the enhancer-data view; the old view's slot replacements
         are committed to the working payload first."""
         if not self._is_enh(state) or not view or view == state['view']:  # type: ignore[index]
-            return [gr.update()] * (3 + 3 * N_SLOTS + 7)
+            return [gr.update()] * (N_LOAD_OUT)
         st, changed, skipped = self._commit(state, list(refs), mask_on)  # type: ignore[arg-type]
         note = f' · kept: {", ".join(changed)}' if changed else ''
         note += f' · NOT kept: {", ".join(skipped)}' if skipped else ''
         return [*self._load(with_view(st, view)), f'view `{view}`{note}']
 
     def _on_pull(self, state: dict | None, *refs: str):
-        n_out = 3 + 3 * N_SLOTS + 7
+        n_out = N_LOAD_OUT
         text = pyperclip.paste()
         st = parse_payload(text)
         if st is not None:
@@ -1656,14 +1724,14 @@ class RefdefTab:
             f' + {n_aud} audio' if n_aud else ''
         )
         status = f'pulled {what} → slot {", ".join(str(i + 1) for i in slots)}'
-        return [*[gr.update()] * 3, *upd, *[gr.update()] * 6, status + dropped]
+        return [*[gr.update()] * 3, *upd, *[gr.update()] * 7, status + dropped]
 
     def _on_reset(self):
         return [*self._load(None), 'reset']
 
     # -- save history ------------------------------------------------- #
     @staticmethod
-    def _snap(state, idx, verb, kind, text, *refs_roles) -> dict:
+    def _snap(state, idx, verb, kind, text, vision, *refs_roles) -> dict:
         """UI config + the clipspace's enhancer data (if it holds any)."""
         return {
             'clip': enh_clip(pyperclip.paste()),
@@ -1674,6 +1742,7 @@ class RefdefTab:
             'verb': verb,
             'kind': kind,
             'text': text or '',
+            'vision': [bool(v) for v in (vision or [False] * N_SLOTS)],  # t189 D4
         }
 
     @staticmethod
@@ -1717,6 +1786,7 @@ class RefdefTab:
                 value=st['view'] if enh else None,
                 visible=enh,
             ),
+            [bool(v) for v in (list(snap.get('vision') or []) + [False] * N_SLOTS)[:N_SLOTS]],
         ]
 
     def _col(self):
@@ -1794,7 +1864,7 @@ class RefdefTab:
         clip = ' · ⎘ enh' if s.get('has_clip') else ''
         return f'**save {pos + 1}/{n}** · {cls._ts_str(s.get("ts"))}{cat}{clip}'
 
-    def _on_save(self, cat, state, idx, verb, kind, text, *refs_roles):
+    def _on_save(self, cat, state, idx, verb, kind, text, vision, *refs_roles):
         """Save the shown config under category ``cat`` (a new typed-in one
         joins the dropdown)."""
         cur = {'pos': None, 'draft': None}
@@ -1802,7 +1872,7 @@ class RefdefTab:
         if col is None:
             gr.Warning('save: no DB connection', duration=0.5)
             return 'save: no DB connection', cur, gr.update(), gr.update()
-        doc = snap_to_doc(self._snap(state, idx, verb, kind, text, *refs_roles))
+        doc = snap_to_doc(self._snap(state, idx, verb, kind, text, vision, *refs_roles))
         doc['category'] = norm_cat(cat)
         last = col.find_one({}, sort=[('ts', -1), ('_id', -1)])
         if last and all(last.get(k) == v for k, v in doc.items()):
@@ -1826,7 +1896,7 @@ class RefdefTab:
     def _on_cat(self, hist: dict | None, cat):
         """Category filter changed: a shown save's index no longer applies, so
         go back to the current config (the parked draft)."""
-        n_out = 3 + 3 * N_SLOTS + 7
+        n_out = N_LOAD_OUT
         hist = hist or {'pos': None, 'draft': None}
         md = self._hist_md(None, self._save_ids(cat))
         if hist['pos'] is None or not hist['draft']:
@@ -1839,7 +1909,7 @@ class RefdefTab:
         """Delete the shown save — two clicks: the first arms it (any other
         action disarms). Then show the next older save, else the next newer,
         else the current config."""
-        n_out = 3 + 3 * N_SLOTS + 7
+        n_out = N_LOAD_OUT
         hist = hist or {'pos': None, 'draft': None}
         saves, col = self._save_ids(cat), self._col()
         pos = hist['pos']
@@ -1870,12 +1940,22 @@ class RefdefTab:
         return [*outs, msg, hist, self._hist_md(new, saves), cats]
 
     def _on_hist(
-        self, hist: dict | None, step: int, cat, state, idx, verb, kind, text, *refs_roles
+        self,
+        hist: dict | None,
+        step: int,
+        cat,
+        state,
+        idx,
+        verb,
+        kind,
+        text,
+        vision,
+        *refs_roles,
     ):
         """◀ / ▶ through the saves of category ``cat``; leaving the current
         config drafts it so ▶ past the newest save restores it (even when it
         was never saved)."""
-        n_out = 3 + 3 * N_SLOTS + 7
+        n_out = N_LOAD_OUT
         hist = hist or {'pos': None, 'draft': None}
         saves = self._save_ids(cat)
         pos = hist['pos']
@@ -1888,7 +1968,7 @@ class RefdefTab:
             return [*[gr.update()] * n_out, hist, self._hist_md(pos, saves)]
         draft = hist['draft']
         if pos is None:
-            draft = self._snap(state, idx, verb, kind, text, *refs_roles)
+            draft = self._snap(state, idx, verb, kind, text, vision, *refs_roles)
         if new is None:
             snap, hist, msg = draft, {'pos': None, 'draft': None}, 'back to the current config'
         else:
@@ -1903,13 +1983,19 @@ class RefdefTab:
         return [*self._load_snap(snap), msg, hist, self._hist_md(new, saves)]
 
     def _slots_from_ui(
-        self, refs_roles: list[str], mask_on: list[bool] | None = None
+        self,
+        refs_roles: list[str],
+        mask_on: list[bool] | None = None,
+        vision: list[bool] | None = None,
     ) -> list[dict]:
         on = mask_on or [True] * N_SLOTS
+        vis = vision or [False] * N_SLOTS
         slots = []
         for i in range(N_SLOTS):
             url, id_img = self.resolve_ref(refs_roles[2 * i])
             slot: dict[str, Any] = {'url': url, 'id': id_img, 'role': refs_roles[2 * i + 1]}
+            if vis[i]:
+                slot['vision'] = True
             if not on[i]:
                 slot['mask_off'] = True
             elif hit := mask_object(url):
@@ -1925,16 +2011,19 @@ class RefdefTab:
         auto: bool,
         text: str,
         mask_on: list[bool],
+        vision: list[bool],
         carry: dict | None,
         *refs_roles,
     ):
-        slots = self._slots_from_ui(list(refs_roles), mask_on)
+        slots = self._slots_from_ui(list(refs_roles), mask_on, vision)
         if self._is_enh(state):
             refs = [refs_roles[2 * i] for i in range(N_SLOTS)]
             st, _, skipped = self._commit(state, refs, mask_on)  # type: ignore[arg-type]
             # the full payload (all sections) goes back; never triggers the enhancer
             clip_copy(json.dumps(st['payload'], ensure_ascii=False))
             note = f' · NOT deployed: {", ".join(skipped)}' if skipped else ''
+            if vis := [i + 1 for i, s in enumerate(slots) if s.get('vision') and s['url']]:
+                note += f' · vision ignored: slot {", ".join(map(str, vis))} (no enhancer)'
             changed = st['changed']
             what = f'img urls patched: {", ".join(changed)}' if changed else 'unchanged'
             return f'deployed enhancer data ({what}){note}'
@@ -1964,7 +2053,10 @@ class RefdefTab:
             )
             return f'NOT deployed: `{verb}` — {"; ".join(probs)}'
         if verb in QFIX_VERBS:  # scripted enhancer data, no enhancer (FEATURE 180)
-            return self._deploy_qfix(slots, text, origin)
+            res = self._deploy_qfix(slots, text, origin)
+            if vis_off := vision_ignored(slots, verb):  # scripted: nobody looks (t189)
+                res += f' · vision ignored: slot {", ".join(map(str, vis_off))}'
+            return res
         anchor_note = ''
         inherit = None
         if verb in CONTINUE_VERBS:  # the enhancer inherits the anchor's refs from its payload
@@ -1993,6 +2085,10 @@ class RefdefTab:
         clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
         msg = f'deployed instruction `{verb}` ({n}/{N_SLOTS} slots, kind={kind}){anchor_note}'
+        if vis := vision_slots(slots, verb):
+            msg += f' · 👁 vision: slot {", ".join(map(str, vis))}'
+        if vis_off := vision_ignored(slots, verb):
+            msg += f' · vision ignored: slot {", ".join(map(str, vis_off))}'
         if masked := ignored_masks(slots, verb):
             msg += f' · masks ignored: slot {", ".join(map(str, masked))}'
         note = trigger_enhancer() if auto else 'auto-trigger off'
@@ -2268,6 +2364,8 @@ class RefdefTab:
             mask_on = gr.State([True] * N_SLOTS)  # per-slot masking switch (🟥/⬜)
             slot_on = gr.State([True] * N_SLOTS)  # per-slot enable switch (✅/🚫)
             slot_tgls = []
+            vision = gr.State([False] * N_SLOTS)  # per-slot pixel / vision switch (🖼/👁)
+            vis_tgls = []
             # slot 1 (the main ref) gets its own row, the rest SLOTS_PER_ROW per row;
             # per slot: image, button row, role row
             rows = [[0]] + [
@@ -2282,11 +2380,17 @@ class RefdefTab:
                         label=f'slot {i + 1}',
                         height=300,
                         interactive=False,
+                        elem_id=f'refdef-img-{i + 1}',
                     )
                 )
                 refs.append(gr.State(''))
                 with gr.Row():
                     slot_tgls.append(gr.Button(SLOT_ICON_ON, scale=0, min_width=40))
+                    vis_tgls.append(
+                        gr.Button(
+                            VIS_ICON_PIXEL, scale=0, min_width=40, elem_classes=['refdef-vis']
+                        )
+                    )
                     slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
                     clears.append(gr.Button('✕', scale=0, min_width=40))
                     mask_btns.append(gr.Button('🎭', scale=0, min_width=40))
@@ -2311,7 +2415,7 @@ class RefdefTab:
             for row in rows:
                 with gr.Row(equal_height=True):
                     if row == [0]:
-                        with gr.Column(scale=1):
+                        with gr.Column(scale=1, elem_classes=['refdef-slot']):
                             make_slot(0)
                         with gr.Column(scale=2, visible=False, elem_id='refdef-carry') as carry_box:
                             carry_md = gr.Markdown()
@@ -2338,7 +2442,7 @@ class RefdefTab:
                                             )
                         continue
                     for i in row:
-                        with gr.Column():
+                        with gr.Column(elem_classes=['refdef-slot']):
                             make_slot(i)
 
             # 🎭 mask editor (shared by the slots): paint over the area to mask
@@ -2393,9 +2497,11 @@ class RefdefTab:
 
             refs_roles = [c for pair in zip(refs, roles, strict=True) for c in pair]
             slot_outs = [c for trip in zip(imgs, refs, roles, strict=True) for c in trip]
-            load_outs = [state, idx, raw, *slot_outs, kind, verb, text, source_md, entry_md, view]
+            load_outs = [
+                state, idx, raw, *slot_outs, kind, verb, text, source_md, entry_md, view, vision
+            ]  # fmt: skip
 
-            snap_ins = [state, idx, verb, kind, text, *refs_roles]
+            snap_ins = [state, idx, verb, kind, text, vision, *refs_roles]
             cur_hist = {'pos': None, 'draft': None}
 
             def pull(h, *a):
@@ -2407,7 +2513,33 @@ class RefdefTab:
                 return self._hist_md(h['pos'], self._save_ids(c))
 
             # new slot content switches masking back on (all slots / one slot)
-            on_outs = [mask_on, *mask_tgls, slot_on, *slot_tgls, *imgs]
+            # … and refreshes the 🖼/👁 buttons from the (loaded) vision switches
+            on_outs = [mask_on, *mask_tgls, slot_on, *slot_tgls, *imgs, *vis_tgls]
+
+            def vis_btn(i, on, vb):  # 🖼/👁 button of slot i; locked slots stay 🖼 (t189 D2)
+                locked = vision_locked(i, vb)
+                eye = bool(on) and not locked
+                return gr.update(
+                    value=VIS_ICON_VISION if eye else VIS_ICON_PIXEL,
+                    interactive=not locked,
+                    elem_classes=['refdef-vis', 'refdef-vis-on'] if eye else ['refdef-vis'],
+                )
+
+            def vis_btns(vis, vb):
+                return [vis_btn(i, v, vb) for i, v in enumerate(vis or [False] * N_SLOTS)]
+
+            def vis_toggle(i, vis, ref, vb):
+                vis = list(vis)
+                if not vis[i] and media_kind(self.resolve_ref(ref)[0] if ref else None) == 'audio':
+                    gr.Info('👁 vision: images / videos only', duration=0.5)
+                else:
+                    vis[i] = not vis[i]
+                return vis, vis_btn(i, vis[i], vb)
+
+            def vis_reset(i, vis, vb):  # new slot content → 🖼
+                vis = list(vis)
+                vis[i] = False
+                return vis, vis_btn(i, False, vb)
 
             def slot_vis(on):  # (button, preview dimming) of one slot
                 return (
@@ -2415,7 +2547,7 @@ class RefdefTab:
                     gr.update(elem_classes=[] if on else ['refdef-slot-off']),
                 )
 
-            def all_on():
+            def all_on(vision_on, vb):
                 vis = [slot_vis(True)] * N_SLOTS
                 return [
                     [True] * N_SLOTS,
@@ -2423,6 +2555,7 @@ class RefdefTab:
                     [True] * N_SLOTS,
                     *[b for b, _ in vis],
                     *[im for _, im in vis],
+                    *vis_btns(vision_on, vb),
                 ]
 
             def slot_toggle(i, on):
@@ -2451,19 +2584,19 @@ class RefdefTab:
 
             pull_btn.click(pull, [hist, state, *refs], [*load_outs, status, hist]).then(
                 hist_refresh, [hist, cat], [hist_md]
-            ).then(all_on, [], on_outs)
+            ).then(all_on, [vision, verb], on_outs)
             reset_btn.click(
                 lambda: [*self._on_reset(), cur_hist], [], [*load_outs, status, hist]
-            ).then(hist_refresh, [hist, cat], [hist_md]).then(all_on, [], on_outs)
+            ).then(hist_refresh, [hist, cat], [hist_md]).then(all_on, [vision, verb], on_outs)
             prompt_dd.input(self._on_prompt_pick, [prompt_dd], [text, p_name, p_cat, p_models])
             p_add.click(self._on_prompt_add, [p_name, p_cat, p_models, text], [prompt_dd])
             p_del.click(self._on_prompt_del, [prompt_dd], [prompt_dd])
             save_btn.click(self._on_save, [cat, *snap_ins], [status, hist, hist_md, cat])
             del_btn.click(self._on_del, [hist, cat], [*load_outs, status, hist, hist_md, cat]).then(
-                all_on, [], on_outs
+                all_on, [vision, verb], on_outs
             )
             cat.input(self._on_cat, [hist, cat], [*load_outs, status, hist, hist_md]).then(
-                all_on, [], on_outs
+                all_on, [vision, verb], on_outs
             )
             view.input(
                 lambda st, v, m, so, *rr: self._on_view(
@@ -2471,24 +2604,39 @@ class RefdefTab:
                 ),
                 [state, view, mask_on, slot_on, *refs_roles],
                 [*load_outs, status],
-            ).then(all_on, [], on_outs)
+            ).then(all_on, [vision, verb], on_outs)
             for btn, step in ((prev_btn, -1), (next_btn, 1)):
                 btn.click(
                     lambda h, c, *a, step=step: self._on_hist(h, step, c, *a),
                     [hist, cat, *snap_ins],
                     [*load_outs, status, hist, hist_md],
-                ).then(all_on, [], on_outs)
+                ).then(all_on, [vision, verb], on_outs)
             for i, (img, ref, clear) in enumerate(zip(imgs, refs, clears, strict=True)):
                 # role stays: in enhancer mode it is payload-owned
                 clear.click(lambda: (None, ''), [], [img, ref]).then(
                     lambda on, i=i: one_on(i, on), [mask_on], [mask_on, mask_tgls[i]]
-                ).then(lambda on, i=i: slot_enable(i, on), [slot_on], [slot_on, slot_tgls[i], img])
+                ).then(
+                    lambda on, i=i: slot_enable(i, on), [slot_on], [slot_on, slot_tgls[i], img]
+                ).then(
+                    lambda v, vb, i=i: vis_reset(i, v, vb), [vision, verb], [vision, vis_tgls[i]]
+                )
             for i, (img, ref, slot_pull) in enumerate(zip(imgs, refs, slot_pulls, strict=True)):
                 slot_pull.click(self._on_slot_pull, [], [img, ref]).then(
                     lambda on, i=i: one_on(i, on), [mask_on], [mask_on, mask_tgls[i]]
-                ).then(lambda on, i=i: slot_enable(i, on), [slot_on], [slot_on, slot_tgls[i], img])
+                ).then(
+                    lambda on, i=i: slot_enable(i, on), [slot_on], [slot_on, slot_tgls[i], img]
+                ).then(
+                    lambda v, vb, i=i: vis_reset(i, v, vb), [vision, verb], [vision, vis_tgls[i]]
+                )
             for i, stgl in enumerate(slot_tgls):
                 stgl.click(lambda on, i=i: slot_toggle(i, on), [slot_on], [slot_on, stgl, imgs[i]])
+            for i, vtgl in enumerate(vis_tgls):
+                vtgl.click(
+                    lambda v, r, vb, i=i: vis_toggle(i, v, r, vb),
+                    [vision, refs[i], verb],
+                    [vision, vtgl],
+                )
+            verb.change(vis_btns, [vision, verb], vis_tgls, show_progress='hidden')
             for i, (tgl, clr) in enumerate(zip(mask_tgls, mask_clrs, strict=True)):
                 tgl.click(
                     lambda on, st, r, i=i: self._on_mask_toggle(i, on, st, r),
@@ -2529,10 +2677,10 @@ class RefdefTab:
                     [carry, ctgl, carry_imgs[j]],
                 )
             deploy_btn.click(
-                lambda st, v, k, a, t, m, so, c, *rr: self._on_deploy(
-                    st, v, k, a, t, m, c, *disable_slots(list(rr), so)
+                lambda st, v, k, a, t, m, so, vi, c, *rr: self._on_deploy(
+                    st, v, k, a, t, m, vi, c, *disable_slots(list(rr), so)
                 ),
-                [state, verb, kind, auto, text, mask_on, slot_on, carry, *refs_roles],
+                [state, verb, kind, auto, text, mask_on, slot_on, vision, carry, *refs_roles],
                 [status],
             )
             update_btn.click(
@@ -2554,6 +2702,12 @@ REFDEF_HEAD = r"""
 #refdef-cat-label { text-align: right; }
 .refdef-role-main textarea { overflow-y: auto !important; }
 .refdef-slot-off { opacity: 0.3; }
+/* 👁 vision slot (t189): a big eye over the preview, set by the 🖼/👁 button */
+.refdef-slot:has(.refdef-vis-on) [id^="refdef-img-"] { position: relative; }
+.refdef-slot:has(.refdef-vis-on) [id^="refdef-img-"]::after {
+  content: '\1F441\FE0F'; position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; font-size: 110px; opacity: 0.6; pointer-events: none;
+  z-index: 20; text-shadow: 0 0 12px #000; }
 #refdef-deploy:hover { background: #388e3c !important; }
 </style>
 """

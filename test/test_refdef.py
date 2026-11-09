@@ -445,6 +445,7 @@ def test_snap_doc_roundtrip():
         'verb': 'enh',
         'kind': 'prompt',
         'text': 't',
+        'vision': [False, True, False],
         'clip': json.dumps(_iteration()),
     }
     doc = snap_to_doc(snap)
@@ -1072,3 +1073,70 @@ def test_predefined_prompts():
             save_prompt(col, *bad)
     assert delete_prompt(col, 'b') and not delete_prompt(col, 'b') and not delete_prompt(col, '')
     assert [d['name'] for d in list_prompts(col)] == ['facesheet']
+
+
+# ---------------------------------------------------------------------- #
+# 🖼 pixel / 👁 vision switch (FEATURE t189)
+# ---------------------------------------------------------------------- #
+def _vslots(*urls, vision=()):
+    from aidb.app.tab_refdef import N_SLOTS
+
+    slots = [{'url': u, 'id': None, 'role': f'r{i + 1}'} for i, u in enumerate(urls)]
+    slots += [{'url': None, 'id': None, 'role': ''}] * (N_SLOTS - len(slots))
+    for n in vision:
+        slots[n - 1] = {**slots[n - 1], 'vision': True}
+    return slots
+
+
+def test_vision_payload_use_field_and_default_unchanged():
+    from aidb.app.tab_refdef import refdef_payload
+
+    plain = _vslots('/a/x.png', '/a/y.png')
+    base = refdef_payload(plain, 'ref', 'hint', 't')
+    assert all('use' not in r for r in base['refs'])
+    vis = refdef_payload(_vslots('/a/x.png', '/a/y.png', vision=(2,)), 'ref-novis', 'hint', 't')
+    assert vis['refs'][1]['use'] == 'vision' and 'use' not in vis['refs'][0]
+    # all 🖼 → byte-identical to a payload built without the switch
+    assert json.dumps(refdef_payload(plain, 'ref', 'hint', 't')) == json.dumps(base)
+
+
+def test_vision_locks_audio_and_qfix():
+    from aidb.app.tab_refdef import vision_ignored, vision_locked, vision_slots
+
+    assert vision_locked(0, 'img-fsw-novis') and vision_locked(1, 'img-fsw-novis')
+    assert not vision_locked(2, 'img-fsw-novis')
+    for verb in ('pre-vid', 'post-vid', 'inp-mask', 'inp-nomask', 'pickup'):
+        assert vision_locked(0, verb) and not vision_locked(1, verb)
+    assert not vision_locked(0, 'ref')
+    s = _vslots('/a/x.png', '/a/y.png', '/a/z.wav', vision=(1, 2, 3))
+    assert vision_slots(s, 'img-fsw-novis') == []
+    assert vision_ignored(s, 'img-fsw-novis') == [1, 2, 3]
+    assert vision_slots(s, 'ref') == [1, 2]  # audio has no 👁
+    assert vision_slots(s, 'inp-qfix') == []
+
+
+def test_vision_outside_budget_and_mask_dropped():
+    from aidb.app.tab_refdef import ignored_masks, ref_budget_problems, refdef_payload
+
+    imgs = [f'/a/{i}.png' for i in range(7)]
+    assert ref_budget_problems(_vslots(*imgs), 'ref')
+    assert ref_budget_problems(_vslots(*imgs, vision=(7,)), 'ref') == []
+    s = _vslots('/a/x.png', '/a/y.png', vision=(2,))
+    s[1]['mask'] = {'schema_id': 'm'}
+    assert ignored_masks(s, 'ref') == [2]
+    assert 'mask' not in refdef_payload(s, 'ref', 'hint', '')['refs'][1]
+
+
+def test_vision_ref_img_needs_a_pixel_image():
+    from aidb.app.tab_refdef import img_ref_problems
+
+    assert img_ref_problems(_vslots('/a/x.png', vision=(1,)), 'ref-img')
+    assert img_ref_problems(_vslots('/a/x.png', '/a/y.png', vision=(1,)), 'ref-img') == []
+
+
+def test_vision_parse_roundtrip():
+    from aidb.app.tab_refdef import parse_payload, refdef_payload
+
+    p = refdef_payload(_vslots('/a/x.png', '/a/y.png', vision=(2,)), 'ref', 'hint', '')
+    st = parse_payload(json.dumps(p))
+    assert st['slots'][1].get('vision') is True and not st['slots'][0].get('vision')
