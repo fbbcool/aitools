@@ -1140,3 +1140,140 @@ def test_vision_parse_roundtrip():
     p = refdef_payload(_vslots('/a/x.png', '/a/y.png', vision=(2,)), 'ref', 'hint', '')
     st = parse_payload(json.dumps(p))
     assert st['slots'][1].get('vision') is True and not st['slots'][0].get('vision')
+
+
+# -- t191: clip refs under pre-/post-vid + inherited budget; t190 tab pins -- #
+def _cslots(*specs):
+    """Slots from ``url`` or ``(url, role)`` specs."""
+    return [
+        {'url': s, 'id': None, 'role': ''}
+        if isinstance(s, str)
+        else {'url': s[0], 'id': None, 'role': s[1]}
+        for s in specs
+    ]
+
+
+def test_continue_allows_clips():
+    from aidb.app.tab_refdef import continue_problems
+
+    for verb in ('post-vid', 'pre-vid'):
+        assert continue_problems(_cslots('/a.mkv', '/cut.mp4', '/p.png', '/v.mov'), verb) == []
+        assert continue_problems(_cslots('/a.png', '/cut.mp4'), verb) == [
+            'slot 1 needs the anchor clip (video)'
+        ]
+    assert continue_problems(_cslots('/a.png'), 'ref') == []
+
+
+def test_budget_continue_anchor_and_inherit():
+    from aidb.app.tab_refdef import ref_budget_problems
+
+    # the anchor is pinned frames, not a ref: anchor + 2 new clips is within the cap
+    assert ref_budget_problems(_cslots('/a.mkv', '/v1.mp4', '/v2.mp4'), 'post-vid') == []
+    # ... but under ref slot 1 is an ordinary clip ref
+    assert ref_budget_problems(_cslots('/a.mkv', '/v1.mp4', '/v2.mp4'), 'ref') == [
+        'max 2 clips, got 3'
+    ]
+    inh = [
+        {'n': 1, 'kind': 'video', 'url': '/r/c1.mov', 'use': True},
+        {'n': 2, 'kind': 'video', 'url': '/r/c2.mov', 'use': True},
+        {'n': 3, 'kind': 'image', 'url': '/r/man.png', 'use': True},
+    ]
+    slots = _cslots('/a.mkv', '/v1.mp4')
+    for verb in ('post-vid', 'pre-vid'):
+        assert ref_budget_problems(slots, verb, inh) == ['max 2 clips, got 3']
+        assert ref_budget_problems(slots, verb) == []  # no carry → slots only
+    # a switched-off carried ref frees its place
+    inh_off = [dict(inh[0], use=False), *inh[1:]]
+    assert ref_budget_problems(slots, 'post-vid', inh_off) == []
+    # the same file carried and in a slot counts once (t191 D; path normalised)
+    assert ref_budget_problems(_cslots('/a.mkv', '/r/./c1.mov'), 'post-vid', inh) == []
+    # every kind counts: 2 carried audio + 1 new = 3
+    aud = [{'kind': 'audio', 'url': f'/r/a{i}.wav', 'use': True} for i in (1, 2)]
+    assert ref_budget_problems(_cslots('/a.mkv', '/n.wav'), 'post-vid', aud) == [
+        'max 2 audios, got 3'
+    ]
+    # a carried clip's soundtrack (audio: true) counts in the total
+    pics = [f'/p{i}.png' for i in range(1, 7)]
+    full = _cslots('/a.mkv', *pics, '/a1.wav', '/a2.wav')
+    clips = [{'kind': 'video', 'url': f'/r/c{i}.mov', 'use': True, 'audio': True} for i in (1, 2)]
+    assert ref_budget_problems(full, 'post-vid', clips) == []  # 6 + 2 + 2 + 2 = 12
+    full.append({'url': '/r/c3.mov', 'id': None, 'role': ''})
+    assert ref_budget_problems(full, 'post-vid', clips[:1] + [dict(clips[1], url='/r/x.mov')]) == [
+        'max 2 clips, got 3',
+        'max 12 refs in total (soundtracks counted), got 13',  # 6 + 2 + 3 + 2
+    ]
+    # inherit is ignored outside pre-/post-vid
+    assert ref_budget_problems(_cslots('/v1.mp4'), 'ref', inh) == []
+
+
+def test_inherit_list_soundtrack():
+    from aidb.app.tab_refdef import inherit_list
+
+    carry = {
+        'anchor': '/c/a.mkv',
+        'refs': [{'kind': 'video', 'vid': 1, 'url': '/r/c.mov', 'audio': True}, {'kind': 'image'}],
+        'on': [True, True],
+    }
+    inh = inherit_list(carry, '/c/a.mkv')
+    assert inh[0]['audio'] is True and 'audio' not in inh[1]
+
+
+def test_pins_outside_budget_and_conflicts():
+    from aidb.app.tab_refdef import pin_of, pin_problems, ref_budget_problems
+
+    s = _cslots(
+        ('/p.png', 'Last frame to land on'), ('/q.png', '  first_frame'), ('/v.mp4', 'last frame')
+    )
+    assert [pin_of(x, 'ref') for x in s] == ['last', 'first', None]  # video: no pin
+    assert pin_of(s[0], 'enh') is None  # other verbs: ordinary role text
+    assert pin_of({'url': '/p.png', 'role': 'the last frame'}, 'ref') is None  # starts-with only
+    pics = [f'/p{i}.png' for i in range(1, 7)]
+    # 6 pictures + a pinned 7th still fits
+    assert ref_budget_problems(_cslots(*pics, ('/p7.png', 'last frame')), 'ref') == []
+    assert ref_budget_problems(_cslots(*pics, '/p7.png'), 'ref') == ['max 6 pictures, got 7']
+    # conflicts: first + post-vid, last + pre-vid; the other pairs are fine
+    assert pin_problems(_cslots('/a.mkv', ('/p.png', 'first frame')), 'post-vid') == [
+        "slot 2 pins the first frame — post-vid already pins the anchor's tail at frame 0"
+    ]
+    assert pin_problems(_cslots('/a.mkv', ('/p.png', 'last frame x')), 'pre-vid') == [
+        "slot 2 pins the last frame — pre-vid already pins the anchor's head at the end"
+    ]
+    assert pin_problems(_cslots('/a.mkv', ('/p.png', 'last frame')), 'post-vid') == []
+    assert pin_problems(_cslots('/a.mkv', ('/p.png', 'first frame')), 'pre-vid') == []
+    assert pin_problems(_cslots(('/p.png', 'first frame')), 'ref') == []
+
+
+def test_continue_deploy_counts_carry(monkeypatch):
+    """deploy (t191): inherit is built ahead of the guards, so a carried clip
+    pair + a new clip is refused with the budget toast, nothing deployed."""
+    from pathlib import Path
+
+    from aidb.app import tab_refdef
+
+    toasts, clip = [], {}
+    for kind in ('Warning', 'Info', 'Success'):
+        monkeypatch.setattr(
+            tab_refdef.gr, kind, lambda m, duration=None, k=kind: toasts.append((k, m))
+        )
+    monkeypatch.setattr(tab_refdef, 'anchor_master', lambda u: Path(u))
+    monkeypatch.setattr(tab_refdef, 'clip_copy', lambda t: clip.update(v=t))
+    monkeypatch.setattr(tab_refdef, 'trigger_enhancer', lambda: 'triggered')
+    tab = tab_refdef.RefdefTab.__new__(tab_refdef.RefdefTab)
+    slots = _cslots('/c/a.mkv', ('/n/cut.mp4', 'cut to this'))
+    monkeypatch.setattr(tab, '_slots_from_ui', lambda *a: [dict(s) for s in slots])
+    monkeypatch.setattr(tab, '_is_enh', lambda st: False)
+    carry = {
+        'anchor': '/c/a.mkv',
+        'refs': [{'kind': 'video', 'vid': i, 'url': f'/r/c{i}.mov'} for i in (1, 2)],
+        'on': [True, True],
+    }
+    msg = tab._on_deploy(None, 'post-vid', 'hint', False, '', [], [], carry)
+    assert msg == 'NOT deployed: `post-vid` — max 2 clips, got 3' and 'v' not in clip
+    assert toasts == [('Warning', 'post-vid: max 2 clips, got 3')]
+    carry['on'] = [False, True]  # 🚫 one carried clip → deploys
+    toasts.clear()
+    msg = tab._on_deploy(None, 'post-vid', 'hint', False, '', [], [], carry)
+    assert msg.startswith('deployed instruction `post-vid`') and 'inherit 1/2' in msg
+    p = json.loads(clip['v'])
+    assert [r['media'] for r in p['refs'][:2]] == ['video', 'video']
+    assert p['continue']['dir'] == 'post' and len(p['inherit']) == 2

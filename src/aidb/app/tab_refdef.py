@@ -52,11 +52,14 @@ pulled:
 H3 ref budget (``H3_VERBS`` = ref / ref-novis / pre-vid / post-vid, FEATURE t181):
 at most 6 pictures, 2 clips, 2 audio files and 12 refs in total (a clip with
 ``audio: true`` counts its soundtrack too); more → 2 s toast, nothing deployed.
-Chain anchors whose inherited refs break the budget are refused by the enhancer.
+Under pre-/post-vid the anchor (slot 1) is pinned frames, not a ref; its carried
+refs with ``use: true`` count with the new ones, a file both carried and in a slot
+once (t191). t190 frame pins (an image slot whose role starts with ``first frame``
+/ ``last frame``) are outside the budget; first + post-vid / last + pre-vid → toast.
 
 ``pre-vid`` / ``post-vid`` (H3 clip chains, board task 172): slot 1 = the
-anchor clip (video), the other slots optional NEW image / audio refs; the text
-is the beat hint. Deploys like ``ref`` (+ a ``continue`` hint ``{dir, url,
+anchor clip (video), the other slots optional NEW image / audio / clip refs (a
+clip = the cut-to shot after the pinned opening, t191); the text is the beat hint. Deploys like ``ref`` (+ a ``continue`` hint ``{dir, url,
 pin}``); the enhancer writes ``prompts_ref[].continue``. Slot 1 must carry its
 enhancer payload (the refs the enhancer inherits): a merge / re-encode is mapped
 to its ``fbbcool_temp_<id>`` master by the 5-char id in its name
@@ -120,6 +123,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -177,7 +181,7 @@ VERBS: Final = (
 )
 # H3 clip-chain continuations (board task 172): slot 1 = the anchor clip
 # (FbbcoolSaveVideo master, video only), the other slots optional NEW refs
-# (images / audio); the enhancer writes prompts_ref[].continue = {dir, url, pin}
+# (images / audio / clips = cut-to shots, t191); the enhancer writes prompts_ref[].continue = {dir, url, pin}
 CONTINUE_VERBS: Final = {'pre-vid': 'pre', 'post-vid': 'post'}
 # verbs whose prompt is built from the slot roles alone (enhancer never looks at
 # the media): slot 1 needs media + a role; it references the other slots by number
@@ -189,6 +193,13 @@ ROLE_ONLY_VERBS: Final = ('ref-novis',)
 H3_VERBS: Final = ('ref', 'ref-novis', 'pre-vid', 'post-vid')
 H3_REF_CAP: Final = {'image': 6, 'video': 2, 'audio': 2}
 H3_REF_TOTAL: Final = 12
+# t190 frame pins (enhancer refdef.py PIN_RE / PIN_CONFLICT): an image slot whose
+# role starts with "first frame" / "last frame" is pinned (AddGuide 0 / -1), no ref
+PIN_RE: Final = re.compile(r'^\s*(first|last)[\s_-]*frame\b', re.I)
+PIN_CONFLICT: Final = {
+    'post-vid': ('first', "post-vid already pins the anchor's tail at frame 0"),
+    'pre-vid': ('last', "pre-vid already pins the anchor's head at the end"),
+}
 # qwen21 head swap (agent-comfy workflows/qwen21-headswap.json, BFS head LoRA): slot 1 =
 # target (body / pose / light / bg = <image1>), slot 2 = reference head (<image2>), both
 # stills, nothing else. The enhancer writes a ``head_swap:`` prompt_qwen21 into
@@ -699,36 +710,73 @@ def missing_roles(slots: list[dict], verb: str) -> list[int]:
 
 def continue_problems(slots: list[dict], verb: str) -> list[str]:
     """Why a pre-vid / post-vid instruction can't deploy: slot 1 must be the
-    anchor clip (video), the other slots images / audio only."""
+    anchor clip (video). The other slots take any media — a clip there is the
+    cut-to shot source (FEATURE t191); the H3 budget is ``ref_budget_problems``."""
     if verb not in CONTINUE_VERBS or not slots:
         return []
-    probs = []
     if media_kind(slots[0].get('url')) != 'video':
-        probs.append('slot 1 needs the anchor clip (video)')
-    probs += [
-        f'slot {i + 1} is a video (new refs: images / audio)'
-        for i, s in enumerate(slots[1:], 1)
-        if media_kind(s.get('url')) == 'video'
+        return ['slot 1 needs the anchor clip (video)']
+    return []
+
+
+def pin_of(slot: dict, verb: str) -> str | None:
+    """t190 frame pin: ``'first'`` / ``'last'`` when an H3 verb's filled image
+    slot's role starts with the keyword (the enhancer's ``PIN_RE``). A pinned ref
+    is no ``<Picture N>`` and sits outside the H3 budget."""
+    if verb not in H3_VERBS or media_kind(slot.get('url')) != 'image':
+        return None
+    m = PIN_RE.match(slot.get('role') or '')
+    return m.group(1).lower() if m else None
+
+
+def pin_problems(slots: list[dict], verb: str) -> list[str]:
+    """t190 pin conflicts the enhancer refuses: a first-frame pin under post-vid
+    (the anchor's tail already sits at frame 0), a last-frame pin under pre-vid."""
+    bad = PIN_CONFLICT.get(verb)
+    return [
+        f'slot {i + 1} pins the {bad[0]} frame — {bad[1]}'
+        for i, s in enumerate(slots[:N_SLOTS])
+        if bad and pin_of(s, verb) == bad[0]
     ]
-    return probs
 
 
-def ref_budget_problems(slots: list[dict], verb: str) -> list[str]:
+def _ref_key(url: str) -> str:
+    """URL identity for the budget's de-dupe (t191 D): the normalised path."""
+    return os.path.normpath(unquote(str(url)))
+
+
+def ref_budget_problems(
+    slots: list[dict], verb: str, inherit: list[dict] | None = None
+) -> list[str]:
     """Why an H3 ref2va instruction breaks the ref budget (FEATURE t181): per kind
     ``H3_REF_CAP``, in total ``H3_REF_TOTAL`` with a clip's soundtrack counted iff
-    its slot carries ``audio: true``."""
+    its ref carries ``audio: true``. Outside the budget: 👁 vision slots (t189),
+    t190 frame pins, and the pre-/post-vid anchor in slot 1 (pinned frames, not a
+    ref). ``inherit`` (pre-/post-vid, t191): the anchor's carried refs, those with
+    ``use: true`` count too; a file both carried and in a slot counts once."""
     if verb not in H3_VERBS:
         return []
-    # 👁 vision slots ship no pixels → outside the budget (t189)
-    filled = [s for i, s in enumerate(slots) if s.get('url') and not is_vision(s, i, verb)]
+    skip = 1 if verb in CONTINUE_VERBS else 0
+    refs = [
+        {'kind': media_kind(s['url']), 'url': s['url'], 'audio': s.get('audio') is True}
+        for i, s in enumerate(slots)
+        if i >= skip and s.get('url') and not is_vision(s, i, verb) and not pin_of(s, verb)
+    ]
+    if verb in CONTINUE_VERBS:
+        seen = {_ref_key(r['url']) for r in refs}
+        for r in inherit or []:
+            if not r.get('use', True) or not r.get('url') or _ref_key(r['url']) in seen:
+                continue
+            seen.add(_ref_key(r['url']))
+            refs.append({'kind': r.get('kind'), 'url': r['url'], 'audio': r.get('audio') is True})
     n = {k: 0 for k in H3_REF_CAP}
-    for s in filled:
-        if (k := media_kind(s['url'])) in n:
-            n[k] += 1
+    for r in refs:
+        if r['kind'] in n:
+            n[r['kind']] += 1
     probs = [
         f'max {cap} {REF_LABEL[k]}s, got {n[k]}' for k, cap in H3_REF_CAP.items() if n[k] > cap
     ]
-    tracks = sum(1 for s in filled if media_kind(s['url']) == 'video' and s.get('audio') is True)
+    tracks = sum(1 for r in refs if r['kind'] == 'video' and r['audio'])
     if (total := sum(n.values()) + tracks) > H3_REF_TOTAL:
         probs.append(f'max {H3_REF_TOTAL} refs in total (soundtracks counted), got {total}')
     return probs
@@ -1094,6 +1142,8 @@ def inherit_list(carry: dict | None, anchor: str | None) -> list[dict] | None:
             'url': r.get('url'),
             'desc': r.get('desc') or '',
             'use': on[i] if i < len(on) else True,
+            # a carried clip's soundtrack counts in the H3 budget (t181)
+            **({'audio': True} if r.get('audio') is True else {}),
         }
         for i, r in enumerate(carry['refs'])
     ]
@@ -2037,13 +2087,8 @@ class RefdefTab:
         origin = None
         if state and state['kind'] == 'refdef':
             origin = (state['payload'].get('origin') or {}).get('scene_id')
-        if probs := (
-            continue_problems(slots, verb)
-            or ref_budget_problems(slots, verb)
-            or swap_problems(slots, verb)
-            or img_ref_problems(slots, verb)
-            or qfix_problems(slots, verb)
-        ):
+
+        def refused(probs: list[str]) -> str:
             # qfix: 2 s app toast (FEATURE 180); the other verbs keep 1 s
             gr.Warning(
                 f'{verb}: {"; ".join(probs)}',
@@ -2052,35 +2097,49 @@ class RefdefTab:
                 else 1,
             )
             return f'NOT deployed: `{verb}` — {"; ".join(probs)}'
+
+        if probs := continue_problems(slots, verb):
+            return refused(probs)
+        anchor_note = ''
+        inherit = None
+        master = None
+        # the enhancer inherits the anchor's refs from its payload; built ahead of the
+        # budget check, which counts the carried refs too (t191)
+        if verb in CONTINUE_VERBS:
+            url = slots[0]['url']
+            try:
+                master = anchor_master(url)
+            except ValueError as e:
+                return refused([str(e)])
+            if master is None:
+                return refused(
+                    [
+                        f'slot 1 {Path(url).name} has no enhancer payload (merge / re-encode?) '
+                        'and no fbbcool_temp master found — use the FbbcoolSaveVideo master'
+                    ]
+                )
+            if str(master) != url:
+                slots[0] = {**slots[0], 'url': str(master), 'id': None}
+                anchor_note = f' · anchor → {master.name}'
+            if inherit := inherit_list(carry, str(master)):
+                off = [r['tag'] for r in inherit if not r['use']]
+                anchor_note += f' · inherit {len(inherit) - len(off)}/{len(inherit)}'
+                anchor_note += f' (off: {", ".join(off)})' if off else ''
+        if probs := (
+            pin_problems(slots, verb)
+            or ref_budget_problems(slots, verb, inherit)
+            or swap_problems(slots, verb)
+            or img_ref_problems(slots, verb)
+            or qfix_problems(slots, verb)
+        ):
+            return refused(probs)
         if verb in QFIX_VERBS:  # scripted enhancer data, no enhancer (FEATURE 180)
             res = self._deploy_qfix(slots, text, origin)
             if vis_off := vision_ignored(slots, verb):  # scripted: nobody looks (t189)
                 res += f' · vision ignored: slot {", ".join(map(str, vis_off))}'
             return res
-        anchor_note = ''
-        inherit = None
-        if verb in CONTINUE_VERBS:  # the enhancer inherits the anchor's refs from its payload
-            url = slots[0]['url']
-            try:
-                master = anchor_master(url)
-            except ValueError as e:
-                gr.Warning(f'{verb}: {e}', duration=QFIX_TOAST_WARN_S)
-                return f'NOT deployed: `{verb}` — {e}'
-            if master is None:
-                why = (
-                    f'slot 1 {Path(url).name} has no enhancer payload (merge / re-encode?) '
-                    'and no fbbcool_temp master found — use the FbbcoolSaveVideo master'
-                )
-                gr.Warning(f'{verb}: {why}', duration=QFIX_TOAST_WARN_S)
-                return f'NOT deployed: `{verb}` — {why}'
-            if str(master) != url:
-                slots[0] = {**slots[0], 'url': str(master), 'id': None}
-                anchor_note = f' · anchor → {master.name}'
-                gr.Info(f'{verb}: anchor → {master.name}', duration=QFIX_TOAST_WARN_S)
-            if inherit := inherit_list(carry, str(master)):
-                off = [r['tag'] for r in inherit if not r['use']]
-                anchor_note += f' · inherit {len(inherit) - len(off)}/{len(inherit)}'
-                anchor_note += f' (off: {", ".join(off)})' if off else ''
+        if master is not None and anchor_note.startswith(' · anchor →'):
+            gr.Info(f'{verb}: anchor → {master.name}', duration=QFIX_TOAST_WARN_S)
         payload = refdef_payload(slots, verb, kind, text, origin, inherit)
         clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
