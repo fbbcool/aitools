@@ -90,8 +90,8 @@ deployed ref gets ``use: "vision"``, the enhancer looks at the media (even on
 inp-nomask, pickup; audio has no 👁. Without the enhancer (inp-qfix, enhancer-data deploys) it is ignored with a
 status note. 💾 saves it; slot ⟲ / ✕ reset it to 🖼.
 
-``🎭`` (per slot, local images) opens a shared brush editor: paint the area to
-mask, ✓ stores it (⎘ = ✓ + the masked image's path on the clipspace, ready for
+A click on a slot's (local) image opens the shared brush editor fullscreen
+(task 193; Esc / ✕ closes it): paint the area to mask, ✓ stores it (⎘ = ✓ + the masked image's path on the clipspace, ready for
 a ComfyUI quickload), 🗑 removes it. A mask belongs to the source image (fixed
 path in ``MASK_DIR``; repainting replaces it), so every slot / pull / save
 showing that image shows it (red tint). An instruction deploy adds ``mask`` = a
@@ -280,6 +280,15 @@ SCHEMA_MASK_PREFIX: Final = '1xlasm_enhancer.mask.'
 MASK_KEY_MAIN: Final = 'url_mask'  # the top-level scene image's mask (sibling of url)
 MASK_ICON_ON: Final = '🟥'  # per-slot masking switch: on (mask deployed / tinted)
 MASK_ICON_OFF: Final = '⬜'  # off: slot deployed without any mask
+
+
+# t193: the fullscreen editor overlay stays mounted (a canvas mounted while hidden
+# never loads its image) and is shown / hidden by a CSS class
+def mask_overlay(show: bool) -> dict:
+    """Update showing / hiding the fullscreen mask editor overlay."""
+    return gr.update(elem_classes=['refdef-mask-on' if show else 'refdef-mask-off'])
+
+
 SLOT_ICON_ON: Final = '✅'  # per-slot enable switch: on (slot deployed)
 SLOT_ICON_OFF: Final = '🚫'  # off: slot kept in the tab but deployed as empty
 # per-slot pixel / vision switch (FEATURE t189): 🖼 = direct pixel ref (default),
@@ -2282,8 +2291,7 @@ class RefdefTab:
     def _on_mask_open(self, i: int, ref: str | None):
         """Open the editor on slot ``i``'s image (existing mask as the layer)."""
         url = self._mask_src(ref)
-        if url is None:
-            gr.Info(f'slot {i + 1}: masks need a local image', duration=0.5)
+        if url is None:  # empty / clip / audio / remote slot: the click does nothing
             return gr.update(), gr.update(), gr.update(), gr.update()
         with Image.open(url) as src:
             src.draft('RGB', (MASK_EDIT_SIZE, MASK_EDIT_SIZE))
@@ -2295,7 +2303,7 @@ class RefdefTab:
                 m = src_m.convert('L').resize(bg.size, Image.Resampling.NEAREST)
             layer.paste((*MASK_TINT, 128), mask=m)
         value = {'background': bg, 'layers': [layer], 'composite': None}
-        return gr.update(visible=True), value, i, f'🎭 slot {i + 1} · `{Path(url).name}`'
+        return mask_overlay(True), value, i, f'🎭 slot {i + 1} · `{Path(url).name}`'
 
     @staticmethod
     def _painted(value: dict | None) -> Image.Image | None:
@@ -2324,22 +2332,22 @@ class RefdefTab:
         imgs: list[Any] = list(keep)
         imgs[i] = self._preview(url)
         if hit is None:
-            return [*imgs, gr.update(visible=False), f'slot {i + 1}: empty mask · mask removed']
+            return [*imgs, mask_overlay(False), f'slot {i + 1}: empty mask · mask removed']
         msg = f'slot {i + 1}: mask saved → `{hit[1]}`'
         if copy_masked:
             clip_copy(hit[1])
             msg += ' · clipspace ← masked image'
         gr.Success(f'slot {i + 1}: mask saved', duration=0.5)
-        return [*imgs, gr.update(visible=False), msg]
+        return [*imgs, mask_overlay(False), msg]
 
     def _on_mask_drop(self, i: int | None, *refs):
         keep = [gr.update()] * N_SLOTS
         url = self._mask_src(refs[i]) if i is not None else None
         if i is None or url is None or not drop_mask(url):
-            return [*keep, gr.update(visible=False), 'mask: nothing to remove']
+            return [*keep, mask_overlay(False), 'mask: nothing to remove']
         imgs: list[Any] = list(keep)
         imgs[i] = self._preview(url)
-        return [*imgs, gr.update(visible=False), f'slot {i + 1}: mask removed']
+        return [*imgs, mask_overlay(False), f'slot {i + 1}: mask removed']
 
     @staticmethod
     def _payload_mask(state: dict | None, i: int, url: str | None) -> dict | None:
@@ -2418,7 +2426,7 @@ class RefdefTab:
 
             # input is the clipspace only: images are display-only, the slot
             # ref (img id or url) rides in a per-slot State
-            imgs, refs, roles, slot_pulls, clears, mask_btns = [], [], [], [], [], []
+            imgs, refs, roles, slot_pulls, clears = [], [], [], [], []
             mask_tgls, mask_clrs = [], []
             mask_on = gr.State([True] * N_SLOTS)  # per-slot masking switch (🟥/⬜)
             slot_on = gr.State([True] * N_SLOTS)  # per-slot enable switch (✅/🚫)
@@ -2439,7 +2447,9 @@ class RefdefTab:
                         label=f'slot {i + 1}',
                         height=300,
                         interactive=False,
+                        buttons=[],  # a click opens the fullscreen mask editor (t193)
                         elem_id=f'refdef-img-{i + 1}',
+                        elem_classes=['refdef-img'],
                     )
                 )
                 refs.append(gr.State(''))
@@ -2452,7 +2462,6 @@ class RefdefTab:
                     )
                     slot_pulls.append(gr.Button('⟲', scale=0, min_width=40))
                     clears.append(gr.Button('✕', scale=0, min_width=40))
-                    mask_btns.append(gr.Button('🎭', scale=0, min_width=40))
                     mask_tgls.append(gr.Button(MASK_ICON_ON, scale=0, min_width=40))
                     mask_clrs.append(gr.Button('🧽', scale=0, min_width=40))
                 # slot 1: double height, fixed (scrollbar on overflow)
@@ -2504,27 +2513,33 @@ class RefdefTab:
                         with gr.Column(elem_classes=['refdef-slot']):
                             make_slot(i)
 
-            # 🎭 mask editor (shared by the slots): paint over the area to mask
+            # 🎭 mask editor (shared by the slots, fullscreen overlay — t193): a click
+            # on a slot image opens it; paint over the area to mask
             mask_slot = gr.State(None)
-            with gr.Group(visible=False) as mask_box:
-                with gr.Row(equal_height=True):
-                    mask_md = gr.Markdown()
-                    mask_ok = gr.Button('✓', variant='primary', scale=0, min_width=40)
-                    mask_copy = gr.Button('⎘', scale=0, min_width=40)
-                    mask_del = gr.Button('🗑', scale=0, min_width=40)
-                    mask_close = gr.Button('✕', scale=0, min_width=40)
-                mask_ed = gr.ImageEditor(
-                    type='pil',
-                    sources=(),
-                    transforms=(),
-                    layers=False,
-                    brush=gr.Brush(
-                        default_size=40, colors=[(f'rgb{MASK_TINT}', 0.5)], color_mode='fixed'
-                    ),
-                    eraser=gr.Eraser(default_size=40),
-                    height=800,
-                    show_label=False,
-                )
+            with gr.Column(
+                elem_id='refdef-mask-full', elem_classes=['refdef-mask-off']
+            ) as mask_box:
+                with gr.Group():
+                    with gr.Row(equal_height=True):
+                        mask_md = gr.Markdown()
+                        mask_ok = gr.Button('✓', variant='primary', scale=0, min_width=40)
+                        mask_copy = gr.Button('⎘', scale=0, min_width=40)
+                        mask_del = gr.Button('🗑', scale=0, min_width=40)
+                        mask_close = gr.Button(
+                            '✕', scale=0, min_width=40, elem_id='refdef-mask-close'
+                        )
+                    mask_ed = gr.ImageEditor(
+                        type='pil',
+                        sources=(),
+                        transforms=(),
+                        layers=False,
+                        brush=gr.Brush(
+                            default_size=40, colors=[(f'rgb{MASK_TINT}', 0.5)], color_mode='fixed'
+                        ),
+                        eraser=gr.Eraser(default_size=40),
+                        height='calc(100vh - 80px)',
+                        show_label=False,
+                    )
 
             status = gr.Markdown()
             # predefined prompts (t188): pick → text box; ➕ upserts by name; 🗑 deletes
@@ -2707,8 +2722,8 @@ class RefdefTab:
                     [mask_on, state, refs[i]],
                     [imgs[i], status],
                 )
-            for i, mbtn in enumerate(mask_btns):
-                mbtn.click(
+            for i, img in enumerate(imgs):
+                img.select(
                     lambda r, i=i: self._on_mask_open(i, r),
                     [refs[i]],
                     [mask_box, mask_ed, mask_slot, mask_md],
@@ -2724,7 +2739,7 @@ class RefdefTab:
                     [mask_on, *mask_tgls],
                 )
             mask_del.click(self._on_mask_drop, [mask_slot, *refs], [*imgs, mask_box, status])
-            mask_close.click(lambda: gr.update(visible=False), [], [mask_box])
+            mask_close.click(lambda: mask_overlay(False), [], [mask_box])
             carry_outs = [carry, carry_box, carry_md, *carry_imgs, *carry_tgls]
             refs[0].change(
                 lambda *r: self._on_carry(*r), list(refs), carry_outs, show_progress='hidden'
@@ -2768,5 +2783,17 @@ REFDEF_HEAD = r"""
   justify-content: center; font-size: 110px; opacity: 0.6; pointer-events: none;
   z-index: 20; text-shadow: 0 0 12px #000; }
 #refdef-deploy:hover { background: #388e3c !important; }
+/* t193: a click on a slot image opens the mask editor as a fullscreen overlay */
+.refdef-img img { cursor: crosshair; }
+#refdef-mask-full { position: fixed !important; inset: 0; z-index: 1000; margin: 0 !important;
+  padding: 8px; border-radius: 0; background: var(--body-background-fill); overflow: auto; }
+#refdef-mask-full.refdef-mask-off { visibility: hidden; pointer-events: none; }
 </style>
+<script>
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const box = document.getElementById('refdef-mask-full');
+  if (box && box.classList.contains('refdef-mask-on')) document.getElementById('refdef-mask-close')?.click();
+});
+</script>
 """
