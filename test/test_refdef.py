@@ -983,21 +983,21 @@ def test_ref_img_problems():
         assert img_ref_problems([im] * n, 'ref-img') == []
     assert img_ref_problems([e, e, im], 'ref-img') == []  # gaps ok: compacted downstream
     assert missing_roles([im], 'ref-img') == []  # roles optional
-    assert img_ref_problems([], 'ref-img') == ['needs 1-5 images in slots 1-5']
+    assert img_ref_problems([], 'ref-img') == ['needs 1-5 🖼 images']
     assert img_ref_problems([dict(im, url='/c.mp4'), im], 'ref-img') == [
-        'slot 1 is video (images only)'
+        'slot 1 is video (🖼 images only)'
     ]
     assert img_ref_problems([im, dict(im, url='/v.wav')], 'ref-img') == [
-        'slot 2 is audio (images only)'
+        'slot 2 is audio (🖼 images only)'
     ]
-    assert img_ref_problems([im] * 6, 'ref-img') == ['slot 6 must be empty (max 5 images)']
+    assert img_ref_problems([im] * 6, 'ref-img') == [
+        '6 🖼 pixel images (max 5) — switch some to 👁 or empty them'
+    ]
     assert img_ref_problems([e, e, e, e, im], 'ref-img') == []
     assert img_ref_problems([im] * 6, 'ref') == []  # other verbs unaffected
 
 
-def test_ref_img_payload_drops_masks_keeps_roles():
-    from aidb.app.tab_refdef import ignored_masks
-
+def test_ref_img_payload_ships_masks_keeps_roles():
     mask = {'schema_id': '1xlasm_enhancer.mask.v1', 'type': 'raster', 'url': '/m.png'}
     slots = [
         {'url': '/face1.png', 'id': None, 'role': 'the face', 'mask': mask},
@@ -1010,11 +1010,9 @@ def test_ref_img_payload_drops_masks_keeps_roles():
         (1, 'the face', 'image'),
         (2, '', 'image'),
     ]  # no default roles
-    assert all('mask' not in r for r in p['refs'])
+    assert p['refs'][0]['mask'] == mask and 'mask' not in p['refs'][1]  # t195: shipped
     assert 'continue' not in p and 'inherit' not in p
-    assert ignored_masks(slots, 'ref-img') == [1]
-    assert ignored_masks(slots, 'ref') == []
-    assert refdef_payload(slots, 'ref', 'hint', '')['refs'][0]['mask'] == mask  # others keep it
+    assert refdef_payload(slots, 'ref', 'hint', '')['refs'][0]['mask'] == mask
 
 
 class _FakeCol:
@@ -1115,16 +1113,16 @@ def test_vision_locks_audio_and_qfix():
     assert vision_slots(s, 'inp-qfix') == []
 
 
-def test_vision_outside_budget_and_mask_dropped():
-    from aidb.app.tab_refdef import ignored_masks, ref_budget_problems, refdef_payload
+def test_vision_outside_budget_and_mask_shipped():
+    from aidb.app.tab_refdef import ref_budget_problems, refdef_payload
 
     imgs = [f'/a/{i}.png' for i in range(7)]
     assert ref_budget_problems(_vslots(*imgs), 'ref')
     assert ref_budget_problems(_vslots(*imgs, vision=(7,)), 'ref') == []
     s = _vslots('/a/x.png', '/a/y.png', vision=(2,))
     s[1]['mask'] = {'schema_id': 'm'}
-    assert ignored_masks(s, 'ref') == [2]
-    assert 'mask' not in refdef_payload(s, 'ref', 'hint', '')['refs'][1]
+    r2 = refdef_payload(s, 'ref', 'hint', '')['refs'][1]
+    assert r2['use'] == 'vision' and r2['mask'] == {'schema_id': 'm'}  # t195: where to look
 
 
 def test_vision_ref_img_needs_a_pixel_image():
@@ -1132,6 +1130,38 @@ def test_vision_ref_img_needs_a_pixel_image():
 
     assert img_ref_problems(_vslots('/a/x.png', vision=(1,)), 'ref-img')
     assert img_ref_problems(_vslots('/a/x.png', '/a/y.png', vision=(1,)), 'ref-img') == []
+
+
+def test_ref_img_counts_pixel_slots_t194():
+    from aidb.app.tab_refdef import img_ref_problems, refdef_payload
+
+    x = '/a/x.png'
+    # 1-4 pixel + 👁 image in slot 6 -> ok, slot 6 ships as vision
+    s = _vslots(x, x, x, x, None, x, vision=(6,))
+    assert img_ref_problems(s, 'ref-img') == []
+    assert refdef_payload(s, 'ref-img', 'hint', '')['refs'][5]['use'] == 'vision'
+    # gaps: pixel in 2 / 6 / 9 -> ok (compacted downstream)
+    assert img_ref_problems(_vslots(None, x, None, None, None, x, None, None, x), 'ref-img') == []
+    # 6 pixel anywhere -> count-based rejection; 👁 on one of them fixes it
+    six = (x, None, x, x, None, x, None, x, None, x)
+    assert img_ref_problems(_vslots(*six), 'ref-img') == [
+        '6 🖼 pixel images (max 5) — switch some to 👁 or empty them'
+    ]
+    assert img_ref_problems(_vslots(*six, vision=(10,)), 'ref-img') == []
+    # 👁 slots are uncapped
+    assert img_ref_problems(_vslots(x, *[x] * 9, vision=range(2, 11)), 'ref-img') == []
+    # vision-only -> still rejected
+    assert img_ref_problems(_vslots(None, None, None, None, None, x, vision=(6,)), 'ref-img') == [
+        'needs at least one 🖼 pixel image (all filled slots are 👁)'
+    ]
+    # non-image in a pixel slot (any position) -> rejected; 👁 video ok, 👁 audio is pixel
+    assert img_ref_problems(_vslots(x, *[None] * 6, '/c.mp4'), 'ref-img') == [
+        'slot 8 is video (🖼 images only)'
+    ]
+    assert img_ref_problems(_vslots(x, '/c.mp4', vision=(2,)), 'ref-img') == []
+    assert img_ref_problems(_vslots(x, '/v.wav', vision=(2,)), 'ref-img') == [
+        'slot 2 is audio (🖼 images only)'
+    ]
 
 
 def test_vision_parse_roundtrip():

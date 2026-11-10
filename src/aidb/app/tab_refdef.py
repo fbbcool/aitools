@@ -85,7 +85,7 @@ the slot (pull, slot ⟲, ✕) switches it back on.
 direct pixel ref (🖼, default) and vision (👁, a big eye over the preview): the
 deployed ref gets ``use: "vision"``, the enhancer looks at the media (even on
 ``*-novis`` verbs), writes it into the prompt as text and ships no pixels for it
-— so it is outside the H3 ref budget and its 🎭 mask is ignored. Locked (always
+— so it is outside the H3 ref budget; its 🎭 mask ships as where to look (t195). Locked (always
 🖼): ``img-fsw-novis`` slots 1 + 2, slot 1 of pre-/post-vid, inp-mask,
 inp-nomask, pickup; audio has no 👁. Without the enhancer (inp-qfix, enhancer-data deploys) it is ignored with a
 status note. 💾 saves it; slot ⟲ / ✕ reset it to 🖼.
@@ -133,8 +133,10 @@ from urllib.parse import unquote
 
 import av
 import gradio as gr
+import numpy as np
 import pyperclip
 from PIL import Image, ImageChops, ImageDraw, ImageOps, PngImagePlugin
+from scipy import ndimage
 
 from ait.tools.files import (
     is_aud,
@@ -213,9 +215,9 @@ SWAP_DEFAULT_ROLES: Final = (
 )
 # qwen21 reference-to-image (FEATURE t187, agent-comfy workflows/qwen21-ref.json):
 # NOVIS — the enhancer never looks at the media, the prompt comes from roles + text.
-# Slots 1-5 = equal still refs (5 since t187 comfyos follow-up) (image 1..N compacted in slot order; empty roles
-# stay empty, no defaults), at least one; slots 6+ empty. 🎭 masks are IGNORED:
-# never emitted for this verb (deploy status names the slots).
+# 1-5 🖼 pixel still refs anywhere in slots 1-10 (t194; image 1..N compacted in slot order;
+# empty roles stay empty, no defaults), 👁 slots uncapped. 🎭 masks ship (t195): the
+# enhancer crops a masked pixel ref to the mask bbox + padding before qwen21-ref.
 IMG_REF_VERBS: Final = ('ref-img',)
 IMG_REF_MAX: Final = 5
 # qwen21 quickfix (board FEATURE 180, ComfyUI userdata workflows/qwen21-quickfix.json):
@@ -808,25 +810,28 @@ def swap_problems(slots: list[dict], verb: str) -> list[str]:
 
 
 def img_ref_problems(slots: list[dict], verb: str) -> list[str]:
-    """Why a ref-img instruction can't deploy: 1-5 still images in slots 1-5,
-    slots 6+ empty."""
+    """Why a ref-img instruction can't deploy (t194 contract, shared with the
+    enhancer): 1-``IMG_REF_MAX`` 🖼 pixel slots anywhere in 1-``N_SLOTS``
+    (compacted in slot order downstream), pixel slots still images only, 👁
+    vision slots image/video and uncapped."""
     if verb not in IMG_REF_VERBS:
         return []
     slots = (list(slots) + empty_slots())[:N_SLOTS]
-    head = slots[:IMG_REF_MAX]
+    filled = [(i, s) for i, s in enumerate(slots) if s.get('url')]
+    pixel = [(i, s) for i, s in filled if not is_vision(s, i, verb)]
     probs = [
-        f'slot {i + 1} is {kind} (images only)'
-        for i, s in enumerate(head)
+        f'slot {i + 1} is {kind} (🖼 images only)'
+        for i, s in pixel
         if (kind := media_kind(s.get('url'))) not in (None, 'image')
     ]
-    if not any(s.get('url') for s in head):
-        probs.append(f'needs 1-{IMG_REF_MAX} images in slots 1-{IMG_REF_MAX}')
-    elif all(is_vision(s, i, verb) for i, s in enumerate(head) if s.get('url')):
+    if not filled:
+        probs.append(f'needs 1-{IMG_REF_MAX} 🖼 images')
+    elif not pixel:
         probs.append('needs at least one 🖼 pixel image (all filled slots are 👁)')
-    if extra := [
-        str(i + 1) for i, s in enumerate(slots[IMG_REF_MAX:], IMG_REF_MAX) if s.get('url')
-    ]:
-        probs.append(f'slot {", ".join(extra)} must be empty (max {IMG_REF_MAX} images)')
+    elif len(pixel) > IMG_REF_MAX:
+        probs.append(
+            f'{len(pixel)} 🖼 pixel images (max {IMG_REF_MAX}) — switch some to 👁 or empty them'
+        )
     return probs
 
 
@@ -862,16 +867,6 @@ def vision_ignored(slots: list[dict], verb: str) -> list[int]:
         i + 1
         for i, s in enumerate(slots[:N_SLOTS])
         if s.get('vision') and s.get('url') and not is_vision(s, i, verb)
-    ]
-
-
-def ignored_masks(slots: list[dict], verb: str) -> list[int]:
-    """1-based slots whose 🎭 mask the deploy ignores: ref-img emits no masks, a
-    👁 vision slot ships no pixels (t189 D3)."""
-    return [
-        i + 1
-        for i, s in enumerate(slots[:N_SLOTS])
-        if s.get('url') and s.get('mask') and (verb in IMG_REF_VERBS or is_vision(s, i, verb))
     ]
 
 
@@ -1064,8 +1059,9 @@ def write_mask(url: str, painted: Image.Image) -> tuple[str, str] | None:
     """Store ``painted`` (L / any mode; > 0 = masked, any size) as the mask of
     the source image ``url``: scaled to the (EXIF-upright) image size, then the
     L mask + the RGBA ``masked`` image (alpha 0 where masked; the source's PNG
-    text chunks kept, so ComfyUI metadata survives). An empty mask deletes the
-    mask files → None."""
+    text chunks kept, so ComfyUI metadata survives). Enclosed holes are filled:
+    an outline painted around an area masks the whole area (misw 2026-11-10).
+    An empty mask deletes the mask files → None."""
     with Image.open(url) as src:
         info = {k: v for k, v in src.info.items() if isinstance(k, str) and isinstance(v, str)}
         im = ImageOps.exif_transpose(src).convert('RGB')
@@ -1075,6 +1071,7 @@ def write_mask(url: str, painted: Image.Image) -> tuple[str, str] | None:
     if m.getbbox() is None:
         drop_mask(url)
         return None
+    m = Image.fromarray(ndimage.binary_fill_holes(np.asarray(m) > 0).astype(np.uint8) * 255)
     mask_p, masked_p = mask_paths(url)
     MASK_DIR.mkdir(parents=True, exist_ok=True)
     m.save(mask_p)
@@ -1180,12 +1177,10 @@ def refdef_payload(
                 'id': s.get('id') or None,
                 'role': _instruction_role(s, i, verb),
                 'media': media_kind(s.get('url')),
-                # 🎭 painted mask (only when one exists): mask.v1 object (task 175)
-                **(
-                    {'mask': s['mask']}
-                    if s.get('mask') and verb not in IMG_REF_VERBS and not is_vision(s, i, verb)
-                    else {}
-                ),
+                # 🎭 painted mask (only when one exists): mask.v1 object (task 175).
+                # t195: shipped for every slot — pixel ref = the model sees only the
+                # masked part (ref-img: crop to bbox), 👁 vision = where to look.
+                **({'mask': s['mask']} if s.get('mask') else {}),
                 # 👁 (t189): the enhancer describes the media into the prompt, no pixels
                 **({'use': VIS_USE} if is_vision(s, i, verb) else {}),
             }
@@ -2157,8 +2152,6 @@ class RefdefTab:
             msg += f' · 👁 vision: slot {", ".join(map(str, vis))}'
         if vis_off := vision_ignored(slots, verb):
             msg += f' · vision ignored: slot {", ".join(map(str, vis_off))}'
-        if masked := ignored_masks(slots, verb):
-            msg += f' · masks ignored: slot {", ".join(map(str, masked))}'
         note = trigger_enhancer() if auto else 'auto-trigger off'
         if verb in SWAP_VERBS:  # deploy toast like inp-qfix
             dflt = [r['slot'] for r in payload['refs'][:2] if r['role'] in SWAP_DEFAULT_ROLES]
