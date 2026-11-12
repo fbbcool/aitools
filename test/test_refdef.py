@@ -456,6 +456,188 @@ def test_snap_doc_roundtrip():
     assert snap_to_doc(dict(snap, state=None))['mode'] == 'instruction'
 
 
+# --- ⇪ deploy history (FEATURE t206) ------------------------------------ #
+class _RingCursor(list):
+    def sort(self, order):
+        for key, d in reversed(order):
+            list.sort(self, key=lambda x: x[key], reverse=d < 0)
+        return self
+
+
+class _RingCol:
+    """Just enough of a pymongo collection for ``record_deploy``."""
+
+    def __init__(self):
+        self.docs, self._n = [], 0
+
+    def find(self, flt=None, proj=None):
+        return _RingCursor(self.docs)
+
+    def find_one(self, flt=None, sort=None):
+        docs = _RingCursor(self.docs).sort(sort or [])
+        return docs[0] if docs else None
+
+    def insert_one(self, doc):
+        self._n += 1
+        self.docs.append({**doc, '_id': self._n})
+
+    def delete_many(self, flt):
+        self.docs = [d for d in self.docs if d['_id'] not in flt['_id']['$in']]
+
+
+def test_ring_overflow():
+    from aidb.app.tab_refdef import ring_overflow
+
+    assert ring_overflow([1, 2, 3], 5) == []
+    assert ring_overflow([1, 2, 3], 3) == []
+    assert ring_overflow([1, 2, 3, 4, 5], 3) == [1, 2]
+    assert ring_overflow([1, 2], 0) == [1, 2]
+
+
+def test_record_deploy_ring_buffer():
+    from datetime import datetime, timedelta
+
+    from aidb.app.tab_refdef import (
+        DEPLOYS_MAX,
+        N_SLOTS,
+        deploy_doc,
+        doc_to_snap,
+        record_deploy,
+    )
+
+    assert DEPLOYS_MAX == 50
+    col, t0 = _RingCol(), datetime(2026, 11, 12)
+
+    def doc(n):
+        snap = {
+            'state': None, 'idx': 0, 'refs': [f'/a{n}.png'], 'roles': ['r'], 'verb': 'enh',
+            'kind': 'hint', 'text': str(n), 'vision': [False], 'clip': None,
+        }  # fmt: skip
+        return snap, deploy_doc(snap, [True, False], [False], f'{{"n": {n}}}')
+
+    for n in range(51):
+        assert record_deploy(col, doc(n)[1], now=t0 + timedelta(seconds=n))
+    assert len(col.docs) == 50  # the 51st deploy dropped the oldest
+    assert sorted(d['text'] for d in col.docs) == sorted(str(n) for n in range(1, 51))
+    # identical to the newest → not stored twice; an older repeat is stored
+    assert not record_deploy(col, doc(50)[1], now=t0 + timedelta(seconds=99))
+    assert len(col.docs) == 50
+    assert record_deploy(col, doc(3)[1], now=t0 + timedelta(seconds=100))
+    assert len(col.docs) == 50 and min(int(d['text']) for d in col.docs) == 2
+
+    snap, d = doc(7)
+    assert doc_to_snap(d) == snap  # restores like a 💾 save
+    assert d['slot_on'][:3] == [True, False, True] and d['mask_on'][:2] == [False, True]
+    assert len(d['slot_on']) == len(d['mask_on']) == N_SLOTS
+    assert d['deployed'] == '{"n": 7}' and d['mode'] == 'instruction'
+
+
+# --- 📥 pickup (FEATURE t205) -------------------------------------------- #
+def _picked(tab=None, **kw):
+    from aidb.app.tab_refdef import PICKUP_MIN_VERSION
+
+    slots = [
+        {'url': '/a.png', 'id': None, 'role': 'main'},
+        {'url': None, 'id': None, 'role': ''},
+        {'url': '/gone.png', 'id': None, 'role': 'dress', 'vision': True},
+    ]
+    block = refdef_payload(slots, 'ref-novis', 'prompt', 'hello', 'scn1', tab=tab)
+    ver = '.'.join(map(str, PICKUP_MIN_VERSION))
+    entry = {'prompt': 'p', 'from_rev': 3, 'ts': '2026-11-12', 'refdef': block}
+    return {
+        'schema_id': f'1xlasm_enhancer.iteration.v{ver}',
+        'rev': 3,
+        'prompts': {'current': 0, 'prompt_data': [{'prompt': 'main'}]},
+        'prompts_ref': {'current': 0, 'prompt_data': [entry]},
+        **kw,
+    }
+
+
+def test_schema_version():
+    from aidb.app.tab_refdef import schema_version
+
+    assert schema_version('1xlasm_enhancer.iteration.v6.15') == (6, 15)
+    assert schema_version('1xlasm_enhancer.iteration.v7') == (7,)
+    assert schema_version('1xlasm_enhancer.iteration') is None
+    assert (6, 9) < (6, 15) < (7,)
+
+
+def test_pickup_restores_config_best_effort():
+    from aidb.app.tab_refdef import N_SLOTS, pickup_snap, tab_block
+
+    mask_on = [True] * N_SLOTS
+    mask_on[0] = False
+    slot_on = [True] * N_SLOTS
+    slot_on[1] = False
+    tab = tab_block([{'slot': 2, 'url': '/off.png', 'id': None, 'role': 'off'}], slot_on, mask_on)
+    res = pickup_snap(_picked(tab), exists=lambda r: r != '/gone.png')
+    snap = res['snap']
+    assert snap['refs'][:4] == ['/a.png', '/off.png', '/gone.png', '']
+    assert snap['roles'][:3] == ['main', 'off', 'dress']
+    assert (snap['verb'], snap['kind'], snap['text']) == ('ref-novis', 'prompt', 'hello')
+    assert snap['vision'][:3] == [False, False, True]
+    assert snap['state']['kind'] == 'refdef'  # instruction mode, origin kept
+    assert snap['state']['payload']['origin'] == {'scene_id': 'scn1'}
+    # a missing ref does not fail the pickup: kept, reported, switched off
+    assert res['missing'] == [3]
+    assert res['slot_on'][:4] == [True, False, False, True]
+    assert res['mask_on'][:2] == [False, True]
+    # no tab block (hand-made instruction): everything on
+    res = pickup_snap(_picked(), exists=lambda r: True)
+    assert res['missing'] == [] and all(res['slot_on']) and all(res['mask_on'])
+
+
+def test_pickup_refusals():
+    import pytest
+
+    from aidb.app.tab_refdef import PICKUP_OLD, PickupError, pickup_snap
+
+    with pytest.raises(PickupError, match=PICKUP_OLD):
+        pickup_snap(_picked(schema_id='1xlasm_enhancer.iteration.v6.14'))
+    with pytest.raises(PickupError, match=PICKUP_OLD):
+        pickup_snap(_picked(schema_id='1xlasm_enhancer.iteration'))
+    p = _picked()
+    del p['prompts_ref']['prompt_data'][0]['refdef']
+    with pytest.raises(PickupError, match='no refdef config'):
+        pickup_snap(p)
+    with pytest.raises(PickupError):
+        pickup_snap(None)
+
+
+def test_refdef_entry_prefers_latest_step():
+    from aidb.app.tab_refdef import refdef_entry
+
+    p = _picked()
+    old = {'from_rev': 1, 'ts': '2026-11-13', 'refdef': {'verb': 'enh'}}
+    p['prompts_img'] = {'current': 0, 'prompt_data': [old]}  # a section without a view
+    assert refdef_entry(p)['refdef']['verb'] == 'ref-novis'  # from_rev == rev wins
+    p['rev'] = 1
+    assert refdef_entry(p)['refdef']['verb'] == 'enh'
+    assert refdef_entry({'prompts': {'prompt_data': [{'prompt': 'x'}]}}) is None
+
+
+def test_instruction_and_qfix_carry_the_config():
+    from aidb.app.tab_refdef import pickup_snap, qfix_payload, sync_refdef_urls, tab_block
+
+    tab = tab_block([], None, None)
+    slots = [{'url': '/a.png', 'id': None, 'role': 'make it red'}] + [
+        {'url': None, 'id': None, 'role': ''}
+    ] * 9
+    assert refdef_payload(slots, 'enh', 'hint', 't', tab=tab)['tab'] == tab
+    assert 'tab' not in refdef_payload(slots, 'enh', 'hint', 't')
+    qp = qfix_payload(slots, 'hint text', None, tab)
+    entry = qp['prompts_inp']['prompt_data'][0]
+    assert entry['refdef']['verb'] == 'inp-qfix' and entry['refdef']['tab'] == tab
+    assert 'data:' not in json.dumps(qp)  # urls only
+    # an enhancer-mode url patch keeps the block in step
+    assert sync_refdef_urls(entry, {'/a.png': '/b.png'})
+    assert entry['refdef']['refs'][0]['url'] == '/b.png'
+    assert not sync_refdef_urls(entry, {'/zzz.png': '/c.png'})
+    snap = pickup_snap(qp)['snap']  # qfix writes a pickup-able schema version
+    assert snap['refs'][0] == '/b.png' and snap['roles'][0] == 'make it red'
+    assert snap['verb'] == 'inp-qfix' and snap['text'] == 'hint text'
+
+
 def test_norm_cat():
     from aidb.app.tab_refdef import CAT_ALL, norm_cat
 
@@ -995,6 +1177,46 @@ def test_ref_img_problems():
     ]
     assert img_ref_problems([e, e, e, e, im], 'ref-img') == []
     assert img_ref_problems([im] * 6, 'ref') == []  # other verbs unaffected
+
+
+def test_ref_img_h3_same_rules_as_ref_img_t204():
+    """ref-img-h3 = ref-img for MiniMax H3 Image: the verb is the engine choice,
+    slot rules + instruction shape identical (cap stays 5, no H3 video budget)."""
+    from aidb.app.tab_refdef import (
+        H3_VERBS,
+        IMG_REF_VERBS,
+        VERB_VIEW,
+        VERBS,
+        img_ref_problems,
+        missing_roles,
+        ref_budget_problems,
+    )
+
+    v = 'ref-img-h3'
+    assert v in VERBS and v in IMG_REF_VERBS and v not in VERB_VIEW and v not in H3_VERBS
+    x = '/a/x.png'
+    cases = [
+        _vslots(),
+        _vslots(x),
+        _vslots(None, None, x),
+        _vslots(*[x] * 5),
+        _vslots(*[x] * 6),
+        _vslots(*[x] * 10, vision=range(6, 11)),
+        _vslots(x, vision=(1,)),
+        _vslots('/c.mp4', x),
+        _vslots(x, '/c.mp4', vision=(2,)),
+        _vslots(x, '/v.wav'),
+    ]
+    for s in cases:
+        want = [p.replace('ref-img', v) for p in img_ref_problems(s, 'ref-img')]
+        assert img_ref_problems(s, v) == want
+        assert ref_budget_problems(s, v) == []
+        a, b = refdef_payload(s, 'ref-img', 'prompt', 't'), refdef_payload(s, v, 'prompt', 't')
+        assert b['verb'] == v and b['schema_id'] == SCHEMA_REFDEF
+        strip = lambda d: {k: d[k] for k in d if k not in ('verb', 'ts', 'created')}  # noqa: E731
+        assert strip(a) == strip(b)
+    assert img_ref_problems(_vslots(*[x] * 6), v)  # cap 5 holds
+    assert missing_roles(_vslots(x), v) == []
 
 
 def test_ref_img_payload_ships_masks_keeps_roles():

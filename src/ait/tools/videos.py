@@ -24,12 +24,12 @@ from PIL import Image
 
 from ait.tools.files import suffix_vid
 
-from ait.tools.images import PARENT_METADATA_CHUNK, _metadata_from_chunks
+from ait.tools.images import PARENT_METADATA_CHUNK, PAYLOAD_CHUNK, _metadata_from_chunks
 
 # Container-level tag names as written by FbbcoolSaveVideo. Matroska stores
 # tag names case-insensitively and ffmpeg/PyAV return them UPPERCASED on read
 # (PARENT_METADATA, PROMPT, WORKFLOW) — matching is case-insensitive.
-METADATA_TAGS: Final = ('prompt', 'workflow', PARENT_METADATA_CHUNK)
+METADATA_TAGS: Final = ('prompt', 'workflow', PARENT_METADATA_CHUNK, PAYLOAD_CHUNK)
 
 # Anchor-frame slots (board task 84). FbbcoolSaveVideo masters carry one
 # single-frame lossless FFV1/bgr0 stream per anchor, titled

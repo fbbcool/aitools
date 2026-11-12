@@ -236,6 +236,13 @@ Payload-less renders resolve as before: the file's own registration first, else
 the embedded `parent_metadata` provenance chain (`metadata()['parent']` —
 parent registered → its scene; else the parent's directory as scene url).
 
+`metadata()['payload']` (images and videos) is the payload a SmartInput graph
+actually served for that render — its own `payload_json` chunk/tag, `None` on
+renders without it. It is additive: `enhancer` and its attribution rules are
+unchanged. From iteration v6.15 on, entries made from a refdef instruction carry
+that instruction verbatim as `refdef` (urls and text only); the scene app's refdef
+tab restores it with the 📥 pickup button (`aidb.app.tab_refdef.pickup_snap`).
+
 Outcome contract: **truthy str** = adopted scene id; **`None`** = enhancer
 payload matched no scene and no `subdir_new` was given; **`False`** = nothing
 resolves / never-overwrite collision — on both non-str outcomes **nothing** is

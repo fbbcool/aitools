@@ -44,6 +44,10 @@ pulled:
     (``qfix_payload``): ``prompts_inp`` with slot 1 = edit target (+ its 🎭 mask
     → mask mode, else nomask), slots 2.. = 0-2 still refs (image 2 / 3 in slot
     order), slot 1's role = the ``prompt_qwen21`` edit instruction verbatim.
+    ``ref-img`` / ``ref-img-h3`` = reference-to-image, novis (``IMG_REF_VERBS``): 1-5
+    🖼 pixel stills anywhere in the slots (+ uncapped 👁 slots), roles optional; the
+    verb picks the engine of the ``prompts_img`` entry the enhancer writes — qwen21
+    (``ref-img``, t187) or MiniMax H3 Image (``ref-img-h3``, t204). No size control here.
     ``ref`` = the slots are MiniMax H3 ref2va picture references
     (``<Picture i>``, board task 159); like ``enh``: slot 1 required, stills. With
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
@@ -113,6 +117,24 @@ twice). The category dropdown next to 💾
 filters ◀ / ▶ and files a save under it; ``(all)`` = no filter / uncategorized,
 a typed-in name starts a new category.
 
+Pickup (FEATURE t205): an instruction deploy carries a ``tab`` block (✅/🚫 + 🟥/⬜
+switches, the disabled slots' content); the enhancer copies the whole instruction
+verbatim as ``refdef`` into the entry it writes (``inp-qfix`` does so itself), so
+every render embeds the config that made it — urls and text only. ``📥`` right of
+pull reads the clipspace (a render path / url / img id, or enhancer data), finds
+that block (``refdef_entry``) and overwrites the tab with it (``pickup_snap``),
+best effort: a ref whose file is gone keeps url + role, shows a "not found" tile
+and is switched 🚫. Enhancer data older than ``PICKUP_MIN_VERSION`` is refused with
+the error ``version too old!``.
+
+Deploy history (FEATURE t206): every successful ``⇪ deploy`` (not ``⇄ update`` /
+``⛓ join``) stores the tab config — the save shape plus the ✅/🚫 and 🟥/⬜
+switches and the deployed clipspace text — in ``refdef_deploys``, one global
+ring buffer of the newest ``DEPLOYS_MAX``; a deploy identical to the newest
+entry is not stored twice. The own ``<`` / ``>`` buttons step through it like
+◀ / ▶ through the saves (same parked draft; ``>`` past the newest deploy = the
+current config). Entries cannot be deleted by hand and have no category.
+
 Payload logic is in pure module functions (``parse_payload``, ``with_view``,
 ``patch_iteration``, ``refdef_payload``) so it can be tested without gradio.
 """
@@ -155,6 +177,8 @@ from ait.tools.videos import (
     ref_frame,
     seam_summary,
 )
+from ait.tools.videos import metadata as vid_metadata
+from ait.tools.images import metadata as img_metadata
 from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
@@ -180,6 +204,7 @@ VERBS: Final = (
     'img-fsw-novis',
     'inp-qfix',
     'ref-img',
+    'ref-img-h3',
 )
 # H3 clip-chain continuations (board task 172): slot 1 = the anchor clip
 # (FbbcoolSaveVideo master, video only), the other slots optional NEW refs
@@ -218,7 +243,12 @@ SWAP_DEFAULT_ROLES: Final = (
 # 1-5 🖼 pixel still refs anywhere in slots 1-10 (t194; image 1..N compacted in slot order;
 # empty roles stay empty, no defaults), 👁 slots uncapped. 🎭 masks ship (t195): the
 # enhancer crops a masked pixel ref to the mask bbox + padding before qwen21-ref.
-IMG_REF_VERBS: Final = ('ref-img',)
+# ``ref-img-h3`` (FEATURE t204) = the same instruction for MiniMax H3 Image
+# (agent-comfy workflows/mmh3-img-ref.json): the verb IS the engine choice — one engine
+# per prompts_img entry, the enhancer writes the H3 prompt (refs = <Picture N>) and the
+# canvas size. Same slot rules as ``ref-img`` (cap stays IMG_REF_MAX), not an H3_VERBS
+# member (that is the H3 video ref budget).
+IMG_REF_VERBS: Final = ('ref-img', 'ref-img-h3')
 IMG_REF_MAX: Final = 5
 # qwen21 quickfix (board FEATURE 180, ComfyUI userdata workflows/qwen21-quickfix.json):
 # NO enhancer roundtrip — deploy scripts the enhancer data itself (``qfix_payload``):
@@ -229,7 +259,9 @@ QFIX_VERBS: Final = ('inp-qfix',)
 QFIX_MAX_REFS: Final = 2
 QFIX_TOAST_OK_S: Final = 0.5  # deploy success toast
 QFIX_TOAST_WARN_S: Final = 2  # guard refusal / failure toast
-SCHEMA_ITERATION_OUT: Final = '1xlasm_enhancer.iteration.v6.10'  # what qfix writes
+SCHEMA_ITERATION_OUT: Final = (
+    '1xlasm_enhancer.iteration.v6.15'  # what qfix writes (v6.15 = refdef block, t205)
+)
 QFIX_MADE_BY: Final = 'refdef.inp-qfix'  # its payload marker (pull: instruction → slot 1 role)
 # ⇄ update: the enhancer-data view (section) a verb owns (board task 162). A verb
 # here patches ONLY its view; the other verbs never touch these views.
@@ -254,6 +286,21 @@ TRIGGER_CMD: Final = '/refdef'
 HERDR_READY: Final = ('idle', 'done')
 HERDR_TIMEOUT_S: Final = 10
 SAVES_COLLECTION: Final = 'refdef_saves'  # 💾 save history (see build)
+# ⇪ deploy history (FEATURE t206): every successful ⇪ deploy (not ⇄ update / ⛓ join)
+# stores the tab config here — one global ring buffer, the newest DEPLOYS_MAX stay
+DEPLOYS_COLLECTION: Final = 'refdef_deploys'
+DEPLOYS_MAX: Final = 50
+# refdef pickup (FEATURE t205): entries made from a refdef instruction carry it verbatim
+# as ``refdef`` (urls + text only) → every render embeds its config; ``tab`` = the
+# tab-only switches the enhancer ignores. Pickup refuses older enhancer data.
+REFDEF_KEY: Final = 'refdef'
+TAB_KEY: Final = 'tab'
+PICKUP_MIN_VERSION: Final = (6, 15)  # first iteration schema whose entries carry the block
+PICKUP_OLD: Final = 'version too old!'
+PICKUP_ICON: Final = '📥'
+SW_KEEP: Final = 'keep'  # switch-restore State value: leave the ✅/🚫 🟥/⬜ switches alone
+SCHEMA_VERSION_RE: Final = re.compile(r'\.v(\d+(?:\.\d+)*)$')
+DEPLOY_FAIL: Final = 'NOT deployed'  # status prefix of every refused / failed deploy
 # predefined prompts (FEATURE t188): {name (unique), category, models, prompt, ts};
 # the dropdown above the text box fills it, ➕ upserts by name, 🗑 deletes
 PROMPTS_COLLECTION: Final = 'refdef_prompts'
@@ -810,7 +857,7 @@ def swap_problems(slots: list[dict], verb: str) -> list[str]:
 
 
 def img_ref_problems(slots: list[dict], verb: str) -> list[str]:
-    """Why a ref-img instruction can't deploy (t194 contract, shared with the
+    """Why a ref-img / ref-img-h3 instruction can't deploy (t194 contract, shared with the
     enhancer): 1-``IMG_REF_MAX`` 🖼 pixel slots anywhere in 1-``N_SLOTS``
     (compacted in slot order downstream), pixel slots still images only, 👁
     vision slots image/video and uncapped."""
@@ -899,7 +946,12 @@ def _qfix_media(slot: dict, desc: str) -> dict:
     return obj
 
 
-def qfix_payload(slots: list[dict], text: str = '', origin_scene_id: str | None = None) -> dict:
+def qfix_payload(
+    slots: list[dict],
+    text: str = '',
+    origin_scene_id: str | None = None,
+    tab: dict | None = None,
+) -> dict:
     """The enhancer data an ``inp-qfix`` deploy writes — built here, no enhancer
     (board FEATURE 180): a ``prompts_inp`` entry exactly as the enhancer's
     ``/inpaint`` commits it (engine qwen21, ``src.mask`` = the slot 1 🎭 mask →
@@ -923,6 +975,8 @@ def qfix_payload(slots: list[dict], text: str = '', origin_scene_id: str | None 
         'hints': (text or '').strip() or None,
         'from_rev': 0,
         'ts': SceneDef.now_ts(),
+        # t205: the config that made this entry, for pickup from the render
+        REFDEF_KEY: refdef_payload(slots, QFIX_VERBS[0], 'hint', text, origin_scene_id, tab=tab),
     }
     payload: dict[str, Any] = {
         'schema_id': SCHEMA_ITERATION_OUT,
@@ -1162,8 +1216,10 @@ def refdef_payload(
     text: str,
     origin_scene_id: str | None = None,
     inherit: list[dict] | None = None,
+    tab: dict | None = None,
 ) -> dict:
-    """The instruction payload the enhancer builds its enhancer data from. A
+    """The instruction payload the enhancer builds its enhancer data from. ``tab``
+    (``tab_block``) = tab-only switches, carried for pickup (t205), ignored downstream. A
     slot's ``mask`` (a mask.v1 object, see ``mask_object``) becomes the ref's
     ``mask``. ``inherit`` (pre-/post-vid only): the anchor's carried refs with
     their ``use`` switch — the enhancer inherits only ``use: true`` ones."""
@@ -1198,6 +1254,8 @@ def refdef_payload(
         }
         if inherit:
             payload['inherit'] = inherit
+    if tab:
+        payload[TAB_KEY] = tab
     return payload
 
 
@@ -1296,6 +1354,150 @@ def hist_step(pos: int | None, n: int, step: int) -> int | None:
     cur = n if pos is None else min(pos, n)
     new = max(0, min(n, cur + step))
     return None if new >= n else new
+
+
+class PickupError(ValueError):
+    """Pickup refused (error notification, tab untouched)."""
+
+
+def schema_version(schema_id: str | None) -> tuple[int, ...] | None:
+    """``…iteration.v6.15`` → ``(6, 15)``; None without a version suffix."""
+    m = SCHEMA_VERSION_RE.search(str(schema_id or ''))
+    return tuple(int(n) for n in m.group(1).split('.')) if m else None
+
+
+def tab_block(disabled: list[dict], slot_on, mask_on) -> dict:
+    """The instruction's ``tab`` block: ✅/🚫 + 🟥/⬜ switches and the disabled
+    slots' content (``[{slot, url, id, role}]`` — they deploy as empty refs)."""
+    pad = [True] * N_SLOTS
+    return {
+        'slot_on': [bool(v) for v in (list(slot_on or []) + pad)[:N_SLOTS]],
+        'mask_on': [bool(v) for v in (list(mask_on or []) + pad)[:N_SLOTS]],
+        'disabled': disabled,
+    }
+
+
+def refdef_entry(payload: dict) -> dict | None:
+    """The enhancer-data entry whose ``refdef`` block describes the render: of
+    every ``prompts*`` section's current entry carrying one, the entry the latest
+    enhancer step wrote (``from_rev`` == ``rev``), newest ``ts`` first."""
+    rev, cands = payload.get('rev'), []
+    for key, sec in payload.items():
+        if not (str(key).startswith('prompts') and isinstance(sec, dict)):
+            continue
+        data = [e for e in sec.get('prompt_data') or [] if isinstance(e, dict)]
+        cur = sec.get('current', 0)
+        if not data:
+            continue
+        e = data[cur] if isinstance(cur, int) and 0 <= cur < len(data) else data[0]
+        if isinstance(e.get(REFDEF_KEY), dict):
+            fresh = rev is not None and e.get('from_rev') == rev
+            cands.append((fresh, str(e.get('ts') or ''), len(cands), e))
+    return max(cands)[3] if cands else None
+
+
+def pickup_snap(payload: dict | None, exists=None) -> dict:
+    """Enhancer data (a render's embedded payload) → the tab config that made it:
+    ``{snap, slot_on, mask_on, missing, inherit}`` — ``snap`` in the 💾 save shape
+    (instruction mode), ``missing`` = slot numbers whose media ``exists(ref)``
+    denies (kept with url + role, switched off). Best effort per slot; raises
+    ``PickupError`` only when there is nothing to restore: enhancer data older than
+    ``PICKUP_MIN_VERSION`` (``PICKUP_OLD``) or no ``refdef`` block."""
+    if not isinstance(payload, dict):
+        raise PickupError('no enhancer data')
+    ver = schema_version(payload.get('schema_id'))
+    if ver is None or ver < PICKUP_MIN_VERSION:
+        raise PickupError(PICKUP_OLD)
+    entry = refdef_entry(payload)
+    if entry is None:
+        raise PickupError('no refdef config in this render')
+    block = copy.deepcopy(entry[REFDEF_KEY])
+    tab = block.get(TAB_KEY) if isinstance(block.get(TAB_KEY), dict) else {}
+    st = parse_payload(json.dumps(dict(block, schema_id=SCHEMA_REFDEF))) or {}
+    slots = st.get('slots') or empty_slots()
+    pad = [True] * N_SLOTS
+    slot_on = [bool(v) for v in (list(tab.get('slot_on') or []) + pad)[:N_SLOTS]]
+    mask_on = [bool(v) for v in (list(tab.get('mask_on') or []) + pad)[:N_SLOTS]]
+    for d in tab.get('disabled') or []:  # disabled slots deployed empty: content from tab
+        n = d.get('slot') if isinstance(d, dict) else None
+        if isinstance(n, int) and 1 <= n <= N_SLOTS and not slots[n - 1].get('url'):
+            slots[n - 1] = dict(
+                slots[n - 1], url=d.get('url'), id=d.get('id'), role=d.get('role') or ''
+            )
+            slot_on[n - 1] = False
+    refs = [str(s.get('id') or s.get('url') or '') for s in slots]
+    missing = [i + 1 for i, r in enumerate(refs) if r and exists is not None and not exists(r)]
+    for n in missing:
+        slot_on[n - 1] = False
+    inherit = block.get('inherit')
+    return {
+        'snap': {
+            'state': st or None,
+            'idx': 0,
+            'refs': refs,
+            'roles': [s.get('role') or '' for s in slots],
+            'verb': st.get('verb') or VERBS[0],
+            'kind': st.get('prompt_kind') or 'hint',
+            'text': st.get('text') or '',
+            'vision': [bool(s.get('vision')) for s in slots],
+            'clip': None,
+        },
+        'slot_on': slot_on,
+        'mask_on': mask_on,
+        'missing': missing,
+        'inherit': inherit if isinstance(inherit, list) else None,
+    }
+
+
+def sync_refdef_urls(entry: dict | None, swaps: dict[str, str]) -> bool:
+    """Enhancer-mode patch → the entry's ``refdef`` block follows: every block ref
+    (and disabled slot) whose url was replaced gets the new url (its id / mask no
+    longer apply). True when something changed."""
+    block = (entry or {}).get(REFDEF_KEY)
+    if not isinstance(block, dict) or not swaps:
+        return False
+    hit = False
+    tab = block.get(TAB_KEY) if isinstance(block.get(TAB_KEY), dict) else {}
+    for r in [*(block.get('refs') or []), *(tab.get('disabled') or [])]:
+        if isinstance(r, dict) and r.get('url') in swaps:
+            r['url'] = swaps[r['url']]
+            r['id'] = None
+            r.pop('mask', None)
+            hit = True
+    return hit
+
+
+def ring_overflow(ids: list, cap: int) -> list:
+    """Ring buffer: of ``ids`` (oldest first) the ones to drop so the newest
+    ``cap`` stay."""
+    return list(ids[: max(0, len(ids) - max(0, cap))])
+
+
+def deploy_doc(snap: dict, slot_on, mask_on, deployed: str | None) -> dict:
+    """Deploy-history doc: the 💾 save shape (``snap_to_doc``) + the ✅/🚫 and 🟥/⬜
+    switches as deployed + the deployed clipspace text (record only — never
+    written back: a re-played instruction would re-trigger the enhancer)."""
+    return {
+        **snap_to_doc(snap),
+        'slot_on': [bool(v) for v in (list(slot_on or []) + [True] * N_SLOTS)[:N_SLOTS]],
+        'mask_on': [bool(v) for v in (list(mask_on or []) + [True] * N_SLOTS)[:N_SLOTS]],
+        'deployed': deployed or '',
+    }
+
+
+def record_deploy(col, doc: dict, cap: int = DEPLOYS_MAX, now: datetime | None = None) -> bool:
+    """Append ``doc`` to the deploy ring buffer ``col`` and drop what exceeds the
+    newest ``cap``. A deploy identical to the newest entry is not stored twice
+    → False."""
+    order = [('ts', 1), ('_id', 1)]
+    last = col.find_one({}, sort=[('ts', -1), ('_id', -1)])
+    if last and all(last.get(k) == v for k, v in doc.items() if k != 'ts'):
+        return False
+    col.insert_one({**doc, 'ts': now or datetime.now(timezone.utc).replace(tzinfo=None)})
+    ids = [d['_id'] for d in col.find({}, {'_id': 1}).sort(order)]
+    if drop := ring_overflow(ids, cap):
+        col.delete_many({'_id': {'$in': drop}})
+    return True
 
 
 def enh_clip(text: str | None) -> str | None:
@@ -1733,7 +1935,18 @@ class RefdefTab:
         urls = [self.resolve_ref(r)[0] for r in refs]
         on = mask_on or [True] * N_SLOTS
         masks = [slot_mask({'url': u, 'mask_off': not on[i]}) for i, u in enumerate(urls)]
-        work, changed, skipped = patch_iteration(state['payload'], state['view'], urls, masks)
+        view = state['view']
+        work, changed, skipped = patch_iteration(state['payload'], view, urls, masks)
+        # t205: the patched entry's refdef block follows the replaced urls
+        old = [(m or {}).get('url') for m in _view_media(state['payload'], view)]
+        new = [(m or {}).get('url') for m in _view_media(work, view)]
+        swaps = {a: b for a, b in zip(old, new, strict=False) if a and b and a != b}
+        if view == 'main':
+            ents = _entries(work)
+            entry = ents[_current(work)] if ents else None
+        else:
+            entry = _section_entry(work, view)
+        sync_refdef_urls(entry, swaps)
         before = state.get('changed', [])
         merged = before + [c for c in changed if c not in before]
         return dict(state, payload=work, changed=merged), changed, skipped
@@ -2016,12 +2229,24 @@ class RefdefTab:
         if pos is not None and pos >= len(saves):  # saves vanished meanwhile
             pos = len(saves) - 1 if saves else None
         new = hist_step(pos, len(saves), step)
+        on_deploy = pos is None and hist.get('dpos') is not None  # a < > entry is shown
+        if on_deploy and new is None and hist['draft']:  # ▶ from it = back to current
+            snap, msg = (
+                hist['draft'],
+                'back to the current config' + self._restore_clip(hist['draft']),
+            )
+            return [
+                *self._load_snap(snap),
+                msg,
+                {'pos': None, 'draft': None},
+                self._hist_md(None, saves),
+            ]
         if new == pos:
             edge = 'oldest save' if step < 0 else 'current config'
             gr.Info(f'already at the {edge}', duration=0.5)
             return [*[gr.update()] * n_out, hist, self._hist_md(pos, saves)]
         draft = hist['draft']
-        if pos is None:
+        if pos is None and not (on_deploy and draft):
             draft = self._snap(state, idx, verb, kind, text, vision, *refs_roles)
         if new is None:
             snap, hist, msg = draft, {'pos': None, 'draft': None}, 'back to the current config'
@@ -2035,6 +2260,163 @@ class RefdefTab:
             msg = f'loaded save {new + 1}/{len(saves)} · {self._ts_str(doc.get("ts"))}'
         msg += self._restore_clip(snap)
         return [*self._load_snap(snap), msg, hist, self._hist_md(new, saves)]
+
+    # -- pickup (FEATURE t205) ----------------------------------------- #
+    def _tab_block(self, refs_roles: list[str], slot_on, mask_on) -> dict:
+        """``tab_block`` of the slots as shown (before ``disable_slots``)."""
+        on = (list(slot_on or []) + [True] * N_SLOTS)[:N_SLOTS]
+        disabled = []
+        for i in range(N_SLOTS):
+            if not on[i] and refs_roles[2 * i]:
+                url, id_img = self.resolve_ref(refs_roles[2 * i])
+                disabled.append(
+                    {'slot': i + 1, 'url': url, 'id': id_img, 'role': refs_roles[2 * i + 1] or ''}
+                )
+        return tab_block(disabled, on, mask_on)
+
+    def _pickup_source(self, text: str | None) -> tuple[dict | None, str]:
+        """Clipspace → (enhancer data, where it came from): enhancer data itself, or
+        the payload embedded in a render (path / url / img id; a clip → its
+        FbbcoolSaveVideo master when the clip itself carries none)."""
+        st = parse_payload(text)
+        if st is not None:
+            return (st['payload'], 'clipspace') if st['kind'] == 'iteration' else (None, '')
+        lines = [ln.strip() for ln in (text or '').splitlines() if ln.strip()]
+        url = self.resolve_ref(lines[0])[0] if lines else None
+        if not url or not Path(url).is_file():
+            return None, ''
+        cands = [url]
+        if is_vid(url):
+            try:
+                if (master := anchor_master(url)) is not None and str(master) != url:
+                    cands.append(str(master))
+            except ValueError:
+                pass
+        for c in cands:
+            try:
+                md = (vid_metadata if is_vid(c) else img_metadata)(c)
+            except Exception:  # noqa: BLE001 - unreadable = no payload
+                md = None
+            # the served-payload chunk first (every SmartInput graph, t205), else the
+            # payload the render embeds anyway (clips, EnhancerClient images)
+            for key in ('payload', 'enhancer'):
+                if md and isinstance(md.get(key), dict):
+                    return md[key], Path(c).name
+        return None, ''
+
+    def _ref_exists(self, ref: str) -> bool:
+        url = self.resolve_ref(ref)[0]
+        return bool(url) and (url.startswith(('http://', 'https://')) or Path(url).is_file())
+
+    @staticmethod
+    def _not_found_tile(ref: str) -> Image.Image:
+        im = Image.new('RGB', (PREVIEW_SIZE, PREVIEW_SIZE // 2), (40, 24, 24))
+        draw = ImageDraw.Draw(im)
+        draw.text((16, PREVIEW_SIZE // 4 - 24), 'not found', fill=(255, 120, 120), font_size=40)
+        draw.text((16, PREVIEW_SIZE // 4 + 30), Path(ref).name[-90:], fill=(200, 200, 200))
+        return im
+
+    def _on_pickup(self):
+        """📥: restore the refdef config a render was made from (clipspace = render
+        path / url / img id, or enhancer data) — overwrites the tab, best effort:
+        a missing ref keeps url + role, shows 'not found' and is switched 🚫.
+        → [*load outs, status, hist, switches, pending inherit] (no-ops on refusal)"""
+        keep = [*[gr.update()] * (N_LOAD_OUT + 2), SW_KEEP, gr.update()]
+        payload, src = self._pickup_source(pyperclip.paste())
+        if payload is None:
+            gr.Info('nothing to pick up', duration=0.5)
+            return keep
+        try:
+            res = pickup_snap(payload, self._ref_exists)
+        except PickupError as exc:
+            # error notification; raising leaves every output (the tab) untouched
+            raise gr.Error(str(exc), duration=QFIX_TOAST_WARN_S) from exc
+        snap = res['snap']
+        outs = self._load_snap(snap)
+        for n in res['missing']:  # slot image sits at 3 + 3 * slot
+            outs[3 + 3 * (n - 1)] = self._not_found_tile(snap['refs'][n - 1])
+        n_fill = sum(1 for r in snap['refs'] if r)
+        msg = f'picked up `{snap["verb"]}` from {src} ({n_fill}/{N_SLOTS} slots)'
+        if res['missing']:
+            where = ', '.join(map(str, res['missing']))
+            msg += f' · not found: slot {where}'
+            gr.Warning(f'pickup: slot {where} not found', duration=QFIX_TOAST_WARN_S)
+        else:
+            gr.Success('picked up', duration=QFIX_TOAST_OK_S)
+        sw = {'slot_on': res['slot_on'], 'mask_on': res['mask_on']}
+        return [*outs, msg, {'pos': None, 'draft': None}, sw, res['inherit']]
+
+    # -- deploy history (FEATURE t206) -------------------------------- #
+    def _dcol(self):
+        return self._dbc._get_collection(DEPLOYS_COLLECTION)
+
+    def _deploy_ids(self) -> list[dict]:
+        """[{_id, ts, verb, mode}] of the deploy ring buffer, oldest first."""
+        col = self._dcol()
+        if col is None:
+            return []
+        proj = {'_id': 1, 'ts': 1, 'verb': 1, 'mode': 1}
+        return list(col.find({}, proj).sort([('ts', 1), ('_id', 1)]))
+
+    @classmethod
+    def _dhist_md(cls, dpos: int | None, deploys: list[dict]) -> str:
+        n = len(deploys)
+        if dpos is None or dpos >= n:
+            return f'⇪ {n}/{DEPLOYS_MAX}'
+        d = deploys[dpos]
+        what = d.get('verb') if d.get('mode') == 'instruction' else 'enh data'
+        return f'**⇪ {dpos + 1}/{n}** · {cls._ts_str(d.get("ts"))} · `{what}`'
+
+    def _record_deploy(self, res: str, slot_on, mask_on, snap_args: tuple) -> None:
+        """After ``_on_deploy``: a successful deploy joins the ring buffer. Never
+        raises — the deploy itself already happened."""
+        if res.startswith(DEPLOY_FAIL):
+            return
+        try:
+            col = self._dcol()
+            if col is None:
+                return
+            deployed = pyperclip.paste()
+            snap = dict(self._snap(*snap_args), clip=enh_clip(deployed))
+            record_deploy(col, deploy_doc(snap, slot_on, mask_on, deployed))
+        except Exception as exc:  # noqa: BLE001
+            print(f'[refdef_tab:error] deploy history: {exc}')
+
+    def _on_dhist(self, hist: dict | None, step: int, *snap_args):
+        """< / > through the deploy history (oldest … newest, then the current
+        config). Shares the draft with the 💾 saves: whatever history entry is
+        shown, the current config stays parked until one returns to it.
+        → [*load outs, status, hist, switches | None]"""
+        n_out = N_LOAD_OUT
+        hist = hist or {'pos': None, 'draft': None}
+        deploys = self._deploy_ids()
+        dpos = hist.get('dpos')
+        if dpos is not None and dpos >= len(deploys):  # trimmed meanwhile
+            dpos = len(deploys) - 1 if deploys else None
+        new = hist_step(dpos, len(deploys), step)
+        on_save = hist['pos'] is not None
+        if new == dpos and not (on_save and new is None and step > 0):
+            edge = 'oldest deploy' if step < 0 else 'current config'
+            gr.Info(f'already at the {edge}', duration=0.5)
+            return [*[gr.update()] * n_out, hist, SW_KEEP]
+        draft = hist['draft']
+        if not on_save and hist.get('dpos') is None:
+            draft = self._snap(*snap_args)
+        if new is None:
+            if not draft:
+                return [*[gr.update()] * n_out, hist, SW_KEEP]
+            msg = 'back to the current config' + self._restore_clip(draft)
+            return [*self._load_snap(draft), msg, {'pos': None, 'draft': None}, None]
+        col = self._dcol()
+        doc = col.find_one({'_id': deploys[new]['_id']}) if col is not None else None
+        if doc is None:
+            gr.Warning('deploy not found', duration=0.5)
+            return [*[gr.update()] * n_out, hist, SW_KEEP]
+        snap = doc_to_snap(doc)
+        msg = f'loaded deploy {new + 1}/{len(deploys)} · {self._ts_str(doc.get("ts"))}'
+        msg += self._restore_clip(snap)
+        sw = {'slot_on': doc.get('slot_on'), 'mask_on': doc.get('mask_on')}
+        return [*self._load_snap(snap), msg, {'pos': None, 'draft': draft, 'dpos': new}, sw]
 
     def _slots_from_ui(
         self,
@@ -2068,6 +2450,7 @@ class RefdefTab:
         vision: list[bool],
         carry: dict | None,
         *refs_roles,
+        tab: dict | None = None,
     ):
         slots = self._slots_from_ui(list(refs_roles), mask_on, vision)
         if self._is_enh(state):
@@ -2138,13 +2521,13 @@ class RefdefTab:
         ):
             return refused(probs)
         if verb in QFIX_VERBS:  # scripted enhancer data, no enhancer (FEATURE 180)
-            res = self._deploy_qfix(slots, text, origin)
+            res = self._deploy_qfix(slots, text, origin, tab)
             if vis_off := vision_ignored(slots, verb):  # scripted: nobody looks (t189)
                 res += f' · vision ignored: slot {", ".join(map(str, vis_off))}'
             return res
         if master is not None and anchor_note.startswith(' · anchor →'):
             gr.Info(f'{verb}: anchor → {master.name}', duration=QFIX_TOAST_WARN_S)
-        payload = refdef_payload(slots, verb, kind, text, origin, inherit)
+        payload = refdef_payload(slots, verb, kind, text, origin, inherit, tab)
         clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
         msg = f'deployed instruction `{verb}` ({n}/{N_SLOTS} slots, kind={kind}){anchor_note}'
@@ -2161,11 +2544,13 @@ class RefdefTab:
         return f'{msg} · {note}'
 
     @staticmethod
-    def _deploy_qfix(slots: list[dict], text: str, origin: str | None) -> str:
+    def _deploy_qfix(
+        slots: list[dict], text: str, origin: str | None, tab: dict | None = None
+    ) -> str:
         """inp-qfix deploy: script the enhancer data onto the clipspace and read it
         back; success toast 0.5 s, any failure an error toast 2 s (FEATURE 180)."""
         try:
-            qp = qfix_payload(slots, text, origin)
+            qp = qfix_payload(slots, text, origin, tab)
             out = json.dumps(qp, ensure_ascii=False)
             clip_copy(out)
             if pyperclip.paste() != out:
@@ -2180,7 +2565,7 @@ class RefdefTab:
         print(f'[refdef_tab:info] deploy {msg}')
         return f'{msg} · no enhancer trigger'
 
-    def _on_carry(self, url: str | None, *others: str | None):
+    def _on_carry(self, url: str | None, *others: str | None, pending: list | None = None):
         """Slot 1 changed → its carried refs panel: header, one cell per ref
         (preview labelled ``tag · desc``, ``≡ slot N`` when a slot already holds the
         same media), all switched on; hidden when the clip carries no refs."""
@@ -2193,15 +2578,22 @@ class RefdefTab:
         if not c['refs']:
             return c, gr.update(visible=False), '', *cells, *btns
         slot_urls = {self.resolve_ref(o)[0]: n for n, o in enumerate(others, 2) if o}
+        # a picked-up config (t205) brings its inherit switches: matched by url
+        off = {r.get('url') for r in pending or [] if isinstance(r, dict) and r.get('use') is False}
+        c['on'] = [r.get('url') not in off for r in c['refs']]
         for j, r in enumerate(c['refs'][:CARRY_CELLS]):
             dup = slot_urls.get(r.get('url'))
             label = carry_tag(r) + (f' ≡ slot {dup}' if dup else '')
             desc = (r.get('desc') or '').strip()
             label += f' · {desc[:90]}' if desc else ''
+            on = c['on'][j]
             cells[j] = gr.update(
-                visible=True, value=self._preview(r.get('url')), label=label, elem_classes=[]
+                visible=True,
+                value=self._preview(r.get('url')),
+                label=label,
+                elem_classes=[] if on else ['refdef-slot-off'],
             )
-            btns[j] = gr.update(visible=True, value=SLOT_ICON_ON)
+            btns[j] = gr.update(visible=True, value=SLOT_ICON_ON if on else SLOT_ICON_OFF)
         anchor = Path(c['anchor']).name
         head = f'⤷ `{anchor}`' if url and Path(url).name != anchor else ''
         more = (
@@ -2374,9 +2766,14 @@ class RefdefTab:
             # save-history pointer: pos None = current config; draft = the current
             # config parked while a save is shown
             hist = gr.State({'pos': None, 'draft': None})
+            # switches of a loaded deploy-history entry (None = all on)
+            dsw = gr.State(None)
+            # inherit switches of a picked-up config, applied by the carry panel (t205)
+            pend = gr.State(None)
 
             with gr.Row():
                 pull_btn = gr.Button('⟲ pull', variant='primary', scale=1)
+                pickup_btn = gr.Button(PICKUP_ICON, scale=0, min_width=40)  # t205
                 deploy_btn = gr.Button('⇪ deploy', elem_id='refdef-deploy', scale=1)
                 update_btn = gr.Button('⇄ update', scale=1)
                 join_btn = gr.Button('⛓ join', scale=1)
@@ -2415,7 +2812,12 @@ class RefdefTab:
                     scale=2,
                     min_width=200,
                 )
-                gr.Column(scale=3)  # spacer
+                # ⇪ deploy history (t206): own < > over the last DEPLOYS_MAX deploys
+                dprev_btn = gr.Button('<', scale=0, min_width=40)
+                with gr.Column(scale=0, min_width=230):
+                    dhist_md = gr.Markdown(self._dhist_md(None, self._deploy_ids()))
+                dnext_btn = gr.Button('>', scale=0, min_width=40)
+                gr.Column(scale=1)  # spacer
 
             # input is the clipspace only: images are display-only, the slot
             # ref (img id or url) rides in a per-slot State
@@ -2579,6 +2981,9 @@ class RefdefTab:
             def hist_refresh(h, c):
                 return self._hist_md(h['pos'], self._save_ids(c))
 
+            def dhist_refresh(h):
+                return self._dhist_md((h or {}).get('dpos'), self._deploy_ids())
+
             # new slot content switches masking back on (all slots / one slot)
             # … and refreshes the 🖼/👁 buttons from the (loaded) vision switches
             on_outs = [mask_on, *mask_tgls, slot_on, *slot_tgls, *imgs, *vis_tgls]
@@ -2614,16 +3019,25 @@ class RefdefTab:
                     gr.update(elem_classes=[] if on else ['refdef-slot-off']),
                 )
 
-            def all_on(vision_on, vb):
-                vis = [slot_vis(True)] * N_SLOTS
+            def switches(sw, vision_on, vb):
+                """``on_outs`` for the ✅/🚫 + 🟥/⬜ switches ``sw`` (None = all on)."""
+                if sw == SW_KEEP:  # nothing was loaded
+                    return [gr.update()] * len(on_outs)
+                pad = [True] * N_SLOTS
+                s_on = [bool(v) for v in (list((sw or {}).get('slot_on') or []) + pad)[:N_SLOTS]]
+                m_on = [bool(v) for v in (list((sw or {}).get('mask_on') or []) + pad)[:N_SLOTS]]
+                vis = [slot_vis(o) for o in s_on]
                 return [
-                    [True] * N_SLOTS,
-                    *[gr.update(value=MASK_ICON_ON)] * N_SLOTS,
-                    [True] * N_SLOTS,
+                    m_on,
+                    *[gr.update(value=MASK_ICON_ON if o else MASK_ICON_OFF) for o in m_on],
+                    s_on,
                     *[b for b, _ in vis],
                     *[im for _, im in vis],
                     *vis_btns(vision_on, vb),
                 ]
+
+            def all_on(vision_on, vb):
+                return switches(None, vision_on, vb)
 
             def slot_toggle(i, on):
                 on = list(on)
@@ -2651,20 +3065,29 @@ class RefdefTab:
 
             pull_btn.click(pull, [hist, state, *refs], [*load_outs, status, hist]).then(
                 hist_refresh, [hist, cat], [hist_md]
-            ).then(all_on, [vision, verb], on_outs)
+            ).then(dhist_refresh, [hist], [dhist_md]).then(all_on, [vision, verb], on_outs)
+            pickup_btn.click(self._on_pickup, [], [*load_outs, status, hist, dsw, pend]).success(
+                hist_refresh, [hist, cat], [hist_md]
+            ).success(dhist_refresh, [hist], [dhist_md]).success(
+                switches, [dsw, vision, verb], on_outs
+            )
             reset_btn.click(
                 lambda: [*self._on_reset(), cur_hist], [], [*load_outs, status, hist]
-            ).then(hist_refresh, [hist, cat], [hist_md]).then(all_on, [vision, verb], on_outs)
+            ).then(hist_refresh, [hist, cat], [hist_md]).then(
+                dhist_refresh, [hist], [dhist_md]
+            ).then(all_on, [vision, verb], on_outs)
             prompt_dd.input(self._on_prompt_pick, [prompt_dd], [text, p_name, p_cat, p_models])
             p_add.click(self._on_prompt_add, [p_name, p_cat, p_models, text], [prompt_dd])
             p_del.click(self._on_prompt_del, [prompt_dd], [prompt_dd])
-            save_btn.click(self._on_save, [cat, *snap_ins], [status, hist, hist_md, cat])
+            save_btn.click(self._on_save, [cat, *snap_ins], [status, hist, hist_md, cat]).then(
+                dhist_refresh, [hist], [dhist_md]
+            )
             del_btn.click(self._on_del, [hist, cat], [*load_outs, status, hist, hist_md, cat]).then(
                 all_on, [vision, verb], on_outs
             )
             cat.input(self._on_cat, [hist, cat], [*load_outs, status, hist, hist_md]).then(
-                all_on, [vision, verb], on_outs
-            )
+                dhist_refresh, [hist], [dhist_md]
+            ).then(all_on, [vision, verb], on_outs)
             view.input(
                 lambda st, v, m, so, *rr: self._on_view(
                     st, v, m, *disable_slots(list(rr), so)[::2]
@@ -2677,7 +3100,15 @@ class RefdefTab:
                     lambda h, c, *a, step=step: self._on_hist(h, step, c, *a),
                     [hist, cat, *snap_ins],
                     [*load_outs, status, hist, hist_md],
-                ).then(all_on, [vision, verb], on_outs)
+                ).then(dhist_refresh, [hist], [dhist_md]).then(all_on, [vision, verb], on_outs)
+            for btn, step in ((dprev_btn, -1), (dnext_btn, 1)):
+                btn.click(
+                    lambda h, *a, step=step: self._on_dhist(h, step, *a),
+                    [hist, *snap_ins],
+                    [*load_outs, status, hist, dsw],
+                ).then(hist_refresh, [hist, cat], [hist_md]).then(
+                    dhist_refresh, [hist], [dhist_md]
+                ).then(switches, [dsw, vision, verb], on_outs)
             for i, (img, ref, clear) in enumerate(zip(imgs, refs, clears, strict=True)):
                 # role stays: in enhancer mode it is payload-owned
                 clear.click(lambda: (None, ''), [], [img, ref]).then(
@@ -2735,7 +3166,11 @@ class RefdefTab:
             mask_close.click(lambda: mask_overlay(False), [], [mask_box])
             carry_outs = [carry, carry_box, carry_md, *carry_imgs, *carry_tgls]
             refs[0].change(
-                lambda *r: self._on_carry(*r), list(refs), carry_outs, show_progress='hidden'
+                # the picked-up inherit switches are applied once, then dropped
+                lambda pd, *r: [*self._on_carry(*r, pending=pd), None],
+                [pend, *refs],
+                [*carry_outs, pend],
+                show_progress='hidden',
             )
             for j, ctgl in enumerate(carry_tgls):
                 ctgl.click(
@@ -2743,13 +3178,43 @@ class RefdefTab:
                     [carry],
                     [carry, ctgl, carry_imgs[j]],
                 )
+
+            def deploy(st, ix, v, k, a, t, m, so, vi, c, h, *rr):
+                res = self._on_deploy(
+                    st,
+                    v,
+                    k,
+                    a,
+                    t,
+                    m,
+                    vi,
+                    c,
+                    *disable_slots(list(rr), so),
+                    tab=self._tab_block(list(rr), so, m),
+                )
+                # history keeps the slots as shown (disabled ones incl.) + the switches
+                self._record_deploy(res, so, m, (st, ix, v, k, t, vi, *rr))
+                # a successful deploy makes the shown config the current one
+                return res, h if res.startswith(DEPLOY_FAIL) else cur_hist
+
             deploy_btn.click(
-                lambda st, v, k, a, t, m, so, vi, c, *rr: self._on_deploy(
-                    st, v, k, a, t, m, vi, c, *disable_slots(list(rr), so)
-                ),
-                [state, verb, kind, auto, text, mask_on, slot_on, vision, carry, *refs_roles],
-                [status],
-            )
+                deploy,
+                [
+                    state,
+                    idx,
+                    verb,
+                    kind,
+                    auto,
+                    text,
+                    mask_on,
+                    slot_on,
+                    vision,
+                    carry,
+                    hist,
+                    *refs_roles,
+                ],
+                [status, hist],
+            ).then(hist_refresh, [hist, cat], [hist_md]).then(dhist_refresh, [hist], [dhist_md])
             update_btn.click(
                 lambda st, v, m, so, *rr: self._on_update(st, v, m, *disable_slots(list(rr), so)),
                 [state, verb, mask_on, slot_on, *refs_roles],

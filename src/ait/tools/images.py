@@ -17,6 +17,9 @@ METADATA_SCHEMA: Final = 'ait.image.metadata.v1'
 # The ComfyUI graph chunks cannot serve this: resolved parent identity (scene/image ids,
 # clipboard payloads) exists only at execution time and never appears in the graph.
 PARENT_METADATA_CHUNK: Final = 'parent_metadata'
+# The payload a SmartInput graph actually served for THIS render (agent-comfy, board
+# FEATURE t205) — own chunk/tag next to the others, `parent_metadata` untouched.
+PAYLOAD_CHUNK: Final = 'payload_json'
 
 # PNG iTXt chunk carrying the 1xlasm-datasetter per-image trainer metadata (JSON), recognised
 # by its `schema_id` prefix. Authoritative schema: 1xlasm-datasetter
@@ -77,6 +80,10 @@ def metadata(url: Path | str) -> dict | None:
                                             # bearing the execution-time
                                             # `prompt_index` supersedes an
                                             # index-less own copy (#30)
+          'payload': dict | None,           # the payload a SmartInput graph
+                                            # served for this render (own
+                                            # `payload_json` chunk, t205);
+                                            # None on renders without it
           'generation': {
               'prompt': str | None,         # identified positive prompt
               'prompt_index': int | None,   # v4 rendered entry: stamped
@@ -266,6 +273,15 @@ def _metadata_from_chunks(url: Path, info_ext: dict, width: int, height: int) ->
         except Exception:
             pass
 
+    # The served payload chunk (t205): schema-gated like the other payload copies;
+    # additive — `enhancer` and its attribution above are untouched by it.
+    payload: dict | None = None
+    try:
+        served = _parse_json_chunk(info_ext.get(PAYLOAD_CHUNK))
+        payload = _iteration_payload_from_obj(served) if served is not None else None
+    except Exception:
+        payload = None
+
     return {
         'schema': METADATA_SCHEMA,
         'url': str(url),
@@ -277,6 +293,7 @@ def _metadata_from_chunks(url: Path, info_ext: dict, width: int, height: int) ->
         },
         'comfy': {'prompt_graph': prompt_graph, 'workflow': workflow},
         'enhancer': enhancer,
+        'payload': payload,
         'generation': {
             'prompt': prompt,
             'prompt_index': prompt_index,
