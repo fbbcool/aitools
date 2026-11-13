@@ -10,7 +10,6 @@ from ait.tools import videos
 from aidb.app.tab_refdef import (
     CONTINUE_VERBS,
     continue_problems,
-    join_args,
     refdef_payload,
 )
 
@@ -39,15 +38,6 @@ def test_continue_payload_carries_the_link():
         assert p['continue'] == {'dir': d, 'url': '/a/x.mkv', 'pin': videos.CHAIN_PIN}
         assert p['refs'][0]['media'] == 'video'
     assert 'continue' not in refdef_payload(_slots('/a/p.png'), 'ref', 'hint', '')
-
-
-def test_join_args():
-    assert join_args(_slots('/a/last.mkv')) == ('/a/last.mkv', None)
-    assert join_args(_slots('/a/last.mkv', '/a/first.mkv')) == ('/a/last.mkv', '/a/first.mkv')
-    with pytest.raises(ValueError):
-        join_args(_slots('/a/p.png'))
-    with pytest.raises(ValueError):
-        join_args(_slots('/a/last.mkv', '/a/p.png'))
 
 
 # -- link resolution / walk --------------------------------------------- #

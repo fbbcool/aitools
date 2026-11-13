@@ -1529,3 +1529,54 @@ def test_continue_deploy_counts_carry(monkeypatch):
     p = json.loads(clip['v'])
     assert [r['media'] for r in p['refs'][:2]] == ['video', 'video']
     assert p['continue']['dir'] == 'post' and len(p['inherit']) == 2
+
+
+def test_hand_mask_shapes(tmp_path, monkeypatch):
+    import aidb.app.tab_refdef as rd
+    import numpy as np
+    from PIL import Image
+
+    monkeypatch.setattr(rd, 'MASK_DIR', tmp_path / 'masks')
+    src = tmp_path / 'target.png'
+    Image.new('RGB', (200, 100), (10, 20, 30)).save(src)
+    url = str(src)
+    # three dabs: the corners of a triangle
+    painted = Image.new('L', (200, 100), 0)
+    for x, y in ((20, 20), (180, 20), (100, 80)):
+        painted.paste(255, (x - 3, y - 3, x + 4, y + 4))
+    mask, _ = rd.write_mask(url, painted, shape='hull')
+    m = Image.open(mask)
+    assert m.getpixel((100, 40)) == 255  # inside the triangle, never painted
+    assert m.getpixel((100, 20)) == 255  # on the top edge between two dabs
+    assert m.getpixel((20, 80)) == 0 and m.getpixel((180, 80)) == 0  # outside
+    # bbox: the bounding rectangle of all dabs, nothing beyond
+    mask, _ = rd.write_mask(url, painted, shape='bbox')
+    m = Image.open(mask)
+    assert m.getpixel((20, 80)) == 255 and m.getpixel((180, 80)) == 255
+    assert m.getpixel((17, 17)) == 255 and m.getpixel((183, 83)) == 255
+    assert m.getpixel((16, 50)) == 0 and m.getpixel((100, 84)) == 0 and m.getpixel((184, 50)) == 0
+    # as painted: the dabs only
+    mask, _ = rd.write_mask(url, painted)
+    assert Image.open(mask).getpixel((100, 40)) == 0
+    # as painted is raw: a painted outline stays an outline (no hole fill, t208)
+    ring = Image.new('L', (200, 100), 0)
+    ring.paste(255, (50, 20, 150, 80))
+    ring.paste(0, (60, 30, 140, 70))
+    mask, _ = rd.write_mask(url, ring, shape='painted')
+    m = Image.open(mask)
+    assert m.getpixel((55, 50)) == 255 and m.getpixel((100, 50)) == 0
+    assert set(rd.MASK_SHAPES) == {'hull', 'bbox', 'painted'} and rd.MASK_SHAPE_DEFAULT == 'hull'
+    # degenerate input is its own hull; the hull never loses painted pixels
+    dot = np.zeros((10, 10), bool)
+    dot[4, 4] = True
+    assert (rd.convex_hull_mask(dot) == dot).all()
+    line = np.zeros((10, 10), bool)
+    line[5, 2:8] = True
+    assert (rd.convex_hull_mask(line) == line).all()
+    empty = np.zeros((10, 10), bool)
+    assert not rd.convex_hull_mask(empty).any()
+    ell = np.zeros((20, 20), bool)
+    ell[2:18, 2:5] = True
+    ell[15:18, 2:18] = True
+    h = rd.convex_hull_mask(ell)
+    assert (h | ell == h).all() and h[10, 8] and not h[3, 16]

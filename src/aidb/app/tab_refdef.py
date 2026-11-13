@@ -11,14 +11,17 @@ enhancer data via ``patch_iteration`` on the tab's view (else the clipspace's
 default view), a refdef.v1 instruction slot by slot (url/id only). Empty
 slots leave the clipspace's ref untouched.
 
-Pull is smart: enhancer data (``1xlasm_enhancer.iteration.*``) or a
-refdef.v1 instruction loads as a whole; an img url / url list / img id /
-scene id clipspace is added to the free slots (extras dropped); anything
-else only shows a 0.5 s toast. A slot's own ⟲ puts the first image of any
-pull data into just that slot. What deploy writes depends on what was
-pulled:
+Pull only fills slots: an img url / url list / img id / scene id clipspace is
+added to the free slots (extras dropped); anything else — enhancer data and
+refdef.v1 instructions included — only shows a 0.5 s toast. (The whole-tab
+import of enhancer data / an instruction was removed from pull 2026-11-13; a
+separate clipspace import is a feature candidate. ``parse_payload`` + ``_load``
+are the kept building blocks.) A slot's own ⟲ puts the first image of any
+clipspace data (enhancer data and instructions included) into just that slot.
+What deploy writes depends on the tab's mode:
 
-  * **enhancer mode** (enhancer data pulled): the tab keeps the WHOLE
+  * **enhancer mode** (only via a 💾 save / deploy-history entry that holds
+    enhancer data): the tab keeps the WHOLE
     payload as a working copy and shows one section at a time — the
     *view* (main / vid / inp / next / ref = ``prompts`` / ``prompts_vid`` /
     ``prompts_inp`` / ``prompts_next`` / ``prompts_ref``; default = the section the latest
@@ -67,10 +70,8 @@ clip = the cut-to shot after the pinned opening, t191); the text is the beat hin
 pin}``); the enhancer writes ``prompts_ref[].continue``. Slot 1 must carry its
 enhancer payload (the refs the enhancer inherits): a merge / re-encode is mapped
 to its ``fbbcool_temp_<id>`` master by the 5-char id in its name
-(``anchor_master``), else deploy is refused. ``⛓ join`` is
-script-only like ⇄ update: slot 1 = the LAST clip of a chain, slot 2 = the
-FIRST (a pre, optional) → ``ait.tools.videos.chain_join`` writes the joined
-master to ``~/Downloads/000_comfy/`` and toasts path + seam summary.
+(``anchor_master``), else deploy is refused. (Joining a chain is not done here —
+datos provides it; ``ait.tools.videos.chain_join`` is the script.)
 
 Slot-1 area (FEATURE t185): slot 1 sits left; when its clip carries refs (the
 rendered ``prompts_ref`` entry embedded in it, or in its ``fbbcool_temp`` master
@@ -81,7 +82,7 @@ pre-/post-vid deploy sends them as refdef.v1 ``inherit: [{n, tag, kind, url,
 desc, use}]`` (``inherit_list``); the enhancer inherits only ``use: true``.
 
 ``✅`` / ``🚫`` (per slot) enables / disables a slot: a disabled slot keeps its
-image + role in the tab (dimmed) but deploys, updates, joins and view-switches as
+image + role in the tab (dimmed) but deploys, updates and view-switches as
 an empty slot (enhancer mode: its replacement is not patched in). New content in
 the slot (pull, slot ⟲, ✕) switches it back on.
 
@@ -96,7 +97,12 @@ status note. 💾 saves it; slot ⟲ / ✕ reset it to 🖼.
 
 A click on a slot's (local) image opens the shared brush editor fullscreen
 (task 193; Esc / ✕ closes it): paint the area to mask, ✓ stores it (⎘ = ✓ + the masked image's path on the clipspace, ready for
-a ComfyUI quickload), 🗑 removes it. A mask belongs to the source image (fixed
+a ComfyUI quickload), 🗑 removes it. The shape button (t208) cycles how ✓ / ⎘ store
+what was painted: ⬢ convex hull (default; one hull over everything painted — a
+few dabs at the corners mask the polygon between them), ▭ bbox (the filled
+bounding rectangle of everything painted), ✏ as painted (the raw pixels, nothing
+filled). The shape is fixed here: consumers take the stored raster as is (a crop
+step frames it by its own tight bbox, padding 0, grey outside the mask). A mask belongs to the source image (fixed
 path in ``MASK_DIR``; repainting replaces it), so every slot / pull / save
 showing that image shows it (red tint). An instruction deploy adds ``mask`` = a
 ``1xlasm_enhancer.mask.v1`` raster object ``{schema_id, type, url, w, h, sha}`` to
@@ -127,8 +133,7 @@ best effort: a ref whose file is gone keeps url + role, shows a "not found" tile
 and is switched 🚫. Enhancer data older than ``PICKUP_MIN_VERSION`` is refused with
 the error ``version too old!``.
 
-Deploy history (FEATURE t206): every successful ``⇪ deploy`` (not ``⇄ update`` /
-``⛓ join``) stores the tab config — the save shape plus the ✅/🚫 and 🟥/⬜
+Deploy history (FEATURE t206): every successful ``⇪ deploy`` (not ``⇄ update``) stores the tab config — the save shape plus the ✅/🚫 and 🟥/⬜
 switches and the deployed clipspace text — in ``refdef_deploys``, one global
 ring buffer of the newest ``DEPLOYS_MAX``; a deploy identical to the newest
 entry is not stored twice. The own ``<`` / ``>`` buttons step through it like
@@ -158,7 +163,7 @@ import gradio as gr
 import numpy as np
 import pyperclip
 from PIL import Image, ImageChops, ImageDraw, ImageOps, PngImagePlugin
-from scipy import ndimage
+from scipy.spatial import ConvexHull, QhullError
 
 from ait.tools.files import (
     is_aud,
@@ -172,10 +177,8 @@ from ait.tools.files import (
 from ait.tools.videos import (
     CHAIN_PIN,
     anchor_master,
-    chain_join,
     clip_refs,
     ref_frame,
-    seam_summary,
 )
 from ait.tools.videos import metadata as vid_metadata
 from ait.tools.images import metadata as img_metadata
@@ -286,7 +289,7 @@ TRIGGER_CMD: Final = '/refdef'
 HERDR_READY: Final = ('idle', 'done')
 HERDR_TIMEOUT_S: Final = 10
 SAVES_COLLECTION: Final = 'refdef_saves'  # 💾 save history (see build)
-# ⇪ deploy history (FEATURE t206): every successful ⇪ deploy (not ⇄ update / ⛓ join)
+# ⇪ deploy history (FEATURE t206): every successful ⇪ deploy (not ⇄ update)
 # stores the tab config here — one global ring buffer, the newest DEPLOYS_MAX stay
 DEPLOYS_COLLECTION: Final = 'refdef_deploys'
 DEPLOYS_MAX: Final = 50
@@ -297,7 +300,7 @@ REFDEF_KEY: Final = 'refdef'
 TAB_KEY: Final = 'tab'
 PICKUP_MIN_VERSION: Final = (6, 15)  # first iteration schema whose entries carry the block
 PICKUP_OLD: Final = 'version too old!'
-PICKUP_ICON: Final = '📥'
+PICKUP_ICON: Final = '⤓'
 SW_KEEP: Final = 'keep'  # switch-restore State value: leave the ✅/🚫 🟥/⬜ switches alone
 SCHEMA_VERSION_RE: Final = re.compile(r'\.v(\d+(?:\.\d+)*)$')
 DEPLOY_FAIL: Final = 'NOT deployed'  # status prefix of every refused / failed deploy
@@ -329,6 +332,10 @@ SCHEMA_MASK_PREFIX: Final = '1xlasm_enhancer.mask.'
 MASK_KEY_MAIN: Final = 'url_mask'  # the top-level scene image's mask (sibling of url)
 MASK_ICON_ON: Final = '🟥'  # per-slot masking switch: on (mask deployed / tinted)
 MASK_ICON_OFF: Final = '⬜'  # off: slot deployed without any mask
+# mask editor shape modes (t208): how ✓ stores what was painted — the shape is
+# decided here, consumers take the raster as is. Button cycles in this order.
+MASK_SHAPES: Final = {'hull': '⬢', 'bbox': '▭', 'painted': '✏'}
+MASK_SHAPE_DEFAULT: Final = 'hull'
 
 
 # t193: the fullscreen editor overlay stays mounted (a canvas mounted while hidden
@@ -361,7 +368,7 @@ CARRY_TAG_KEYS: Final = (('pic', 'image'), ('vid', 'video'), ('aud', 'audio'))
 # ---------------------------------------------------------------------- #
 def disable_slots(refs_roles: list[str], slot_on: list[bool] | None) -> list[str]:
     """The flat ``[ref, role, ...]`` UI values with every disabled slot (✅ off)
-    blanked: deploy / update / join / view switch treat it as empty, the tab keeps
+    blanked: deploy / update / view switch treat it as empty, the tab keeps
     its content."""
     out = list(refs_roles)
     for i, on in enumerate(slot_on or []):
@@ -994,18 +1001,6 @@ def qfix_payload(
     return payload
 
 
-def join_args(slots: list[dict]) -> tuple[str, str | None]:
-    """``chain_join`` inputs from the slots: slot 1 = the LAST clip of the
-    chain, slot 2 = optionally the FIRST clip (a pre). Raises ValueError."""
-    last = slots[0].get('url') if slots else None
-    if media_kind(last) != 'video':
-        raise ValueError('slot 1 needs the last clip of the chain (video)')
-    first = slots[1].get('url') if len(slots) > 1 else None
-    if first and media_kind(first) != 'video':
-        raise ValueError('slot 2 (first clip, optional) must be a video')
-    return str(last), (str(first) if first else None)
-
-
 def mask_paths(url: str) -> tuple[Path, Path]:
     """(mask, masked) file paths of a source image (exist or not)."""
     src = Path(url).expanduser().resolve()
@@ -1109,12 +1104,43 @@ def drop_mask(url: str) -> bool:
     return hit
 
 
-def write_mask(url: str, painted: Image.Image) -> tuple[str, str] | None:
+def convex_hull_mask(m: np.ndarray) -> np.ndarray:
+    """Bool mask → the filled convex hull of all its set pixels (one hull over
+    everything painted, separate blobs included). Degenerate input (a dot, a
+    straight line) is its own hull."""
+    ys = np.flatnonzero(m.any(axis=1))
+    if ys.size == 0:
+        return m
+    rows = m[ys]
+    # per row only the outermost pixels can be hull vertices
+    x0 = rows.argmax(axis=1)
+    x1 = m.shape[1] - 1 - rows[:, ::-1].argmax(axis=1)
+    pts = np.unique(np.concatenate([np.stack([x0, ys], 1), np.stack([x1, ys], 1)]), axis=0)
+    try:
+        poly = pts[ConvexHull(pts).vertices]  # 2-D: counterclockwise order
+    except (QhullError, ValueError):
+        return m
+    out = Image.new('L', (m.shape[1], m.shape[0]), 0)
+    ImageDraw.Draw(out).polygon([(int(x), int(y)) for x, y in poly], fill=255, outline=255)
+    return (np.asarray(out) > 0) | m
+
+
+def bbox_mask(m: np.ndarray) -> np.ndarray:
+    """Bool mask → the filled bounding rectangle of all its set pixels."""
+    ys, xs = np.flatnonzero(m.any(axis=1)), np.flatnonzero(m.any(axis=0))
+    out = np.zeros_like(m)
+    if ys.size:
+        out[ys[0] : ys[-1] + 1, xs[0] : xs[-1] + 1] = True
+    return out
+
+
+def write_mask(url: str, painted: Image.Image, shape: str = 'painted') -> tuple[str, str] | None:
     """Store ``painted`` (L / any mode; > 0 = masked, any size) as the mask of
     the source image ``url``: scaled to the (EXIF-upright) image size, then the
     L mask + the RGBA ``masked`` image (alpha 0 where masked; the source's PNG
-    text chunks kept, so ComfyUI metadata survives). Enclosed holes are filled:
-    an outline painted around an area masks the whole area (misw 2026-11-10).
+    text chunks kept, so ComfyUI metadata survives). ``shape`` (t208, a
+    ``MASK_SHAPES`` key): ``painted`` = the raw pixels (nothing filled),
+    ``hull`` / ``bbox`` = the convex hull / bounding rectangle of everything painted.
     An empty mask deletes the mask files → None."""
     with Image.open(url) as src:
         info = {k: v for k, v in src.info.items() if isinstance(k, str) and isinstance(v, str)}
@@ -1125,7 +1151,12 @@ def write_mask(url: str, painted: Image.Image) -> tuple[str, str] | None:
     if m.getbbox() is None:
         drop_mask(url)
         return None
-    m = Image.fromarray(ndimage.binary_fill_holes(np.asarray(m) > 0).astype(np.uint8) * 255)
+    arr = np.asarray(m) > 0
+    if shape == 'hull':
+        arr = convex_hull_mask(arr)
+    elif shape == 'bbox':
+        arr = bbox_mask(arr)
+    m = Image.fromarray(arr.astype(np.uint8) * 255)
     mask_p, masked_p = mask_paths(url)
     MASK_DIR.mkdir(parents=True, exist_ok=True)
     m.save(mask_p)
@@ -1841,10 +1872,7 @@ class RefdefTab:
     @classmethod
     def _source_md(cls, state: dict | None, idx: int) -> str:
         if not cls._is_enh(state):
-            return (
-                '**mode: instruction** — deploy writes `refdef.v1` + verb '
-                '(pull enhancer data to switch to enhancer mode)'
-            )
+            return '**mode: instruction** — deploy writes `refdef.v1` + verb'
         p = state['payload']  # type: ignore[index]
         view = state['view']  # type: ignore[index]
         md = (
@@ -1963,11 +1991,7 @@ class RefdefTab:
 
     def _on_pull(self, state: dict | None, *refs: str):
         n_out = N_LOAD_OUT
-        text = pyperclip.paste()
-        st = parse_payload(text)
-        if st is not None:
-            return [*self._load(st), f'pulled `{st["payload"].get("schema_id")}`']
-        imgs = self.images_from_clipspace(text)
+        imgs = self.images_from_clipspace(pyperclip.paste())
         if not imgs:
             gr.Info('nothing usable to pull', duration=0.5)
             return [gr.update()] * n_out
@@ -2643,27 +2667,6 @@ class RefdefTab:
             gr.Success(f'updated {len(changed)} ref(s)', duration=0.5)
         return f'updated clipspace{where}: {", ".join(changed)}{note}'
 
-    def _on_join(self, *refs_roles):
-        """⛓ join (board task 172): script only, no agent — walk the chain from
-        slot 1 (last clip) / slot 2 (first clip, optional), write the joined
-        master to CHAIN_OUT_DIR and toast the path + seam summary."""
-        slots = self._slots_from_ui(list(refs_roles))
-        try:
-            last, first = join_args(slots)
-            rep = chain_join(last, first)
-        except Exception as e:
-            gr.Warning(f'join: {e}', duration=3)
-            return f'join failed: {e}'
-        name = Path(rep['out']).name
-        n = len(rep['clips'])
-        summary = seam_summary(rep) or 'single clip'
-        gr.Success(f'joined {n} clips → {name}', duration=3)
-        print(f'[refdef_tab:info] join {rep["out"]}: {summary}')
-        return (
-            f'joined {n} clips ({rep["seconds"]:.1f} s) → `{rep["out"]}`  \n'
-            f'seams (MAD /255, plain→written (motion before/after)): {summary}'
-        )
-
     # -- UI build (call inside the app's gr.Blocks context) ------------- #
     # -- 🎭 hand-drawn masks ------------------------------------------- #
     def _mask_src(self, ref: str | None) -> str | None:
@@ -2704,8 +2707,11 @@ class RefdefTab:
             m = ImageChops.lighter(m, a.resize(m.size, Image.Resampling.NEAREST))
         return m
 
-    def _on_mask_apply(self, i: int | None, value: dict | None, copy_masked: bool, *refs):
-        """Store the painted mask for slot ``i``'s image (empty = delete it);
+    def _on_mask_apply(
+        self, i: int | None, value: dict | None, shape: str, copy_masked: bool, *refs
+    ):
+        """Store the painted mask for slot ``i``'s image (empty = delete it;
+        ``shape`` = a ``MASK_SHAPES`` key, see ``write_mask``);
         ``copy_masked`` also puts the RGBA masked image's path on the clipspace."""
         keep = [gr.update()] * N_SLOTS
         url = self._mask_src(refs[i]) if i is not None else None
@@ -2713,7 +2719,7 @@ class RefdefTab:
         if i is None or url is None or m is None:
             gr.Warning('mask: no slot image in the editor', duration=0.5)
             return [*keep, gr.update(), 'mask: no slot image in the editor']
-        hit = write_mask(url, m)
+        hit = write_mask(url, m, shape=shape if shape in MASK_SHAPES else MASK_SHAPE_DEFAULT)
         imgs: list[Any] = list(keep)
         imgs[i] = self._preview(url)
         if hit is None:
@@ -2736,7 +2742,7 @@ class RefdefTab:
 
     @staticmethod
     def _payload_mask(state: dict | None, i: int, url: str | None) -> dict | None:
-        """The pulled payload's mask of slot ``i`` while it still shows that media."""
+        """The loaded payload's mask of slot ``i`` while it still shows that media."""
         s = (state or {}).get('slots') or []
         if i < len(s) and url and s[i].get('url') == url:
             return s[i].get('mask')
@@ -2761,7 +2767,7 @@ class RefdefTab:
 
     def build(self) -> None:
         with gr.Tab('refdef', elem_id='refdef_tab'):
-            state = gr.State(None)  # parse_payload() result of the last enhancer pull
+            state = gr.State(None)  # parse_payload() result of a loaded save / deploy-history entry
             idx = gr.State(0)  # pointed prompt_data entry (display only)
             # save-history pointer: pos None = current config; draft = the current
             # config parked while a save is shown
@@ -2771,13 +2777,15 @@ class RefdefTab:
             # inherit switches of a picked-up config, applied by the carry panel (t205)
             pend = gr.State(None)
 
-            with gr.Row():
-                pull_btn = gr.Button('⟲ pull', variant='primary', scale=1)
-                pickup_btn = gr.Button(PICKUP_ICON, scale=0, min_width=40)  # t205
+            # all five are fixed top-left (REFDEF_HEAD); the row itself takes no space
+            with gr.Row(elem_id='refdef-actions'):
+                pull_btn = gr.Button('⟲ pull', variant='primary', elem_id='refdef-pull', scale=1)
+                pickup_btn = gr.Button(
+                    f'{PICKUP_ICON} pickup', elem_id='refdef-pickup', scale=0, min_width=40
+                )  # t205
                 deploy_btn = gr.Button('⇪ deploy', elem_id='refdef-deploy', scale=1)
-                update_btn = gr.Button('⇄ update', scale=1)
-                join_btn = gr.Button('⛓ join', scale=1)
-                reset_btn = gr.Button('reset', scale=0, min_width=80)
+                update_btn = gr.Button('⇄ update', elem_id='refdef-update', scale=1)
+                reset_btn = gr.Button('✕ reset', elem_id='refdef-reset', scale=0, min_width=80)
             with gr.Row():
                 verb = gr.Radio(
                     list(VERBS),
@@ -2876,34 +2884,39 @@ class RefdefTab:
             carry = gr.State(carry_of(None))
             carry_imgs, carry_tgls = [], []
             for row in rows:
-                with gr.Row(equal_height=True):
-                    if row == [0]:
+                if row == [0]:
+                    # slot 1 and the prompt box share a row, 50:50
+                    with gr.Row(equal_height=True):
                         with gr.Column(scale=1, elem_classes=['refdef-slot']):
                             make_slot(0)
-                        with gr.Column(scale=2, visible=False, elem_id='refdef-carry') as carry_box:
-                            carry_md = gr.Markdown()
-                            for r0 in range(0, CARRY_CELLS, CARRY_PER_ROW):
-                                with gr.Row():
-                                    for _ in range(r0, min(CARRY_CELLS, r0 + CARRY_PER_ROW)):
-                                        with gr.Column(min_width=180):
-                                            carry_imgs.append(
-                                                gr.Image(
-                                                    type='pil',
-                                                    height=240,
-                                                    interactive=False,
-                                                    show_label=True,
-                                                    visible=False,
-                                                )
+                        with gr.Column(scale=1, elem_id='refdef-text-col'):
+                            text = gr.Textbox(label='prompt / prompt hint', lines=21, max_lines=21)
+                    # carried refs: own row below
+                    with gr.Column(visible=False, elem_id='refdef-carry') as carry_box:
+                        carry_md = gr.Markdown()
+                        for r0 in range(0, CARRY_CELLS, CARRY_PER_ROW):
+                            with gr.Row():
+                                for _ in range(r0, min(CARRY_CELLS, r0 + CARRY_PER_ROW)):
+                                    with gr.Column(min_width=180):
+                                        carry_imgs.append(
+                                            gr.Image(
+                                                type='pil',
+                                                height=240,
+                                                interactive=False,
+                                                show_label=True,
+                                                visible=False,
                                             )
-                                            carry_tgls.append(
-                                                gr.Button(
-                                                    SLOT_ICON_ON,
-                                                    size='sm',
-                                                    min_width=40,
-                                                    visible=False,
-                                                )
+                                        )
+                                        carry_tgls.append(
+                                            gr.Button(
+                                                SLOT_ICON_ON,
+                                                size='sm',
+                                                min_width=40,
+                                                visible=False,
                                             )
-                        continue
+                                        )
+                    continue
+                with gr.Row(equal_height=True):
                     for i in row:
                         with gr.Column(elem_classes=['refdef-slot']):
                             make_slot(i)
@@ -2911,12 +2924,16 @@ class RefdefTab:
             # 🎭 mask editor (shared by the slots, fullscreen overlay — t193): a click
             # on a slot image opens it; paint over the area to mask
             mask_slot = gr.State(None)
+            mask_shape = gr.State(MASK_SHAPE_DEFAULT)  # t208 shape mode
             with gr.Column(
                 elem_id='refdef-mask-full', elem_classes=['refdef-mask-off']
             ) as mask_box:
                 with gr.Group():
                     with gr.Row(equal_height=True):
                         mask_md = gr.Markdown()
+                        mask_shape_btn = gr.Button(
+                            MASK_SHAPES[MASK_SHAPE_DEFAULT], scale=0, min_width=40
+                        )
                         mask_ok = gr.Button('✓', variant='primary', scale=0, min_width=40)
                         mask_copy = gr.Button('⎘', scale=0, min_width=40)
                         mask_del = gr.Button('🗑', scale=0, min_width=40)
@@ -2957,11 +2974,10 @@ class RefdefTab:
                 )
                 p_add = gr.Button('➕', scale=0, min_width=40)
                 p_del = gr.Button('🗑', scale=0, min_width=40)
-            text = gr.Textbox(label='prompt / prompt hint', lines=8, max_lines=30)
             with gr.Accordion('source / concepts / triggers', open=False):
                 source_md = gr.Markdown(self._source_md(None, 0))
                 entry_md = gr.Markdown()
-            with gr.Accordion('raw payload (as pulled / last view switch)', open=False):
+            with gr.Accordion('raw payload (as loaded / last view switch)', open=False):
                 raw = gr.Code(language='json', interactive=False)
 
             refs_roles = [c for pair in zip(refs, roles, strict=True) for c in pair]
@@ -3154,14 +3170,21 @@ class RefdefTab:
                 )
             for btn, copy_masked in ((mask_ok, False), (mask_copy, True)):
                 btn.click(
-                    lambda i, v, *r, c=copy_masked: self._on_mask_apply(i, v, c, *r),
-                    [mask_slot, mask_ed, *refs],
+                    lambda i, v, h, *r, c=copy_masked: self._on_mask_apply(i, v, h, c, *r),
+                    [mask_slot, mask_ed, mask_shape, *refs],
                     [*imgs, mask_box, status],
                 ).then(  # a freshly painted mask switches its slot back on
                     painted_on,
                     [mask_slot, mask_on],
                     [mask_on, *mask_tgls],
                 )
+
+            def next_shape(cur: str):
+                keys = list(MASK_SHAPES)
+                nxt = keys[(keys.index(cur) + 1) % len(keys)] if cur in keys else keys[0]
+                return nxt, MASK_SHAPES[nxt]
+
+            mask_shape_btn.click(next_shape, [mask_shape], [mask_shape, mask_shape_btn])
             mask_del.click(self._on_mask_drop, [mask_slot, *refs], [*imgs, mask_box, status])
             mask_close.click(lambda: mask_overlay(False), [], [mask_box])
             carry_outs = [carry, carry_box, carry_md, *carry_imgs, *carry_tgls]
@@ -3220,11 +3243,6 @@ class RefdefTab:
                 [state, verb, mask_on, slot_on, *refs_roles],
                 [status],
             )
-            join_btn.click(
-                lambda so, *rr: self._on_join(*disable_slots(list(rr), so)),
-                [slot_on, *refs_roles],
-                [status],
-            )
 
 
 REFDEF_HEAD = r"""
@@ -3241,6 +3259,24 @@ REFDEF_HEAD = r"""
   justify-content: center; font-size: 110px; opacity: 0.6; pointer-events: none;
   z-index: 20; text-shadow: 0 0 12px #000; }
 #refdef-deploy:hover { background: #388e3c !important; }
+/* t207: deploy / pull / pickup / update / reset stay at a fixed screen place (top left,
+   stacked), below the mask editor */
+#refdef-deploy, #refdef-pull, #refdef-pickup, #refdef-update, #refdef-reset {
+  position: fixed !important; left: 8px; z-index: 900; height: 40px;
+  width: 110px !important; min-width: 110px !important; max-width: 110px !important;
+  flex: none !important; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+#refdef-actions { display: contents !important; }
+#refdef-deploy { top: 8px; }
+#refdef-pull { top: 56px; }
+#refdef-pickup { top: 104px; }
+#refdef-update { top: 152px; }
+#refdef-reset { top: 200px; }
+#refdef-pickup { background: #f9c513 !important; border-color: #f9c513 !important;
+  color: #000 !important; }
+#refdef-pickup:hover { background: #ffd84d !important; }
+#refdef-update, #refdef-reset { background: #616161 !important; border-color: #616161 !important;
+  color: #fff !important; }
+#refdef-update:hover, #refdef-reset:hover { background: #757575 !important; }
 /* t193: a click on a slot image opens the mask editor as a fullscreen overlay */
 .refdef-img img { cursor: crosshair; }
 #refdef-mask-full { position: fixed !important; inset: 0; z-index: 1000; margin: 0 !important;
