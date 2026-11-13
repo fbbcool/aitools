@@ -166,6 +166,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageOps, PngImagePlugin
 from scipy.spatial import ConvexHull, QhullError
 
 from ait.tools.files import (
+    REFDEF_TMP_MASKS,
     is_aud,
     is_img,
     is_img_or_vid,
@@ -324,7 +325,7 @@ SNAP_KEYS: Final = ('state', 'idx', 'refs', 'roles', 'verb', 'kind', 'text', 'vi
 # path derived from the image path. ``*__mask.png`` = L (white = masked);
 # ``*__masked.png`` = the image as RGBA with alpha 0 where masked — what ComfyUI
 # loaders (FbbcoolImgQuickload, LoadImage) read as their mask (mask = 1 - alpha).
-MASK_DIR: Final = Path.home() / 'Downloads' / '000_comfy' / 'refdef_masks'
+MASK_DIR: Final = REFDEF_TMP_MASKS  # ~/Downloads/000_tmp/refdef/masks (t209)
 MASK_EDIT_SIZE: Final = 1536  # editor canvas edge (px); the mask is scaled back up
 MASK_TINT: Final = (255, 0, 0)  # slot-preview overlay of the masked area
 SCHEMA_MASK: Final = '1xlasm_enhancer.mask.v1'  # board task 175, comment 628

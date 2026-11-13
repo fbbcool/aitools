@@ -22,7 +22,7 @@ import av
 import numpy as np
 from PIL import Image
 
-from ait.tools.files import suffix_vid
+from ait.tools.files import REFDEF_TMP_AUDIO, suffix_vid
 
 from ait.tools.images import PARENT_METADATA_CHUNK, PAYLOAD_CHUNK, _metadata_from_chunks
 
@@ -935,8 +935,9 @@ def voice_ref(
     under the voice keeps the floor high → the line is rejected. The line
     edges are snapped past whisper's word edges while still voiced, padded
     by 0.15 s and written as a mono pcm_s16le wav at the clip's sample
-    rate — `out`, default ``<clip stem>_voice.wav`` next to the clip (stable,
-    so later chain links reference the same file).
+    rate — `out`, default ``<clip stem>_voice.wav`` in ``REFDEF_TMP_AUDIO``
+    (``~/Downloads/000_tmp/refdef/audio``, board task 209; stable, so later
+    chain links reference the same file).
 
     Returns the wav path, or None when the clip has no music-free line (or no
     audio). v1: one speaking character.
@@ -983,7 +984,7 @@ def voice_ref(
             f'(floor {floor:.0f} dB, speech {speech:.0f} dB): {text[:60]!r}')  # fmt: skip
         if not ok:
             continue
-        dst = Path(out) if out else src.with_name(f'{src.stem}_voice.wav')
+        dst = Path(out) if out else REFDEF_TMP_AUDIO / f'{src.stem}_voice.wav'
         dst.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(
             ['ffmpeg', '-v', 'error', '-y', '-i', str(src), '-map', '0:a:0',

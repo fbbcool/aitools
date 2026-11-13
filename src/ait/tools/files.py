@@ -7,6 +7,18 @@ SUFFIX_IMG: Final = ['png', 'webp', 'jpg', 'jpeg', 'gif']
 SUFFIX_VID: Final = ['mov', 'mp4', 'mkv']
 SUFFIX_AUD: Final = ['wav', 'mp3', 'flac', 'ogg', 'm4a', 'opus', 'aac']
 
+# Intermediate files of the refdef pipeline (board task 209): whatever a workflow
+# or an agent has to save on the way (painted masks, audio rips, ref crops,
+# looking aids) lives under this root, one subfolder per kind — never among the
+# renders. Path convention shared by all agents; cleanup is the user's.
+REFDEF_TMP_DIR: Final = Path.home() / 'Downloads' / '000_tmp' / 'refdef'
+REFDEF_TMP_MASKS: Final = REFDEF_TMP_DIR / 'masks'  # refdef tab 🎭 masks
+REFDEF_TMP_AUDIO: Final = REFDEF_TMP_DIR / 'audio'  # voice rips (videos.voice_ref)
+REFDEF_TMP_CROPS: Final = REFDEF_TMP_DIR / 'crops'  # enhancer: masked ref-img crops
+REFDEF_TMP_FOCUS: Final = REFDEF_TMP_DIR / 'focus'  # enhancer: looking aids
+REFDEF_TMP_INSTR: Final = REFDEF_TMP_DIR / 'instr'  # enhancer: normalized instructions
+REFDEF_TMP_DOWNLOADS: Final = REFDEF_TMP_DIR / 'downloads'  # enhancer: localized http slots
+
 
 def suffix_img() -> list[str]:
     postfixes = SUFFIX_IMG

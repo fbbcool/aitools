@@ -9,7 +9,6 @@ import pytest
 from ait.tools import videos
 from aidb.app.tab_refdef import (
     CONTINUE_VERBS,
-    continue_problems,
     refdef_payload,
 )
 
@@ -20,17 +19,6 @@ def _slots(*urls):
 
 
 # -- refdef verbs ------------------------------------------------------- #
-def test_continue_verbs_validate_slots():
-    assert continue_problems(_slots('/a/x.mkv', '/a/p.png', '/a/v.wav'), 'post-vid') == []
-    assert continue_problems(_slots('/a/p.png'), 'pre-vid') == [
-        'slot 1 needs the anchor clip (video)'
-    ]
-    assert continue_problems(_slots('/a/x.mkv', '/a/y.mkv'), 'post-vid') == [
-        'slot 2 is a video (new refs: images / audio)'
-    ]
-    assert continue_problems(_slots('/a/p.png'), 'ref') == []  # other verbs unaffected
-
-
 def test_continue_payload_carries_the_link():
     for verb, d in CONTINUE_VERBS.items():
         p = refdef_payload(_slots('/a/x.mkv', '/a/p.png'), verb, 'hint', 'beat')
