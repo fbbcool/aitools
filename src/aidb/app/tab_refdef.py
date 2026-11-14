@@ -55,7 +55,7 @@ What deploy writes depends on the tab's mode:
     (``<Picture i>``, board task 159); like ``enh``: slot 1 required, stills. With
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
     session ``xlasm`` with ``/refdef`` — only when it is idle.
-    ``auto`` (fixed top-left toggle, off on every app start; FEATURE t211): the
+    ``auto`` (fixed top-left toggle, on at every app start; FEATURE t211): the
     instruction carries ``auto: true`` (key absent = off) and the enhancer queues the
     ComfyUI workflow for the verb right after its own deploy — which workflow is the
     enhancer's knowledge, the tab sends only the flag. inp-qfix (no enhancer run)
@@ -385,6 +385,13 @@ def disable_slots(refs_roles: list[str], slot_on: list[bool] | None) -> list[str
         if not on and 2 * i + 1 < len(out):
             out[2 * i] = out[2 * i + 1] = ''
     return out
+
+
+def strip_role_comments(role: str | None) -> str:
+    """A role as sent: every line whose first non-blank char is ``#`` dropped
+    (commented out in the tab, never deployed); the tab keeps the raw text."""
+    lines = (role or '').splitlines()
+    return '\n'.join(ln for ln in lines if not ln.lstrip().startswith('#')).strip()
 
 
 def empty_slots() -> list[dict]:
@@ -771,6 +778,27 @@ def media_kind(url: str | None) -> str | None:
     if suf in suffix_aud():
         return 'audio'
     return None
+
+
+def media_size(url: str | None) -> dict | None:
+    """``{w, h}`` of an image / video slot (video = frame size) — t212 metadata
+    for the workflows' ``set ratio`` auto. None when empty, audio, remote or
+    unreadable: the slot then simply ships without ``size``."""
+    kind = media_kind(url)
+    if kind not in ('image', 'video') or not url or '://' in url.removeprefix('file://'):
+        return None
+    path = Path(unquote(url.removeprefix('file://'))).expanduser()
+    try:
+        if kind == 'image':
+            with Image.open(path) as im:  # header only, no pixel decode
+                w, h = im.size
+        else:
+            with av.open(str(path)) as c:
+                st = c.streams.video[0]
+                w, h = st.codec_context.width, st.codec_context.height
+    except Exception:
+        return None
+    return {'w': int(w), 'h': int(h)} if w and h else None
 
 
 def missing_roles(slots: list[dict], verb: str) -> list[int]:
@@ -1265,7 +1293,9 @@ def refdef_payload(
     (``tab_block``) = tab-only switches, carried for pickup (t205), ignored downstream. A
     slot's ``mask`` (a mask.v1 object, see ``mask_object``) becomes the ref's
     ``mask``. ``inherit`` (pre-/post-vid only): the anchor's carried refs with
-    their ``use`` switch — the enhancer inherits only ``use: true`` ones."""
+    their ``use`` switch — the enhancer inherits only ``use: true`` ones. An image /
+    video ref carries ``size: {w, h}`` when its file is readable (t212: the
+    workflows' ``set ratio`` auto snaps slot 1 to square / portrait / landscape)."""
     payload: dict[str, Any] = {
         'schema_id': SCHEMA_REFDEF,
         'verb': verb if verb in VERBS else VERBS[0],
@@ -1276,6 +1306,8 @@ def refdef_payload(
                 'id': s.get('id') or None,
                 'role': _instruction_role(s, i, verb),
                 'media': media_kind(s.get('url')),
+                # t212: frame size for the workflows' set ratio auto (metadata, P01)
+                **({'size': sz} if (sz := media_size(s.get('url'))) else {}),
                 # 🎭 painted mask (only when one exists): mask.v1 object (task 175).
                 # t195: shipped for every slot — pixel ref = the model sees only the
                 # masked part (ref-img: crop to bbox), 👁 vision = where to look.
@@ -2473,7 +2505,8 @@ class RefdefTab:
         slots = []
         for i in range(N_SLOTS):
             url, id_img = self.resolve_ref(refs_roles[2 * i])
-            slot: dict[str, Any] = {'url': url, 'id': id_img, 'role': refs_roles[2 * i + 1]}
+            role = strip_role_comments(refs_roles[2 * i + 1])
+            slot: dict[str, Any] = {'url': url, 'id': id_img, 'role': role}
             if vis[i]:
                 slot['vision'] = True
             if not on[i]:
@@ -2824,9 +2857,11 @@ class RefdefTab:
                 deploy_btn = gr.Button('⇪ deploy', elem_id='refdef-deploy', scale=1)
                 update_btn = gr.Button('⇄ update', elem_id='refdef-update', scale=1)
                 reset_btn = gr.Button('✕ reset', elem_id='refdef-reset', scale=0, min_width=80)
-                # t211: grey = off, green = on; off on every page load
-                run_btn = gr.Button('auto', elem_id='refdef-auto', scale=0, min_width=80)
-            run = gr.State(False)
+                # t211: grey = off, green = on; on at every page load
+                run_btn = gr.Button(
+                    'auto', variant='primary', elem_id='refdef-auto', scale=0, min_width=80
+                )
+            run = gr.State(True)
             run_btn.click(
                 lambda on: (not on, gr.update(variant='secondary' if on else 'primary')),
                 [run],

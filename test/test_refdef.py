@@ -1,6 +1,8 @@
 import json
 
 from aidb.app.tab_refdef import (
+    media_size,
+    strip_role_comments,
     EDITED_BY,
     SCHEMA_REFDEF,
     available_views,
@@ -1625,3 +1627,45 @@ def test_qfix_auto_sends_launch_prompt(tmp_path, monkeypatch):
     monkeypatch.setattr(tab_refdef.pyperclip, 'paste', lambda: 'stale')
     sent.clear()
     assert deploy(slots, '', None, None, True).startswith('NOT deployed') and sent == []
+
+
+def test_strip_role_comments():
+    assert strip_role_comments('# off\nface of slot 2\n  # also off\nkeep #3') == (
+        'face of slot 2\nkeep #3'
+    )
+    assert strip_role_comments('# only a comment') == ''
+    assert strip_role_comments(None) == ''
+    assert strip_role_comments('plain') == 'plain'
+
+
+def test_refdef_ref_size_t212(tmp_path):
+    """t212: image / video refs carry size {w, h}; audio, empty, missing files don't."""
+    import av
+    import numpy as np
+    from PIL import Image
+
+    img = tmp_path / 'p.png'
+    Image.new('RGB', (40, 60)).save(img)
+    vid = tmp_path / 'c.mp4'
+    with av.open(str(vid), 'w') as c:
+        st = c.add_stream('libx264', rate=8)
+        st.width, st.height, st.pix_fmt = 64, 32, 'yuv420p'
+        for _ in range(2):
+            frame = av.VideoFrame.from_ndarray(np.zeros((32, 64, 3), np.uint8), format='rgb24')
+            for p in st.encode(frame):
+                c.mux(p)
+        for p in st.encode():
+            c.mux(p)
+    assert media_size(str(img)) == {'w': 40, 'h': 60}
+    assert media_size(f'file://{vid}') == {'w': 64, 'h': 32}
+    assert media_size(str(tmp_path / 'gone.png')) is None
+    assert media_size('https://h/c.png') is None
+    slots = [
+        {'url': str(img), 'id': None, 'role': 'main'},
+        {'url': str(vid), 'id': None, 'role': ''},
+        {'url': str(tmp_path / 'a.wav'), 'id': None, 'role': ''},
+        {'url': None, 'id': None, 'role': ''},
+    ]
+    refs = refdef_payload(slots, 'ref', 'hint', '')['refs']
+    assert [r.get('size') for r in refs] == [{'w': 40, 'h': 60}, {'w': 64, 'h': 32}, None, None]
+    assert 'size' not in refs[2] and 'size' not in refs[3]
