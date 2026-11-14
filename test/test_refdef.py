@@ -543,7 +543,8 @@ def _picked(tab=None, **kw):
         {'url': None, 'id': None, 'role': ''},
         {'url': '/gone.png', 'id': None, 'role': 'dress', 'vision': True},
     ]
-    block = refdef_payload(slots, 'ref-novis', 'prompt', 'hello', 'scn1', tab=tab)
+    block = refdef_payload(slots, 'ref', 'prompt', 'hello', 'scn1', tab=tab)
+    block['verb'] = 'ref-novis'  # an old render (verb dropped in t213)
     ver = '.'.join(map(str, PICKUP_MIN_VERSION))
     entry = {'prompt': 'p', 'from_rev': 3, 'ts': '2026-11-12', 'refdef': block}
     return {
@@ -576,8 +577,9 @@ def test_pickup_restores_config_best_effort():
     snap = res['snap']
     assert snap['refs'][:4] == ['/a.png', '/off.png', '/gone.png', '']
     assert snap['roles'][:3] == ['main', 'off', 'dress']
-    assert (snap['verb'], snap['kind'], snap['text']) == ('ref-novis', 'prompt', 'hello')
-    assert snap['vision'][:3] == [False, False, True]
+    # t213: ref-novis → ref, its filled non-vision image slots → pixel only
+    assert (snap['verb'], snap['kind'], snap['text']) == ('ref', 'prompt', 'hello')
+    assert snap['vision'][:3] == ['pixel', 'open', 'vision']
     assert snap['state']['kind'] == 'refdef'  # instruction mode, origin kept
     assert snap['state']['payload']['origin'] == {'scene_id': 'scn1'}
     # a missing ref does not fail the pickup: kept, reported, switched off
@@ -684,20 +686,22 @@ def test_ten_slots_and_media_kind(tmp_path):
     assert im is not None and im.size[0] > im.size[1]
 
 
-def test_ref_novis_needs_roles():
+def test_pixel_only_slot1_needs_role_t213():
     from aidb.app.tab_refdef import VERBS, missing_roles
 
-    assert 'ref-novis' in VERBS
+    assert 'ref-novis' not in VERBS  # dropped: ref + pixel-only slots
     slots = [
-        {'url': '/a.png', 'id': None, 'role': 'red dress'},
-        {'url': '/b.wav', 'id': None, 'role': '  '},
+        {'url': '/a.png', 'id': None, 'role': 'red dress', 'pixel': True},
+        {'url': '/b.png', 'id': None, 'role': '  ', 'pixel': True},
         {'url': None, 'id': None, 'role': ''},
     ]
-    assert missing_roles(slots, 'ref-novis') == []  # only slot 1 needs a role
-    assert missing_roles([dict(slots[0], role=' '), *slots[1:]], 'ref-novis') == [1]
-    assert missing_roles([dict(slots[0], url=None), *slots[1:]], 'ref-novis') == [1]
-    assert missing_roles([dict(slots[0], role='')], 'ref') == []
-    assert refdef_payload(slots, 'ref-novis', 'hint', '')['verb'] == 'ref-novis'
+    assert missing_roles(slots, 'ref') == []  # only slot 1 needs a role
+    assert missing_roles([dict(slots[0], role=' '), *slots[1:]], 'ref') == [1]
+    assert missing_roles([dict(slots[0], url=None), *slots[1:]], 'ref') == []  # nothing there
+    s1_open = {'url': '/a.png', 'id': None, 'role': ''}
+    assert missing_roles([s1_open], 'ref') == []  # open / vision: the enhancer may look
+    assert missing_roles([dict(s1_open, vision=True)], 'ref') == []
+    assert missing_roles([dict(slots[0], role='')], 'ref-img') == []  # ref only
 
 
 def test_ref_view_v68_slots_and_kinds():
@@ -766,7 +770,7 @@ def test_update_task162_ref_and_inp_sections():
     p = _iteration(prompts_ref=_ref_section(ref_refs), prompts_inp=_inp())
     text = json.dumps(p)
     slots = [_slot('/r/clip.mkv'), _slot('/r/new.png')]
-    for verb in ('ref', 'ref-novis'):
+    for verb in ('ref',):
         out, view, changed, skipped = update_payload(text, slots, 'inp', verb)
         assert view == 'ref' and changed == ['prompts_ref.refs[1]'] and not skipped
         assert out['prompts_ref']['prompt_data'][0]['refs'][1]['url'] == '/r/new.png'
@@ -1061,12 +1065,12 @@ def test_h3_ref_budget():
 
     pics = [f'/p{i}.png' for i in range(1, 7)]
     full = sl(*pics, '/v1.mp4', '/v2.mp4', '/a1.wav', '/a2.wav', audio=('/v1.mp4', '/v2.mp4'))
-    for verb in ('ref', 'ref-novis', 'pre-vid', 'post-vid'):
+    for verb in ('ref', 'pre-vid', 'post-vid'):
         assert ref_budget_problems(full, verb) == []  # exactly 12
     assert ref_budget_problems(sl(*pics[:4]), 'ref') == []
     assert ref_budget_problems(sl(*pics, '/p7.png'), 'ref') == ['max 6 pictures, got 7']
     assert ref_budget_problems(sl('/v1.mp4', '/v2.mp4', '/v3.mp4'), 'ref') == ['max 2 clips, got 3']
-    assert ref_budget_problems(sl('/p.png', '/a.wav', '/b.wav', '/c.mp3'), 'ref-novis') == [
+    assert ref_budget_problems(sl('/p.png', '/a.wav', '/b.wav', '/c.mp3'), 'ref') == [
         'max 2 audios, got 3'
     ]
     # 7 + 2 + 2 + 2 soundtracks = 13: per-kind cap and total both fire
@@ -1300,13 +1304,15 @@ def test_predefined_prompts():
 # ---------------------------------------------------------------------- #
 # 🖼 pixel / 👁 vision switch (FEATURE t189)
 # ---------------------------------------------------------------------- #
-def _vslots(*urls, vision=()):
+def _vslots(*urls, vision=(), pixel=()):
     from aidb.app.tab_refdef import N_SLOTS
 
     slots = [{'url': u, 'id': None, 'role': f'r{i + 1}'} for i, u in enumerate(urls)]
     slots += [{'url': None, 'id': None, 'role': ''}] * (N_SLOTS - len(slots))
     for n in vision:
         slots[n - 1] = {**slots[n - 1], 'vision': True}
+    for n in pixel:
+        slots[n - 1] = {**slots[n - 1], 'pixel': True}
     return slots
 
 
@@ -1316,7 +1322,7 @@ def test_vision_payload_use_field_and_default_unchanged():
     plain = _vslots('/a/x.png', '/a/y.png')
     base = refdef_payload(plain, 'ref', 'hint', 't')
     assert all('use' not in r for r in base['refs'])
-    vis = refdef_payload(_vslots('/a/x.png', '/a/y.png', vision=(2,)), 'ref-novis', 'hint', 't')
+    vis = refdef_payload(_vslots('/a/x.png', '/a/y.png', vision=(2,)), 'ref', 'hint', 't')
     assert vis['refs'][1]['use'] == 'vision' and 'use' not in vis['refs'][0]
     # all 🖼 → byte-identical to a payload built without the switch
     assert json.dumps(refdef_payload(plain, 'ref', 'hint', 't')) == json.dumps(base)
@@ -1669,3 +1675,76 @@ def test_refdef_ref_size_t212(tmp_path):
     refs = refdef_payload(slots, 'ref', 'hint', '')['refs']
     assert [r.get('size') for r in refs] == [{'w': 40, 'h': 60}, {'w': 64, 'h': 32}, None, None]
     assert 'size' not in refs[2] and 'size' not in refs[3]
+
+
+# ---------------------------------------------------------------------- #
+# media use 3-mode cycle open / pixel / vision (FEATURE t213)
+# ---------------------------------------------------------------------- #
+def test_mode_cycle_and_norm_t213():
+    from aidb.app.tab_refdef import N_SLOTS, next_mode, norm_mode, norm_modes
+
+    def cyc(i, verb):
+        return [next_mode(m, i, verb) for m in ('open', 'pixel', 'vision')]
+
+    assert cyc(0, 'ref') == ['pixel', 'vision', 'open']
+    assert cyc(0, 'inp-nomask') == ['pixel', 'open', 'pixel']  # vision-locked (vision shows open)
+    assert cyc(0, 'enh') == ['vision', 'vision', 'open']  # pixel-locked: open <-> vision
+    assert cyc(2, 'sketch') == ['vision', 'vision', 'open']
+    assert cyc(0, 'pickup') == ['open'] * 3  # both locked: open only
+    assert cyc(1, 'enh') == ['pixel', 'vision', 'open']
+    # t189 bools: True = vision, False / None = open
+    assert [norm_mode(v) for v in (True, False, None, 'pixel', 'vision', 'x')] == [
+        'vision',
+        'open',
+        'open',
+        'pixel',
+        'vision',
+        'open',
+    ]
+    assert norm_modes([True, 'pixel']) == ['vision', 'pixel'] + ['open'] * (N_SLOTS - 2)
+    assert norm_modes(None) == ['open'] * N_SLOTS
+
+
+def test_pixel_payload_use_and_budget_t213():
+    from aidb.app.tab_refdef import (
+        img_ref_problems,
+        pixel_only_slots,
+        ref_budget_problems,
+        refdef_payload,
+    )
+
+    s = _vslots('/a/x.png', '/a/y.png', '/a/z.wav', '/a/c.mp4', vision=(2,), pixel=(1, 3, 4))
+    refs = refdef_payload(s, 'ref', 'hint', '')['refs']
+    assert [r.get('use') for r in refs[:5]] == ['pixel', 'vision', None, 'pixel', None]
+    assert pixel_only_slots(s, 'ref') == [1, 4]  # audio has no modes
+    # locked slots ship pixels: pixel only stays, vision does not
+    lk = _vslots('/a/x.png', '/a/y.png', pixel=(1,), vision=(2,))
+    assert [r.get('use') for r in refdef_payload(lk, 'img-fsw-novis', 'hint', '')['refs'][:2]] == [
+        'pixel',
+        None,
+    ]
+    # pixel-locked slots (the enhancer has to look) deploy pixel only as open
+    pl = _vslots('/a/x.png', '/a/y.png', pixel=(1, 2))
+    assert [r.get('use') for r in refdef_payload(pl, 'enh', 'hint', '')['refs'][:2]] == [
+        None,
+        'pixel',
+    ]
+    # pixel-only slots count in the budgets like open ones
+    imgs = [f'/a/{i}.png' for i in range(7)]
+    assert ref_budget_problems(_vslots(*imgs, pixel=(7,)), 'ref')
+    assert img_ref_problems(_vslots(*imgs[:6], pixel=(6,)), 'ref-img')
+
+
+def test_ref_novis_migration_t213():
+    from aidb.app.tab_refdef import parse_payload, refdef_payload
+
+    p = refdef_payload(_vslots('/a/x.png', '/a/y.png', '/a/z.wav'), 'ref', 'hint', '')
+    p['refs'][1]['use'] = 'vision'
+    p['verb'] = 'ref-novis'  # an old instruction / deploy
+    st = parse_payload(json.dumps(p))
+    assert st['verb'] == 'ref'
+    assert [bool(s.get('pixel')) for s in st['slots'][:3]] == [True, False, False]
+    assert st['slots'][1].get('vision') is True
+    # use: pixel roundtrips
+    p2 = refdef_payload(_vslots('/a/x.png', pixel=(1,)), 'ref', 'hint', '')
+    assert parse_payload(json.dumps(p2))['slots'][0].get('pixel') is True

@@ -34,10 +34,9 @@ What deploy writes depends on the tab's mode:
     instruction with the selected verb (replicate / enh / pickup / inp-mask /
     inp-nomask / sketch / ref) that the enhancer builds its enhancer data from.
     ``sketch`` = a fresh scene from the hint text alone (slots may be empty).
-    ``ref-novis`` = like ``ref``, but the enhancer never looks at the media (no
-    vision, saves tokens): the ref prompt is built from the slot roles (+ hint)
-    alone. Slot 1 needs media + a role (``missing_roles``); it references the
-    other slots by refdef slot number ("slot 3"), whose roles may be empty.
+    (``ref-novis`` is dropped, t213: it is ``ref`` with pixel-only slots; old
+    saves / history / pulls load that way. Under ``ref`` a pixel-only slot 1
+    needs media + a role, ``missing_roles``.)
     ``img-fsw-novis`` = qwen21 head swap (``SWAP_VERBS``): slot 1 = target, slot 2 =
     reference head, both images; the enhancer writes a ``head_swap:`` prompt into
     ``prompts_inp`` without looking at the images (roles optional — an empty one
@@ -47,7 +46,7 @@ What deploy writes depends on the tab's mode:
     (``qfix_payload``): ``prompts_inp`` with slot 1 = edit target (+ its 🎭 mask
     → mask mode, else nomask), slots 2.. = 0-2 still refs (image 2 / 3 in slot
     order), slot 1's role = the ``prompt_qwen21`` edit instruction verbatim.
-    ``ref-img`` / ``ref-img-h3`` = reference-to-image, novis (``IMG_REF_VERBS``): 1-5
+    ``ref-img`` / ``ref-img-h3`` = reference-to-image (``IMG_REF_VERBS``; looking = slot modes, t213): 1-5
     🖼 pixel stills anywhere in the slots (+ uncapped 👁 slots), roles optional; the
     verb picks the engine of the ``prompts_img`` entry the enhancer writes — qwen21
     (``ref-img``, t187) or MiniMax H3 Image (``ref-img-h3``, t204). No size control here.
@@ -62,7 +61,7 @@ What deploy writes depends on the tab's mode:
     sends the launch-only prompt ``LAUNCH_CMD`` instead. No effect on an
     enhancer-data deploy; a history entry / pickup never switches it on.
 
-H3 ref budget (``H3_VERBS`` = ref / ref-novis / pre-vid / post-vid, FEATURE t181):
+H3 ref budget (``H3_VERBS`` = ref / pre-vid / post-vid, FEATURE t181):
 at most 6 pictures, 2 clips, 2 audio files and 12 refs in total (a clip with
 ``audio: true`` counts its soundtrack too); more → 2 s toast, nothing deployed.
 Under pre-/post-vid the anchor (slot 1) is pinned frames, not a ref; its carried
@@ -92,14 +91,26 @@ image + role in the tab (dimmed) but deploys, updates and view-switches as
 an empty slot (enhancer mode: its replacement is not patched in). New content in
 the slot (pull, slot ⟲, ✕) switches it back on.
 
-``🖼`` / ``👁`` (per slot, FEATURE t189) switches an image / video slot between a
-direct pixel ref (🖼, default) and vision (👁, a big eye over the preview): the
-deployed ref gets ``use: "vision"``, the enhancer looks at the media (even on
-``*-novis`` verbs), writes it into the prompt as text and ships no pixels for it
-— so it is outside the H3 ref budget; its 🎭 mask ships as where to look (t195). Locked (always
-🖼): ``img-fsw-novis`` slots 1 + 2, slot 1 of pre-/post-vid, inp-mask,
-inp-nomask, pickup; audio has no 👁. Without the enhancer (inp-qfix, enhancer-data deploys) it is ignored with a
-status note. 💾 saves it; slot ⟲ / ✕ reset it to 🖼.
+Media use (per image / video slot, FEATURE t189 → t213), the button right of
+✅/🚫 cycles open → pixel → vision → open; the slot mode alone decides whether
+the enhancer may look (no verb-level novis any more):
+
+  * **open** (🖼, default): pixel ref, plus optional vision — the enhancer may
+    add vision facts and read the media's metadata. refdef.v1: no ``use``.
+  * **pixel only** (👁 grey + struck through, also big over the preview): pure
+    pixel ref, vision and metadata strictly off. refdef.v1: ``use: "pixel"``.
+  * **vision only** (👁, a big eye over the preview): the enhancer describes the
+    media into the prompt and ships no pixels for it — so it is outside the H3
+    ref budget; its 🎭 mask ships as where to look (t195). ``use: "vision"``.
+
+Locked modes skip in the cycle (the button is greyed when only open is left):
+no vision where pixels must ship — ``img-fsw-novis`` slots 1 + 2, slot 1 of
+pre-/post-vid, inp-mask, inp-nomask, pickup; no pixel only where the enhancer
+has to look — slot 1 of enh / replicate / pickup / pre-/post-vid / inp-mask,
+every sketch slot (``pixel_locked``). Audio has no modes. Open + pixel count in
+the budgets. Without the enhancer (inp-qfix, enhancer-data deploys) open =
+pixel; vision is ignored with a status note. 💾 / deploy history save the modes
+(t189 bools load as vision / open); slot ⟲ / ✕ reset to open.
 
 A click on a slot's (local) image opens the shared brush editor fullscreen
 (task 193; Esc / ✕ closes it): paint the area to mask, ✓ stores it (⎘ = ✓ + the masked image's path on the clipspace, ready for
@@ -208,7 +219,6 @@ VERBS: Final = (
     'inp-nomask',
     'sketch',
     'ref',
-    'ref-novis',
     'pre-vid',
     'post-vid',
     'img-fsw-novis',
@@ -220,14 +230,14 @@ VERBS: Final = (
 # (FbbcoolSaveVideo master, video only), the other slots optional NEW refs
 # (images / audio / clips = cut-to shots, t191); the enhancer writes prompts_ref[].continue = {dir, url, pin}
 CONTINUE_VERBS: Final = {'pre-vid': 'pre', 'post-vid': 'post'}
-# verbs whose prompt is built from the slot roles alone (enhancer never looks at
-# the media): slot 1 needs media + a role; it references the other slots by number
-ROLE_ONLY_VERBS: Final = ('ref-novis',)
+# t213: verbs where a pixel-only slot 1 needs a role (nobody looks at it; was the
+# ref-novis rule, that verb is dropped — the slot mode replaces it)
+ROLE_ONLY_VERBS: Final = ('ref',)
 # MiniMax H3 ref2va budget (FEATURE t181 plan v3): per kind 6 pictures / 2 clips /
 # 2 audio files, and at most 12 refs in total where a clip's soundtrack counts as
 # one more ref iff the ref carries ``audio: true``. Same rule as the enhancer's
 # refusal; checked before deploy (``ref_budget_problems``).
-H3_VERBS: Final = ('ref', 'ref-novis', 'pre-vid', 'post-vid')
+H3_VERBS: Final = ('ref', 'pre-vid', 'post-vid')
 H3_REF_CAP: Final = {'image': 6, 'video': 2, 'audio': 2}
 H3_REF_TOTAL: Final = 12
 # t190 frame pins (enhancer refdef.py PIN_RE / PIN_CONFLICT): an image slot whose
@@ -249,7 +259,7 @@ SWAP_DEFAULT_ROLES: Final = (
     'reference head: the head/face that replaces the head/face of slot 1',
 )
 # qwen21 reference-to-image (FEATURE t187, agent-comfy workflows/qwen21-ref.json):
-# NOVIS — the enhancer never looks at the media, the prompt comes from roles + text.
+# was novis; since t213 the slot modes decide whether the enhancer looks (open default).
 # 1-5 🖼 pixel still refs anywhere in slots 1-10 (t194; image 1..N compacted in slot order;
 # empty roles stay empty, no defaults), 👁 slots uncapped. 🎭 masks ship (t195): the
 # enhancer crops a masked pixel ref to the mask bbox + padding before qwen21-ref.
@@ -281,7 +291,6 @@ VERB_VIEW: Final = {
     'img-fsw-novis': 'inp',
     'inp-qfix': 'inp',
     'ref': 'ref',
-    'ref-novis': 'ref',
 }
 REF_LABEL: Final = {'image': 'picture', 'video': 'clip', 'audio': 'audio'}  # ref view
 STILL_VIEWS: Final = ('inp',)  # qwen21 still slots: images only
@@ -357,13 +366,28 @@ def mask_overlay(show: bool) -> dict:
 
 SLOT_ICON_ON: Final = '✅'  # per-slot enable switch: on (slot deployed)
 SLOT_ICON_OFF: Final = '🚫'  # off: slot kept in the tab but deployed as empty
-# per-slot pixel / vision switch (FEATURE t189): 🖼 = direct pixel ref (default),
-# 👁 = the enhancer looks at the media and writes it into the prompt as text
-VIS_ICON_PIXEL: Final = '🖼\ufe0f'
+# per-slot media use (FEATURE t189 → t213: 3-mode cycle open → pixel → vision):
+# open = pixel ref + optional vision / metadata (enhancer's choice, ``use`` absent),
+# pixel = pure pixel ref (no vision, no metadata; ``use: "pixel"``),
+# vision = the enhancer describes the media into the prompt, no pixels (``use: "vision"``)
+MODE_OPEN: Final = 'open'
+MODE_PIXEL: Final = 'pixel'
+MODE_VISION: Final = 'vision'
+MODES: Final = (MODE_OPEN, MODE_PIXEL, MODE_VISION)  # cycle order
+VIS_ICON_PIXEL: Final = '🖼\ufe0f'  # open (name kept from t189)
 VIS_ICON_VISION: Final = '👁\ufe0f'  # emoji presentation (bare U+1F441 = text glyph)
-VIS_USE: Final = 'vision'  # refdef.v1 ref ``use`` value (absent = pixel)
+VIS_ICON: Final = {
+    MODE_OPEN: VIS_ICON_PIXEL,
+    MODE_PIXEL: VIS_ICON_VISION,
+    MODE_VISION: VIS_ICON_VISION,
+}
+VIS_USE: Final = 'vision'  # refdef.v1 ref ``use`` value for vision
+PIXEL_USE: Final = 'pixel'  # refdef.v1 ref ``use`` value for pixel only (t213)
+LEGACY_NOVIS: Final = {'ref-novis': 'ref'}  # t213: dropped verb → its verb + pixel slots
 VIS_MEDIA: Final = ('image', 'video')  # audio has no pixels
 VISION_LOCK_SLOT1: Final = ('inp-mask', 'inp-nomask', 'pickup')  # + swap / continue verbs
+# t213: slot 1 the enhancer must look at → no pixel only there (+ every sketch slot)
+PIXEL_LOCK_SLOT1: Final = ('enh', 'replicate', 'pickup', 'pre-vid', 'post-vid', 'inp-mask')
 # load outputs + status: state, idx, raw, 3×slot, kind, verb, text, source, entry,
 # view, vision, status
 N_LOAD_OUT: Final = 3 + 3 * N_SLOTS + 8
@@ -561,10 +585,15 @@ def parse_payload(text: str | None) -> dict | None:
                     'url': ref.get('url'),
                     'id': ref.get('id'),
                     'role': ref.get('role') or '',
-                    **({'vision': True} if ref.get('use') == VIS_USE else {}),
+                    **mode_flags(ref.get('use')),
                 }
         kind = payload.get('kind')
-        verb = payload.get('verb')
+        verb, modes = migrate_verb(
+            payload.get('verb'), [slot_mode(s) for s in slots], [s.get('url') for s in slots]
+        )
+        for s, m in zip(slots, modes, strict=True):
+            s.pop(MODE_PIXEL, None)
+            s.update(mode_flags(m))
         return {
             'kind': 'refdef',
             'payload': payload,
@@ -802,13 +831,15 @@ def media_size(url: str | None) -> dict | None:
 
 
 def missing_roles(slots: list[dict], verb: str) -> list[int]:
-    """1-based slots whose role a role-only verb requires but lacks. Only slot 1
-    must carry media + a role: it holds the prompt and references the other
-    slots by their refdef slot number, whose roles may stay empty."""
+    """1-based slots whose role is required but lacks (t213, was ``ref-novis``):
+    under ``ref`` a pixel-only slot 1 needs a role — nobody looks at it, so the
+    role is its only description. Other slots' roles may stay empty."""
     if verb not in ROLE_ONLY_VERBS or not slots:
         return []
     s1 = slots[0]
-    return [] if s1.get('url') and (s1.get('role') or '').strip() else [1]
+    if not s1.get('pixel') or not s1.get('url'):
+        return []
+    return [] if (s1.get('role') or '').strip() else [1]
 
 
 def continue_problems(slots: list[dict], verb: str) -> list[str]:
@@ -927,6 +958,70 @@ def img_ref_problems(slots: list[dict], verb: str) -> list[str]:
     return probs
 
 
+def norm_mode(v: Any) -> str:
+    """A slot's stored media use → mode: t189 bools (True = vision) and t213 mode
+    strings; anything else = open."""
+    if v is True or v == MODE_VISION:
+        return MODE_VISION
+    return MODE_PIXEL if v == MODE_PIXEL else MODE_OPEN
+
+
+def norm_modes(vals: Any) -> list[str]:
+    """``N_SLOTS`` modes from a stored list (padded / cut; None = all open)."""
+    vals = list(vals or [])
+    return [norm_mode(v) for v in (vals + [None] * N_SLOTS)[:N_SLOTS]]
+
+
+def slot_mode(slot: dict) -> str:
+    """The mode a slot dict carries (``vision`` / ``pixel`` flag, else open)."""
+    if slot.get('vision'):
+        return MODE_VISION
+    return MODE_PIXEL if slot.get('pixel') else MODE_OPEN
+
+
+def mode_flags(mode: str) -> dict:
+    """Slot dict flags for a mode (open = none)."""
+    m = norm_mode(mode)
+    return {m: True} if m != MODE_OPEN else {}
+
+
+def mode_cycle(i: int, verb: str) -> tuple[str, ...]:
+    """The modes slot ``i`` (0-based) offers under ``verb``, in cycle order: no
+    vision where pixels must ship (``vision_locked``), no pixel only where the
+    enhancer has to look (``pixel_locked``); just open when both apply."""
+    return tuple(
+        m
+        for m in MODES
+        if not (m == MODE_VISION and vision_locked(i, verb))
+        and not (m == MODE_PIXEL and pixel_locked(i, verb))
+    )
+
+
+def shown_mode(mode: str, i: int, verb: str) -> str:
+    """The mode slot ``i`` effectively has (one the verb locks out = open)."""
+    m = norm_mode(mode)
+    return m if m in mode_cycle(i, verb) else MODE_OPEN
+
+
+def next_mode(mode: str, i: int, verb: str) -> str:
+    """The switch's next mode: open → pixel → vision → open, skipping locked ones."""
+    cyc = mode_cycle(i, verb)
+    m = shown_mode(mode, i, verb)
+    return cyc[(cyc.index(m) + 1) % len(cyc)]
+
+
+def migrate_verb(verb: Any, modes: list[str], urls: list[Any]) -> tuple[Any, list[str]]:
+    """t213: a dropped novis verb (``ref-novis``) → its verb, with every filled
+    image / video slot that is not vision switched to pixel only."""
+    if verb not in LEGACY_NOVIS:
+        return verb, modes
+    out = [
+        MODE_PIXEL if m != MODE_VISION and media_kind(u) in VIS_MEDIA else m
+        for m, u in zip(modes, urls, strict=False)
+    ]
+    return LEGACY_NOVIS[verb], out + modes[len(out) :]
+
+
 def vision_locked(i: int, verb: str) -> bool:
     """Slot ``i`` (0-based) is one the verb needs as pixels (t189 D2): the swap's
     target + new face, the pre-/post-vid anchor, the inpaint edit image, the
@@ -934,6 +1029,16 @@ def vision_locked(i: int, verb: str) -> bool:
     if verb in SWAP_VERBS:
         return i < 2
     return i == 0 and verb in (*CONTINUE_VERBS, *VISION_LOCK_SLOT1)
+
+
+def pixel_locked(i: int, verb: str) -> bool:
+    """Slot ``i`` (0-based) is one the enhancer has to look at (t213, xlasmos'
+    contract reply — it refuses ``use: pixel`` there): slot 1 of enh / replicate /
+    pickup / pre-vid / post-vid / inp-mask (the scene's image, the render, the
+    anchor, the edit target it places mask shapes on), every sketch slot."""
+    if verb == 'sketch':
+        return True
+    return i == 0 and verb in PIXEL_LOCK_SLOT1
 
 
 def is_vision(slot: dict, i: int, verb: str) -> bool:
@@ -950,6 +1055,19 @@ def is_vision(slot: dict, i: int, verb: str) -> bool:
 def vision_slots(slots: list[dict], verb: str) -> list[int]:
     """1-based slots deployed as ``use: vision``."""
     return [i + 1 for i, s in enumerate(slots[:N_SLOTS]) if is_vision(s, i, verb)]
+
+
+def is_pixel_only(slot: dict, i: int, verb: str) -> bool:
+    """Slot ``i`` deploys as ``use: pixel``: pixel only set, image / video media,
+    not ``pixel_locked`` (vision-locked slots may — they ship pixels either way)."""
+    return bool(
+        slot.get('pixel') and media_kind(slot.get('url')) in VIS_MEDIA and not pixel_locked(i, verb)
+    )
+
+
+def pixel_only_slots(slots: list[dict], verb: str) -> list[int]:
+    """1-based slots deployed as ``use: pixel``."""
+    return [i + 1 for i, s in enumerate(slots[:N_SLOTS]) if is_pixel_only(s, i, verb)]
 
 
 def vision_ignored(slots: list[dict], verb: str) -> list[int]:
@@ -1313,7 +1431,14 @@ def refdef_payload(
                 # masked part (ref-img: crop to bbox), 👁 vision = where to look.
                 **({'mask': s['mask']} if s.get('mask') else {}),
                 # 👁 (t189): the enhancer describes the media into the prompt, no pixels
-                **({'use': VIS_USE} if is_vision(s, i, verb) else {}),
+                # t213: pixel only = pure pixel ref (no vision, no metadata); open = absent
+                **(
+                    {'use': VIS_USE}
+                    if is_vision(s, i, verb)
+                    else {'use': PIXEL_USE}
+                    if is_pixel_only(s, i, verb)
+                    else {}
+                ),
             }
             for i, s in enumerate(slots[:N_SLOTS])
         ],
@@ -1350,7 +1475,7 @@ def update_payload(
     first that takes every filled slot without skips, in the order ``view``
     (the tab's), the payload's default view, then the other views newest
     first. The ``verb`` decides first (board task 162): a verb in
-    ``VERB_VIEW`` (inp-* → ``inp``, ref / ref-novis → ``ref``) patches only
+    ``VERB_VIEW`` (inp-* → ``inp``, ref → ``ref``) patches only
     that view, every other verb only the views no verb owns (main / vid /
     next), so sections the verb doesn't address stay byte-identical. If none
     fits cleanly, the first candidate is patched and its skips are reported;
@@ -1516,7 +1641,7 @@ def pickup_snap(payload: dict | None, exists=None) -> dict:
             'verb': st.get('verb') or VERBS[0],
             'kind': st.get('prompt_kind') or 'hint',
             'text': st.get('text') or '',
-            'vision': [bool(s.get('vision')) for s in slots],
+            'vision': [slot_mode(s) for s in slots],  # t213 modes (key kept from t189)
             'clip': None,
         },
         'slot_on': slot_on,
@@ -1999,7 +2124,7 @@ class RefdefTab:
                 value=st['view'] if st and enh else None,
                 visible=enh,
             ),
-            [bool(s.get('vision')) for s in slots],
+            [slot_mode(s) for s in slots],
         ]
 
     def _commit(
@@ -2080,7 +2205,7 @@ class RefdefTab:
             'verb': verb,
             'kind': kind,
             'text': text or '',
-            'vision': [bool(v) for v in (vision or [False] * N_SLOTS)],  # t189 D4
+            'vision': norm_modes(vision),  # t213 modes (t189 bools load as vision / open)
         }
 
     @staticmethod
@@ -2101,8 +2226,14 @@ class RefdefTab:
         idx = snap.get('idx') or 0
         slot_vals: list[Any] = []
         pad = [''] * N_SLOTS  # saves from before a slot-count change
+        refs = (list(snap['refs']) + pad)[:N_SLOTS]
+        verb, modes = migrate_verb(  # t213: ref-novis saves → ref + pixel slots
+            snap.get('verb'),
+            norm_modes(snap.get('vision')),
+            [self.resolve_ref(r)[0] if r else None for r in refs],
+        )
         for ref, role in zip(
-            (list(snap['refs']) + pad)[:N_SLOTS],
+            refs,
             (list(snap['roles']) + pad)[:N_SLOTS],
             strict=True,
         ):
@@ -2115,7 +2246,7 @@ class RefdefTab:
             raw,
             *slot_vals,
             gr.update(value=snap.get('kind') or 'hint', interactive=not enh),
-            snap.get('verb') or VERBS[0],
+            verb if verb in VERBS else VERBS[0],
             gr.update(value=snap.get('text') or '', interactive=not enh),
             self._source_md(st, idx),
             self._entry_md(st, idx),
@@ -2124,7 +2255,7 @@ class RefdefTab:
                 value=st['view'] if enh else None,
                 visible=enh,
             ),
-            [bool(v) for v in (list(snap.get('vision') or []) + [False] * N_SLOTS)[:N_SLOTS]],
+            modes,
         ]
 
     def _col(self):
@@ -2498,17 +2629,16 @@ class RefdefTab:
         self,
         refs_roles: list[str],
         mask_on: list[bool] | None = None,
-        vision: list[bool] | None = None,
+        vision: list[str] | None = None,
     ) -> list[dict]:
         on = mask_on or [True] * N_SLOTS
-        vis = vision or [False] * N_SLOTS
+        vis = norm_modes(vision)
         slots = []
         for i in range(N_SLOTS):
             url, id_img = self.resolve_ref(refs_roles[2 * i])
             role = strip_role_comments(refs_roles[2 * i + 1])
             slot: dict[str, Any] = {'url': url, 'id': id_img, 'role': role}
-            if vis[i]:
-                slot['vision'] = True
+            slot.update(mode_flags(vis[i]))
             if not on[i]:
                 slot['mask_off'] = True
             elif hit := mask_object(url):
@@ -2524,7 +2654,7 @@ class RefdefTab:
         auto: bool,
         text: str,
         mask_on: list[bool],
-        vision: list[bool],
+        vision: list[str],
         carry: dict | None,
         *refs_roles,
         tab: dict | None = None,
@@ -2546,10 +2676,10 @@ class RefdefTab:
             return f'deployed enhancer data ({what}){note}'
         if miss := missing_roles(slots, verb):
             where = ', '.join(str(n) for n in miss)
-            gr.Warning(f'{verb}: slot {where} needs media + a role', duration=1)
+            gr.Warning(f'{verb}: pixel-only slot {where} needs a role', duration=1)
             return (
-                f'NOT deployed: `{verb}` builds the prompt from roles only — '
-                f'slot {where} needs media + a role'
+                f'NOT deployed: `{verb}` slot {where} is pixel only — nobody looks at it, '
+                'so it needs a role'
             )
         origin = None
         if state and state['kind'] == 'refdef':
@@ -2615,6 +2745,8 @@ class RefdefTab:
             msg += ' · auto'
         if vis := vision_slots(slots, verb):
             msg += f' · 👁 vision: slot {", ".join(map(str, vis))}'
+        if pix := pixel_only_slots(slots, verb):
+            msg += f' · pixel only: slot {", ".join(map(str, pix))}'
         if vis_off := vision_ignored(slots, verb):
             msg += f' · vision ignored: slot {", ".join(map(str, vis_off))}'
         note = trigger_enhancer() if auto else 'auto-trigger off'
@@ -2916,7 +3048,7 @@ class RefdefTab:
             mask_on = gr.State([True] * N_SLOTS)  # per-slot masking switch (🟥/⬜)
             slot_on = gr.State([True] * N_SLOTS)  # per-slot enable switch (✅/🚫)
             slot_tgls = []
-            vision = gr.State([False] * N_SLOTS)  # per-slot pixel / vision switch (🖼/👁)
+            vision = gr.State([MODE_OPEN] * N_SLOTS)  # per-slot media use (t213 modes)
             vis_tgls = []
             # slot 1 (the main ref) gets its own row, the rest SLOTS_PER_ROW per row;
             # per slot: image, button row, role row
@@ -3086,30 +3218,31 @@ class RefdefTab:
             # … and refreshes the 🖼/👁 buttons from the (loaded) vision switches
             on_outs = [mask_on, *mask_tgls, slot_on, *slot_tgls, *imgs, *vis_tgls]
 
-            def vis_btn(i, on, vb):  # 🖼/👁 button of slot i; locked slots stay 🖼 (t189 D2)
-                locked = vision_locked(i, vb)
-                eye = bool(on) and not locked
+            def vis_btn(i, mode, vb):  # media-use button of slot i (t213 open/pixel/vision)
+                m = shown_mode(mode, i, vb)  # a mode the verb locks out shows as open
+                cls = {MODE_PIXEL: ['refdef-vis-pix'], MODE_VISION: ['refdef-vis-on']}
                 return gr.update(
-                    value=VIS_ICON_VISION if eye else VIS_ICON_PIXEL,
-                    interactive=not locked,
-                    elem_classes=['refdef-vis', 'refdef-vis-on'] if eye else ['refdef-vis'],
+                    value=VIS_ICON[m],
+                    interactive=len(mode_cycle(i, vb)) > 1,
+                    elem_classes=['refdef-vis', *cls.get(m, [])],
                 )
 
             def vis_btns(vis, vb):
-                return [vis_btn(i, v, vb) for i, v in enumerate(vis or [False] * N_SLOTS)]
+                return [vis_btn(i, v, vb) for i, v in enumerate(norm_modes(vis))]
 
-            def vis_toggle(i, vis, ref, vb):
-                vis = list(vis)
-                if not vis[i] and media_kind(self.resolve_ref(ref)[0] if ref else None) == 'audio':
-                    gr.Info('👁 vision: images / videos only', duration=0.5)
+            def vis_toggle(i, vis, ref, vb):  # cycle open → pixel → vision (locked: no vision)
+                vis = norm_modes(vis)
+                if media_kind(self.resolve_ref(ref)[0] if ref else None) == 'audio':
+                    gr.Info('media use: images / videos only', duration=0.5)
+                    vis[i] = MODE_OPEN
                 else:
-                    vis[i] = not vis[i]
+                    vis[i] = next_mode(vis[i], i, vb)
                 return vis, vis_btn(i, vis[i], vb)
 
-            def vis_reset(i, vis, vb):  # new slot content → 🖼
-                vis = list(vis)
-                vis[i] = False
-                return vis, vis_btn(i, False, vb)
+            def vis_reset(i, vis, vb):  # new slot content → open
+                vis = norm_modes(vis)
+                vis[i] = MODE_OPEN
+                return vis, vis_btn(i, MODE_OPEN, vb)
 
             def slot_vis(on):  # (button, preview dimming) of one slot
                 return (
@@ -3336,12 +3469,25 @@ REFDEF_HEAD = r"""
 #refdef-cat-label { text-align: right; }
 .refdef-role-main textarea { overflow-y: auto !important; }
 .refdef-slot-off { opacity: 0.3; }
-/* 👁 vision slot (t189): a big eye over the preview, set by the 🖼/👁 button */
-.refdef-slot:has(.refdef-vis-on) [id^="refdef-img-"] { position: relative; }
-.refdef-slot:has(.refdef-vis-on) [id^="refdef-img-"]::after {
+/* 👁 vision slot (t189): a big eye over the preview, set by the media-use button */
+.refdef-slot:has(.refdef-vis-on) [id^="refdef-img-"],
+.refdef-slot:has(.refdef-vis-pix) [id^="refdef-img-"] { position: relative; }
+.refdef-slot:has(.refdef-vis-on) [id^="refdef-img-"]::after,
+.refdef-slot:has(.refdef-vis-pix) [id^="refdef-img-"]::after {
   content: '\1F441\FE0F'; position: absolute; inset: 0; display: flex; align-items: center;
   justify-content: center; font-size: 110px; opacity: 0.6; pointer-events: none;
   z-index: 20; text-shadow: 0 0 12px #000; }
+/* pixel only (t213): the eye disabled — grey + struck through, on button and preview */
+.refdef-vis-pix { position: relative; filter: grayscale(1); opacity: 0.55; }
+.refdef-vis-pix::before {
+  content: ''; position: absolute; left: 20%; right: 20%; top: 50%; z-index: 1;
+  border-top: 2px solid #e53935; transform: rotate(-35deg); pointer-events: none; }
+.refdef-slot:has(.refdef-vis-pix) [id^="refdef-img-"]::after {
+  filter: grayscale(1); opacity: 0.45; }
+.refdef-slot:has(.refdef-vis-pix) [id^="refdef-img-"]::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 150px; margin-left: -75px;
+  z-index: 21; border-top: 6px solid #e53935; transform: rotate(-35deg);
+  opacity: 0.8; pointer-events: none; }
 #refdef-deploy:hover { background: #388e3c !important; }
 /* t207: deploy / pull / pickup / update / reset stay at a fixed screen place (top left,
    stacked), below the mask editor */
