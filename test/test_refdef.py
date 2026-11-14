@@ -1580,3 +1580,48 @@ def test_hand_mask_shapes(tmp_path, monkeypatch):
     ell[15:18, 2:18] = True
     h = rd.convex_hull_mask(ell)
     assert (h | ell == h).all() and h[10, 8] and not h[3, 16]
+
+
+def test_auto_flag_only_when_on():
+    """FEATURE t211: refdef.v1 carries ``auto: true`` only with the auto toggle on;
+    the deploy-history doc records it the same way."""
+    from aidb.app.tab_refdef import AUTO_KEY, deploy_doc, refdef_payload
+
+    slots = [{'url': '/x/a.png', 'id': None, 'role': 'r'}]
+    off = refdef_payload(slots, 'ref-img', 'hint', '', None)
+    on = refdef_payload(slots, 'ref-img', 'hint', '', None, auto=True)
+    assert AUTO_KEY not in off and on[AUTO_KEY] is True
+    assert {k: v for k, v in on.items() if k != AUTO_KEY} == off
+    snap = {'state': None, 'verb': 'ref-img'}
+    assert AUTO_KEY not in deploy_doc(snap, [], [], 'x')
+    assert deploy_doc(snap, [], [], 'x', True)[AUTO_KEY] is True
+
+
+def test_qfix_auto_sends_launch_prompt(tmp_path, monkeypatch):
+    """FEATURE t211: inp-qfix + auto → launch-only prompt to the enhancer after the
+    clipspace write; never on a failed deploy, never with auto off."""
+    from aidb.app import tab_refdef
+
+    clip, sent, toasts = {}, [], []
+    monkeypatch.setattr(tab_refdef, 'clip_copy', lambda t: clip.update(v=t))
+    monkeypatch.setattr(tab_refdef.pyperclip, 'paste', lambda: clip.get('v'))
+    for kind in ('Success', 'Error', 'Warning'):
+        monkeypatch.setattr(tab_refdef.gr, kind, lambda m, duration=None, k=kind: toasts.append(k))
+
+    def trigger(cmd):
+        sent.append(cmd)
+        return f'{cmd} sent to enhancer'
+
+    monkeypatch.setattr(tab_refdef, 'trigger_enhancer', trigger)
+    deploy = tab_refdef.RefdefTab._deploy_qfix
+    a = _png(tmp_path / 'a.png')
+    slots = [dict(_slot(a), role='fix it'), _slot(a)]
+    assert deploy(slots, '', None).endswith('no enhancer trigger') and sent == []
+    msg = deploy(slots, '', None, None, True)
+    assert sent == ['/refdef auto inp-qfix'] and 'auto: /refdef auto inp-qfix sent' in msg
+    assert tab_refdef.AUTO_KEY not in json.loads(clip['v'])
+    monkeypatch.setattr(tab_refdef, 'trigger_enhancer', lambda cmd: 'enhancer working — NOT sent')
+    assert 'NOT sent' in deploy(slots, '', None, None, True) and toasts[-1] == 'Warning'
+    monkeypatch.setattr(tab_refdef.pyperclip, 'paste', lambda: 'stale')
+    sent.clear()
+    assert deploy(slots, '', None, None, True).startswith('NOT deployed') and sent == []

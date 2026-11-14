@@ -55,6 +55,12 @@ What deploy writes depends on the tab's mode:
     (``<Picture i>``, board task 159); like ``enh``: slot 1 required, stills. With
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
     session ``xlasm`` with ``/refdef`` — only when it is idle.
+    ``auto`` (fixed top-left toggle, off on every app start; FEATURE t211): the
+    instruction carries ``auto: true`` (key absent = off) and the enhancer queues the
+    ComfyUI workflow for the verb right after its own deploy — which workflow is the
+    enhancer's knowledge, the tab sends only the flag. inp-qfix (no enhancer run)
+    sends the launch-only prompt ``LAUNCH_CMD`` instead. No effect on an
+    enhancer-data deploy; a history entry / pickup never switches it on.
 
 H3 ref budget (``H3_VERBS`` = ref / ref-novis / pre-vid / post-vid, FEATURE t181):
 at most 6 pictures, 2 clips, 2 audio files and 12 refs in total (a clip with
@@ -288,6 +294,9 @@ HERDR_SESSION: Final = 'xlasm'
 HERDR_AGENT: Final = 'xlasmos'  # 1xlasm-enhancer's herdr agent name
 TRIGGER_CMD: Final = '/refdef'
 HERDR_READY: Final = ('idle', 'done')
+# FEATURE t211: `auto` = the enhancer queues the workflow for the verb after its deploy
+AUTO_KEY: Final = 'auto'  # refdef.v1 top-level, only present (true) when on
+LAUNCH_CMD: Final = '/refdef auto {verb}'  # launch-only prompt (scripted verbs: inp-qfix)
 HERDR_TIMEOUT_S: Final = 10
 SAVES_COLLECTION: Final = 'refdef_saves'  # 💾 save history (see build)
 # ⇪ deploy history (FEATURE t206): every successful ⇪ deploy (not ⇄ update)
@@ -1249,8 +1258,10 @@ def refdef_payload(
     origin_scene_id: str | None = None,
     inherit: list[dict] | None = None,
     tab: dict | None = None,
+    auto: bool = False,
 ) -> dict:
-    """The instruction payload the enhancer builds its enhancer data from. ``tab``
+    """The instruction payload the enhancer builds its enhancer data from. ``auto``
+    (t211) = the enhancer queues the verb's workflow after its deploy. ``tab``
     (``tab_block``) = tab-only switches, carried for pickup (t205), ignored downstream. A
     slot's ``mask`` (a mask.v1 object, see ``mask_object``) becomes the ref's
     ``mask``. ``inherit`` (pre-/post-vid only): the anchor's carried refs with
@@ -1288,6 +1299,8 @@ def refdef_payload(
             payload['inherit'] = inherit
     if tab:
         payload[TAB_KEY] = tab
+    if auto:
+        payload[AUTO_KEY] = True
     return payload
 
 
@@ -1505,7 +1518,7 @@ def ring_overflow(ids: list, cap: int) -> list:
     return list(ids[: max(0, len(ids) - max(0, cap))])
 
 
-def deploy_doc(snap: dict, slot_on, mask_on, deployed: str | None) -> dict:
+def deploy_doc(snap: dict, slot_on, mask_on, deployed: str | None, auto: bool = False) -> dict:
     """Deploy-history doc: the 💾 save shape (``snap_to_doc``) + the ✅/🚫 and 🟥/⬜
     switches as deployed + the deployed clipspace text (record only — never
     written back: a re-played instruction would re-trigger the enhancer)."""
@@ -1514,6 +1527,7 @@ def deploy_doc(snap: dict, slot_on, mask_on, deployed: str | None) -> dict:
         'slot_on': [bool(v) for v in (list(slot_on or []) + [True] * N_SLOTS)[:N_SLOTS]],
         'mask_on': [bool(v) for v in (list(mask_on or []) + [True] * N_SLOTS)[:N_SLOTS]],
         'deployed': deployed or '',
+        **({AUTO_KEY: True} if auto else {}),  # t211: record only, never loaded
     }
 
 
@@ -1674,8 +1688,8 @@ def _herdr(*args: str) -> dict:
         raise RuntimeError(f'herdr: bad json: {res.stdout[:200]}') from e
 
 
-def trigger_enhancer() -> str:
-    """Send TRIGGER_CMD to the enhancer agent if it is ready for input.
+def trigger_enhancer(cmd: str = TRIGGER_CMD) -> str:
+    """Send ``cmd`` (default TRIGGER_CMD) to the enhancer agent if it is ready for input.
 
     Never types into a working/blocked agent. Fire-and-forget: does not wait
     for the enhancer to finish. Returns a short status note.
@@ -1686,12 +1700,12 @@ def trigger_enhancer() -> str:
         return f'enhancer not reachable ({e})'
     status = agent.get('agent_status')
     if status not in HERDR_READY:
-        return f'enhancer {status or "unknown"} — {TRIGGER_CMD} NOT sent'
+        return f'enhancer {status or "unknown"} — {cmd} NOT sent'
     try:
-        _herdr('agent', 'prompt', HERDR_AGENT, TRIGGER_CMD)
+        _herdr('agent', 'prompt', HERDR_AGENT, cmd)
     except RuntimeError as e:
-        return f'{TRIGGER_CMD} failed ({e})'
-    return f'{TRIGGER_CMD} sent to enhancer'
+        return f'{cmd} failed ({e})'
+    return f'{cmd} sent to enhancer'
 
 
 # ---------------------------------------------------------------------- #
@@ -2380,7 +2394,7 @@ class RefdefTab:
         col = self._dcol()
         if col is None:
             return []
-        proj = {'_id': 1, 'ts': 1, 'verb': 1, 'mode': 1}
+        proj = {'_id': 1, 'ts': 1, 'verb': 1, 'mode': 1, AUTO_KEY: 1}
         return list(col.find({}, proj).sort([('ts', 1), ('_id', 1)]))
 
     @classmethod
@@ -2390,9 +2404,12 @@ class RefdefTab:
             return f'⇪ {n}/{DEPLOYS_MAX}'
         d = deploys[dpos]
         what = d.get('verb') if d.get('mode') == 'instruction' else 'enh data'
-        return f'**⇪ {dpos + 1}/{n}** · {cls._ts_str(d.get("ts"))} · `{what}`'
+        run = ' · auto' if d.get(AUTO_KEY) else ''
+        return f'**⇪ {dpos + 1}/{n}** · {cls._ts_str(d.get("ts"))} · `{what}`{run}'
 
-    def _record_deploy(self, res: str, slot_on, mask_on, snap_args: tuple) -> None:
+    def _record_deploy(
+        self, res: str, slot_on, mask_on, snap_args: tuple, auto: bool = False
+    ) -> None:
         """After ``_on_deploy``: a successful deploy joins the ring buffer. Never
         raises — the deploy itself already happened."""
         if res.startswith(DEPLOY_FAIL):
@@ -2403,7 +2420,9 @@ class RefdefTab:
                 return
             deployed = pyperclip.paste()
             snap = dict(self._snap(*snap_args), clip=enh_clip(deployed))
-            record_deploy(col, deploy_doc(snap, slot_on, mask_on, deployed))
+            # auto has no effect on an enhancer-data deploy → not recorded there
+            auto = auto and not self._is_enh(snap_args[0])
+            record_deploy(col, deploy_doc(snap, slot_on, mask_on, deployed, auto))
         except Exception as exc:  # noqa: BLE001
             print(f'[refdef_tab:error] deploy history: {exc}')
 
@@ -2476,7 +2495,10 @@ class RefdefTab:
         carry: dict | None,
         *refs_roles,
         tab: dict | None = None,
+        run: bool = False,
     ):
+        """``auto`` = the *auto trigger enhancer* checkbox (types ``/refdef``);
+        ``run`` = the ``auto`` toggle (t211: the enhancer queues the verb's workflow)."""
         slots = self._slots_from_ui(list(refs_roles), mask_on, vision)
         if self._is_enh(state):
             refs = [refs_roles[2 * i] for i in range(N_SLOTS)]
@@ -2546,16 +2568,18 @@ class RefdefTab:
         ):
             return refused(probs)
         if verb in QFIX_VERBS:  # scripted enhancer data, no enhancer (FEATURE 180)
-            res = self._deploy_qfix(slots, text, origin, tab)
+            res = self._deploy_qfix(slots, text, origin, tab, run)
             if vis_off := vision_ignored(slots, verb):  # scripted: nobody looks (t189)
                 res += f' · vision ignored: slot {", ".join(map(str, vis_off))}'
             return res
         if master is not None and anchor_note.startswith(' · anchor →'):
             gr.Info(f'{verb}: anchor → {master.name}', duration=QFIX_TOAST_WARN_S)
-        payload = refdef_payload(slots, verb, kind, text, origin, inherit, tab)
+        payload = refdef_payload(slots, verb, kind, text, origin, inherit, tab, run)
         clip_copy(json.dumps(payload, ensure_ascii=False))
         n = sum(1 for s in slots if s['url'])
         msg = f'deployed instruction `{verb}` ({n}/{N_SLOTS} slots, kind={kind}){anchor_note}'
+        if run:
+            msg += ' · auto'
         if vis := vision_slots(slots, verb):
             msg += f' · 👁 vision: slot {", ".join(map(str, vis))}'
         if vis_off := vision_ignored(slots, verb):
@@ -2570,10 +2594,15 @@ class RefdefTab:
 
     @staticmethod
     def _deploy_qfix(
-        slots: list[dict], text: str, origin: str | None, tab: dict | None = None
+        slots: list[dict],
+        text: str,
+        origin: str | None,
+        tab: dict | None = None,
+        run: bool = False,
     ) -> str:
         """inp-qfix deploy: script the enhancer data onto the clipspace and read it
-        back; success toast 0.5 s, any failure an error toast 2 s (FEATURE 180)."""
+        back; success toast 0.5 s, any failure an error toast 2 s (FEATURE 180).
+        ``run`` (t211 auto): then ask the enhancer to queue the workflow (``LAUNCH_CMD``)."""
         try:
             qp = qfix_payload(slots, text, origin, tab)
             out = json.dumps(qp, ensure_ascii=False)
@@ -2586,9 +2615,17 @@ class RefdefTab:
             return f'NOT deployed: `inp-qfix` — {exc}'
         e = qp['prompts_inp']['prompt_data'][0]
         msg = f'inp-qfix deployed: {e["mode"]}, {len(e.get("refs") or [])} refs'
-        gr.Success(msg, duration=QFIX_TOAST_OK_S)
-        print(f'[refdef_tab:info] deploy {msg}')
-        return f'{msg} · no enhancer trigger'
+        if not run:
+            gr.Success(msg, duration=QFIX_TOAST_OK_S)
+            print(f'[refdef_tab:info] deploy {msg}')
+            return f'{msg} · no enhancer trigger'
+        note = trigger_enhancer(LAUNCH_CMD.format(verb=QFIX_VERBS[0]))
+        ok = note.endswith('sent to enhancer')
+        (gr.Success if ok else gr.Warning)(
+            f'{msg} · auto: {note}', duration=QFIX_TOAST_OK_S if ok else QFIX_TOAST_WARN_S
+        )
+        print(f'[refdef_tab:info] deploy {msg} · auto: {note}')
+        return f'{msg} · auto: {note}'
 
     def _on_carry(self, url: str | None, *others: str | None, pending: list | None = None):
         """Slot 1 changed → its carried refs panel: header, one cell per ref
@@ -2778,7 +2815,7 @@ class RefdefTab:
             # inherit switches of a picked-up config, applied by the carry panel (t205)
             pend = gr.State(None)
 
-            # all five are fixed top-left (REFDEF_HEAD); the row itself takes no space
+            # all six are fixed top-left (REFDEF_HEAD); the row itself takes no space
             with gr.Row(elem_id='refdef-actions'):
                 pull_btn = gr.Button('⟲ pull', variant='primary', elem_id='refdef-pull', scale=1)
                 pickup_btn = gr.Button(
@@ -2787,6 +2824,15 @@ class RefdefTab:
                 deploy_btn = gr.Button('⇪ deploy', elem_id='refdef-deploy', scale=1)
                 update_btn = gr.Button('⇄ update', elem_id='refdef-update', scale=1)
                 reset_btn = gr.Button('✕ reset', elem_id='refdef-reset', scale=0, min_width=80)
+                # t211: grey = off, green = on; off on every page load
+                run_btn = gr.Button('auto', elem_id='refdef-auto', scale=0, min_width=80)
+            run = gr.State(False)
+            run_btn.click(
+                lambda on: (not on, gr.update(variant='secondary' if on else 'primary')),
+                [run],
+                [run, run_btn],
+                show_progress='hidden',
+            )
             with gr.Row():
                 verb = gr.Radio(
                     list(VERBS),
@@ -3203,7 +3249,7 @@ class RefdefTab:
                     [carry, ctgl, carry_imgs[j]],
                 )
 
-            def deploy(st, ix, v, k, a, t, m, so, vi, c, h, *rr):
+            def deploy(st, ix, v, k, a, ru, t, m, so, vi, c, h, *rr):
                 res = self._on_deploy(
                     st,
                     v,
@@ -3215,9 +3261,10 @@ class RefdefTab:
                     c,
                     *disable_slots(list(rr), so),
                     tab=self._tab_block(list(rr), so, m),
+                    run=bool(ru),
                 )
                 # history keeps the slots as shown (disabled ones incl.) + the switches
-                self._record_deploy(res, so, m, (st, ix, v, k, t, vi, *rr))
+                self._record_deploy(res, so, m, (st, ix, v, k, t, vi, *rr), bool(ru))
                 # a successful deploy makes the shown config the current one
                 return res, h if res.startswith(DEPLOY_FAIL) else cur_hist
 
@@ -3229,6 +3276,7 @@ class RefdefTab:
                     verb,
                     kind,
                     auto,
+                    run,
                     text,
                     mask_on,
                     slot_on,
@@ -3262,7 +3310,7 @@ REFDEF_HEAD = r"""
 #refdef-deploy:hover { background: #388e3c !important; }
 /* t207: deploy / pull / pickup / update / reset stay at a fixed screen place (top left,
    stacked), below the mask editor */
-#refdef-deploy, #refdef-pull, #refdef-pickup, #refdef-update, #refdef-reset {
+#refdef-deploy, #refdef-pull, #refdef-pickup, #refdef-update, #refdef-reset, #refdef-auto {
   position: fixed !important; left: 8px; z-index: 900; height: 40px;
   width: 110px !important; min-width: 110px !important; max-width: 110px !important;
   flex: none !important; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
@@ -3272,6 +3320,11 @@ REFDEF_HEAD = r"""
 #refdef-pickup { top: 104px; }
 #refdef-update { top: 152px; }
 #refdef-reset { top: 200px; }
+#refdef-auto { top: 248px; }
+/* t211: auto toggle — grey = off, green = on (variant primary) */
+#refdef-auto { background: #616161 !important; border-color: #616161 !important;
+  color: #fff !important; }
+#refdef-auto.primary { background: #388e3c !important; border-color: #388e3c !important; }
 #refdef-pickup { background: #f9c513 !important; border-color: #f9c513 !important;
   color: #000 !important; }
 #refdef-pickup:hover { background: #ffd84d !important; }
