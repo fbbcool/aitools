@@ -50,6 +50,11 @@ What deploy writes depends on the tab's mode:
     🖼 pixel stills anywhere in the slots (+ uncapped 👁 slots), roles optional; the
     verb picks the engine of the ``prompts_img`` entry the enhancer writes — qwen21
     (``ref-img``, t187) or MiniMax H3 Image (``ref-img-h3``, t204). No size control here.
+    ``mmh3-img-cswap`` = MiniMax H3 Image character swap (``SWAP_VERBS``, FEATURE t216):
+    slot 1 = scene + 🎭 mask of the person to replace, slot 2 = character (mask
+    optional, t198 crop), both stills; slot 1 without a mask needs a role or hint
+    text naming the target (``cswap_problems``); empty roles deploy as
+    ``CSWAP_DEFAULT_ROLES``. Routing to the ``prompts_img`` entry is the enhancer's.
     ``ref`` = the slots are MiniMax H3 ref2va picture references
     (``<Picture i>``, board task 159); like ``enh``: slot 1 required, stills. With
     *auto-trigger* on, deploy then prompts the ``enhancer`` agent in herdr
@@ -104,7 +109,7 @@ the enhancer may look (no verb-level novis any more):
     ref budget; its 🎭 mask ships as where to look (t195). ``use: "vision"``.
 
 Locked modes skip in the cycle (the button is greyed when only open is left):
-no vision where pixels must ship — ``img-fsw-novis`` slots 1 + 2, slot 1 of
+no vision where pixels must ship — swap verbs slots 1 + 2, slot 1 of
 pre-/post-vid, inp-mask, inp-nomask, pickup; no pixel only where the enhancer
 has to look — slot 1 of enh / replicate / pickup / pre-/post-vid / inp-mask,
 every sketch slot (``pixel_locked``). Audio has no modes. Open + pixel count in
@@ -200,6 +205,7 @@ from ait.tools.videos import (
 )
 from ait.tools.videos import metadata as vid_metadata
 from ait.tools.images import metadata as img_metadata
+from ait.tools.role import descr as role_descr, role as file_role
 from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
@@ -225,6 +231,7 @@ VERBS: Final = (
     'inp-qfix',
     'ref-img',
     'ref-img-h3',
+    'mmh3-img-cswap',
 )
 # H3 clip-chain continuations (board task 172): slot 1 = the anchor clip
 # (FbbcoolSaveVideo master, video only), the other slots optional NEW refs
@@ -251,13 +258,27 @@ PIN_CONFLICT: Final = {
 # target (body / pose / light / bg = <image1>), slot 2 = reference head (<image2>), both
 # stills, nothing else. The enhancer writes a ``head_swap:`` prompt_qwen21 into
 # prompts_inp without vision — from the roles (optional) + hint alone.
-SWAP_VERBS: Final = ('img-fsw-novis',)
+# ``mmh3-img-cswap`` (FEATURE t216, agent-comfy workflows/mmh3-img-cswap.json) = MiniMax
+# H3 Image character swap, same 2-still slot rules: slot 1 = scene (<Picture 1>) + 🎭
+# mask of the person to replace, slot 2 = character (<Picture 2>, mask optional).
+SWAP_VERBS: Final = ('img-fsw-novis', 'mmh3-img-cswap')
+CSWAP_VERBS: Final = ('mmh3-img-cswap',)
 # empty swap roles = the default swap semantics (slot 1 head/face replaced by slot 2's),
 # written into the instruction so the enhancer never sees a blank role
 SWAP_DEFAULT_ROLES: Final = (
     'target: keep body, pose, outfit, light and background; its head/face gets replaced',
     'reference head: the head/face that replaces the head/face of slot 1',
 )
+CSWAP_DEFAULT_ROLES: Final = (
+    'scene: the masked person (else the one named in the hint) gets replaced; '
+    'everything else stays unchanged',
+    'character: replaces the target, keeps face, hair, identity and outfit',
+)
+SWAP_ROLES: Final = {'img-fsw-novis': SWAP_DEFAULT_ROLES, 'mmh3-img-cswap': CSWAP_DEFAULT_ROLES}
+SWAP_SLOT_NAMES: Final = {
+    'img-fsw-novis': ('target', 'reference head'),
+    'mmh3-img-cswap': ('scene', 'character'),
+}
 # qwen21 reference-to-image (FEATURE t187, agent-comfy workflows/qwen21-ref.json):
 # was novis; since t213 the slot modes decide whether the enhancer looks (open default).
 # 1-5 🖼 pixel still refs anywhere in slots 1-10 (t194; image 1..N compacted in slot order;
@@ -924,12 +945,25 @@ def swap_problems(slots: list[dict], verb: str) -> list[str]:
     slots = (list(slots) + empty_slots())[:N_SLOTS]
     probs = [
         f'slot {i + 1} needs the {what} (image)'
-        for i, what in enumerate(('target', 'reference head'))
+        for i, what in enumerate(SWAP_SLOT_NAMES[verb])
         if media_kind(slots[i].get('url')) != 'image'
     ]
     if extra := [str(i + 1) for i, s in enumerate(slots[2:], 2) if s.get('url')]:
         probs.append(f'slot {", ".join(extra)} must be empty (2 images only)')
     return probs
+
+
+def cswap_problems(slots: list[dict], verb: str, text: str | None = '') -> list[str]:
+    """Why a character-swap instruction can't deploy (t216): without a 🎭 mask on
+    slot 1 the target must be named — by slot 1's own role or the hint text."""
+    if verb not in CSWAP_VERBS:
+        return []
+    s1 = ((list(slots) + empty_slots())[:1])[0]
+    if not s1.get('url') or s1.get('mask'):
+        return []  # missing scene: swap_problems' refusal
+    if (s1.get('role') or '').strip() or (text or '').strip():
+        return []
+    return ['slot 1 needs a 🎭 mask on the person to replace, or a role / hint naming them']
 
 
 def img_ref_problems(slots: list[dict], verb: str) -> list[str]:
@@ -1339,8 +1373,8 @@ def _instruction_role(slot: dict, i: int, verb: str) -> str:
     """A slot's role as deployed: stripped; an empty swap-verb role (slot 1 / 2)
     falls back to ``SWAP_DEFAULT_ROLES``."""
     role = (slot.get('role') or '').strip()
-    if not role and verb in SWAP_VERBS and i < len(SWAP_DEFAULT_ROLES) and slot.get('url'):
-        return SWAP_DEFAULT_ROLES[i]
+    if not role and verb in SWAP_VERBS and i < len(SWAP_ROLES[verb]) and slot.get('url'):
+        return SWAP_ROLES[verb][i]
     return role
 
 
@@ -1953,13 +1987,23 @@ class RefdefTab:
                 return url, id_img
         return None
 
-    def _on_slot_pull(self):
+    @classmethod
+    def _pulled_role(cls, state: dict | None, url: str, keep: bool = False) -> Any:
+        """Slot role after a pull: enhancer mode keeps the (payload-owned) role;
+        instruction mode takes the file's embedded role descr (t215). Without
+        one: blank (tab pull) or untouched (`keep`, slot pull) as before t215."""
+        if cls._is_enh(state):
+            return gr.update()
+        d = role_descr(file_role(url))
+        return d if d or not keep else gr.update()
+
+    def _on_slot_pull(self, state: dict | None = None):
         hit = self.first_image_from_clipspace(pyperclip.paste())
         if hit is None:
             gr.Info('nothing usable to pull', duration=0.5)
-            return gr.update(), gr.update()
+            return gr.update(), gr.update(), gr.update()
         url, id_img = hit
-        return self._preview(url), id_img or url
+        return self._preview(url), id_img or url, self._pulled_role(state, url, keep=True)
 
     @staticmethod
     def _preview(
@@ -2175,8 +2219,7 @@ class RefdefTab:
         if not slots:
             return [gr.update()] * n_out
         for i, (url, id_img) in zip(slots, imgs, strict=False):
-            # enhancer mode keeps the (payload-owned) role; instruction mode starts blank
-            role = gr.update() if self._is_enh(state) else ''
+            role = self._pulled_role(state, url)
             upd[3 * i : 3 * i + 3] = [self._preview(url), id_img or url, role]
         dropped = f' ({n_drop} dropped, no free slot)' if n_drop else ''
         placed = [url for _, (url, _id) in zip(slots, imgs, strict=False)]
@@ -2726,6 +2769,7 @@ class RefdefTab:
             pin_problems(slots, verb)
             or ref_budget_problems(slots, verb, inherit)
             or swap_problems(slots, verb)
+            or cswap_problems(slots, verb, text)
             or img_ref_problems(slots, verb)
             or qfix_problems(slots, verb)
         ):
@@ -2751,7 +2795,7 @@ class RefdefTab:
             msg += f' · vision ignored: slot {", ".join(map(str, vis_off))}'
         note = trigger_enhancer() if auto else 'auto-trigger off'
         if verb in SWAP_VERBS:  # deploy toast like inp-qfix
-            dflt = [r['slot'] for r in payload['refs'][:2] if r['role'] in SWAP_DEFAULT_ROLES]
+            dflt = [r['slot'] for r in payload['refs'][:2] if r['role'] in SWAP_ROLES[verb]]
             roles = f'default roles: slot {", ".join(map(str, dflt))}' if dflt else 'own roles'
             gr.Success(f'{verb} deployed: {roles} · {note}', duration=QFIX_TOAST_OK_S)
         print(f'[refdef_tab:info] deploy {verb}: {note}')
@@ -3350,7 +3394,7 @@ class RefdefTab:
                     lambda v, vb, i=i: vis_reset(i, v, vb), [vision, verb], [vision, vis_tgls[i]]
                 )
             for i, (img, ref, slot_pull) in enumerate(zip(imgs, refs, slot_pulls, strict=True)):
-                slot_pull.click(self._on_slot_pull, [], [img, ref]).then(
+                slot_pull.click(self._on_slot_pull, [state], [img, ref, roles[i]]).then(
                     lambda on, i=i: one_on(i, on), [mask_on], [mask_on, mask_tgls[i]]
                 ).then(
                     lambda on, i=i: slot_enable(i, on), [slot_on], [slot_on, slot_tgls[i], img]

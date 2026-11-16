@@ -63,7 +63,9 @@ def test_fixture_v1_shape():
         'generation',
         'loras',
         'seed',
+        'payload',
         'parent',
+        'role',
         'inherited',
     }
     assert md['url'] == str(FIXTURE_MKV)

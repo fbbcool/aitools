@@ -52,6 +52,9 @@ class AIDBSceneApp:
         from aidb.app.tab_refdef import RefdefTab
         self._refdef_tab = RefdefTab(self._dbc)
 
+        from aidb.app.tab_metadata import MetadataTab
+        self._metadata_tab = MetadataTab()
+
         self._interface = self._create_interface()
 
     # head HTML injected into the page <head> so the penis-mask annotator's
@@ -63,7 +66,8 @@ class AIDBSceneApp:
         from aidb.app.tab_review import REVIEW_HEAD
         from aidb.app.tab_hf_datasets import HF_DATASETS_HEAD
         from aidb.app.tab_refdef import REFDEF_HEAD
-        return PENIS_MASK_HEAD + REVIEW_HEAD + HF_DATASETS_HEAD + REFDEF_HEAD
+        from aidb.app.tab_metadata import METADATA_HEAD
+        return PENIS_MASK_HEAD + REVIEW_HEAD + HF_DATASETS_HEAD + REFDEF_HEAD + METADATA_HEAD
 
     def _create_interface(self):
         """
@@ -551,6 +555,10 @@ class AIDBSceneApp:
             # refdef tab: 3 ref slots + roles + prompt/hint; displays/edits the
             # enhancer clipspace payload and writes refdef.v1 (board task 150).
             self._refdef_tab.build()
+
+            # metadata tab (board task 214): pull a media path, show all embedded
+            # metadata readable, linked media as preview cards.
+            self._metadata_tab.build()
 
             # Link hidden triggers to functions
             button_hidden_cmd.click(

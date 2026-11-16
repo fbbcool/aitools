@@ -810,6 +810,56 @@ def test_img_fsw_novis_swap_problems():
     assert refdef_payload([tgt, head], 'ref', 'hint', '')['refs'][0]['role'] == ''
 
 
+def test_mmh3_img_cswap():
+    """FEATURE t216: H3 Image character swap — 2 stills, vision locked, default roles,
+    slot 1 without mask needs a role / hint naming the target, masks pass through."""
+    from aidb.app.tab_refdef import (
+        CSWAP_DEFAULT_ROLES,
+        QFIX_VERBS,
+        SWAP_VERBS,
+        VERB_VIEW,
+        VERBS,
+        cswap_problems,
+        mode_cycle,
+        swap_problems,
+        vision_locked,
+    )
+
+    v = 'mmh3-img-cswap'
+    assert v in VERBS and v in SWAP_VERBS and v not in VERB_VIEW and v not in QFIX_VERBS
+    mask = {'schema_id': '1xlasm_enhancer.mask.v1', 'type': 'raster', 'url': '/m.png'}
+    scene = {'url': '/scene.png', 'id': None, 'role': '', 'mask': mask}
+    char = {'url': '/char.png', 'id': None, 'role': ''}
+    assert swap_problems([scene, char], v) == [] and cswap_problems([scene, char], v) == []
+    assert swap_problems([scene], v) == ['slot 2 needs the character (image)']
+    vid = dict(scene, url='/clip.mp4')
+    assert swap_problems([vid, char], v) == ['slot 1 needs the scene (image)']
+    extra = [scene, char, dict(char, url='/x.png')]
+    assert swap_problems(extra, v) == ['slot 3 must be empty (2 images only)']
+    # no mask: the target must be named by slot 1's own role or the hint text
+    bare = {k: x for k, x in scene.items() if k != 'mask'}
+    assert cswap_problems([bare, char], v, '') == [
+        'slot 1 needs a 🎭 mask on the person to replace, or a role / hint naming them'
+    ]
+    assert cswap_problems([bare, char], v, 'the man in the purple shirt') == []
+    assert cswap_problems([dict(bare, role='the man left'), char], v, '') == []
+    assert cswap_problems([bare, char], 'img-fsw-novis', '') == []
+    assert cswap_problems([dict(bare, url=None), char], v, '') == []  # swap_problems' job
+    # vision locked on slots 1 + 2, free from slot 3 on
+    assert vision_locked(0, v) and vision_locked(1, v) and not vision_locked(2, v)
+    assert 'vision' not in mode_cycle(0, v) and 'vision' not in mode_cycle(1, v)
+    # payload: default roles for empty ones, own roles verbatim, both masks ship
+    char_m = dict(char, mask=dict(mask, url='/m2.png'))
+    p = refdef_payload([scene, char_m], v, 'hint', '')
+    assert p['verb'] == v
+    assert [r['role'] for r in p['refs'][:2]] == list(CSWAP_DEFAULT_ROLES)
+    assert p['refs'][0]['mask'] == mask and p['refs'][1]['mask']['url'] == '/m2.png'
+    assert [r['media'] for r in p['refs'][:2]] == ['image', 'image']
+    own = refdef_payload([dict(scene, role='the waiter'), char], v, 'hint', '')
+    assert [r['role'] for r in own['refs'][:2]] == ['the waiter', CSWAP_DEFAULT_ROLES[1]]
+    assert 'mask' not in own['refs'][1]
+
+
 def test_hand_mask_roundtrip(tmp_path, monkeypatch):
     import os
 

@@ -27,6 +27,12 @@ PAYLOAD_CHUNK: Final = 'payload_json'
 TRAINER_META_CHUNK: Final = '1xlasm_trainer'
 TRAINER_META_SCHEMA_PREFIX: Final = '1xlasm_datasetter.trainer.'
 
+# Media role (board FEATURE t215): what a media file is for, edited in the scene-app
+# metadata tab. PNG text chunk / video container tag `ait_role`, JSON
+# {'schema': ROLE_SCHEMA, 'descr': str, ...}; read/write API in `ait.tools.role`.
+ROLE_CHUNK: Final = 'ait_role'
+ROLE_SCHEMA: Final = 'ait.media.role.v1'
+
 
 def image_from_url(url: str | Path, verbose: bool = False) -> PILImage.Image | None:
     url = Path(url)
@@ -99,6 +105,8 @@ def metadata(url: Path | str) -> dict | None:
           'parent': dict | None,            # provenance envelope of the source
                                             # image this render was derived from
                                             # (`parent_metadata` chunk)
+          'role': dict | None,              # media role (`ait_role` chunk,
+                                            # t215): {'schema', 'descr', ...}
           'inherited': [str, ...],          # top-level fields recovered from
                                             # `parent` because the image's own
                                             # chunks didn't yield them; [] when
@@ -302,6 +310,7 @@ def _metadata_from_chunks(url: Path, info_ext: dict, width: int, height: int) ->
         'loras': loras,
         'seed': seed,
         'parent': parent,
+        'role': role_from_raw(info_ext.get(ROLE_CHUNK)),
         'inherited': inherited,
     }
 
@@ -333,6 +342,14 @@ def _iteration_payload_from_obj(obj, depth: int = 6) -> dict | None:
         except (ValueError, TypeError):
             return None
     return None
+
+
+def role_from_raw(raw) -> dict | None:
+    """Parsed `ait_role` chunk/tag: a dict with a str `descr`, else None."""
+    role = _parse_json_chunk(raw)
+    if not role or not isinstance(role.get('descr'), str):
+        return None
+    return role
 
 
 def _parse_json_chunk(chunk) -> dict | None:
@@ -1024,11 +1041,12 @@ def _embedding_payload_parse(raw, model: str):
     return v / norm
 
 
-def _png_text_chunk_upsert(url: Path, key: str, text: str) -> bool:
+def _png_text_chunk_upsert(url: Path, key: str, text: str | None) -> bool:
     """Insert/replace one tEXt chunk in a PNG *without re-encoding*: IDAT and
     every other chunk (prompt graph, workflow, parent_metadata provenance)
-    stay byte-identical; a stale chunk under the same key is replaced. Atomic
-    via temp file + rename. Returns False (no write) on any non-PNG input."""
+    stay byte-identical; a stale text chunk (tEXt/iTXt/zTXt) under the same
+    key is replaced. `text=None` only removes it. Atomic via temp file +
+    rename. Returns False (no write) on any non-PNG input."""
     import struct
     import zlib
 
@@ -1040,13 +1058,15 @@ def _png_text_chunk_upsert(url: Path, key: str, text: str) -> bool:
         return False
 
     keyb = key.encode('latin-1')
-    data = keyb + b'\x00' + text.encode('latin-1')
-    new_chunk = (
-        struct.pack('>I', len(data))
-        + b'tEXt'
-        + data
-        + struct.pack('>I', zlib.crc32(b'tEXt' + data))
-    )
+    new_chunk = b''
+    if text is not None:
+        data = keyb + b'\x00' + text.encode('latin-1')
+        new_chunk = (
+            struct.pack('>I', len(data))
+            + b'tEXt'
+            + data
+            + struct.pack('>I', zlib.crc32(b'tEXt' + data))
+        )
 
     out = bytearray(_PNG_SIG)
     pos = len(_PNG_SIG)
@@ -1056,7 +1076,7 @@ def _png_text_chunk_upsert(url: Path, key: str, text: str) -> bool:
         ctype = raw[pos + 4 : pos + 8]
         chunk = raw[pos : pos + 12 + length]
         pos += 12 + length
-        if ctype == b'tEXt' and chunk[8:].startswith(keyb + b'\x00'):
+        if ctype in (b'tEXt', b'iTXt', b'zTXt') and chunk[8:].startswith(keyb + b'\x00'):
             continue
         # before the first IDAT, so PIL surfaces the chunk on open() without a
         # full pixel load (post-IDAT text only appears after .load())
