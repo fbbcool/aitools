@@ -1,0 +1,36 @@
+{
+  "train_mmh3img": {
+    "common": {
+      "transformer": [
+        {
+          "repo_id": "Comfy-Org/MiniMax-H3-Image",
+          "file": "diffusion_models/minimax_h3_image_pruned_int8_convrot.safetensors",
+          "skip": false
+        }
+      ],
+      "vae": [
+        {
+          "repo_id": "Comfy-Org/MiniMax-H3-Image",
+          "file": "vae/minimax_h3_image_vae_fp16.safetensors",
+          "skip": false
+        }
+      ],
+      "text_encoder": [
+        {
+          "repo_id": "Comfy-Org/MiniMax-H3",
+          "file": "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+          "skip": false
+        }
+      ],
+      "lora": [
+        {
+          "repo_id": "ostris/minimax_h3_training_adapter",
+          "file": "minimax_h3_image_training_adapter_v1.safetensors",
+          "weight": 1.0,
+          "skip": false
+        }
+      ]
+    },
+    "gts-atomic": {}
+  }
+}

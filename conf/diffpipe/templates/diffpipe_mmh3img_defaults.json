@@ -1,0 +1,19 @@
+{
+  "epochs": 30,
+  "max_steps": "",
+  "micro_batch_size_per_gpu": 1,
+  "warmup_steps": 20,
+  "checkpoint_every_n_epochs": 1,
+  "caching_batch_size": 1,
+  "activation_checkpointing": true,
+  "blocks_to_swap": 48,
+  "compile": true,
+  "model___type": "minimax_h3_image",
+  "model___diffusion_model": "",
+  "model___vae": "",
+  "model___text_encoders_minimax": "",
+  "model___pdd_step_weights": "",
+  "adapter___rank": 16,
+  "adapter___frozen_loras": "",
+  "optimizer___lr": 1e-4
+}

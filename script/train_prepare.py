@@ -28,13 +28,13 @@ from trainer import Trainer
 # }
 
 # model = 'mmh3'
-model = 'moss'  # 'qwen' | 'krea2' | 'mmh3' | 'qwen21' (Qwen-Image 2.1, edit only: experiment 'qwen21-xlasm-add') | 'moss' (MOSS-Image)
+model = 'mmh3img'  # 'qwen' | 'krea2' | 'mmh3' | 'qwen21' (Qwen-Image 2.1, edit only: experiment 'qwen21-xlasm-add') | 'moss' (MOSS-Image) | 'mmh3img' (MiniMax-H3-Image T2I)
 base = None  # krea2: None = group train_krea2 (currently raw re0.75 fp8; snofs entries skip:true in models_train_krea2.json) | 're' = group train_krea2-re (raw re0.75 fp8, no variant groups)
 variant = 'gts-atomic'
 # gpu = '5090'
 # gpu = 'h100-nvl'
-# gpu = '6000'  # RTX PRO 6000 Blackwell, 96 GB
-gpu = '5090'
+# gpu = '5090'
+gpu = '6000'  # RTX PRO 6000 Blackwell, 96 GB
 trigger = 'xlasm'  # dataset-dict key (selects `datasets[trigger]`)
 # caption_trigger = '1alexandra'  # word prepended to every caption; None = triggerless
 caption_trigger = None
@@ -48,7 +48,8 @@ num_repeats = 1
 # experiment = None
 # experiment = 'mmh3-xlasm-s12'
 # experiment = 'mmh3-xlasm-v5'
-experiment = 'moss-xlasm-v5'
+# experiment = 'moss-xlasm-v5'
+experiment = 'mmh3img-xlasm-v5'
 
 # ──────────────────────────────────────────────────────
 gpu_config = {
@@ -85,6 +86,21 @@ gpu_config_mmh3 = {
         # 2026-10-19 xlasm @1024 b4: checkpointing on = 33 GB VRAM, 5.7 s/step; OFF = OOM (83 GB alloc + 8.6 frag).
         'activation_checkpointing': True,  # on-GPU checkpointing; 'unsloth' offloads to RAM (slower)
         'compile': True,
+    },
+}
+
+# mmh3img (MiniMax-H3-Image T2I): 5090 values from agent-lora's 4-img overfit on the local replica (2026-11-18:
+# 1024 px, r32, b1, blocks_to_swap 48, on-GPU checkpointing, compile -> 3.7 s/step, ~11 GB VRAM). Others untested.
+gpu_config_mmh3img = {
+    '5090': {
+        'micro_batch_size_per_gpu': 1,
+        'blocks_to_swap': 48,
+    },
+    # RTX PRO 6000 (96 GB): untested; mirrors the H3-video 6000 settings (33 GB @1024 b4 there).
+    # OOM back-off: micro-batch 2 -> blocks_to_swap 8/16/24 -> 'unsloth' checkpointing.
+    '6000': {
+        'micro_batch_size_per_gpu': 4,
+        'blocks_to_swap': 0,
     },
 }
 
@@ -279,6 +295,20 @@ config_trainer_mmh3_default = {
     'model___image_shift': 1,
 }
 
+# mmh3img (MiniMax-H3-Image T2I, diffpipe fork branch feature-h3image, models/minimax_h3_image.py). Trains only on
+# the checkpoint's 6 PDD sigmas (optional 'model___pdd_step_weights' list); no shift / timestep / cfg knobs. The ostris
+# image training adapter (models_train_mmh3img.json common lora, frozen, OFF at inference) is always bound.
+config_trainer_mmh3img_default = {
+    'epochs': 30,  # sentinel, manual cancel
+    **gpu_config_mmh3img.get(gpu, {}),
+    'warmup_steps': 20,
+    'save_every_n_epochs': 1,
+    'caching_batch_size': 1,
+    'steps_per_print': 10,
+    'adapter___rank': 16,
+    'optimizer___lr': 1e-4,
+}
+
 # qwen21 (Qwen-Image 2.1, diffpipe fork models/qwen_image21.py): EDIT training only (operator 2026-10-25: krea2 owns
 # T2I). Edit-pair HF sets (metadata `source` / `mask` / `instruction`) need Trainer(edit=True) -> experiment 'edit'.
 config_trainer_qwen21_edit = {
@@ -324,6 +354,9 @@ config_trainer = {
     },
     'mmh3': {
         'gts-atomic': config_trainer_mmh3_default,
+    },
+    'mmh3img': {
+        'gts-atomic': config_trainer_mmh3img_default,
     },
     'qwen21': {
         'edit': config_trainer_qwen21_edit,
@@ -630,6 +663,22 @@ experiments = {
         'config_trainer': {
             'checkpoint_every_n_epochs': 2,
             'checkpoint_every_n_minutes': '',
+        },
+    },
+    # mmh3img-xlasm-v5 (agent-lora, 2026-11-18): first MiniMax-H3-Image run, xlasm on the size-stripped v5 set. Mirrors
+    # mmh3-xlasm-v5 (H3-video run 3, keeper ep24 = first cue-free size on H3) for a direct comparison: r32, 2e-4, 5 repeats
+    # (750 views/epoch, 188 steps at b4 on the 6000). The H3-video LoRA transferred anatomy but NOT cue-free size to
+    # H3-Image -> native training. Trains only on the 6 PDD sigmas; ostris image adapter v1 frozen, OFF at inference.
+    # Keeper window: ~7K views ~ep10, H3-video peaked ~120 views/img (~ep24). Judge per epoch with the cue-free size
+    # grid at 2048^2 (6 st cfg1), not loss. 4-img overfit (1024, r32 2e-4) passed on the local replica.
+    'mmh3img-xlasm-v5': {
+        'variant': 'gts-atomic',
+        'trigger': 'xlasm-v5',
+        'num_repeats': 5,
+        'config_trainer': {
+            'adapter___rank': 32,
+            'optimizer___lr': 2e-4,
+            'checkpoint_every_n_epochs': 2,
         },
     },
 }
