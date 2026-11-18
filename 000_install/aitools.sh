@@ -165,7 +165,17 @@ ___train_install_trainer() {
   #yes | pip install git+https://github.com/huggingface/diffusers
   pip install -U "diffusers==0.35.*"
 }
+___tmux_conf() {
+  # mouse-wheel scrolling + long scrollback for the training tmux session. ~/.tmux.conf covers new tmux servers;
+  # `tmux set -g` also applies it to a server that is already running (the bootstrap starts tmux before train_install).
+  # history-limit only affects windows created afterwards. Mouse text selection: hold Shift.
+  grep -qs '^set -g mouse on' ~/.tmux.conf || printf 'set -g mouse on\nset -g history-limit 50000\n' >> ~/.tmux.conf
+  if command -v tmux >/dev/null && tmux info >/dev/null 2>&1; then
+    tmux set -g mouse on; tmux set -g history-limit 50000
+  fi
+}
 train_install() {
+  ___tmux_conf
   ___train_install_aitools
   ___train_install_trainer
 }
