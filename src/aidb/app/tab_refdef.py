@@ -225,6 +225,7 @@ VERBS: Final = (
     'inp-nomask',
     'sketch',
     'ref',
+    'ref-pika',  # t217: ref via mmh3-ref-pika (ref → mmh3-ref-eros)
     'pre-vid',
     'post-vid',
     'img-fsw-novis',
@@ -239,12 +240,12 @@ VERBS: Final = (
 CONTINUE_VERBS: Final = {'pre-vid': 'pre', 'post-vid': 'post'}
 # t213: verbs where a pixel-only slot 1 needs a role (nobody looks at it; was the
 # ref-novis rule, that verb is dropped — the slot mode replaces it)
-ROLE_ONLY_VERBS: Final = ('ref',)
+ROLE_ONLY_VERBS: Final = ('ref', 'ref-pika')
 # MiniMax H3 ref2va budget (FEATURE t181 plan v3): per kind 6 pictures / 2 clips /
 # 2 audio files, and at most 12 refs in total where a clip's soundtrack counts as
 # one more ref iff the ref carries ``audio: true``. Same rule as the enhancer's
 # refusal; checked before deploy (``ref_budget_problems``).
-H3_VERBS: Final = ('ref', 'pre-vid', 'post-vid')
+H3_VERBS: Final = ('ref', 'ref-pika', 'pre-vid', 'post-vid')
 H3_REF_CAP: Final = {'image': 6, 'video': 2, 'audio': 2}
 H3_REF_TOTAL: Final = 12
 # t190 frame pins (enhancer refdef.py PIN_RE / PIN_CONFLICT): an image slot whose
@@ -312,6 +313,7 @@ VERB_VIEW: Final = {
     'img-fsw-novis': 'inp',
     'inp-qfix': 'inp',
     'ref': 'ref',
+    'ref-pika': 'ref',
 }
 REF_LABEL: Final = {'image': 'picture', 'video': 'clip', 'audio': 'audio'}  # ref view
 STILL_VIEWS: Final = ('inp',)  # qwen21 still slots: images only

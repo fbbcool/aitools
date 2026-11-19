@@ -770,7 +770,7 @@ def test_update_task162_ref_and_inp_sections():
     p = _iteration(prompts_ref=_ref_section(ref_refs), prompts_inp=_inp())
     text = json.dumps(p)
     slots = [_slot('/r/clip.mkv'), _slot('/r/new.png')]
-    for verb in ('ref',):
+    for verb in ('ref', 'ref-pika'):  # t217: ref-pika owns the ref view too
         out, view, changed, skipped = update_payload(text, slots, 'inp', verb)
         assert view == 'ref' and changed == ['prompts_ref.refs[1]'] and not skipped
         assert out['prompts_ref']['prompt_data'][0]['refs'][1]['url'] == '/r/new.png'
@@ -1115,7 +1115,7 @@ def test_h3_ref_budget():
 
     pics = [f'/p{i}.png' for i in range(1, 7)]
     full = sl(*pics, '/v1.mp4', '/v2.mp4', '/a1.wav', '/a2.wav', audio=('/v1.mp4', '/v2.mp4'))
-    for verb in ('ref', 'pre-vid', 'post-vid'):
+    for verb in ('ref', 'ref-pika', 'pre-vid', 'post-vid'):
         assert ref_budget_problems(full, verb) == []  # exactly 12
     assert ref_budget_problems(sl(*pics[:4]), 'ref') == []
     assert ref_budget_problems(sl(*pics, '/p7.png'), 'ref') == ['max 6 pictures, got 7']
@@ -1798,3 +1798,35 @@ def test_ref_novis_migration_t213():
     # use: pixel roundtrips
     p2 = refdef_payload(_vslots('/a/x.png', pixel=(1,)), 'ref', 'hint', '')
     assert parse_payload(json.dumps(p2))['slots'][0].get('pixel') is True
+
+
+# -- ref-pika verb (FEATURE t217): same UI / payload / guards as ref ------------- #
+def test_ref_pika_verb():
+    from aidb.app.tab_refdef import (
+        H3_VERBS,
+        ROLE_ONLY_VERBS,
+        VERB_VIEW,
+        VERBS,
+        missing_roles,
+        pin_of,
+        ref_budget_problems,
+    )
+
+    assert VERBS[VERBS.index('ref') + 1] == 'ref-pika'
+    assert 'ref-pika' in ROLE_ONLY_VERBS and 'ref-pika' in H3_VERBS
+    assert VERB_VIEW['ref-pika'] == 'ref'
+    slots = [
+        {'url': '/a.png', 'id': 'i1', 'role': 'woman'},
+        {'url': '/b.png', 'id': None, 'role': 'beach'},
+        {'url': None, 'id': None, 'role': ''},
+    ]
+    ref = refdef_payload(slots, 'ref', 'hint', 'walks into the sea')
+    pika = refdef_payload(slots, 'ref-pika', 'hint', 'walks into the sea')
+    assert pika['verb'] == 'ref-pika' and {**pika, 'verb': 'ref'} == ref  # only the verb differs
+    st = parse_payload(json.dumps(pika))
+    assert st is not None and st['verb'] == 'ref-pika'
+    s1 = {'url': '/a.png', 'id': None, 'role': ' ', 'pixel': True}
+    assert missing_roles([s1], 'ref-pika') == missing_roles([s1], 'ref') == [1]
+    pics = [f'/p{i}.png' for i in range(1, 8)]
+    assert ref_budget_problems(_cslots(*pics), 'ref-pika') == ['max 6 pictures, got 7']
+    assert pin_of({'url': '/p.png', 'role': 'first frame'}, 'ref-pika') == 'first'
