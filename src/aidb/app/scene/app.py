@@ -55,6 +55,9 @@ class AIDBSceneApp:
         from aidb.app.tab_metadata import MetadataTab
         self._metadata_tab = MetadataTab()
 
+        from aidb.app.tab_avatar import AvatarTab
+        self._avatar_tab = AvatarTab(self._dbc)
+
         self._interface = self._create_interface()
 
     # head HTML injected into the page <head> so the penis-mask annotator's
@@ -67,7 +70,11 @@ class AIDBSceneApp:
         from aidb.app.tab_hf_datasets import HF_DATASETS_HEAD
         from aidb.app.tab_refdef import REFDEF_HEAD
         from aidb.app.tab_metadata import METADATA_HEAD
-        return PENIS_MASK_HEAD + REVIEW_HEAD + HF_DATASETS_HEAD + REFDEF_HEAD + METADATA_HEAD
+        from aidb.app.tab_avatar import AVATAR_HEAD
+        return (
+            PENIS_MASK_HEAD + REVIEW_HEAD + HF_DATASETS_HEAD + REFDEF_HEAD + METADATA_HEAD
+            + AVATAR_HEAD
+        )
 
     def _create_interface(self):
         """
@@ -559,6 +566,10 @@ class AIDBSceneApp:
             # metadata tab (board task 214): pull a media path, show all embedded
             # metadata readable, linked media as preview cards.
             self._metadata_tab.build()
+
+            # avatar tab (board FEATURE t218): avatars collection — metadata,
+            # media copies + roles, ⟲ pull / ⇪ deploy url list for refdef.
+            self._avatar_tab.build()
 
             # Link hidden triggers to functions
             button_hidden_cmd.click(

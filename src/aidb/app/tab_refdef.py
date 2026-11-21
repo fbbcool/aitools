@@ -205,7 +205,12 @@ from ait.tools.videos import (
 )
 from ait.tools.videos import metadata as vid_metadata
 from ait.tools.images import metadata as img_metadata
-from ait.tools.role import descr as role_descr, role as file_role
+from ait.tools.role import (
+    descr as role_descr,
+    role as file_role,
+    role_set as file_role_set,
+    supported as role_supported,
+)
 from aidb.scene.scene_common import SceneDef
 from aidb.scene.scene_image_manager import SceneImageManager
 from aidb.scene.scene_manager import SceneManager
@@ -228,6 +233,8 @@ VERBS: Final = (
     'ref-pika',  # t217: ref via mmh3-ref-pika (ref → mmh3-ref-eros)
     'pre-vid',
     'post-vid',
+    'pre-vid-pika',  # t219: pre-vid via the Pika chain workflow
+    'post-vid-pika',  # t219: post-vid via the Pika chain workflow
     'img-fsw-novis',
     'inp-qfix',
     'ref-img',
@@ -237,7 +244,12 @@ VERBS: Final = (
 # H3 clip-chain continuations (board task 172): slot 1 = the anchor clip
 # (FbbcoolSaveVideo master, video only), the other slots optional NEW refs
 # (images / audio / clips = cut-to shots, t191); the enhancer writes prompts_ref[].continue = {dir, url, pin}
-CONTINUE_VERBS: Final = {'pre-vid': 'pre', 'post-vid': 'post'}
+CONTINUE_VERBS: Final = {
+    'pre-vid': 'pre',
+    'post-vid': 'post',
+    'pre-vid-pika': 'pre',  # t219
+    'post-vid-pika': 'post',
+}
 # t213: verbs where a pixel-only slot 1 needs a role (nobody looks at it; was the
 # ref-novis rule, that verb is dropped — the slot mode replaces it)
 ROLE_ONLY_VERBS: Final = ('ref', 'ref-pika')
@@ -245,7 +257,7 @@ ROLE_ONLY_VERBS: Final = ('ref', 'ref-pika')
 # 2 audio files, and at most 12 refs in total where a clip's soundtrack counts as
 # one more ref iff the ref carries ``audio: true``. Same rule as the enhancer's
 # refusal; checked before deploy (``ref_budget_problems``).
-H3_VERBS: Final = ('ref', 'ref-pika', 'pre-vid', 'post-vid')
+H3_VERBS: Final = ('ref', 'ref-pika', 'pre-vid', 'post-vid', 'pre-vid-pika', 'post-vid-pika')
 H3_REF_CAP: Final = {'image': 6, 'video': 2, 'audio': 2}
 H3_REF_TOTAL: Final = 12
 # t190 frame pins (enhancer refdef.py PIN_RE / PIN_CONFLICT): an image slot whose
@@ -254,6 +266,8 @@ PIN_RE: Final = re.compile(r'^\s*(first|last)[\s_-]*frame\b', re.I)
 PIN_CONFLICT: Final = {
     'post-vid': ('first', "post-vid already pins the anchor's tail at frame 0"),
     'pre-vid': ('last', "pre-vid already pins the anchor's head at the end"),
+    'post-vid-pika': ('first', "post-vid-pika already pins the anchor's tail at frame 0"),
+    'pre-vid-pika': ('last', "pre-vid-pika already pins the anchor's head at the end"),
 }
 # qwen21 head swap (agent-comfy workflows/qwen21-headswap.json, BFS head LoRA): slot 1 =
 # target (body / pose / light / bg = <image1>), slot 2 = reference head (<image2>), both
@@ -410,7 +424,16 @@ LEGACY_NOVIS: Final = {'ref-novis': 'ref'}  # t213: dropped verb → its verb + 
 VIS_MEDIA: Final = ('image', 'video')  # audio has no pixels
 VISION_LOCK_SLOT1: Final = ('inp-mask', 'inp-nomask', 'pickup')  # + swap / continue verbs
 # t213: slot 1 the enhancer must look at → no pixel only there (+ every sketch slot)
-PIXEL_LOCK_SLOT1: Final = ('enh', 'replicate', 'pickup', 'pre-vid', 'post-vid', 'inp-mask')
+PIXEL_LOCK_SLOT1: Final = (
+    'enh',
+    'replicate',
+    'pickup',
+    'pre-vid',
+    'post-vid',
+    'pre-vid-pika',
+    'post-vid-pika',
+    'inp-mask',
+)
 # load outputs + status: state, idx, raw, 3×slot, kind, verb, text, source, entry,
 # view, vision, status
 N_LOAD_OUT: Final = 3 + 3 * N_SLOTS + 8
@@ -3014,6 +3037,31 @@ class RefdefTab:
         img = self._preview(url, self._payload_mask(state, i, url), mask_on[i])
         return img, f'slot {i + 1}: mask removed'
 
+    def _on_role_write(self, i: int, ref: str | None, role: str | None) -> str:
+        """💾 slot ``i``'s role → the slot file's embedded role (t220, t215 format).
+        '#' lines are dropped (t211); an empty role is refused, never removes the
+        file's role (that is the metadata tab's 🗑). Returns the status line."""
+        url, _ = self.resolve_ref(ref)
+        text = strip_role_comments(role)
+        msg = ''
+        if not url:
+            msg = f'slot {i + 1}: empty'
+        elif not text:
+            msg = f'slot {i + 1}: role empty'
+        elif url.startswith(('http://', 'https://')) or not role_supported(url):
+            msg = f'slot {i + 1}: role unsupported for {Path(url).suffix or "this file"}'
+        if msg:
+            gr.Info(msg, duration=1.5)
+            return msg
+        try:
+            file_role_set(url, {'descr': text})
+        except Exception as e:  # noqa: BLE001 - report, never break the tab
+            self._log(f'role write {url} failed: {e}', 'error')
+            gr.Warning(f'slot {i + 1}: role write failed: {e}')
+            return f'slot {i + 1}: role write failed: {e}'
+        gr.Info(f'slot {i + 1}: role saved', duration=1)
+        return f'slot {i + 1}: role saved → {Path(url).name}'
+
     def build(self) -> None:
         with gr.Tab('refdef', elem_id='refdef_tab'):
             state = gr.State(None)  # parse_payload() result of a loaded save / deploy-history entry
@@ -3090,7 +3138,7 @@ class RefdefTab:
             # input is the clipspace only: images are display-only, the slot
             # ref (img id or url) rides in a per-slot State
             imgs, refs, roles, slot_pulls, clears = [], [], [], [], []
-            mask_tgls, mask_clrs = [], []
+            mask_tgls, mask_clrs, role_wrs = [], [], []
             mask_on = gr.State([True] * N_SLOTS)  # per-slot masking switch (🟥/⬜)
             slot_on = gr.State([True] * N_SLOTS)  # per-slot enable switch (✅/🚫)
             slot_tgls = []
@@ -3127,6 +3175,9 @@ class RefdefTab:
                     clears.append(gr.Button('✕', scale=0, min_width=40))
                     mask_tgls.append(gr.Button(MASK_ICON_ON, scale=0, min_width=40))
                     mask_clrs.append(gr.Button('🧽', scale=0, min_width=40))
+                    role_wrs.append(
+                        gr.Button('💾', scale=0, min_width=40, elem_classes=['refdef-role-write'])
+                    )
                 # slot 1: double height, fixed (scrollbar on overflow)
                 n_lines = ROLE_LINES * 2 if i == 0 else ROLE_LINES
                 roles.append(
@@ -3423,6 +3474,13 @@ class RefdefTab:
                     [mask_on, state, refs[i]],
                     [imgs[i], status],
                 )
+            for i, wr in enumerate(role_wrs):
+                wr.click(
+                    lambda r, t, i=i: self._on_role_write(i, r, t),
+                    [refs[i], roles[i]],
+                    [status],
+                    show_progress='hidden',
+                )
             for i, img in enumerate(imgs):
                 img.select(
                     lambda r, i=i: self._on_mask_open(i, r),
@@ -3565,6 +3623,12 @@ REFDEF_HEAD = r"""
 #refdef-mask-full.refdef-mask-off { visibility: hidden; pointer-events: none; }
 </style>
 <script>
+// t220: hover tip on the per-slot 💾 (gr.Button has no title param)
+new MutationObserver(() => {
+  document.querySelectorAll('.refdef-role-write').forEach(b => {
+    if (!b.title) b.title = 'write role to file';
+  });
+}).observe(document.documentElement, {childList: true, subtree: true});
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const box = document.getElementById('refdef-mask-full');

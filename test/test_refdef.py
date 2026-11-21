@@ -1830,3 +1830,79 @@ def test_ref_pika_verb():
     pics = [f'/p{i}.png' for i in range(1, 8)]
     assert ref_budget_problems(_cslots(*pics), 'ref-pika') == ['max 6 pictures, got 7']
     assert pin_of({'url': '/p.png', 'role': 'first frame'}, 'ref-pika') == 'first'
+
+
+# -- chain pika verbs (FEATURE t219): same UI / payload / guards as pre-/post-vid -- #
+def test_chain_pika_verbs():
+    from aidb.app.tab_refdef import (
+        CONTINUE_VERBS,
+        H3_VERBS,
+        PIN_CONFLICT,
+        ROLE_ONLY_VERBS,
+        VERB_VIEW,
+        VERBS,
+        continue_problems,
+        pin_problems,
+        pixel_locked,
+        vision_locked,
+    )
+
+    i = VERBS.index('post-vid')
+    assert VERBS[i + 1 : i + 3] == ('pre-vid-pika', 'post-vid-pika')
+    for base in ('pre-vid', 'post-vid'):
+        v = f'{base}-pika'
+        assert CONTINUE_VERBS[v] == CONTINUE_VERBS[base] and v in H3_VERBS
+        assert PIN_CONFLICT[v][0] == PIN_CONFLICT[base][0]
+        assert v not in ROLE_ONLY_VERBS and v not in VERB_VIEW
+        assert pixel_locked(0, v) and vision_locked(0, v) and not pixel_locked(1, v)
+        slots = _cslots('/a.mkv', '/cut.mp4', '/p.png')
+        assert continue_problems(slots, v) == continue_problems(slots, base)
+        p = refdef_payload(slots, v, 'hint', 'go')
+        assert p['verb'] == v and {**p, 'verb': base} == refdef_payload(slots, base, 'hint', 'go')
+    assert pin_problems(_cslots('/a.mkv', ('/p.png', 'first frame')), 'post-vid-pika') == [
+        "slot 2 pins the first frame — post-vid-pika already pins the anchor's tail at frame 0"
+    ]
+    assert pin_problems(_cslots('/a.mkv', ('/p.png', 'first frame')), 'pre-vid-pika') == []
+
+
+# -- slot 💾 role write (FEATURE t220): slot role → the file's embedded role -------- #
+def test_slot_role_write(monkeypatch, tmp_path):
+    import subprocess
+
+    from PIL import Image as PILImage
+
+    from ait.tools import role as R
+    from aidb.app import tab_refdef
+
+    toasts = []
+    for kind in ('Warning', 'Info'):
+        monkeypatch.setattr(
+            tab_refdef.gr, kind, lambda m, duration=None, k=kind: toasts.append((k, m))
+        )
+    tab = tab_refdef.RefdefTab.__new__(tab_refdef.RefdefTab)
+    tab._verbose = 0
+    monkeypatch.setattr(tab, '_id_from_path', lambda p: None)
+    png = tmp_path / 'a.png'
+    PILImage.new('RGB', (8, 8), 'red').save(png)
+    mp4 = tmp_path / 'c.mp4'
+    subprocess.run(
+        ['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=d=0.2:s=32x32',
+         '-c:v', 'mpeg4', str(mp4)],
+        check=True, capture_output=True,
+    )  # fmt: skip
+    # png: '#' lines dropped, the rest stored as descr
+    assert tab._on_role_write(1, str(png), '# note\nface ref') == 'slot 2: role saved → a.png'
+    assert R.descr(R.role(png)) == 'face ref' and toasts[-1] == ('Info', 'slot 2: role saved')
+    assert tab._on_role_write(0, str(mp4), 'intro clip') == 'slot 1: role saved → c.mp4'
+    assert R.descr(R.role(mp4)) == 'intro clip'
+    # empty (or comment-only) role refuses — the file's role is kept
+    assert tab._on_role_write(1, str(png), '  # only a comment') == 'slot 2: role empty'
+    assert R.descr(R.role(png)) == 'face ref'
+    # empty slot / unsupported formats
+    assert tab._on_role_write(2, '', 'x') == 'slot 3: empty'
+    jpg = tmp_path / 'b.jpg'
+    PILImage.new('RGB', (8, 8), 'red').save(jpg)
+    before = jpg.read_bytes()
+    assert tab._on_role_write(2, str(jpg), 'x') == 'slot 3: role unsupported for .jpg'
+    assert jpg.read_bytes() == before
+    assert tab._on_role_write(2, 'https://h/x.png', 'x') == 'slot 3: role unsupported for .png'
